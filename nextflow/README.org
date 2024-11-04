@@ -1,4 +1,15 @@
-* Workflow overview
+* Workflows
+# All workflows expect an input csv file with
+** scRNA-seq
 Standard scRNA-seq raw data processing worfklow
 + QC:
 + Mapping
+** WES
+Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.4.4/
+*** Input
+csv file with three fields: patient,fastq_1,fastq_2
+*** Steps
++ QC
+  * Read trimming
++ Read mapping
++

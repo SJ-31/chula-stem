@@ -1,5 +1,6 @@
 /target
 .github
+output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -71,3 +72,7 @@ docs/_build/
 
 # Pyenv
 .python-version
+nextflow/.nextflow*
+nextflow/input
+nextflow/runs
+nextflow/.nf-test
