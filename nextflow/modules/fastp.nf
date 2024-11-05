@@ -1,4 +1,5 @@
 process FASTP {
+    // Version 0.23.4
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
@@ -15,8 +16,8 @@ process FASTP {
     //
 
     script:
-    output1 = "${reads[0].baseName}.fastp.fastq.gz"
-    output2 = "${reads[1].baseName}.fastp.fastq.gz"
+    output1 = "${module_number}-${reads[0].baseName}.fastp.fastq.gz"
+    output2 = "${module_number}-${reads[1].baseName}.fastp.fastq.gz"
     """
     fastp -i ${reads[0]} -I ${reads[1]} \
         -z 4 \
