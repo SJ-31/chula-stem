@@ -1,0 +1,2 @@
+* Exome CRC
+Sequencing platform: NovaSeq 6000

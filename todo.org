@@ -1,1 +1,5 @@
 * Inbox
+** TODO [#A] Recreate variant-calling pipeline for WES data
+CREATED: [2024-11-04 Mon]
+Pipeline should process patient files, with the final output being a report
++ Should determine mutation frequency in genes known to be cancer markers and have high predictive value
