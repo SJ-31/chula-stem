@@ -74,5 +74,4 @@ docs/_build/
 .python-version
 nextflow/.nextflow*
 nextflow/input
-nextflow/runs
 nextflow/.nf-test
