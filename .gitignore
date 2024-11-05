@@ -75,3 +75,4 @@ docs/_build/
 nextflow/.nextflow*
 nextflow/input
 nextflow/.nf-test
+nextflow/work
