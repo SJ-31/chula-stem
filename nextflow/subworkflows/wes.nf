@@ -9,6 +9,7 @@ workflow "whole_exome" {
                       [it.fastq_1, it.fastq_2]] }
         .set { input }
 
-    FASTP(input, "${params.outdir}/fastp/, params.logdir)
+   input.view()
+   // FASTP(input, "${params.outdir}/fastp/", params.logdir)
 
 }
