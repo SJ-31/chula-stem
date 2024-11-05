@@ -5,11 +5,21 @@ Standard scRNA-seq raw data processing worfklow
 + QC:
 + Mapping
 ** WES
-Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.4.4/
+Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.4.4/ and GATK best practices
 *** Input
-csv file with three fields: patient,fastq_1,fastq_2
++ A csv file with four fields
+  * =patient= Patient id, which should be present twice, one for the tumor and another for the normal sample
+  * =fastq_1= path to raw reads
+  * =fastq_2=
+  * =source=  [tumor|normal]
 *** Steps
-+ QC
-  * Read trimming
-+ Read mapping
-+
+**** QC
+=fastp= with the following routines
+- Quality filtering
+- Length filtering
+- Base correction
+- polyG tail trimming: is performed if reads are detected to NextSeq/NovaSeq
+**** Read mapping to reference
+=bwa=
+**** Marking duplicates
+**** Base Quality Score Recalibration

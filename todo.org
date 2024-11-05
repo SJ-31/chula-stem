@@ -1,4 +1,16 @@
 * Inbox
+** TODO [#C] Variant filtering consideration
+CREATED: [2024-11-05 Tue]
+Check to see if any programs you use to filter variants attempt to compare the wild-type vs tumor samples
+** TODO [#B] Have a look at benchmarking the WES variant calling
+CREATED: [2024-11-05 Tue]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Read mapping to reference][Read mapping to reference]]
+See Genome in a Bottle, Platinum Genome, Syndip and see "Best practices for benchmarking germline small-variant calls in human genomes" for help with interpreting the data
+** TODO [#A] Need a tool for getting sequencing metrics and BAM QC
+CREATED: [2024-11-05 Tue]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Read mapping to reference][Read mapping to reference]]
+See BEDTools, Picard tools, QualiMap 2 for sequencing metrics
+See KING and VerifyBAMID for QC
 ** TODO [#A] Recreate variant-calling pipeline for WES data
 CREATED: [2024-11-04 Mon]
 Pipeline should process patient files, with the final output being a report
