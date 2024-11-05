@@ -8,7 +8,7 @@ process FASTP {
     //
 
     output:
-    tuple val(meta), path("*fastp.fastq.gz"), emit: out
+    tuple val(meta), path("*fastp.fastq.gz"), emit: passed
     path("*fail.fastq.gz"), optional: true, emit: failed_reads
     path("*.html")
     path("*.json")
