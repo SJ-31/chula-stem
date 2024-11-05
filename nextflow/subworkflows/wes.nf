@@ -1,3 +1,5 @@
+include { FASTP } from "../modules/fastp.nf"
+
 workflow "whole_exome" {
 
     main:
@@ -6,7 +8,6 @@ workflow "whole_exome" {
         .map { it -> [it.patient, [it.fastq_1, it.fastq_2]] }
         .set { input }
 
-    println params.name
-    input.view()
+    FASTP(input, "${params.outdir}/fastp/, params.logdir)
 
 }
