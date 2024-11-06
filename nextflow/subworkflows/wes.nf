@@ -22,6 +22,7 @@ workflow "whole_exome" {
     MARK_DUPLICATES(BWA.out.mapped, references.genome, 3)
     BQSR(MARK_DUPLICATES.out.dedup, references.genome, references.known_variants, 4)
 
+
      // TODO: after preprocessing, branch data into tumor and normal
      // then to pair up tumour-normal samples
      s1 = [["id": 1, "type": "tumor", "out": "foo", "log": "foo"], "bar"]
