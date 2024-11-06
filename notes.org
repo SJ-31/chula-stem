@@ -1,0 +1,13 @@
+* Unsorted notes
+** Fusion detection tools for RNA-seq :PROCEDURE:
+CREATED: [2024-11-06 Wed]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Steps][Steps]]
+[cite:@cortes-cirianoComputationalAnalysisCancer2022] mention Arriba218, TopHat-Fusion219,  STAR-Fusion220 and deFuse221 follow this strategy.  Other methods, such as TrinityFusion220, CICERO222  and JAFFA-Assembly223 perform de novo assembly of sequencing reads to identify chimeric fusions
+Again, they recommend using multiple callers (because results tend to be variable)
+** RNA-seq aligners :PROCEDURE:
+CREATED: [2024-11-06 Wed]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*RNA-seq uncategorized][RNA-seq uncategorized]]
+[cite:@cortes-cirianoComputationalAnalysisCancer2022] suggest to use STAR and HISAT for aligning RNA-sq data
+# Local Variables:
+# citar-prev-references: ("cortes-cirianoComputationalAnalysisCancer2022")
+# End:
