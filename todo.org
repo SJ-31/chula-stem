@@ -1,12 +1,25 @@
 * Inbox
+** TODO [#C] Download the dbVar data
+DEADLINE: <2024-11-07 Thu>
+CREATED: [2024-11-06 Wed]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Reference data][Reference data]]
+** TODO [#C] Make sure adding the source tag in the INFO field works
+CREATED: [2024-11-06 Wed]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/modules/mutect2.nf::bcftools annotate temp.vcf.gz]]
 ** TODO [#A] Find variants to use for bqsr
 CREATED: [2024-11-05 Tue]
 Maybe dbSNP
-Or check https://www.cancer.gov/ccg/access-data
+Or check http   s://www.cancer.gov/ccg/access-data
 Possibly GATK's resource bundles
 Could also ask Aj
 
-Having a panel of normals would also be useful for some of the variant callers
++ But you shouldn't be using somatic variants with normal samples, so current plan is as follows:
+  * For normal samples, run bqsr with germline variants e.g. dbSNP + dbVar
+    * But we may have Thai genomes project
+  * For tumor samples run bqsr with the same thing as the normals, but with added somatic variants e.g. COSMIC
+    * Or should you run exclusively on the somatic variants? Nope, the thing above is correct
+
+Having a panel of normals would also be useful for some of the variant callers. Can get from thai genomes
 ** TODO [#C] Variant filtering consideration
 CREATED: [2024-11-05 Tue]
 Check to see if any programs you use to filter variants attempt to compare the wild-type vs tumor samples
