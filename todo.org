@@ -1,4 +1,10 @@
 * Inbox
+** TODO [#A] Find variants to use for bqsr
+CREATED: [2024-11-05 Tue]
+Maybe dbSNP
+Or check https://www.cancer.gov/ccg/access-data
+Possibly GATK's resource bundles
+Could also ask Aj
 ** TODO [#C] Variant filtering consideration
 CREATED: [2024-11-05 Tue]
 Check to see if any programs you use to filter variants attempt to compare the wild-type vs tumor samples

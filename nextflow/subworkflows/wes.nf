@@ -1,8 +1,12 @@
+import groovy.toml.TomlSlurper
+
 include { FASTP } from "../modules/fastp.nf"
+include { BWA } from "../modules/bwa.nf"
 
 workflow "whole_exome" {
 
     main:
+    references = new TomlSlurper().parse(file(params.references))
     input = Channel.fromPath(params.input)
         .splitCsv(header: true)
         .map { it -> [["id": it.patient,
@@ -11,7 +15,8 @@ workflow "whole_exome" {
                 "log": "${params.logdir}/${it.patient}_${it.source}",
             ], [file(it.fastq_1), file(it.fastq_2)]] }
 
-   // FASTP(input, 1)
+   FASTP(input, 1)
+   BWA(FASTP.out.passed, references.genome, 2)
 
 
     // TODO: after preprocessing, branch data into tumor and normal
@@ -30,6 +35,5 @@ workflow "whole_exome" {
                                          it[1]] }
     normal = branched.normal.map { it -> [it[0].id, it[1]] }
     paired = tumors.join(normal).map { it -> [it[1], it[2], it[3]] }
-    paired.view()
 
 }

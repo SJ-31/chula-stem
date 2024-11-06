@@ -13,13 +13,12 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * =fastq_2=
   * =source=  [tumor|normal]
 *** Steps
-**** QC
-=fastp= with the following routines
-- Quality filtering
-- Length filtering
-- Base correction
-- polyG tail trimming: is performed if reads are detected to NextSeq/NovaSeq
-**** Read mapping to reference
-=bwa=
-**** Marking duplicates
-**** Base Quality Score Recalibration
++ QC: =fastp= with the following routines
+  * Quality filtering
+  * Length filtering
+  * Base correction
+  * polyG tail trimming: is performed if reads are detected to NextSeq/NovaSeq
++ Read mapping to reference: =bwa=
++ Marking duplicates: GATK's =MarkDuplicatesSpark=
++ Base Quality Score Recalibration
++ Variant calling
