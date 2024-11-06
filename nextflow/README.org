@@ -12,6 +12,12 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * =fastq_1= path to raw reads
   * =fastq_2=
   * =source=  [tumor|normal]
+**** Reference data
++ Genome:
++ Known variants (for BQSR)
+  * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]]
+  * [[https://www.ncbi.nlm.nih.gov/dbvar/content/human_hub/][dbVar]] But these are in csv format
+    * [[https://www.ncbi.nlm.nih.gov/dbvar/studies/nstd102/#variantTab][Clinical structural Variants]],
 *** Steps
 + QC: =fastp= with the following routines
   * Quality filtering

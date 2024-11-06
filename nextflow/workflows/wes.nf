@@ -9,6 +9,8 @@ workflow "whole_exome" {
 
      main:
      references = new TomlSlurper().parse(file(params.references))
+     known_variants = ["cancer": references.known_variants_cancer,
+                       "normal": references.known_variants_normal]
      input = Channel.fromPath(params.input)
          .splitCsv(header: true)
          .map { it -> [["id": it.patient,
@@ -20,7 +22,11 @@ workflow "whole_exome" {
     FASTP(input, 1)
     BWA(FASTP.out.passed, references.genome, 2)
     MARK_DUPLICATES(BWA.out.mapped, references.genome, 3)
-    BQSR(MARK_DUPLICATES.out.dedup, references.genome, references.known_variants, 4)
+
+    // TODO: fix this when you have the known variants downloaded
+    // BQSR(MARK_DUPLICATES.out.dedup, references.genome,
+    //      references.known_variants_normal,
+    //      references.known_variants_cancer, 4)
 
      // TODO: after preprocessing, branch data into tumor and normal
      // then to pair up tumour-normal samples
@@ -37,6 +43,7 @@ workflow "whole_exome" {
                                           "log": "${params.logdir}/${it[0].id}_paired"],
                                           it[1]] }
      normal = branched.normal.map { it -> [it[0].id, it[1]] }
-     paired = tumors.join(normal).map { it -> [it[1], it[2], it[3]] }
+     paired = tumors.join(normal).map { it -> [it[1], it[2], it[3]] } // To remove the id
+    // Channel is now [meta, tumor, normal]
 
 }
