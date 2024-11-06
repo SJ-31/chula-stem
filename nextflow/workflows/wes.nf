@@ -9,8 +9,6 @@ workflow "whole_exome" {
 
      main:
      references = new TomlSlurper().parse(file(params.references))
-     known_variants = ["cancer": references.known_variants_cancer,
-                       "normal": references.known_variants_normal]
      input = Channel.fromPath(params.input)
          .splitCsv(header: true)
          .map { it -> [["id": it.patient,
@@ -24,9 +22,7 @@ workflow "whole_exome" {
     MARK_DUPLICATES(BWA.out.mapped, references.genome, 3)
 
     // TODO: fix this when you have the known variants downloaded
-    // BQSR(MARK_DUPLICATES.out.dedup, references.genome,
-    //      references.known_variants_normal,
-    //      references.known_variants_cancer, 4)
+    // BQSR(MARK_DUPLICATES.out.dedup, references.genome, references.known_variants, 4)
 
      // TODO: after preprocessing, branch data into tumor and normal
      // then to pair up tumour-normal samples

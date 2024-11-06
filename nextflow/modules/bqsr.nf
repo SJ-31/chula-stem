@@ -4,8 +4,7 @@ process BQSR {
     input:
     tuple val(meta), path(bam)
     val(reference)
-    val(normal_variants) // Map containing known sites
-    val(cancer_variants)
+    val(known_sites) // Array containing known sites
     val(module_number)
 
     output:
@@ -15,8 +14,7 @@ process BQSR {
     script:
     recal = "${module_number}-${meta.id}_recal.bam"
     report = "${module_number}-${meta.id}_AnalyzeCovariates.pdf"
-    def specific_sites = cancer_variants ? meta.type == "cancer" : normal_variants
-    def sites_command = specific_sites.collect{"--known-sites $it"}.join(' ')
+    def sites_command = known_sites.collect{"--known-sites $it"}.join(' ')
     def check = file("${meta.out}/$recal")
     def check2 = file("${meta.out}/$report")
     if (check.exists() && check2.exists()) {
