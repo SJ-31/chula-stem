@@ -1,4 +1,4 @@
-include { whole_exome } from "./subworkflows/wes"
+include { whole_exome } from "./workflows/wes"
 
 workflow {
     switch(params.routine) {
