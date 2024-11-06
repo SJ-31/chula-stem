@@ -11,12 +11,22 @@ process MARK_DUPLICATES {
     tuple val(meta), path("${meta.id}_dedup_metrics.txt"), emit: qc
 
     script:
-    """
-    gatk MarkDuplicatesSpark \
-        -I $aligned \
-        -M ${meta.id}_dedup_metrics.txt \
-        -O "${module_number}-${meta.id}_dedup.bam"
+    out = "${module_number}-${meta.id}_dedup.bam"
+    def check = file("${meta.out}/${out}")
+    if (check.exists()) {
+        """
+        cp $check.name .
+        cp ${meta.log}/dedup.log .
+        """
+    } else {
+        """
+        gatk MarkDuplicatesSpark \
+            -I $aligned \
+            -M ${meta.id}_dedup_metrics.txt \
+            -O
 
-    cp .command.out dedup.log
-    """
+        cp .command.out dedup.log
+        """
+    }
+
 }

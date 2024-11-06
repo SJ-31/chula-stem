@@ -15,16 +15,25 @@ process BWA {
     //
 
     script:
-    out = "${module_number}-${meta.id}.sam"
-    """
-    bwa-mem2 index $reference
-    bwa-mem2 mem \
-        -o $out \
-        -v 3 \
-        $reference \
-        ${reads[0]} ${reads[1]}
+    out = "${module_number}-${meta.id}.bam"
+    def check = file("${meta.out}/$out")
+    if (check.exists()) {
+        """
+        cp $check.name .
+        cp "${meta.log}/bwa.log" .
+        """
+    } else {
+        """
+        bwa-mem2 index $reference
+        bwa-mem2 mem \
+            -o aligned.sam \
+            -v 3 \
+            $reference \
+            ${reads[0]} ${reads[1]}
 
-    cp .command.out bwa.log
-    """
+        samtools view -S -b aligned.sam > $out
+        cp .command.out bwa.log
+        """
+    }
     //
 }
