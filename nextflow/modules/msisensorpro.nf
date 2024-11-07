@@ -5,8 +5,8 @@ process MSISENSORPRO {
 
     input:
     tuple val(meta), path(tumor), path(normal)
-    val(reference) // A homopolymers and microsatellites file, generated
-    // with msisensor-pro scan of the reference genome
+    val(reference) // A homopolymers and microsatellites tsv file, generated
+    // with msisensor-pro scan -d <reference genome> -o <tsv>
     val(module_number)
     //
 
@@ -18,7 +18,7 @@ process MSISENSORPRO {
     script:
     out = "${module_number}-${meta.id}_Msisensor.vcf.gz" // TODO: you don't know what
     // the output of this is yet
-    def check = file("${meta.out}/${out}")
+    check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         cp ${check.name} .

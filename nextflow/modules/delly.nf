@@ -18,7 +18,7 @@ process DELLY {
     script:
     out = "${module_number}-${meta.id}_Delly.bcf.gz" // TODO: you don't know what
     // the output of this is yet
-    def check = file("${meta.out}/${out}")
+    check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         cp ${check.name} .

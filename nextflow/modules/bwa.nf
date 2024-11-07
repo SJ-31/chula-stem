@@ -3,6 +3,7 @@ process BWA {
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
+
     input:
     tuple val(meta), val(reads)
     val(reference)
@@ -16,7 +17,7 @@ process BWA {
 
     script:
     out = "${module_number}-${meta.id}.bam"
-    def check = file("${meta.out}/$out")
+    check = file("${meta.out}/$out")
     if (check.exists()) {
         """
         cp $check.name .

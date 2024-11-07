@@ -15,7 +15,7 @@ process MUTECT2 {
 
     script:
     out = "${module_number}-${meta.baseName}_Mutect2.vcf.gz"
-    def check = file("${meta.out}/${out}")
+    check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         cp $check.name .

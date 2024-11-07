@@ -21,7 +21,7 @@ process MANTA {
 
     shell:
     out = "${module_number}-${meta.baseName}_MantaOut"
-    def check = file("${meta.out}/${out}")
+    check = file("${meta.out}/${out}")
     def exome_flag = is_exome ? " --exome " : ""
     if (check.exists()) {
         '''

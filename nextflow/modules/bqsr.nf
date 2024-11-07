@@ -14,9 +14,9 @@ process BQSR {
     script:
     recal = "${module_number}-${meta.id}_recal.bam"
     report = "${module_number}-${meta.id}_AnalyzeCovariates.pdf"
+    check = file("${meta.out}/$recal")
+    check2 = file("${meta.out}/$report")
     def sites_command = known_sites.collect{"--known-sites $it"}.join(' ')
-    def check = file("${meta.out}/$recal")
-    def check2 = file("${meta.out}/$report")
     if (check.exists() && check2.exists()) {
         """
         cp $check.name .

@@ -12,7 +12,7 @@ process MARK_DUPLICATES {
 
     script:
     out = "${module_number}-${meta.id}_dedup.bam"
-    def check = file("${meta.out}/${out}")
+    check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         cp $check.name .

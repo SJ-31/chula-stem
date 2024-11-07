@@ -1,4 +1,4 @@
-process STRELKA {
+process STRELKA2 {
     // Version 2.9.10
     conda params.strelka_env
 
@@ -20,8 +20,8 @@ process STRELKA {
 
     script:
     out = "${module_number}-${meta.baseName}_StrelkaOut"
-    def check = file("${meta.out}/${out}")
-    def exome_flag = is_exome ? " --exome " : ""
+    check = file("${meta.out}/${out}")
+    exome_flag = is_exome ? " --exome " : ""
     if (check.exists()) {
         '''
         cp -r !{check}.name .

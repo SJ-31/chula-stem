@@ -18,8 +18,8 @@ process FASTP {
     script:
     output1 = "${module_number}-${reads[0].baseName}.fastp.fastq.gz"
     output2 = "${module_number}-${reads[1].baseName}.fastp.fastq.gz"
-    def check1 = file("${meta.out}/output1")
-    def check2 = file("${meta.out}/output2")
+    check1 = file("${meta.out}/$output1")
+    check2 = file("${meta.out}/$output2")
     if (check1.exists() && check2.exists()) {
         """
         cp $check1.name .
