@@ -24,27 +24,27 @@ process BQSR {
         """
     } else {
         """
-        gatk BaseRecalibrator \
-            -R $reference \
-            -I $bam \
-            $sites_command \
+        gatk BaseRecalibrator \\
+            -R $reference \\
+            -I $bam \\
+            $sites_command \\
             -O recalibration_1.table
 
-        gatk ApplyBQSR \
-            -R $reference \
-            -I $bam \
-            -bqsr-recal-file recalibration_1.table \
+        gatk ApplyBQSR \\
+            -R $reference \\
+            -I $bam \\
+            -bqsr-recal-file recalibration_1.table \\
             -O $recal
 
-        gatk BaseRecalibrator \
-            -R $reference \
-            -I $recal \
-            $sites_command \
+        gatk BaseRecalibrator \\
+            -R $reference \\
+            -I $recal \\
+            $sites_command \\
             -O recalibration_2.table
 
-        gatk AnalyzeCovariates \
-            -before recalibration_1.table \
-            -after recalibration_2.table \
+        gatk AnalyzeCovariates \\
+            -before recalibration_1.table \\
+            -after recalibration_2.table \\
             -plots $report
         """
     }

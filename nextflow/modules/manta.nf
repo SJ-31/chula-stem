@@ -1,4 +1,5 @@
 process MANTA {
+    // Version 1.6.0
     conda params.manta_env
 
     publishDir "$meta.out", mode: "copy"
@@ -24,7 +25,8 @@ process MANTA {
     def exome_flag = is_exome ? " --exome " : ""
     if (check.exists()) {
         '''
-        cp !{check}.name .
+        cp -r !{check}.name .
+        cp !{meta.out}/*_Manta.vcf.gz .
         cp !{meta.log}/manta.log .
         '''
     } else {

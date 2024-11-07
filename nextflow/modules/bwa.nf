@@ -25,10 +25,10 @@ process BWA {
     } else {
         """
         bwa-mem2 index $reference
-        bwa-mem2 mem \
-            -o aligned.sam \
-            -v 3 \
-            $reference \
+        bwa-mem2 mem \\
+            -o aligned.sam \\
+            -v 3 \\
+            $reference \\
             ${reads[0]} ${reads[1]}
 
         samtools view -S -b aligned.sam > $out

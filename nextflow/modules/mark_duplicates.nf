@@ -20,10 +20,10 @@ process MARK_DUPLICATES {
         """
     } else {
         """
-        gatk MarkDuplicatesSpark \
-            -I $aligned \
-            -M ${meta.id}_dedup_metrics.txt \
-            -O
+        gatk MarkDuplicatesSpark \\
+            -I ${aligned} \\
+            -M ${meta.id}_dedup_metrics.txt \\
+            -O ${out}
 
         cp .command.out dedup.log
         """

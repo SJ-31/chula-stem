@@ -1,4 +1,5 @@
 process STRELKA {
+    // Version 2.9.10
     conda params.strelka_env
 
     publishDir "$meta.out", mode: "copy"
@@ -23,7 +24,8 @@ process STRELKA {
     def exome_flag = is_exome ? " --exome " : ""
     if (check.exists()) {
         '''
-        cp !{check}.name .
+        cp -r !{check}.name .
+        cp !{meta.out}/*_Strelka.vcf.gz .
         cp !{meta.log}/strelka.log .
         '''
     } else {

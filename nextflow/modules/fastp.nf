@@ -28,12 +28,12 @@ process FASTP {
         """
     } else {
         """
-        fastp -i ${reads[0]} -I ${reads[1]} \
-            -z 4 \
-            -h ${module_number}-${meta.id}_fastp.html \
-            -j ${module_number}-${meta.id}_fastp.json \
-            -R ${meta.sample}_report \
-            --failed_out ${meta.id}.fail.fastq.gz \
+        fastp -i ${reads[0]} -I ${reads[1]} \\
+            -z 4 \\
+            -h ${module_number}-${meta.id}_fastp.html \\
+            -j ${module_number}-${meta.id}_fastp.json \\
+            -R ${meta.sample}_report \\
+            --failed_out ${meta.id}.fail.fastq.gz \\
             -o $output1 -O $output2
 
         cp .command.out fastp.log
