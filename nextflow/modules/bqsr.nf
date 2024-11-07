@@ -8,7 +8,7 @@ process BQSR {
     val(module_number)
 
     output:
-    tuple val(meta), path("*_recal.bam")
+    tuple val(meta), path("*_recal.bam"), emit: bam
     path(report)
 
     script:

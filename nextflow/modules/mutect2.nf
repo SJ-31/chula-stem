@@ -9,7 +9,7 @@ process MUTECT2 {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(meta), path(out), emit: variants
     path("*.log")
     //
 
