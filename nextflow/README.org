@@ -1,5 +1,8 @@
 * Workflows
 # All workflows expect an input csv file with
+Outputs are prefixed with "<module_number>-" representing their order in the pipeline (roughly)
+
+Must be submitted to the job queue
 ** scRNA-seq
 Standard scRNA-seq raw data processing worfklow
 + QC:
@@ -15,7 +18,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 **** Reference data
 + Genome:
 + Known variants (for BQSR)
-  * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]]
+  * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
   * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
     * gnomAD v4.1.0 Exomes for all chromosomes
     * ExAC
@@ -36,15 +39,19 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 + Variant calling
   * Tool list
     * GATK Mutect2: somatic SNVs and indels
-    * [[https://github.com/Illumina/strelka][Strelka2]]: small variants
+    * [[https://github.com/Illumina/strelka][Strelka2]]: SNVs and indels, up to a predefined maximum size of (49 bases default)
+    * [[https://github.com/Illumina/manta][Manta]]: Strutural variants (paired with strelka2)
     * [[https://github.com/wwylab/MuSE][MuSE2]]: small variants TODO can't install this
-    * [[https://github.com/VanLoo-lab/ascat][ASCAT]]: allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
     * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
     * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
     * [[https://github.com/dellytools/delly][delly]]: structural variants
   * Concatenate results with =bcftools concat= and report source in =SOURCE= header
 + Metrics
+  * Tumor info: with [[https://github.com/VanLoo-lab/ascat][ASCAT]], which provides allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
   * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution
     https://github.com/im3sanger/dndscv
   * Alignment: =samtools=, see https://bioinformatics.stackexchange.com/questions/13722/calculating-average-coverage-for-bam-files-sequence-data for coverage calc
 + Variant annotation
+* Dependencies
+https://bedops.readthedocs.io/en/latest/index.html
+samtools, bcftools

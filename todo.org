@@ -1,4 +1,20 @@
 * Inbox
+** TODO [#B] Prepare the exclusion file for delly from reference
+DEADLINE: <2024-11-07 Thu>
+CREATED: [2024-11-07 Thu]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/modules/delly.nf::val(exclude)]]
+This should be telomere and centromere regions plus all unplaced contigs according to the delly docs
+Save the script used to make this exclusion file
+
+Format is like this
+chr1	0	10000	telomere
+chr1	248946422	248956422	telomere
+chr10	0	10000	telomere
+chr10	133787422	133797422	telomere
+chr11	0	10000	telomere
+chr11	135076622	135086622	telomere
+chr12	0	10000	telomere
+chr12	133265309	133275309	telomere
 ** TODO [#C] Download the dbVar data
 DEADLINE: <2024-11-07 Thu>
 CREATED: [2024-11-06 Wed]
