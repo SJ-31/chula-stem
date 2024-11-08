@@ -51,6 +51,11 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution
     https://github.com/im3sanger/dndscv
   * Alignment: =samtools=, see https://bioinformatics.stackexchange.com/questions/13722/calculating-average-coverage-for-bam-files-sequence-data for coverage calc
+  * QC metrics from =fastp=
+  * Various metrics from =Picard=
+    * =CountReads=
+    * =CollectAlignmentSummaryMetrics=
+    *
 + Variant annotation
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html

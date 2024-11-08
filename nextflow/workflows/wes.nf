@@ -8,6 +8,7 @@ include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
 include { DELLY } from "../modules/delly.nf"
+include { PICARD } from "../modules/picard.nf"
 
 workflow "whole_exome" {
 
@@ -25,12 +26,19 @@ workflow "whole_exome" {
                 "out": "${params.outdir}/${it.patient}_${it.source}",
                 "type": it.source,
                 "log": "${params.logdir}/${it.patient}_${it.source}",
+                "RGLB": it.read_group_library, // Read group info used by GATK tools
+                "RGPL": it.read_group_platform,
+                "RGPU": it.read_group_platform_unit,
+                "RGSM": it.read_group_sample_name
             ], [file(it.fastq_1), file(it.fastq_2)]] }
 
-    // * Preprocessing
+    /*
+     * Preprocessing
+     */
+
     FASTP(input, 1)
     BWA(FASTP.out.passed, params.ref.genome, 2)
-    MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
+    MARK_DUPLICATES(BWA.out.mapped, 3)
     BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
 
     // After preprocessing, branch data into tumor and normal then pair up by id
@@ -49,7 +57,9 @@ workflow "whole_exome" {
     paired_no_id = paired.map { it -> [it[1], it[2], it[3]] }
     // paired_no_id is [meta, tumor, normal]
 
-    // * Variant callers
+    /*
+     * Variant calling
+     */
     MUTECT2(paired, params.ref.genome, 4)
     MANTA(paired, params.ref.genome, true, 4)
 
@@ -62,4 +72,15 @@ workflow "whole_exome" {
     // TODO need cnvkit copy number file
     CNVKIT(paired, params.ref.genome_copy_number, 4)
     MSISENSORPRO(paired, params.ref.homopolymers_microsatellites, 4)
+
+
+    /*
+     * Variant annotation
+     */
+
+
+
+    /*
+     * Metric collection
+     */
 }
