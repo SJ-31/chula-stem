@@ -32,7 +32,7 @@ process FASTP {
             -z 4 \\
             -h ${module_number}-${meta.id}_fastp.html \\
             -j ${module_number}-${meta.id}_fastp.json \\
-            -R ${meta.sample}_report \\
+            -R ${meta.id}_report \\
             --failed_out ${meta.id}.fail.fastq.gz \\
             -o $output1 -O $output2
 
