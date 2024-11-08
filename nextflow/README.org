@@ -1,3 +1,6 @@
+:REFERENCES:
++ [1] https://support.illumina.com/content/dam/illumina-support/help/Illumina_DRAGEN_Bio_IT_Platform_v3_7_1000000141465/Content/SW/Informatics/Dragen/GPipelineAltMap_fDG.htm
+:END:
 * Workflows
 # All workflows expect an input csv file with
 Outputs are prefixed with "<module_number>-" representing their order in the pipeline (roughly)
@@ -16,22 +19,24 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * =fastq_2=
   * =source=  [tumor|normal]
 **** Reference data
-+ Genome:
++ Genome: hg38???
+  * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
+    * And =gatk CreateSequenceDictionary -R <ref>=
 + Known variants (for BQSR)
   * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
   * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
     * gnomAD v4.1.0 Exomes for all chromosomes
     * ExAC
   * [[https://www.ncbi.nlm.nih.gov/projects/SNP/get_html.cgi?whichHtml=overview][dbSNP]]
-  * [[https://www.ncbi.nlm.nih.gov/dbvar/content/human_hub/][dbVar]] But these are in csv format
-    * [[https://www.ncbi.nlm.nih.gov/dbvar/studies/nstd102/#variantTab][Clinical structural Variants]],
 *** Steps
 + QC: =fastp= with the following routines
   * Quality filtering
   * Length filtering
   * Base correction
   * polyG tail trimming: is performed if reads are detected to NextSeq/NovaSeq
-+ Read mapping to reference: =bwa=
++ Read mapping to reference: =bwa-mem2=
+  * This is done in an alt-aware manner, due to the benefits for variant calling when doing so [1].
+    * You can get the =.alt= index file for =bwa-mem2= at
 + Marking duplicates: GATK's =MarkDuplicatesSpark=
 + Base Quality Score Recalibration: GATK =BaseRecalibrator=  and =ApplyBQSR=
   * Reports changes to base scores with =AnalyzeCovariates=

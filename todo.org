@@ -1,4 +1,10 @@
 * Inbox
+** TODO [#A] Run bwa-mem2 again with the .alt index file to make sure that it reads the ALT contigs
+CREATED: [2024-11-08 Fri]
+This page https://gatk.broadinstitute.org/hc/en-us/articles/360037498992--How-to-Map-reads-to-a-reference-with-alternate-contigs-like-GRCH38#2 has info on how to check if alt-handling was done
+
+But you don't know if the downloaded alt index will work with what you have...
+And there is no documentation about how to generate an alt index file
 ** TODO [#B] Need a BED file containing the baited genomic regions used to prepare the exome data.
 CREATED: [2024-11-08 Fri]
 Is required by CNVkit in the =batch= command and Picard CollectHsMetrics
@@ -31,14 +37,12 @@ chr11	0	10000	telomere
 chr11	135076622	135086622	telomere
 chr12	0	10000	telomere
 chr12	133265309	133275309	telomere
-** TODO [#C] Download the dbVar data
-DEADLINE: <2024-11-07 Thu>
-CREATED: [2024-11-06 Wed]
-LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Reference data][Reference data]]
-** TODO [#C] Make sure adding the source tag in the INFO field works
+** DONE [#C] Make sure adding the source tag in the INFO field works
+CLOSED: [2024-11-08 Fri 15:14]
 CREATED: [2024-11-06 Wed]
 LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/modules/mutect2.nf::bcftools annotate temp.vcf.gz]]
-** TODO [#A] Find variants to use for bqsr
+** DONE [#A] Find variants to use for bqsr
+CLOSED: [2024-11-08 Fri 15:14]
 CREATED: [2024-11-05 Tue]
 Maybe dbSNP
 Or check http   s://www.cancer.gov/ccg/access-data
