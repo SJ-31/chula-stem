@@ -20,8 +20,10 @@ process MARK_DUPLICATES {
         """
     } else {
         """
+        samtools sort $aligned > sorted.bam
         gatk MarkDuplicatesSpark \\
-            -I ${aligned} \\
+            -I sorted.bam \\
+            --ASSUME_SORT_ORDER coordinate \\
             -M ${meta.id}_dedup_metrics.txt \\
             -O ${out}
 
