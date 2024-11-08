@@ -33,8 +33,16 @@ process BWA {
             $reference \\
             ${reads[0]} ${reads[1]}
 
-        samtools view -S -b aligned.sam > $out
+        samtools view -S -b aligned.sam > aligned.bam
         cp .command.out bwa.log
+
+        gatk AddOrReplaceReadGroups \\
+            -I aligned.bam \\
+            -O $out \\
+            --RGLB $meta.RGLB \\
+            --RGPL $meta.RGPL \\
+            --RGPU $meta.RGPU \\
+            --RGSM $meta.RGSM
         """
     }
     //
