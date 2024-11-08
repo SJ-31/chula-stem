@@ -77,3 +77,6 @@ nextflow/input
 nextflow/.nf-test
 nextflow/work
 renv
+tests/sample.vcf.gz
+rust/target
+rust/Cargo.lock
