@@ -1,4 +1,18 @@
 * Inbox
+** TODO [#B] Need a BED file containing the baited genomic regions used to prepare the exome data
+CREATED: [2024-11-08 Fri]
+Is required by CNVkit in the =batch= command and Picard CollectHsMetrics
+CollectHsMetrics also needs the target intervals file
+http://broadinstitute.github.io/picard/picard-metric-definitions.html#HsMetrics
+http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics
+https://cnvkit.readthedocs.io/en/stable/pipeline.html
+** TODO [#C] Figure out how to run the nextflow pipeline with SLURM
+CREATED: [2024-11-08 Fri]
+LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/todo.org::*Have a look at benchmarking the WES variant calling][Have a look at benchmarking the WES variant calling]]
+https://slurm.schedmd.com/sbatch.html
+https://jhpce.jhu.edu/slurm/slurm-commands-ref/
+https://www.nextflow.io/docs/latest/executor.html
+https://github.com/nextflow-io/nextflow/discussions/4095
 ** TODO [#B] Prepare the exclusion file for delly from reference
 DEADLINE: <2024-11-07 Thu>
 CREATED: [2024-11-07 Thu]
