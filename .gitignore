@@ -80,3 +80,4 @@ renv
 tests/sample.vcf.gz
 rust/target
 rust/Cargo.lock
+/tests/added.vcf.gz

@@ -23,11 +23,27 @@ import vcfpy
     help="Tag type (Integer, Float, Flag, Character, String)",
 )
 @click.option(
-    "-d", "--default", required=True, help="Default value of tag in each record"
+    "-a",
+    "--default",
+    required=True,
+    help="Default value of tag in each record",
+    type=str,
 )
 @click.option("-i", "--input", required=True, help="VCF file to annotate")
-@click.option("-i", "--output", required=True, help="Output file")
+@click.option("-o", "--output", required=True, help="Output file")
 def vcf_info_add_tag(
+    name: str,
+    description: str,
+    number: str,
+    type: str,
+    default: str,
+    input: str,
+    output: str,
+):
+    _vcf_info_add_tag(name, description, number, type, default, input, output)
+
+
+def _vcf_info_add_tag(
     name: str,
     description: str,
     number: str,
@@ -49,5 +65,5 @@ def vcf_info_add_tag(
     writer = vcfpy.Writer.from_path(output, reader.header)
     for record in reader:
         record: vcfpy.Record
-        record.INFO[name] = default
+        record.INFO[name] = [default]
         writer.write_record(record)
