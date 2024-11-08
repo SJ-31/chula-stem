@@ -1,31 +1,60 @@
-process GETMETRICS {
-    // TODO: update this again for the pipeline
-    publishDir "${outdir}/2-metrics/$pair_id", mode:'copy'
+process PICARD {
+    publishDir "$meta.out", mode: 'copy'
+    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
     input:
-    tuple val(pair_id), path(sorted_dedup_reads)
-    tuple val(name), path(ref), path(other_ref)
-    val(outdir)
+    tuple val(meta), path(bam)
+    val(omics_type)
+    val(reference)
+    val(target_intervals)
+    val(bait_intervals)
+    val(gene_annotations_refFlat)
+    val(module_number)
 
     output:
-    tuple (val(pair_id),
+    tuple (val(meta),
 	path("${pair_id}_alignment_metrics.txt"),
 	path("${pair_id}_insert_metrics.txt"),
 	path("${pair_id}_insert_size_histogram.pdf"),
 	path("${pair_id}_depth_out.txt"))
 
     script:
-    """
-    java -jar \$PICARD_JAR \
-        CollectAlignmentSummaryMetrics \
-	R=${ref} \
-        I=${sorted_dedup_reads} \
-	O=${pair_id}_alignment_metrics.txt
-    java -jar \$PICARD_JAR \
-        CollectInsertSizeMetrics \
-        INPUT=${sorted_dedup_reads} \
-	OUTPUT=${pair_id}_insert_metrics.txt \
-        HISTOGRAM_FILE=${pair_id}_insert_size_histogram.pdf
-    samtools depth -a ${sorted_dedup_reads} > ${pair_id}_depth_out.txt
-    """
+    out = "${module_number}-${meta.id}_alignment_metrics_Picard.txt"
+    check = file(${meta.out}/"${out}")
+    if (check.exists()) {
+        """
+        cp "${meta.out}/${module_number}"-*_metrics_Picard*" .
+        cp "${meta.log}/picard.log" .
+        """
+    } else {
+        """
+        gatk CollectAlignmentSummaryMetrics -I $bam \\
+            -O $out
+        """
+        if (omics_type == "exome") {
+            """
+            gatk CollectHsMetrics -I $bam \\
+                --BAIT_INTERVALS $bait_intervals \\
+                --TARGET_INTERVALS $target_intervals \\
+                -O ${module_number}-${meta.id}_hs_metrics_Picard.txt
+            """
+        } else if (omics_type == "wgs") {
+            """
+            gatk CollectWgsMetrics -I $bam \\
+                --REFERENCE_SEQUENCE $reference \\
+                -O ${module_number}-${meta.id}_wgs_metrics_Picard.txt
+            """
+        } else if (omics_type == "rna-seq") {
+            """
+            gatk CollectRnaSeqMetrics -I $bam \\
+                --REF_FLAT $gene_annotations_refFlat \\
+                -O ${module_number}-${meta.id}_rnaseq_metrics_Picard.txt
+            """
+        } else {
+            throw new Exception("'omics_type' must be one of wgs|rna-seq|exome")
+        }
+        """
+        cp .command.out picard.log
+        """
+    }
 }

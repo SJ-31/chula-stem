@@ -1,0 +1,35 @@
+process MULTIQC {
+    // Version 1.25.1
+    publishDir "$meta.out", mode: 'copy'
+    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+
+    input:
+    tuple val(meta), path(metrics)
+    val(module_number)
+    // Will aggregate metrics from
+    // - fastp
+    // - Picard & GATK (AlignmentSummaryMetrics, MarkDuplicates,
+    //                  CollectHsMetrics|CollectWgsMetrics|CollectRnaSeqMetrics)
+    // - mosdepth (coverage of reference, sequencing depth)
+
+    output:
+    path("multiqc")
+    //
+
+    script:
+    check = file("${meta.out}/multiqc")
+    if (check.exists()) {
+        """
+        cp -r $check.name .
+        cp "${meta.log}/multiqc.log" .
+        """
+    } else {
+        """
+        multiqc . --config "$params.configdir/multiqc_config.yaml"
+
+        cp .command.out multiqc.log
+        """
+    }
+
+    //
+}
