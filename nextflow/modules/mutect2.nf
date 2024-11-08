@@ -23,15 +23,22 @@ process MUTECT2 {
         """
     } else {
         """
-        gatk Mutect2 \
-            -R $reference \
-            -I $tumor \
-            -I $normal \
-            -normal $normal.baseName \
-            --panel-of-normals ??? \
+        gatk Mutect2 \\
+            -R $reference \\
+            -I $tumor \\
+            -I $normal \\
+            -normal $normal.baseName \\
+            --panel-of-normals ??? \\
             --output temp.vcf.gz
 
-        bcftools annotate temp.vcf.gz TODO
+        vcf_info_add_tag -n SOURCE \\
+            -d "Tool producing call" \\
+            -b '.' \\
+            -t String \\
+            -a mutect2 \\
+            -i temp.vcf.gz \\
+            -o $out
+
         cp .command.out mutect2.log
         """
     }
