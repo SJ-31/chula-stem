@@ -9,4 +9,12 @@ name = "_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
+clap = { version = "4.5.20", features = ["derive"] }
+globset = "0.4.15"
 pyo3 = "0.22.0"
+tempfile = "3.14.0"
+walkdir = "2.5.0"
+
+[[bin]]
+name = "nf_clean"
+path = "src/nf_utils.rs"
