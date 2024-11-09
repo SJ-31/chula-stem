@@ -140,21 +140,29 @@ fn clean_output(outdir: &str, prefixes: Vec<String>, editor: &str) -> Result<(),
         .into_iter()
         .filter_map(|e| e.ok())
         .map(|d| d.into_path())
-        .filter(move |p| globber.is_match(p))
+        .filter(move |p| {
+            let fname = p.file_name().unwrap();
+            globber.is_match(fname) && p.is_file()
+        })
         .map(|p| p.to_str().unwrap_or("").to_string())
         .collect();
-    output_file_names.insert(0, "<--FILES TO DELETE-->".to_string());
+    if output_file_names.len() == 0 {
+        println!("No matches");
+        return Ok(());
+    }
+    output_file_names.insert(0, "--- FILES TO DELETE ---".to_string());
     let mut file = NamedTempFile::new()?;
     _ = file.write_all(output_file_names.join("\n").as_bytes())?;
     let path = &file.path();
-    let name = path.file_name().unwrap().to_str();
-    let output = Command::new(editor).arg(name.unwrap()).output()?;
-    if output.status.success() {
-        let _to_delete = fs::read_to_string(path)?
+    let name = path.to_string_lossy().to_string();
+    let mut output = Command::new(editor).arg(name).spawn()?;
+    if output.wait().unwrap().success() {
+        let _to_delete: Vec<Result<(), io::Error>> = fs::read_to_string(path)?
             .split("\n")
             .map(|p| Path::new(p))
             .filter(|p| p.exists())
-            .map(|p| remove_file(p));
+            .map(|p| remove_file(p))
+            .collect();
     }
     _ = file.close()?;
     Ok(())
