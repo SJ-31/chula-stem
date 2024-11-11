@@ -1,5 +1,7 @@
 process MSISENSORPRO {
     ext version: "1.3.0"
+    conda { task.ext.conda }
+
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
@@ -21,7 +23,7 @@ process MSISENSORPRO {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp ${check.name} .
+        cp ${check} .
         cp ${meta.log}/msisensor.log .
         """
     } else {

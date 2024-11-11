@@ -1,5 +1,6 @@
 process BWA {
     ext version: "2.2.1"
+    conda { task.ext.conda }
     label "big_mem"
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

@@ -1,6 +1,6 @@
 process CNVKIT {
     ext version: "0.9.11"
-    conda task.ext.conda
+    conda { task.ext.conda }
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 

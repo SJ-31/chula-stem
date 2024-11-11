@@ -1,5 +1,6 @@
 process BQSR {
     ext version: "4.6.1.0"
+    conda { task.ext.conda }
     // Recalibrate and also obtain covariate plot
     input:
     tuple val(meta), path(bam)

@@ -1,5 +1,7 @@
 process SNPEFF {
     ext version: "5.2e"
+    conda { task.ext.conda }
+
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
@@ -22,7 +24,7 @@ process SNPEFF {
     check = file("$meta.out/${output}.gz")
     if (check.exists()) {
         """
-        cp $check.name .
+        cp $check .
         cp "${meta.out}/${report}" .
         cp "${meta.log}/snpEff.log" .
         """

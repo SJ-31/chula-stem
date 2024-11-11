@@ -1,5 +1,7 @@
 process MARK_DUPLICATES {
     ext version: "4.6.1.0"
+    conda { task.ext.conda }
+
     publishDir "${meta.out}", mode:'copy'
     publishDir "${meta.log}", mode:'copy', pattern: "*.log"
 
@@ -17,7 +19,7 @@ process MARK_DUPLICATES {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp $check.name .
+        cp $check .
         cp ${meta.log}/dedup.log .
         """
     } else {

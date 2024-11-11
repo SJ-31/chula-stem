@@ -1,5 +1,7 @@
 process MULTIQC {
     ext version: "1.25.1"
+    conda { task.ext.conda }
+
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
@@ -20,7 +22,7 @@ process MULTIQC {
     check = file("${meta.out}/multiqc")
     if (check.exists()) {
         """
-        cp -r $check.name .
+        cp -r $check .
         cp "${meta.log}/multiqc.log" .
         """
     } else {
