@@ -1,5 +1,5 @@
 process BQSR {
-    // GATK version 4.6.1.0
+    ext version: "4.6.1.0"
     // Recalibrate and also obtain covariate plot
     input:
     tuple val(meta), path(bam)

@@ -1,5 +1,5 @@
 process STRELKA2 {
-    // Version 2.9.10
+    ext version: "2.9.10"
     conda params.strelka_env
 
     publishDir "$meta.out", mode: "copy"

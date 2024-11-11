@@ -1,5 +1,5 @@
 process MANTA {
-    // Version 1.6.0
+    ext version: "1.6.0"
     conda params.manta_env
 
     publishDir "$meta.out", mode: "copy"

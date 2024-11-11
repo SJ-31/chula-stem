@@ -1,4 +1,5 @@
 process SNPEFF {
+    ext version: "5.2e"
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
@@ -28,6 +29,8 @@ process SNPEFF {
     } else {
         """
         $params.snpEff -cancer \\
+            -canon \\
+            -nodownload  \\
             -cancerSamples $sample_definition \\
             -v \\
             $reference \\

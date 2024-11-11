@@ -1,5 +1,5 @@
 process FASTP {
-    // Version 0.23.4
+    ext version: "0.23.4"
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 

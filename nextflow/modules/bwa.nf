@@ -1,5 +1,5 @@
 process BWA {
-    // bwa-mem2 version 2.2.1
+    ext version: "2.2.1"
     label "big_mem"
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

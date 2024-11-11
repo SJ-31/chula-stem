@@ -1,5 +1,5 @@
 process MOSDEPTH {
-    // Version 0.3.9
+    ext version: "0.3.9"
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 

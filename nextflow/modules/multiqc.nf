@@ -1,5 +1,5 @@
 process MULTIQC {
-    // Version 1.25.1
+    ext version: "1.25.1"
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
