@@ -4,6 +4,7 @@ process MARK_DUPLICATES {
 
     input:
     tuple val(meta), path(aligned)
+    val(reference)
     val(module_number)
 
     output:
@@ -20,7 +21,14 @@ process MARK_DUPLICATES {
         """
     } else {
         """
-        samtools sort $aligned > sorted.bam
+        gatk SortSam -I $aligned \\
+            -O sorted.bam \\
+            --SORT_ORDER coordinate
+
+        gatk ReorderSam -I sorted.bam \\
+            -O reordered.bam \\
+            --SEQUENCE_DICTIONARY $reference
+
         gatk MarkDuplicatesSpark \\
             -I sorted.bam \\
             --ASSUME_SORT_ORDER coordinate \\
@@ -32,3 +40,5 @@ process MARK_DUPLICATES {
     }
 
 }
+// GATK requires that reads are sorted in coordinate order
+// Contigs are also expected to be ordered the same way across files
