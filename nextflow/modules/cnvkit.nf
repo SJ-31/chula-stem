@@ -22,7 +22,7 @@ process CNVKIT {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp ${check.name} .
+        cp $check .
         cp ${meta.log}/cnvkit.log .
         """
     } else {

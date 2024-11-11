@@ -19,8 +19,8 @@ process BQSR {
     def sites_command = known_sites.collect{"--known-sites $it"}.join(' ')
     if (check.exists() && check2.exists()) {
         """
-        cp $check.name .
-        cp $check2.name .
+        cp $check .
+        cp $check2 .
         """
     } else {
         """
