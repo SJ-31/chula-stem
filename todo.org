@@ -1,4 +1,10 @@
 * Inbox
+** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample
+CREATED: [2024-11-11 Mon]
+Especially check the ids
+** TODO [#A] Automate preparation of snpEff cancer definition file
+CREATED: [2024-11-11 Mon]
+See here for the file format https://pcingola.github.io/SnpEff/snpeff/cansersamples/
 ** TODO [#A] Run bwa-mem2 again with the .alt index file to make sure that it reads the ALT contigs
 CREATED: [2024-11-08 Fri]
 This page https://gatk.broadinstitute.org/hc/en-us/articles/360037498992--How-to-Map-reads-to-a-reference-with-alternate-contigs-like-GRCH38#2 has info on how to check if alt-handling was done

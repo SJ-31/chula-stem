@@ -22,11 +22,12 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 + Genome: hg38???
   * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
     * And =gatk CreateSequenceDictionary -R <ref>=
-+ Known variants (for BQSR)
++ Known variants (for BQSR). To use with bqsr, these must be indexed with =gatk IndexFeatureFile=
   * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
   * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
     * gnomAD v4.1.0 Exomes for all chromosomes
     * ExAC
+      * Can't use this straight from the download, it is mapped to the GRCh37/hg19 reference
   * [[https://www.ncbi.nlm.nih.gov/projects/SNP/get_html.cgi?whichHtml=overview][dbSNP]]
 *** Steps
 + QC: =fastp= with the following routines
@@ -41,6 +42,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 + Base Quality Score Recalibration: GATK =BaseRecalibrator=  and =ApplyBQSR=
   * Reports changes to base scores with =AnalyzeCovariates=
   * Both cancer and normal samples undergo BQSR with the same =known_variants= sources, which will be sources of germline variants (listed fully above)
+    * See [[https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets][here]] for the details of known variants
 + Variant calling
   * Tool list
     * GATK Mutect2: somatic SNVs and indels
