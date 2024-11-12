@@ -1,0 +1,33 @@
+nextflow_process {
+
+    name "Test Process MUTECT2"
+    script "modules/mutect2.nf"
+    process "MUTECT2"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = (["out": "$params.out/mutect2",
+                    "log:" "$params.log/mutect2", "id": "sample2"],
+                    "$params.out/bqsr/b_recal.bam",
+                    "$params.out/bqsr/c_recal.bam"
+            )
+                input[1] = "$params.genome"
+                input[2] = 4
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}
