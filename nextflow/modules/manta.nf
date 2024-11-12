@@ -1,6 +1,5 @@
 process MANTA {
     ext version: "1.6.0"
-   
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
@@ -8,7 +7,6 @@ process MANTA {
     input:
     tuple val(meta), path(tumor), path(normal)
     val(reference)
-    val(is_exome)
     val(module_number)
     //
 
@@ -22,7 +20,7 @@ process MANTA {
     shell:
     out = "${module_number}-${meta.id}_MantaOut"
     check = file("${meta.out}/${out}")
-    def exome_flag = is_exome ? " --exome " : ""
+    args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
         cp -r !{check}.name .

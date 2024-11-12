@@ -1,3 +1,6 @@
+bcftools index !{normal}
+bcftools index !{tumor}
+
 configManta.py \
     --normalBam !{normal} \
     --tumorBam !{tumor} \
