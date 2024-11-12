@@ -22,6 +22,7 @@ process SNPEFF {
     output = "${module_number}-${meta.id}_snpEff.vcf"
     report = "${module_number}-${meta.id}_snpEff_summary.html"
     check = file("$meta.out/${output}.gz")
+    def args = task.ext.args.join(" ")
     if (check.exists()) {
         """
         cp $check .
@@ -30,11 +31,9 @@ process SNPEFF {
         """
     } else {
         """
-        $params.snpEff -cancer \\
-            -canon \\
+        $params.snpEff $args \\
             -nodownload  \\
             -cancerSamples $sample_definition \\
-            -v \\
             $reference \\
             $vcf > $output
         gzip $output

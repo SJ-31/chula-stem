@@ -1,7 +1,6 @@
 process SNPSIFT {
     ext version: "5.2e"
   
-
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
@@ -32,7 +31,7 @@ process SNPSIFT {
         """
         bcftools index $vcf
 
-        $params.SnpSift filter $params.SnpfSift_filter $vcf | \\
+        $params.SnpSift filter ${task.ext.args} $vcf | \\
             $params.SnpSift annotate $annotate_expr > \\
             $output
 
