@@ -6,6 +6,7 @@ nextflow_process {
 
     test("Should run without failures") {
 
+        config "tests/nextflow.config"
         when {
             params {
                 load("$baseDir/tests/wes_params.yaml")
@@ -14,8 +15,8 @@ nextflow_process {
                 """
                 input[0] = [["out": "$params.out/manta",
                     "log": "$params.log/manta", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam"]
+                    "$params.out/bqsr/c_recal.bam",
+                    "$params.out/bqsr/b_recal.bam"]
                 input[1] = "$params.genome"
                 input[2] = 4
                 """
