@@ -18,3 +18,4 @@ module-name = "chula_stem._rust"
 
 [project.scripts]
 vcf_info_add_tag = "chula_stem.utils:vcf_info_add_tag"
+dncsv_buildref = "chula_stem.dndscv:buildref"
