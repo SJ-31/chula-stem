@@ -8,7 +8,6 @@ process STRELKA2 {
     input:
     tuple val(meta), path(tumor), path(normal), path(manta_indels)
     val(reference)
-    val(is_exome)
     val(module_number)
     //
 
@@ -19,9 +18,9 @@ process STRELKA2 {
     //
 
     script:
-    out = "${module_number}-${meta.baseName}_StrelkaOut"
+    out = "${module_number}-${meta.id}_StrelkaOut"
     check = file("${meta.out}/${out}")
-    exome_flag = is_exome ? " --exome " : ""
+    def args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
         cp -r !{check}.name .

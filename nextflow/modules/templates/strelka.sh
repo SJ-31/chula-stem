@@ -3,7 +3,7 @@ configureStrelkaSomaticWorkflow.py \
     --tumorBam !{tumor} \
     --referenceFasta !{reference} \
     --indelCandidates !{manta_indels} \
-    !{exome_flag} \
+    !{args} \
     --runDir !{out}
 
 ./runWorkflow.py

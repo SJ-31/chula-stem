@@ -17,7 +17,7 @@ process MUTECT2 {
     //
 
     script:
-    out = "${module_number}-${meta.baseName}_Mutect2.vcf.gz"
+    out = "${module_number}-${meta.id}_Mutect2.vcf.gz"
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

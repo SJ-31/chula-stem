@@ -2,7 +2,7 @@ configManta.py \
     --normalBam !{normal} \
     --tumorBam !{tumor} \
     --referenceFasta !{reference} \
-    !{exome_flag} \
+    !{args} \
     --runDir !{out}
 
 ./runWorkflow.py

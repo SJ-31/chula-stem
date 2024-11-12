@@ -64,11 +64,11 @@ workflow "whole_exome" {
     def getId = { [it[0].id] + it[1] }
 
     MUTECT2(paired, params.ref.genome, 4)
-    MANTA(paired, params.ref.genome, true, 4)
+    MANTA(paired, params.ref.genome, 4)
 
     to_strelka = paired_no_id.join(MANTA.out.indels)
         .map { [it[1], it[2], it[3], it[4]] }
-    STRELKA2(to_strelka, params.ref.genome, true, 4)
+    STRELKA2(to_strelka, params.ref.genome, 4)
 
     // TODO need delly exclusion file
     DELLY(paired, params.ref.genome, params.ref.delly_exclude, 4)
