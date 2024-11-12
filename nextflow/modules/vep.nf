@@ -1,6 +1,6 @@
 process VEP {
     ext version: ""
-    conda { task.ext.conda }
+    
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

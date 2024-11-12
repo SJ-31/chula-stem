@@ -1,6 +1,6 @@
 process MANTA {
     ext version: "1.6.0"
-    conda { task.ext.conda }
+   
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

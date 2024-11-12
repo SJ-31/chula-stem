@@ -1,6 +1,6 @@
 process MSISENSORPRO {
     ext version: "1.3.0"
-    conda { task.ext.conda }
+  
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

@@ -1,6 +1,6 @@
 process MUTECT2 {
     ext version: "4.6.1.0"
-    conda { task.ext.conda }
+
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

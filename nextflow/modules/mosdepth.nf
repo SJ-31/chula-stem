@@ -1,6 +1,6 @@
 process MOSDEPTH {
     ext version: "0.3.9"
-    conda { task.ext.conda }
+ 
 
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
