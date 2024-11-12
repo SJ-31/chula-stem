@@ -1,6 +1,5 @@
 process MSISENSORPRO {
     ext version: "1.3.0"
-  
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

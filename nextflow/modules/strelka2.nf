@@ -1,6 +1,5 @@
 process STRELKA2 {
     ext version: "2.9.10"
- 
 
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

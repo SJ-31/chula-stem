@@ -1,7 +1,6 @@
 process MUTECT2 {
     ext version: "4.6.1.0"
 
-
     publishDir "$meta.out", mode: "copy"
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
@@ -30,8 +29,7 @@ process MUTECT2 {
             -R $reference \\
             -I $tumor \\
             -I $normal \\
-            -normal $normal.baseName \\
-            --panel-of-normals ??? \\
+            -normal $meta.RGSM_normal \\
             --output temp.vcf.gz
 
         vcf_info_add_tag -n SOURCE \\
@@ -47,3 +45,4 @@ process MUTECT2 {
     }
     //
 }
+// Look into using --panel-of-normals flag \\
