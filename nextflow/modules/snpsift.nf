@@ -32,7 +32,8 @@ process SNPSIFT {
         bcftools index $vcf
 
         $params.SnpSift filter ${task.ext.args} $vcf | \\
-            $params.SnpSift annotate $annotate_expr > \\
+            $params.SnpSift annotate $annotate_expr | \\
+            $params.SnpSift varType > \\
             $output
 
         gzip $output
