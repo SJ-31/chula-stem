@@ -12,12 +12,11 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = (["out": "$params.out/strelka2",
-                    "log:" "$params.log/strelka2", "id": "sample2"],
+                input[0] = [["out": "$params.out/strelka2",
+                    "log": "$params.log/strelka2", "id": "sample2"],
                     "$params.out/bqsr/b_recal.bam",
                     "$params.out/bqsr/c_recal.bam",
-                    "$params.out/manta/4-candidateSmallIndels.vcf.gz"
-            )
+                    "$params.out/manta/4-candidateSmallIndels.vcf.gz"]
                 input[1] = "$params.genome"
                 input[2] = 4
                 """
