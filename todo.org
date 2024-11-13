@@ -1,4 +1,9 @@
 * Inbox
+** TODO [#A] Ask about cancer cell culture
+CREATED: [2024-11-12 Tue]
+How were the cancer cells sequenced?
+And what are the characteristics of the culture process?
+You want to know cause some metrics (namely intratumor heterogeneity and tumor purity) may depend on this
 ** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample
 CREATED: [2024-11-11 Mon]
 Especially check the ids

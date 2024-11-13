@@ -1,5 +1,6 @@
 /target
 .github
+*.nf.test.snap
 output
 
 # Byte-compiled / optimized / DLL files
@@ -81,3 +82,5 @@ tests/sample.vcf.gz
 rust/target
 rust/Cargo.lock
 /tests/added.vcf.gz
+nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
+.stfolder

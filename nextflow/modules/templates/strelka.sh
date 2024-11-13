@@ -6,7 +6,7 @@ configureStrelkaSomaticWorkflow.py \
     !{args} \
     --runDir !{out}
 
-./runWorkflow.py
+!{out}/runWorkflow.py
 
 mv !{out}/variants/*.vcf.gz .
 for variant in *.vcf.gz; do

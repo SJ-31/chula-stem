@@ -14,6 +14,7 @@ include { SNPSIFT } from "../modules/snpsift.nf"
 include { MERGE_VCF as MERGE_VCF_1 } from "../modules/merge_vcf.nf"
 include { MERGE_VCF as MERGE_VCF_2 } from "../modules/merge_vcf.nf"
 include { VEP } from "../modules/vep.nf"
+include {  }
 
 workflow "whole_exome" {
 
@@ -98,8 +99,6 @@ workflow "whole_exome" {
     SNPEFF(all_variants.out.vcf, params.ref.snpEff_db, params.snpEff_cancerSamples, 6)
     VEP(all_variants.out.vcf, params.ref.genome, 6)
     // TODO: need to transfer annotations between them
-
-    // MERGE_VCF_2()
 
     /*
      * Metric collection

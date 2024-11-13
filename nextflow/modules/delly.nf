@@ -5,7 +5,7 @@ process DELLY {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), path(indices)
+    tuple val(meta), path(normal), path(tumor), val(indices)
     val(reference)
     val(exclude)
     val(module_number)

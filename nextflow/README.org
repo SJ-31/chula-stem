@@ -51,19 +51,20 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
     * [[https://github.com/wwylab/MuSE][MuSE2]]: small variants TODO can't install this
     * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
     * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
+      * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
     * [[https://github.com/dellytools/delly][delly]]: structural variants
   * Concatenate results with =bcftools concat= and report source in =SOURCE= header
 + Metrics
   * Tumor info: with [[https://github.com/VanLoo-lab/ascat][ASCAT]], which provides allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
-  * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution
-    https://github.com/im3sanger/dndscv
-  * Alignment: =samtools=, see https://bioinformatics.stackexchange.com/questions/13722/calculating-average-coverage-for-bam-files-sequence-data for coverage calc
+  * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution. [[https://github.com/im3sanger/dndscv][dndSCV]]
   * QC metrics from =fastp=
   * Various metrics from =Picard=
     * =CountReads=
     * =CollectAlignmentSummaryMetrics=
-    *
-+ Variant annotation
+    * TODO: fill this up
++ Variant annotation (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
+  * [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]]
+  * [[https://pcingola.github.io/SnpEff/][snpEff]]
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools

@@ -1,6 +1,3 @@
-bcftools index !{normal}
-bcftools index !{tumor}
-
 configManta.py \
     --normalBam !{normal} \
     --tumorBam !{tumor} \
@@ -8,9 +5,9 @@ configManta.py \
     !{args} \
     --runDir !{out}
 
-./runWorkflow.py
+!{out}/runWorkflow.py
 
-mv !{out}/variants/*.vcf.gz .
+mv !{out}/results/variants/*.vcf.gz .
 for variant in *.vcf.gz; do
     base=$(echo $variant | sed 's/\.vcf\.gz//')
 
