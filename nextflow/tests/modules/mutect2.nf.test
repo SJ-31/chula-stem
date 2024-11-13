@@ -17,8 +17,8 @@ nextflow_process {
                     "id": "sample2",
                     "RGSM_normal": "10"
             ],
-                    "$params.out/bqsr/c_recal.bam",
                     "$params.out/bqsr/b_recal.bam",
+                    "$params.out/bqsr/c_recal.bam",
                     ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
                 input[1] = "$params.genome"
                 input[2] = 4
