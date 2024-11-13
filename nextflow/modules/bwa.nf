@@ -27,7 +27,6 @@ process BWA {
         """
     } else {
         """
-        bwa-mem2 index $reference
         bwa-mem2 mem \\
             -o aligned.sam \\
             -v 3 \\
