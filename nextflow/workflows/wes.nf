@@ -56,33 +56,34 @@ workflow "whole_exome" {
     }
     normals = branched.normal.map { [it[0].id,
                                          ["type": "paired", "id": it[0].id,
-                                         "out": "${params.outdir}/${it[0].id}_paired",
+                                          "out": "${params.outdir}/${it[0].id}_paired",
                                           "RGSM_normal": it[0].RGSM,
-                                         "log": "${params.logdir}/${it[0].id}_paired"],
+                                          "log": "${params.logdir}/${it[0].id}_paired"],
                                          it[1]] }
     tumors = branched.normal.map { [it[0].id, it[1]] }
-    indices = SAMTOOLS_INDEX.out.index.map { [it[0].id, it[1]] }
+    indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] }).groupTuple()
     paired = normal.join(tumors).join(indices) // Order is important for the first two
     paired_no_id = paired.map { it[1..-1] }
     // paired_no_id is [meta, normal, tumor, indices]
+    // TODO: check if this is the case
 
     /*
      * Variant calling
      */
     def getId = { [it[0].id] + it[1] }
 
-    MUTECT2(paired, params.ref.genome, 4)
-    MANTA(paired, params.ref.genome, 4)
+    MUTECT2(paired_no_id, params.ref.genome, 4)
+    MANTA(paired_no_id, params.ref.genome, 4)
 
-    to_strelka = paired_no_id.join(MANTA.out.indels)
-        .map { [it[1], it[2], it[3], it[4]] }
+    to_strelka = paired.join(MANTA.out.indels)
+        .map { it[1..-1] }
     STRELKA2(to_strelka, params.ref.genome, 4)
 
     // TODO need delly exclusion file
-    DELLY(paired, params.ref.genome, params.ref.delly_exclude, 4)
+    DELLY(paired_no_id, params.ref.genome, params.ref.delly_exclude, 4)
     // TODO need cnvkit copy number file
-    CNVKIT(paired, params.ref.cnvkit_copy_number, 4)
-    MSISENSORPRO(paired, params.ref.homopolymers_microsatellites, 4)
+    CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 4)
+    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 4)
 
     all_variants = MUTECT2.out.variants.join(
         MANTA.out.variants.map(getId),
