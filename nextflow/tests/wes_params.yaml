@@ -1,7 +1,13 @@
 references: "/data/project/stemcell/shannc/reference"
 genome: "/data/project/stemcell/shannc/tests/wes_test/GCF_000001405.40_GRCh38.p14_genomic.fna"
-out: "/data/project/stemcell/shannc/tests/wes_test"
+outdir: "/data/project/stemcell/shannc/tests/wes_test"
+
 log: "/data/project/stemcell/shannc/tests/wes_test/log"
 homopoly: "/data/project/stemcell/shannc/reference/msihomopoly-GCF_000001405.40_GRCh38.p14_genomic.tsv"
 delly_exclude: "TODO"
 copy_num: "TODO"
+
+# * Second test
+input: "/data/project/stemcell/shannc/tests/wes_test2/manifest.csv"
+outdir2: "/data/project/stemcell/shannc/tests/wes_test2"
+logdir2: "/data/project/stemcell/shannc/tests/wes_test2/log"

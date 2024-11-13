@@ -1,0 +1,31 @@
+nextflow_workflow {
+
+    name "Test Workflow "whole_exome""
+    script "workflows/wes.nf"
+    workflow ""whole_exome""
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                t = "/data/project/stemcell/shannc/tests"
+                outdir = "$params.t/wes_test2"
+                logdir = "$params.t/wes_test2/log"
+                ref = ["genome": "$params.t/wes_test2/GRCh38.p14_filtered.fna",
+                       "known_variants": ["/data/project/stemcell/shannc/reference/variants/ExAC.r1.sites.vep.vcf.gz"]
+                ]
+                input = "/data/project/stemcell/shannc/tests/wes_test2/manifest.csv"
+            }
+            workflow {
+                """
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+        }
+
+    }
+
+}
