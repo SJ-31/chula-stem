@@ -5,7 +5,7 @@ process MSISENSORPRO {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(tumor), path(normal)
+    tuple val(meta), path(normal), path(tumor)
     val(reference) // A homopolymers and microsatellites tsv file, generated
     // with msisensor-pro scan -d <reference genome> -o <tsv>
     val(module_number)
