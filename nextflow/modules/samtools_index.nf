@@ -6,7 +6,6 @@ process SAMTOOLS_INDEX {
 
     input:
     tuple val(meta), path(bam)
-    val(meta)
     //
 
     output:
