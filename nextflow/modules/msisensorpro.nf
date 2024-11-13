@@ -42,7 +42,7 @@ process MSISENSORPRO {
             -n ${normal} \\
             -t ${tumor} \\
             -d ${reference} \\
-            -o ${out}
+            -o ${prefix}
 
         mv "${prefix}" "${prefix}"_summary.tsv
         mv "${all}" "${all}".tsv
