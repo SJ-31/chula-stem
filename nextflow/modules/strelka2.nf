@@ -5,7 +5,7 @@ process STRELKA2 {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), path(manta_indels)
+    tuple val(meta), path(normal), path(tumor), path(indices), path(manta_indels)
     val(reference)
     val(module_number)
     //
