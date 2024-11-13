@@ -5,7 +5,7 @@ process CNVKIT {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), val(indices)
+    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference) // A copy number reference file (".cnn") created using
     // cnvkit.py reference -f <genome_fasta> -o <output>
     //  Note: if not using WGS, you should prepare a BED file listing genomic coordinates
