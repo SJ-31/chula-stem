@@ -11,21 +11,13 @@ include { DELLY } from "../modules/delly.nf"
 include { PICARD } from "../modules/picard.nf"
 include { SNPEFF } from "../modules/snpeff.nf"
 include { SNPSIFT } from "../modules/snpsift.nf"
-include { MERGE_VCF as MERGE_VCF_1 } from "../modules/merge_vcf.nf"
-include { MERGE_VCF as MERGE_VCF_2 } from "../modules/merge_vcf.nf"
+include { CONCAT_VCF as CONCAT_VCF_1 } from "../modules/concat_vcf.nf"
 include { VEP } from "../modules/vep.nf"
-include {  }
+include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
 workflow "whole_exome" {
 
     main:
-    def check_keys = params.ref.keySet() == ["genome",
-                                             "homopolymers_microsatellites",
-                                             "genome_copy_number",
-                                             "genome_exclude",
-                                             "known_variants",
-                                             "panel_of_normals"].toSet()
-
     input = Channel.fromPath(params.input)
         .splitCsv(header: true)
         .map { [["id": it.patient,
@@ -63,7 +55,7 @@ workflow "whole_exome" {
                                          it[1]] }
     tumors = branched.normal.map { [it[0].id, it[1]] }
     indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] }).groupTuple()
-    paired = normal.join(tumors).join(indices) // Order is important for the first two
+    paired = normals.join(tumors).join(indices) // Order is important for the first two
     paired_no_id = paired.map { it[1..-1] }
     // paired_no_id is [meta, normal, tumor, indices]
     // TODO: check if this is the case
@@ -71,33 +63,33 @@ workflow "whole_exome" {
     /*
      * Variant calling
      */
-    def getId = { [it[0].id] + it[1] }
+    // def getId = { [it[0].id] + it[1] }
 
-    MUTECT2(paired_no_id, params.ref.genome, 4)
-    MANTA(paired_no_id, params.ref.genome, 4)
+    // MUTECT2(paired_no_id, params.ref.genome, 4)
+    // MANTA(paired_no_id, params.ref.genome, 4)
 
-    to_strelka = paired.join(MANTA.out.indels)
-        .map { it[1..-1] }
-    STRELKA2(to_strelka, params.ref.genome, 4)
+    // to_strelka = paired.join(MANTA.out.indels)
+    //     .map { it[1..-1] }
+    // STRELKA2(to_strelka, params.ref.genome, 4)
 
-    // TODO need delly exclusion file
-    DELLY(paired_no_id, params.ref.genome, params.ref.delly_exclude, 4)
-    // TODO need cnvkit copy number file
-    CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 4)
-    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 4)
+    // // TODO need delly exclusion file
+    // DELLY(paired_no_id, params.ref.genome, params.ref.delly_exclude, 4)
+    // // TODO need cnvkit copy number file
+    // CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 4)
+    // MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 4)
 
-    all_variants = MUTECT2.out.variants.join(
-        MANTA.out.variants.map(getId),
-        STRELKA2.out.variants.map(getId),
-        // TODO: This is incomplete cause you don't know the output of the other callers
-    ).map { it[1..-1] }
-    MERGE_VCF_1(all_variants, 5)
+    // all_variants = MUTECT2.out.variants.join(
+    //     MANTA.out.somatic.map(getId),
+    //     STRELKA2.out.somatic.map(getId),
+    //     // TODO: This is incomplete cause you don't know the output of the other callers
+    // ).map { it[1..-1] }
+    // CONCAT_VCF_1(all_variants, 5)
 
-    /*
-     * Variant annotation
-     */
-    SNPEFF(all_variants.out.vcf, params.ref.snpEff_db, params.snpEff_cancerSamples, 6)
-    VEP(all_variants.out.vcf, params.ref.genome, 6)
+    // /*
+    //  * Variant annotation
+    //  */
+    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, params.snpEff_cancerSamples, 6)
+    // VEP(all_variants.out.vcf, params.ref.genome, 6)
     // TODO: need to transfer annotations between them
 
     /*
