@@ -56,9 +56,9 @@ def _vcf_info_add_tag(
     new_line = vcfpy.OrderedDict(
         [
             ("ID", name),
-            ("Description", description),
             ("Number", number),
             ("Type", type),
+            ("Description", description),
         ]
     )
     reader.header.add_info_line(new_line)
