@@ -10,15 +10,17 @@ configManta.py \
 mv !{out}/results/variants/*.vcf.gz .
 for variant in *.vcf.gz; do
     base=$(echo $variant | sed 's/\.vcf\.gz//')
+    name="!{module_number}-${base}_Manta.vcf"
 
-    vcf_info_add_tag -n SOURCE \\
-        -d "Tool producing call" \\
-        -b '.' \\
-        -t String \\
-        -a manta \\
-        -i $variant \\
-        -o "!{module_number}-${base}_Manta.vcf.gz"
+    vcf_info_add_tag -n SOURCE \
+        -d "Tool producing call" \
+        -b '.' \
+        -t String \
+        -a manta \
+        -i $variant \
+        -o "${name}"
+
+    bgzip "${name}"
 done
 
-bcftools annotate temp.vcf.gz TODO
 cp .command.out manta.log
