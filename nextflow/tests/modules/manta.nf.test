@@ -13,11 +13,11 @@ nextflow_process {
             }
             process {
                 """
-                indices = Channel.fromPath("$params.out/bqsr/*.bai").collect()
                 input[0] = [["out": "$params.out/manta",
                     "log": "$params.log/manta", "id": "sample2"],
                     "$params.out/bqsr/c_recal.bam",
-                    "$params.out/bqsr/b_recal.bam", indices]
+                    "$params.out/bqsr/b_recal.bam",
+                    ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
                 input[1] = "$params.genome"
                 input[2] = 4
                 """
