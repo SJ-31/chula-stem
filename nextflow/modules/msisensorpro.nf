@@ -12,17 +12,28 @@ process MSISENSORPRO {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(meta), path("*"), emit: tsvs
     path("*.log")
     //
 
     script:
-    out = "${module_number}-${meta.id}_Msisensor.vcf.gz" // TODO: you don't know what
-    // the output of this is yet
-    check = file("${meta.out}/${out}")
-    if (check.exists()) {
+    prefix = "${module_number}-${meta.id}_Msisensor" // Is the prefix, but also the summary
+    //  file
+    all = "${prefix}_all"
+    unstable = "${prefix}_unstable" // Sites in "all" with statistically significant p-values
+    distribution_file = "${prefix}_dis"
+
+    check_summary = file("${meta.out}/${prefix}_summary.tsv")
+    check_all = file("${meta.out}/${all}.tsv")
+    check_unstable = file("${meta.out}/${unstable}.tsv")
+    check_dis = file("${meta.out}/${distribution_file}.txt")
+
+    if (check_all.exists() && check_summary.exists() && check_dis.exists() && check_unstable.exists()) {
         """
-        cp ${check} .
+        cp $check_all .
+        cp $check_unstable .
+        cp $check_dis .
+        cp $check_summary .
         cp ${meta.log}/msisensor.log .
         """
     } else {
@@ -32,6 +43,11 @@ process MSISENSORPRO {
             -t ${tumor} \\
             -d ${reference} \\
             -o ${out}
+
+        mv "${prefix}" "${prefix}"_summary.tsv
+        mv "${all}" "${all}".tsv
+        mv "${unstable}" "${unstable}".tsv
+        mv "${distribution_file}" "${distribution_file}".txt
 
         cp .command.out msisensor.log
         """
