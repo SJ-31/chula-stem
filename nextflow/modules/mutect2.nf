@@ -17,6 +17,7 @@ process MUTECT2 {
 
     script:
     out = "${module_number}-${meta.id}_Mutect2.vcf.gz"
+    uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
@@ -38,8 +39,9 @@ process MUTECT2 {
             -t String \\
             -a mutect2 \\
             -i temp.vcf.gz \\
-            -o $out
+            -o $uncompressed
 
+        bgzip $out
         cp .command.out mutect2.log
         """
     }
