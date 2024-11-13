@@ -1,6 +1,8 @@
 /target
 .github
 *.nf.test.snap
+*.vcf.gz*
+*.tsv
 output
 
 # Byte-compiled / optimized / DLL files
