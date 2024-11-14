@@ -1,6 +1,7 @@
 /target
 .github
 *.nf.test.snap
+*.nf-test*
 *.vcf.gz*
 *.tsv
 output
