@@ -11,20 +11,20 @@ process VEP {
     //
 
     output:
-    tuple val(meta), path(output)
+    tuple val(meta), path(output), emit: vcf
+    tuple val(meta), path("*.html"), emit: report
     path("*.log")
-    path("*.html")
     //
 
     script:
     output = "${module_number}-${meta.id}_vep.vcf.gz"
     check = file("$meta.out/$output")
-    def args = task.ext.args.join(" ")
+    args = task.ext.args.join(" ")
     if (check.exists()) {
         """
-        cp $check .
-        cp $meta.log/vep.log .
-        cp $meta.log/vep_stats.html .
+        ln -sr $check .
+        ln -sr $meta.log/vep.log .
+        ln -sr $meta.log/vep_stats.html .
         """
     } else {
         """
@@ -37,7 +37,7 @@ process VEP {
             --stats_file vep_stats.html \\
             --vcf \\
             --vcf_info_field ANN \\
-            --compress_output \\
+            --compress_output bgzip \\
             --output_file $output
 
         cp .command.out vep.log
