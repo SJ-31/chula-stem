@@ -5,6 +5,7 @@ tools: "/data/home/shannc/chula-stem/nextflow/input/wes_tools.nf"
 log: "/data/project/stemcell/shannc/tests/wes_test/log"
 homopoly: "/data/project/stemcell/shannc/reference/msihomopoly-GCF_000001405.40_GRCh38.p14_genomic.tsv"
 delly_exclude: "/data/project/stemcell/shannc/reference/tool_specific/hg38.excl.tsv"
+mappability: "TODO"
 copy_num: "TODO"
 
 # * Second test

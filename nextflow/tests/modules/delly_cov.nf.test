@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process DELLY_COV"
+    script "modules/delly_cov.nf"
+    process "DELLY_COV"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/delly_cov", "RGSM_normal": "10",
+                    "log": "$params.log/delly_cov_sv", "id": "sample2"],
+                    "$params.out/bqsr/c_recal.bam",
+                    ["$params.out/bqsr/c_recal.bai"]]
+                input[1] = params.genome
+                input[2] = params.mappability
+                input[3] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
