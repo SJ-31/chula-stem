@@ -11,7 +11,8 @@ include { DELLY } from "../modules/delly.nf"
 include { PICARD } from "../modules/picard.nf"
 include { SNPEFF } from "../modules/snpeff.nf"
 include { SNPSIFT } from "../modules/snpsift.nf"
-include { CONCAT_VCF as CONCAT_VCF_1 } from "../modules/concat_vcf.nf"
+include { MERGE_VCFS as MERGE_A } from "../modules/merge_vcfs.nf"
+include { MERGE_VCFS as MERGE_B } from "../modules/merge_vcfs.nf"
 include { VEP } from "../modules/vep.nf"
 include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
@@ -63,7 +64,7 @@ workflow "whole_exome" {
     /*
      * Variant calling
      */
-    // def getId = { [it[0].id] + it[1] }
+    def getId = { [it[0].id] + it[1] }
 
     // MUTECT2(paired_no_id, params.ref.genome, 4)
     // MANTA(paired_no_id, params.ref.genome, 4)
@@ -72,9 +73,9 @@ workflow "whole_exome" {
     //     .map { it[1..-1] }
     // STRELKA2(to_strelka, params.ref.genome, 4)
 
-    // // TODO need delly exclusion file
+    // TODO need delly exclusion file
     // DELLY(paired_no_id, params.ref.genome, params.ref.delly_exclude, 4)
-    // // TODO need cnvkit copy number file
+    // TODO need cnvkit copy number file
     // CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 4)
     // MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 4)
 
@@ -83,16 +84,21 @@ workflow "whole_exome" {
     //     STRELKA2.out.somatic.map(getId),
     //     // TODO: This is incomplete cause you don't know the output of the other callers
     // ).map { it[1..-1] }
-    // CONCAT_VCF_1(all_variants, 5)
+    // MERGE_A(all_variants, 5)
 
-    // /*
-    //  * Variant annotation
-    //  */
-    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, params.snpEff_cancerSamples, 6)
+    /*
+     * Variant annotation
+     */
+    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, true, 6)
     // VEP(all_variants.out.vcf, params.ref.genome, 6)
     // TODO: need to transfer annotations between them
+    //      Check if merge1 works for this
+    // annotated = SNPEFF.out.vcf.join(VEP.map(getId))
+    // MERGE_B(annotated, 6)
 
     /*
      * Metric collection
      */
+
+
 }
