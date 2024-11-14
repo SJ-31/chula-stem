@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process SNPEFF"
+    script "modules/snpeff.nf"
+    process "SNPEFF"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/snpeff",
+                    "log": "$params.log/snpeff", "id": "sample2",
+                    "RGSM_normal": "10"],
+                    "$params.out/merged.vcf.gz"]
+                input[1] = "GRCh38.p14"
+                input[2] = true
+                input[3] = 6
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

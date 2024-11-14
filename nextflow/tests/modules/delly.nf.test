@@ -12,12 +12,13 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/delly",
+                input[0] = [["out": "$params.out/delly", "RGSM_normal": "10",
                     "log": "$params.log/delly", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam"]
-                input[1] = "$params.genome"
-                input[2] = "$params.delly_exclude"
+                    "$params.outdir/bqsr/b_recal.bam",
+                    "$params.outdir/bqsr/c_recal.bam",
+                    ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
+                input[1] = params.genome
+                input[2] = ""
                 input[3] = 4
                 """
             }

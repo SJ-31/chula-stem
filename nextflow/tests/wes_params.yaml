@@ -1,10 +1,10 @@
 references: "/data/project/stemcell/shannc/reference"
 genome: "/data/project/stemcell/shannc/tests/wes_test/GCF_000001405.40_GRCh38.p14_genomic.fna"
-outdir: "/data/project/stemcell/shannc/tests/wes_test"
-
+out: "/data/project/stemcell/shannc/tests/wes_test"
+tools: "/data/home/shannc/chula-stem/nextflow/input/wes_tools.nf"
 log: "/data/project/stemcell/shannc/tests/wes_test/log"
 homopoly: "/data/project/stemcell/shannc/reference/msihomopoly-GCF_000001405.40_GRCh38.p14_genomic.tsv"
-delly_exclude: "TODO"
+delly_exclude: "/data/project/stemcell/shannc/reference/tool_specific/hg38.excl.tsv"
 copy_num: "TODO"
 
 # * Second test
