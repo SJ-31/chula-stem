@@ -22,8 +22,8 @@ process DELLY {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp ${check} .
-        cp ${meta.log}/delly.log .
+        ln -sr ${check} .
+        ln -sr ${meta.log}/delly.log .
         """
     } else {
         """

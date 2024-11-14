@@ -1,7 +1,6 @@
 process MULTIQC {
     ext version: "1.25.1"
 
-
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
@@ -22,8 +21,8 @@ process MULTIQC {
     check = file("${meta.out}/multiqc")
     if (check.exists()) {
         """
-        cp -r $check .
-        cp "${meta.log}/multiqc.log" .
+        ln -sr -r $check .
+        ln -sr "${meta.log}/multiqc.log" .
         """
     } else {
         """

@@ -19,8 +19,8 @@ process SAMTOOLS_INDEX {
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
-        cp $check .
-        cp ${meta.log}/samtools_index .
+        ln -sr $check .
+        ln -sr ${meta.log}/samtools_index .
         """
     } else {
         """

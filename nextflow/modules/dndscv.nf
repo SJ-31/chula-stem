@@ -21,15 +21,15 @@ process DNDSCV {
     if (check.exists()) {
         """
 
-        cp ${meta.log}/ .
+        ln -sr ${meta.log}/ .
         """
     } else {
         """
-        echo -e "chr\tpos\tref\tmut" > table.tsv
+        echo -e "chr\tpos\tref\talt" > table.tsv
         bcftools query \\
-            -i "SNP=1 || INS=1 || DEL=1" $vcf \\
+            -i "SNP=1 || INS=1 || DEL=1"  \\
             -f "%CHROM\t%POS0\t%REF\t%ALT" \\
-            >> table.tsv
+            $vcf >> table.tsv
 
         cp .command.out .log
         """

@@ -19,8 +19,8 @@ process MARK_DUPLICATES {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp $check .
-        cp ${meta.log}/dedup.log .
+        ln -sr $check .
+        ln -sr ${meta.log}/dedup.log .
         """
     } else {
         """

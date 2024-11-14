@@ -30,11 +30,11 @@ process MSISENSORPRO {
 
     if (check_all.exists() && check_summary.exists() && check_dis.exists() && check_unstable.exists()) {
         """
-        cp $check_all .
-        cp $check_unstable .
-        cp $check_dis .
-        cp $check_summary .
-        cp ${meta.log}/msisensor.log .
+        ln -sr $check_all .
+        ln -sr $check_unstable .
+        ln -sr $check_dis .
+        ln -sr $check_summary .
+        ln -sr ${meta.log}/msisensor.log .
         """
     } else {
         """

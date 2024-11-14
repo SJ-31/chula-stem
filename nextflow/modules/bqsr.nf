@@ -1,6 +1,9 @@
 process BQSR {
     ext version: "4.6.1.0"
 
+    publishDir "$meta.out", mode: "copy"
+    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+
     // Recalibrate and also obtain covariate plot
     input:
     tuple val(meta), path(bam)
@@ -11,6 +14,7 @@ process BQSR {
     output:
     tuple val(meta), path("*_recal.bam"), emit: bam
     path(report)
+    path("*.log")
 
     script:
     recal = "${module_number}-${meta.id}_recal.bam"
@@ -20,8 +24,9 @@ process BQSR {
     def sites_command = known_sites.collect{"--known-sites $it"}.join(' ')
     if (check.exists() && check2.exists()) {
         """
-        cp $check .
-        cp $check2 .
+        ln -sr $check .
+        ln -sr $check2 .
+        ln -sr "${meta.log}/bqsr.log" .
         """
     } else {
         """
@@ -47,6 +52,8 @@ process BQSR {
             -before recalibration_1.table \\
             -after recalibration_2.table \\
             -plots $report
+
+        cp .command.out bqsr.log
         """
     }
 

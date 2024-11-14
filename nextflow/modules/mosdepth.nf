@@ -19,8 +19,8 @@ process MOSDEPTH {
     check = file("${meta.out}/${prefix}.mosdepth.global.dist.txt")
     if (check.exists()) {
         """
-        cp "${meta.out}/${prefix}*" .
-        cp "${meta.log}/mosdepth.log" .
+        ln -sr "${meta.out}/${prefix}*" .
+        ln -sr "${meta.log}/mosdepth.log" .
         """
     } else if (target_regions) {
         """

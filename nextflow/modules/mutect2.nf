@@ -21,8 +21,8 @@ process MUTECT2 {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        cp $check .
-        cp ${meta.log}/mutect2.log .
+        ln -sr $check .
+        ln -sr ${meta.log}/mutect2.log .
         """
     } else {
         """
@@ -34,7 +34,7 @@ process MUTECT2 {
             --output temp.vcf.gz
 
         vcf_info_add_tag -n SOURCE \\
-            -d "Tool producing call" \\
+            -d $params.source_description \\
             -b '.' \\
             -t String \\
             -a mutect2 \\

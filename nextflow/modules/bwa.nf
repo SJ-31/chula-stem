@@ -22,8 +22,8 @@ process BWA {
     check = file("${meta.out}/$out")
     if (check.exists()) {
         """
-        cp $check .
-        cp "${meta.log}/bwa.log" .
+        ln -sr $check .
+        ln -sr "${meta.log}/bwa.log" .
         """
     } else {
         """

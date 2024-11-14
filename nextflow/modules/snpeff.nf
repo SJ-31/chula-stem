@@ -25,9 +25,9 @@ process SNPEFF {
     def args = task.ext.args.join(" ")
     if (check.exists()) {
         """
-        cp $check .
-        cp "${meta.out}/${report}" .
-        cp "${meta.log}/snpEff.log" .
+        ln -sr $check .
+        ln -sr "${meta.out}/${report}" .
+        ln -sr "${meta.log}/snpEff.log" .
         """
     } else {
         """

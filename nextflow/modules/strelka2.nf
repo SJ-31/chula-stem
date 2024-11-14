@@ -22,9 +22,9 @@ process STRELKA2 {
     def args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        cp -r !{check}.name .
-        cp !{meta.out}/*_Strelka.vcf.gz .
-        cp !{meta.log}/strelka.log .
+        ln -sr -r !{check} .
+        ln -sr !{meta.out}/*_Strelka.vcf.gz .
+        ln -sr !{meta.log}/strelka.log .
         '''
     } else {
         template 'strelka.sh'

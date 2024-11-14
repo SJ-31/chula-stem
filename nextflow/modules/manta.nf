@@ -28,9 +28,9 @@ process MANTA {
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        cp -r !{check}.name .
-        cp !{meta.out}/*_Manta.vcf.gz .
-        cp !{meta.log}/manta.log .
+        ln -sr -r !{check} .
+        ln -sr !{meta.out}/*_Manta.vcf.gz .
+        ln -sr !{meta.log}/manta.log .
         '''
     } else {
         template 'manta.sh'

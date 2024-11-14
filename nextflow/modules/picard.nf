@@ -1,6 +1,5 @@
 process PICARD {
     ext version: "4.6.1.0"
-  
 
     publishDir "$meta.out", mode: 'copy'
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
@@ -26,8 +25,8 @@ process PICARD {
     check = file(${meta.out}/"${out}")
     if (check.exists()) {
         """
-        cp "${meta.out}/${module_number}"-*_metrics_Picard*" .
-        cp "${meta.log}/picard.log" .
+        ln -sr "${meta.out}/${module_number}"-*_metrics_Picard*" .
+        ln -sr "${meta.log}/picard.log" .
         """
     } else {
         """

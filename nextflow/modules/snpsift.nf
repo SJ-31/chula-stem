@@ -23,9 +23,9 @@ process SNPSIFT {
     check = file("$meta.out/${output}.gz")
     if (check.exists()) {
         """
-        cp $check .
-        cp "${meta.out}/${report}" .
-        cp "${meta.log}/SnpSift.log" .
+        ln -sr $check .
+        ln -sr "${meta.out}/${report}" .
+        ln -sr "${meta.log}/SnpSift.log" .
         """
     } else {
         """
