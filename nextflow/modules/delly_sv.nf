@@ -1,4 +1,4 @@
-process DELLY {
+process DELLY_SV {
     ext version: "1.3.1"
  
     publishDir "$meta.out", mode: "copy"
@@ -12,30 +12,23 @@ process DELLY {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(meta), path("${out}")
     path("*.log")
     //
 
-    script:
-    out = "${module_number}-${meta.id}_Delly.bcf.gz" // TODO: you don't know what
+    shell:
+    out = "${module_number}-${meta.id}_DellySV.vcf.gz"
     // the output of this is yet
     check = file("${meta.out}/${out}")
+    args = task.ext.args.join(" ")
+    exclude_flag = exclude == "" ? "" : "-x ${exclude}"
     if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/delly.log .
-        """
+        '''
+        ln -sr !{check} .
+        ln -sr !{meta.log}/dellySV.log .
+        '''
     } else {
-        """
-        delly call \\
-            -g ${reference} \\
-            -x ${exclude} \\
-            -o ${out} \\
-            ${tumor} \\
-            ${normal}
-
-        cp .command.out delly.log
-        """
+        template 'delly.bash'
     }
     //
 }
