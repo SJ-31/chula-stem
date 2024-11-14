@@ -1,0 +1,20 @@
+# * Directories
+dir:
+  pytest: "/data/home/shannc/chula-stem/tests"
+  test: "/data/project/stemcell/shannc/tests"
+  wes_test: "/data/project/stemcell/shannc/tests/wes_test"
+  tool_ref: "/data/project/stemcell/shannc/reference/tool_specific"
+
+# * Tools
+java21: "/data/home/shannc/.sdkman/candidates/java/21.0.4-tem/bin/java"
+tools:
+  snpsift: "/data/home/shannc/tools/snpEff/SnpSift.jar"
+  snpeff: "/data/home/shannc/.sdkman/candidates/java/21.0.4-tem/bin/java -jar /data/home/shannc/tools/snpEff/snpEff.jar"
+
+# * Links
+links:
+  delly_exclude: "https://raw.githubusercontent.com/dellytools/delly/refs/heads/main/excludeTemplates/human.hg38.excl.tsv" # Retrieved 14 Nov 2024
+
+# * Misc.
+grch38_rename_file: "/data/project/stemcell/shannc/reference/GRCh38.p14_rename.tsv"
+mutect2_out: "/data/project/stemcell/shannc/tests/wes_test/mutect2/temp.vcf.gz"
