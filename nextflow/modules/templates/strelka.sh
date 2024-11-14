@@ -24,6 +24,7 @@ for variant in *.vcf.gz; do
         -i $variant \
         -o "${name}"
 
+    rm "$variant"
     bgzip "${name}"
 done
 
