@@ -8,39 +8,29 @@ process SNPEFF {
     input:
     tuple val(meta), path(vcf)
     val(reference)
-    val(sample_definition)
+    val(is_somatic)
     val(module_number)
     //
 
     output:
-    path("${output}.gz")
-    path("*.html")
+    tuple val(meta), path("${output}.gz"), emit: vcf
+    tuple val(meta), path("*.html"), emit: report
     path("*.log")
     //
 
-    script:
+    shell:
     output = "${module_number}-${meta.id}_snpEff.vcf"
     report = "${module_number}-${meta.id}_snpEff_summary.html"
     check = file("$meta.out/${output}.gz")
-    def args = task.ext.args.join(" ")
+    args = task.ext.args.join(" ")
     if (check.exists()) {
-        """
-        ln -sr $check .
-        ln -sr "${meta.out}/${report}" .
-        ln -sr "${meta.log}/snpEff.log" .
-        """
+        '''
+        ln -sr !{check} .
+        ln -sr "!{meta.out}/!{report}" .
+        ln -sr "!{meta.log}/snpEff.log" .
+        '''
     } else {
-        """
-        $params.snpEff $args \\
-            -nodownload  \\
-            -cancerSamples $sample_definition \\
-            $reference \\
-            $vcf > $output
-        gzip $output
-
-        cp snpEff_summary.html $report
-        cp .command.out snpEff.log
-        """
+        template 'snpeff.sh'
     }
     //
 }
