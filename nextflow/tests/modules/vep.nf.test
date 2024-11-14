@@ -1,0 +1,31 @@
+nextflow_process {
+
+    name "Test Process VEP"
+    script "modules/vep.nf"
+    process "VEP"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/vep",
+                    "log": "$params.log/vep", "id": "sample2",
+                    "RGSM_normal": "10"],
+                    "$params.out/merged.vcf.gz"]
+                input[1] = "$params.genome"
+                input[2] = 6
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
