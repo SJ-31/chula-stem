@@ -17,8 +17,10 @@ process FASTP {
     //
 
     script:
-    output1 = "${module_number}-${reads[0].baseName}.fastp.fastq.gz"
-    output2 = "${module_number}-${reads[1].baseName}.fastp.fastq.gz"
+    n0 = reads[0].baseName.replace(".fastq.gz", "")
+    n1 = reads[1].baseName.replace(".fastq.gz", "")
+    output1 = "${module_number}-${n1}.fastp.fastq.gz"
+    output2 = "${module_number}-${n2}.fastp.fastq.gz"
     prefix = "${module_number}-${meta.id}_fastp"
     check1 = file("${meta.out}/$output1")
     check2 = file("${meta.out}/$output2")
@@ -33,7 +35,6 @@ process FASTP {
     } else {
         """
         fastp -i ${reads[0]} -I ${reads[1]} \\
-            -z 4 \\
             -h ${prefix}.html \\
             -j ${prefix}.json \\
             -R ${meta.id}_report \\
