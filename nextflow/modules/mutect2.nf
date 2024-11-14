@@ -41,7 +41,7 @@ process MUTECT2 {
             -i temp.vcf.gz \\
             -o $uncompressed
 
-        bgzip $out
+        bgzip $uncompressed
         cp .command.out mutect2.log
         """
     }
