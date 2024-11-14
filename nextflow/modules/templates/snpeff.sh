@@ -19,5 +19,6 @@ fi
 
 bgzip !{output}
 
-cp snpEff_summary.html !{report}
+mv snpEff_summary.html !{report}
+mv snpEff_genes.txt !{genes_file}
 cp .command.out snpEff.log
