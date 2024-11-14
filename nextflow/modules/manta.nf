@@ -28,7 +28,7 @@ process MANTA {
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        ln -sr -r !{check} .
+        ln -sr !{check} .
         ln -sr !{meta.out}/*_Manta.vcf.gz .
         ln -sr !{meta.log}/manta.log .
         '''

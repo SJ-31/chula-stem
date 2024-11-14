@@ -16,13 +16,13 @@ process STRELKA2 {
     path("*.log")
     //
 
-    script:
+    shell:
     out = "${module_number}-${meta.id}_StrelkaOut"
     check = file("${meta.out}/${out}")
-    def args = task.ext.args.join(" ")
+    args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        ln -sr -r !{check} .
+        ln -sr !{check} .
         ln -sr !{meta.out}/*_Strelka.vcf.gz .
         ln -sr !{meta.log}/strelka.log .
         '''

@@ -13,7 +13,7 @@ for variant in *.vcf.gz; do
     name="!{module_number}-${base}_Manta.vcf"
 
     vcf_info_add_tag -n SOURCE \
-        -d !{params.source_description} \
+        -d "!{params.source_description}" \
         -b '.' \
         -t String \
         -a manta \
