@@ -38,7 +38,7 @@ process MARK_DUPLICATES {
             -M ${meta.id}_dedup_metrics.txt \\
             -O ${out}
 
-        cp .command.out dedup.log
+        get_nextflow_log.bash dedup.log
         """
     }
 

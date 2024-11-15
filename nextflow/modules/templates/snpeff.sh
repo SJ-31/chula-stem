@@ -21,4 +21,4 @@ bgzip !{output}
 
 mv snpEff_summary.html !{report}
 mv snpEff_genes.txt !{genes_file}
-cp .command.out snpEff.log
+get_nextflow_log.bash snpEff.log

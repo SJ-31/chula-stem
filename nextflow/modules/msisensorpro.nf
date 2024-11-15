@@ -49,7 +49,7 @@ process MSISENSORPRO {
         mv "${unstable}" "${unstable}".tsv
         mv "${distribution_file}" "${distribution_file}".txt
 
-        cp .command.out msisensor.log
+        get_nextflow_log.bash msisensor.log
         """
     }
     //

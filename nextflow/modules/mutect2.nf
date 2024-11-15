@@ -42,7 +42,7 @@ process MUTECT2 {
             -o $uncompressed
 
         bgzip $uncompressed
-        cp .command.out mutect2.log
+        get_nextflow_log.bash mutect2.log
         """
     }
     //

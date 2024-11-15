@@ -28,7 +28,7 @@ process MULTIQC {
         """
         multiqc . --config "$params.configdir/multiqc_config.yaml"
 
-        cp .command.out multiqc.log
+        get_nextflow_log.bash multiqc.log
         """
     }
 

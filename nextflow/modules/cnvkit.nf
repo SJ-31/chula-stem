@@ -33,7 +33,7 @@ process CNVKIT {
             -d ${out} \\
             ${tumor}
 
-        cp .command.out msisensor.log
+        get_nextflow_log.bash msisensor.log
         """
     }
     //

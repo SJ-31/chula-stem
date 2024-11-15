@@ -30,4 +30,4 @@ delly call !{args} \
 # Post-filter
 delly filter -f somatic -o !{out} -s samples.tsv geno.bcf
 
-cp .command.out delly.log
+get_nextflow_log.bash delly.log

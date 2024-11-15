@@ -28,4 +28,4 @@ for variant in *.vcf.gz; do
     bgzip "${name}"
 done
 
-cp .command.out strelka.log
+get_nextflow_log.bash strelka.log

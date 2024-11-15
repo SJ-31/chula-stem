@@ -14,16 +14,18 @@ process FASTP {
     path("*fail.fastq.gz"), optional: true, emit: failed_reads
     path("*.html")
     path("*.json")
+    path("*.log")
     //
 
     script:
-    n0 = reads[0].baseName.replace(".fastq.gz", "")
-    n1 = reads[1].baseName.replace(".fastq.gz", "")
-    output1 = "${module_number}-${n1}.fastp.fastq.gz"
-    output2 = "${module_number}-${n2}.fastp.fastq.gz"
+    n0 = reads[0].baseName.replaceAll(".fastq", "")
+    n1 = reads[1].baseName.replaceAll(".fastq", "")
+    output1 = "${module_number}-${n0}.fastp.fastq.gz"
+    output2 = "${module_number}-${n1}.fastp.fastq.gz"
     prefix = "${module_number}-${meta.id}_fastp"
     check1 = file("${meta.out}/$output1")
     check2 = file("${meta.out}/$output2")
+    args = task.ext.args.join(" ")
     if (check1.exists() && check2.exists()) {
         """
       ln -sr $check1 .
@@ -39,9 +41,10 @@ process FASTP {
             -j ${prefix}.json \\
             -R ${meta.id}_report \\
             --failed_out ${meta.id}.fail.fastq.gz \\
+            ${args} \\
             -o $output1 -O $output2
 
-        cp .command.out fastp.log
+        get_nextflow_log.bash fastp.log
         """
     }
 

@@ -33,7 +33,7 @@ process MERGE_VCFS {
         gatk MergeVcfs ${merge_flag} \\
             -O $check
 
-        cp .command.out vcf_merge_annotations.log
+        get_nextflow_log.bash vcf_merge_annotations.log
         """
     }
     //

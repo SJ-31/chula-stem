@@ -26,12 +26,12 @@ process MOSDEPTH {
         """
         mosdepth $prefix $bam \\
             --by $target_regions
-        cp .command.out mosdepth.log
+        get_nextflow_log.bash mosdepth.log
         """
     } else {
         """
         mosdepth $prefix $bam
-        cp .command.out mosdepth.log
+        get_nextflow_log.bash mosdepth.log
         """
     }
 

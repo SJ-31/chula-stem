@@ -25,7 +25,7 @@ process SAMTOOLS_INDEX {
     } else {
         """
         samtools index $bam
-        cp .command.out samtools_index.log
+        get_nextflow_log.bash samtools_index.log
         """
     }
     //

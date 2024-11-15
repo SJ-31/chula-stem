@@ -17,7 +17,7 @@ process DNDSCV {
     script:
     output =
         check = file("${meta.out}/output")
-    def args = task.ext.args.join(" ")
+    args = task.ext.args.join(" ")
     if (check.exists()) {
         """
 
@@ -31,7 +31,7 @@ process DNDSCV {
             -f "%CHROM\t%POS0\t%REF\t%ALT" \\
             $vcf >> table.tsv
 
-        cp .command.out .log
+        get_nextflow_log.bash .log
         """
     }
     //

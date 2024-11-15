@@ -36,9 +36,9 @@ process SNPSIFT {
             $params.SnpSift varType > \\
             $output
 
-        gzip $output
+        bgzip $output
 
-        cp .command.out SnpSift.log
+        get_nextflow_log.bash SnpSift.log
         """
     }
     //

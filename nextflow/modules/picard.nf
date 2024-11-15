@@ -56,7 +56,7 @@ process PICARD {
             throw new Exception("'omics_type' must be one of wgs|rna-seq|exome")
         }
         """
-        cp .command.out picard.log
+        get_nextflow_log.bash picard.log
         """
     }
 }

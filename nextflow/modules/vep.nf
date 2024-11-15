@@ -40,7 +40,7 @@ process VEP {
             --compress_output bgzip \\
             --output_file $output
 
-        cp .command.out vep.log
+        get_nextflow_log.bash vep.log
         """
     }
     //

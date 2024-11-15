@@ -34,7 +34,7 @@ process BWA {
             ${reads[0]} ${reads[1]}
 
         samtools view -S -b aligned.sam > aligned.bam
-        cp .command.out bwa.log
+        get_nextflow_log.bash bwa.log
 
         gatk AddOrReplaceReadGroups \\
             -I aligned.bam \\
