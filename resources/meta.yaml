@@ -14,6 +14,7 @@ tools:
 # * Links
 links:
   delly_exclude: "https://raw.githubusercontent.com/dellytools/delly/refs/heads/main/excludeTemplates/human.hg38.excl.tsv" # Retrieved 14 Nov 2024
+  delly_mappability_GRCh38: "https://gear-genomics.embl.de/data/delly/Homo_sapiens.GRCh38.dna.primary_assembly.fa.r101.s501.blacklist.gz" # Retrieved 15 Nov 2024
 
 # * Misc.
 grch38_rename_file: "/data/project/stemcell/shannc/reference/GRCh38.p14_rename.tsv"
