@@ -11,8 +11,8 @@ process MARK_DUPLICATES {
     val(module_number)
 
     output:
-    tuple val(meta), path("${meta.id}_dedup.bam"), emit: dedup
-    tuple val(meta), path("${meta.id}_dedup_metrics.txt"), emit: qc
+    tuple val(meta), path(out), emit: dedup
+    tuple val(meta), path(txt), emit: qc
 
     script:
     out = "${module_number}-${meta.id}_dedup.bam"
