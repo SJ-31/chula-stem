@@ -2,7 +2,7 @@ process MARK_DUPLICATES {
     ext version: "4.6.1.0"
     
 
-    publishDir "${meta.out}", mode:'copy'
+    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
     publishDir "${meta.log}", mode:'copy', pattern: "*.log"
 
     input:
@@ -16,11 +16,13 @@ process MARK_DUPLICATES {
 
     script:
     out = "${module_number}-${meta.id}_dedup.bam"
+    txt = "${module_number}-${meta.id}_dedup_metrics.txt"
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        ln -sr $check .
+        ln -sr ${check} .
         ln -sr ${meta.log}/dedup.log .
+        ln -sr ${meta.out}/${txt} .
         """
     } else {
         """
@@ -32,10 +34,10 @@ process MARK_DUPLICATES {
             -O reordered.bam \\
             --SEQUENCE_DICTIONARY $reference
 
-        gatk MarkDuplicatesSpark \\
+        gatk MarkDuplicates \\
             -I sorted.bam \\
             --ASSUME_SORT_ORDER coordinate \\
-            -M ${meta.id}_dedup_metrics.txt \\
+            -M ${txt} \\
             -O ${out}
 
         get_nextflow_log.bash dedup.log

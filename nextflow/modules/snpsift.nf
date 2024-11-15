@@ -1,7 +1,7 @@
 process SNPSIFT {
     ext version: "5.2e"
   
-    publishDir "$meta.out", mode: "copy"
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:

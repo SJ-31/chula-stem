@@ -1,7 +1,7 @@
 process CNVKIT {
     ext version: "0.9.11"
 
-    publishDir "$meta.out", mode: "copy"
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
