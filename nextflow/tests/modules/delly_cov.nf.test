@@ -14,9 +14,9 @@ nextflow_process {
                 """
                 input[0] = [["out": "$params.out/delly_cov", "RGSM_normal": "10",
                     "log": "$params.log/delly_cov_sv", "id": "sample2"],
-                    "$params.out/bqsr/c_recal.bam",
-                    ["$params.out/bqsr/c_recal.bai"]]
-                input[1] = params.genome
+                    "$params.out2/patient_10_cancer/3-patient_10_dedup.bam",
+                    ["$params.out2/patient_10_cancer/3-patient_10_dedup.bam.bai"]]
+                input[1] = params.genome_filtered
                 input[2] = params.mappability
                 input[3] = 3
                 """

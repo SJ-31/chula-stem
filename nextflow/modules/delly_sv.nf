@@ -12,7 +12,7 @@ process DELLY_SV {
     //
 
     output:
-    tuple val(meta), path("${out}")
+    tuple val(meta), path(out)
     path("*.log")
     //
 
