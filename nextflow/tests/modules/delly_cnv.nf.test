@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process DELLY_CNV"
+    script "modules/delly_cnv.nf"
+    process "DELLY_CNV"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/delly_cnv", "RGSM_normal": "10",
+                    "log": "$params.log/delly_cnv_sv", "id": "sample2"],
+                    "$params.out2/patient_10_cancer/3-patient_10_dedup.bam",
+                    ["$params.out2/patient_10_cancer/3-patient_10_dedup.bam.bai"]]
+                input[1] = params.genome_filtered
+                input[2] = params.mappability
+                input[3] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
