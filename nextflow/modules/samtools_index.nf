@@ -14,7 +14,7 @@ process SAMTOOLS_INDEX {
     //
 
     script:
-    output = "${bam.baseName}.bai"
+    output = "${bam}.bai"
     check = file("${meta.out}/$output")
     args = task.ext.args.join(" ")
     if (check.exists()) {
