@@ -79,6 +79,7 @@ nextflow/.nextflow*
 nextflow/input
 nextflow/.nf-test
 nextflow/work
+nextflow/sbatch_nf*
 nextflow/reports
 renv
 tests/sample.vcf.gz
