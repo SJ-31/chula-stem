@@ -5,7 +5,7 @@ testdir=$(yq ".dir.pytest" meta.yaml)
 a="${testdir}/vcf_test.vcf"
 snpsift=$(yq ".tools.snpsift" meta.yaml)
 java=$(yq ".java21" meta.yaml)
-source="/data/project/stemcell/shannc/tests/wes_test/merged.vcf.gz"
+source="/data/project/stemcell/shannc/tests/wes_test/strelka2/4-somatic.snvs_Strelka.vcf.gz"
 table="${testdir}/dndscv_mutants.tsv"
 
 bcftools annotate --rename-chrs "$rename" "$source" > tmp.vcf
