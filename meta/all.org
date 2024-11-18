@@ -1,2 +1,3 @@
 * Exome CRC
-Sequencing platform: NovaSeq 6000
++ Sequencing platform: NovaSeq 6000
++ Capture kit: SureSelect Human All Exon V6

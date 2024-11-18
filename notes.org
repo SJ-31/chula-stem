@@ -1,4 +1,14 @@
 * Unsorted notes
+** Benchmarking WES :PROCEDURE:
+CREATED: [2024-11-18 Mon]
+LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Steps][Steps]]
+ + See the following paper https://www.nature.com/articles/s41598-020-69772-8#Tab2 for ideas on how to benchmark pipeline
+   * They have some sources of exome data that you could use https://www.nature.com/articles/s41598-020-69772-8/tables/2
+   * "We adopted three evaluation metrics that are frequently used in the research community to provide comprehensive assessments of imbalanced learning problems, namely, recall (fraction of predicted true variants among all true variants), precision (fractions of predictions that are true among all predicted variants), and F1-score (weighted mean of precisions and recall)."
+** CAncer driver prediction :PROCEDURE:
+CREATED: [2024-11-15 Fri]
+LOCATION: [[file:~/Bio_SDD/chula-stem/tests/test_dndscv.py]]
+https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giad106/7471728?login=true describes a method of predicting cancer driver genes from gene expression data (so you could use this if you get to rnaseq)
 ** Fusion detection tools for RNA-seq :PROCEDURE:
 CREATED: [2024-11-06 Wed]
 LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*Steps][Steps]]

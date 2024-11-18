@@ -1,13 +1,50 @@
+:REFERENCES:
++ [1] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
+:END:
 * Inbox
+** TODO [#A] Figure out how to segment the tumor genome
+CREATED: [2024-11-14 Thu]
+LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/modules/templates/delly_cnv.bash::--cnv-size:]]
+Should probably read the delly paper to find out what all of these things mean
+ --cnv-size:
+ --cn_offset:
+ --sdrd (read-depth shift):
+** TODO [#B] Check out wally for plotting reads
+CREATED: [2024-11-14 Thu]
+https://github.com/tobiasrausch/wally
+** TODO [#C] dndscv keeps failing
+CREATED: [2024-11-14 Thu]
+The error is "Zero coding substitutions found in this dataset", despite your dataset having plenty of snps
+Could this be an issue with the .rda reference file prepared from entrez??
+** TODO [#A] Get capture kit BED files from agilent website
+Website should be up by <2024-11-19 Tue>
+https://earray.chem.agilent.com/suredesign/
 ** TODO [#A] Ask about cancer cell culture
 CREATED: [2024-11-12 Tue]
 How were the cancer cells sequenced?
 And what are the characteristics of the culture process?
 You want to know cause some metrics (namely intratumor heterogeneity and tumor purity) may depend on this
+** TODO [#A] Look into using a consensus approach for variant callers
+Apparently the literature indicates that different variant callers tend to yield different results, and their performance is variable between datasets. So you could use a consensus approach with majority vote, (but would probably need to more callers )
+
+"From performance comparison results of individual callers, we observed that there is no clear winner for all datasets, and each caller has its own strengths and weaknesses in different settings. The varied performance of callers indicates that using ensemble approaches to combine them is essential for performance improvement."   [1]
+
+Or you could run a bunch of benchmarks to see what works well for the specific platform
+
+See https://www.nature.com/articles/s41598-020-69772-8#Tab2
+** TODO [#A] Remaining tests to write
+- ASCAT
+- delly_cnv
+- cnvkit
+- mosdepth
+- dndscv
+- multiqc
+- Picard
 ** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample
 CREATED: [2024-11-11 Mon]
 Especially check the ids
-** TODO [#A] Automate preparation of snpEff cancer definition file
+** DONE [#A] Automate preparation of snpEff cancer definition file
+CLOSED: [2024-11-15 Fri 08:44]
 CREATED: [2024-11-11 Mon]
 See here for the file format https://pcingola.github.io/SnpEff/snpeff/cansersamples/
 ** TODO [#A] Run bwa-mem2 again with the .alt index file to make sure that it reads the ALT contigs
@@ -25,29 +62,14 @@ http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetri
 https://cnvkit.readthedocs.io/en/stable/pipeline.html
 
 You should ask P' Thip about this, as well as how to handle read groups
-** TODO [#C] Figure out how to run the nextflow pipeline with SLURM
+** DONE [#C] Figure out how to run the nextflow pipeline with SLURM
+CLOSED: [2024-11-15 Fri 08:30]
 CREATED: [2024-11-08 Fri]
 LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/todo.org::*Have a look at benchmarking the WES variant calling][Have a look at benchmarking the WES variant calling]]
 https://slurm.schedmd.com/sbatch.html
 https://jhpce.jhu.edu/slurm/slurm-commands-ref/
 https://www.nextflow.io/docs/latest/executor.html
 https://github.com/nextflow-io/nextflow/discussions/4095
-** TODO [#B] Prepare the exclusion file for delly from reference
-DEADLINE: <2024-11-07 Thu>
-CREATED: [2024-11-07 Thu]
-LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/modules/delly.nf::val(exclude)]]
-This should be telomere and centromere regions plus all unplaced contigs according to the delly docs
-Save the script used to make this exclusion file
-
-Format is like this
-chr1	0	10000	telomere
-chr1	248946422	248956422	telomere
-chr10	0	10000	telomere
-chr10	133787422	133797422	telomere
-chr11	0	10000	telomere
-chr11	135076622	135086622	telomere
-chr12	0	10000	telomere
-chr12	133265309	133275309	telomere
 ** DONE [#C] Make sure adding the source tag in the INFO field works
 CLOSED: [2024-11-08 Fri 15:14]
 CREATED: [2024-11-06 Wed]
