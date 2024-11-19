@@ -28,6 +28,14 @@ delly call !{args} \
     !{normal}
 
 # Post-filter
-delly filter -f somatic -o !{out} -s samples.tsv geno.bcf
+delly filter -f somatic -o tmp2.vcf.gz -s samples.tsv geno.bcf
+
+vcf_info_add_tag -n SOURCE \
+    -d "!{params.source_description}" \
+    -b '.' \
+    -t String \
+    -a delly \
+    -i tmp2.vcf.gz \
+    -o "!{out}"
 
 get_nextflow_log.bash dellySV.log
