@@ -63,27 +63,28 @@ workflow "whole_exome" {
     paired = normals.join(tumors).join(indices) // Order is important for the first two
     paired_no_id = paired.map { it[1..-1] }
     // paired_no_id is [meta, normal, tumor, indices]
+    to_delly_cov = branched.tumor.map({ [it[0].id] + it[0..-1] }).join(indices).map { it[1..-1] }
 
-    // DELLY_COV(branched.tumor, params.ref.genome, params.ref.mappability, 3)
+    DELLY_COV(to_delly_cov, params.ref.genome, params.ref.mappability, 3)
     /*
      * Variant calling
      */
     def getId = { [it[0].id] + it[1] }
 
-    MUTECT2(paired_no_id, params.ref.genome, 4)
-    MANTA(paired_no_id, params.ref.genome, 4)
+    MUTECT2(paired_no_id, params.ref.genome, 5)
+    MANTA(paired_no_id, params.ref.genome, 5)
 
     to_strelka = paired.join(MANTA.out.indels)
         .map { it[1..-1] }
-    STRELKA2(to_strelka, params.ref.genome, 4)
+    STRELKA2(to_strelka, params.ref.genome, 5)
 
     // to_delly_cnv = paired.join(DELLY_COV.out.cov).map {it[1..-1]}
-    // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.mappability, 4)
+    // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.mappability, 5)
 
-    DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude, 4)
+    // DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude, 5)
     // TODO need cnvkit copy number file
-    // CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 4)
-    // MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 4)
+    // CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 5)
+    // MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 5)
     //
     // all_variants = MUTECT2.out.variants.join(
     //     MANTA.out.somatic.map(getId),
@@ -91,17 +92,17 @@ workflow "whole_exome" {
     //     DELLY_SV.out.variants.map(getId),
     //     DELLY_CNV.out.variants.map(getId),
     //     // TODO: This is incomplete cause you don't know the output of the other callers
-    // ).map { it[1..-1] } MERGE_A(all_variants, 5)
+    // ).map { it[1..-1] } MERGE_A(all_variants, 6)
 
     /*
      * Variant annotation
      */
-    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, true, 6)
-    // VEP(all_variants.out.vcf, params.ref.genome, 6)
+    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, true, 7)
+    // VEP(all_variants.out.vcf, params.ref.genome, 7)
     // TODO: need to transfer annotations between them
     //      Check if merge1 works for this
     // annotated = SNPEFF.out.vcf.join(VEP.map(getId))
-    // MERGE_B(annotated, 6)
+    // MERGE_B(annotated, 8)
 
     /*
      * Metric collection
