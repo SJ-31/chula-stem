@@ -12,17 +12,20 @@ process MUTECT2 {
 
     output:
     tuple val(meta), path(out), emit: variants
+    path(stats)
     path("*.log")
     //
 
     script:
     out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
+    stats = "${module_number}-${meta.filename}-Mutect2_stats.txt"
     uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         ln -sr $check .
         ln -sr ${meta.log}/mutect2.log .
+        ln -sr "${meta.out}/${stats}" .
         """
     } else {
         """
@@ -33,8 +36,10 @@ process MUTECT2 {
             -normal $meta.RGSM_normal \\
             --output temp.vcf.gz
 
+        mv temp.vcf.gz.stats $stats
+
         vcf_info_add_tag -n SOURCE \\
-            -d $params.source_description \\
+            -d "$params.source_description" \\
             -b '.' \\
             -t String \\
             -a mutect2 \\
