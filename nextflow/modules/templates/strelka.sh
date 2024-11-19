@@ -13,19 +13,21 @@ configureStrelkaSomaticWorkflow.py \
 
 mv !{out}/results/variants/*.vcf.gz .
 for variant in *.vcf.gz; do
-    base=$(echo $variant | sed 's/\.vcf\.gz//')
-    name="!{module_number}-${base}_Strelka.vcf"
+    if [[ ! "$variant" == "candidateSmallIndels.vcf.gz" ]]; then
+        base=$(echo $variant | sed 's/\.vcf\.gz//')
+        name="!{module_number}-${base}_Strelka.vcf"
 
-    vcf_info_add_tag -n SOURCE \
-        -d "!{params.source_description}" \
-        -b '.' \
-        -t String \
-        -a strelka2 \
-        -i $variant \
-        -o "${name}"
+        vcf_info_add_tag -n SOURCE \
+            -d "!{params.source_description}" \
+            -b '.' \
+            -t String \
+            -a strelka2 \
+            -i $variant \
+            -o "${name}"
 
-    rm "$variant"
-    bgzip "${name}"
+        rm "$variant"
+        bgzip "${name}"
+    fi
 done
 
 get_nextflow_log.bash strelka.log
