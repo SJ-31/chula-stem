@@ -28,7 +28,8 @@ delly call !{args} \
     !{normal}
 
 # Post-filter
-delly filter -f somatic -o tmp2.vcf.gz -s samples.tsv geno.bcf
+delly filter -f somatic -o tmp2.bcf -s samples.tsv geno.bcf
+bcftools view -O z tmp2.bcf > tmp2.vcf.gz
 
 vcf_info_add_tag -n SOURCE \
     -d "!{params.source_description}" \
