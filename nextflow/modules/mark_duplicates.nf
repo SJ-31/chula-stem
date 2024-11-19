@@ -1,5 +1,5 @@
 process MARK_DUPLICATES {
-    ext version: "4.6.1.0"
+    ext version: params.gatk_version
     
 
     publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
