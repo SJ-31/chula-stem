@@ -17,7 +17,7 @@ process VEP {
     //
 
     script:
-    output = "${module_number}-${meta.id}_vep.vcf.gz"
+    output = "${module_number}-${meta.filename}-vep.vcf.gz"
     check = file("$meta.out/$output")
     args = task.ext.args.join(" ")
     if (check.exists()) {

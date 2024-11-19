@@ -17,7 +17,7 @@ process DELLY_COV {
     //
 
     script:
-    output = "${module_number}-${meta.id}_Delly.cov.gz"
+    output = "${module_number}-${meta.filename}-Delly.cov.gz"
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

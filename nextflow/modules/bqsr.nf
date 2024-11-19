@@ -12,14 +12,14 @@ process BQSR {
     val(module_number)
 
     output:
-    tuple val(meta), path("*_recal.bam"), emit: bam
+    tuple val(meta), path(recal), emit: bam
     path(report)
     path(recal_dir)
     path("*.log")
 
     script:
-    recal = "${module_number}-${meta.id}_recal.bam"
-    report = "${module_number}-${meta.id}_AnalyzeCovariates.pdf"
+    recal = "${module_number}-${meta.filename}-recal.bam"
+    report = "${module_number}-${meta.filename}-AnalyzeCovariates.pdf"
     recal_dir = "${module_number}-recalibration_tables"
     check = file("${meta.out}/$recal")
     check2 = file("${meta.out}/$report")
@@ -29,7 +29,7 @@ process BQSR {
         ln -sr $check .
         ln -sr $check2 .
         ln -sr "${meta.log}/bqsr.log" .
-        ln -sr "${meta.out}/${recal_dir}" .
+        cp -r "${meta.out}/${recal_dir}" .
         """
     } else {
         """

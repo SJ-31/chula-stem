@@ -15,7 +15,7 @@ process MOSDEPTH {
     //
 
     script:
-    prefix = "${module_number}-${meta.id}_Mosdepth"
+    prefix = "${module_number}-${meta.filename}-Mosdepth"
     check = file("${meta.out}/${prefix}.mosdepth.global.dist.txt")
     if (check.exists()) {
         """

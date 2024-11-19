@@ -20,7 +20,7 @@ process SAMTOOLS_INDEX {
     if (check.exists()) {
         """
         ln -sr $check .
-        ln -sr ${meta.log}/samtools_index .
+        ln -sr ${meta.log}/samtools_index.log .
         """
     } else {
         """

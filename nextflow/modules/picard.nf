@@ -21,7 +21,7 @@ process PICARD {
 	path("${pair_id}_depth_out.txt"))
 
     script:
-    out = "${module_number}-${meta.id}_alignment_metrics_Picard.txt"
+    out = "${module_number}-${meta.filename}-alignment_metrics_Picard.txt"
     check = file(${meta.out}/"${out}")
     if (check.exists()) {
         """
@@ -38,19 +38,19 @@ process PICARD {
             gatk CollectHsMetrics -I $bam \\
                 --BAIT_INTERVALS $bait_intervals \\
                 --TARGET_INTERVALS $target_intervals \\
-                -O ${module_number}-${meta.id}_hs_metrics_Picard.txt
+                -O ${module_number}-${meta.filename}-hs_metrics_Picard.txt
             """
         } else if (omics_type == "wgs") {
             """
             gatk CollectWgsMetrics -I $bam \\
                 --REFERENCE_SEQUENCE $reference \\
-                -O ${module_number}-${meta.id}_wgs_metrics_Picard.txt
+                -O ${module_number}-${meta.filename}-wgs_metrics_Picard.txt
             """
         } else if (omics_type == "rna-seq") {
             """
             gatk CollectRnaSeqMetrics -I $bam \\
                 --REF_FLAT $gene_annotations_refFlat \\
-                -O ${module_number}-${meta.id}_rnaseq_metrics_Picard.txt
+                -O ${module_number}-${meta.filename}-rnaseq_metrics_Picard.txt
             """
         } else {
             throw new Exception("'omics_type' must be one of wgs|rna-seq|exome")

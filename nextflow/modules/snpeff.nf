@@ -18,9 +18,9 @@ process SNPEFF {
     //
 
     shell:
-    output = "${module_number}-${meta.id}_snpEff.vcf"
-    report = "${module_number}-${meta.id}_snpEff_summary.html"
-    genes_file = "${module_number}-${meta.id}_snpEff_genes.txt"
+    output = "${module_number}-${meta.filename}-snpEff.vcf"
+    report = "${module_number}-${meta.filename}-snpEff_summary.html"
+    genes_file = "${module_number}-${meta.filename}-snpEff_genes.txt"
     check = file("$meta.out/${output}.gz")
     args = task.ext.args.join(" ")
     if (check.exists()) {

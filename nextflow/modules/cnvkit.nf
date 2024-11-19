@@ -18,7 +18,7 @@ process CNVKIT {
     //
 
     script:
-    out = "${module_number}-${meta.id}_Cnvkit"
+    out = "${module_number}-${meta.filename}-Cnvkit"
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

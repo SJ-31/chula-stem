@@ -17,7 +17,7 @@ process DELLY_CNV {
     //
 
     shell:
-    out = "${module_number}-${meta.id}_DellyCNV.vcf.gz"
+    out = "${module_number}-${meta.filename}-DellyCNV.vcf.gz"
     // the output of this is yet
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")

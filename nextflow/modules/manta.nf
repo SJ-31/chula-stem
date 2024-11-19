@@ -23,12 +23,12 @@ process MANTA {
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
 
     shell:
-    out = "${module_number}-${meta.id}_MantaOut"
+    out = "${module_number}-${meta.filename}-MantaOut"
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        ln -sr !{check} .
+        cp -r !{check} .
         ln -sr !{meta.out}/*_Manta.vcf.gz .
         ln -sr !{meta.log}/manta.log .
         '''

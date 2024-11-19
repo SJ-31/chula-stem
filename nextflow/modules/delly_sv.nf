@@ -12,12 +12,12 @@ process DELLY_SV {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(meta), path(out), emit: variants
     path("*.log")
     //
 
     shell:
-    out = "${module_number}-${meta.id}_DellySV.vcf.gz"
+    out = "${module_number}-${meta.filename}-DellySV.vcf.gz"
     // the output of this is yet
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")

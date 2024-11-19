@@ -15,8 +15,8 @@ process MARK_DUPLICATES {
     tuple val(meta), path(txt), emit: qc
 
     script:
-    out = "${module_number}-${meta.id}_dedup.bam"
-    txt = "${module_number}-${meta.id}_dedup_metrics.txt"
+    out = "${module_number}-${meta.filename}-dedup.bam"
+    txt = "${module_number}-${meta.filename}-dedup_metrics.txt"
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

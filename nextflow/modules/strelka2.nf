@@ -17,12 +17,12 @@ process STRELKA2 {
     //
 
     shell:
-    out = "${module_number}-${meta.id}_StrelkaOut"
+    out = "${module_number}-${meta.filename}-StrelkaOut"
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
-        ln -sr !{check} .
+        cp -r !{check} .
         ln -sr !{meta.out}/*_Strelka.vcf.gz .
         ln -sr !{meta.log}/strelka.log .
         '''

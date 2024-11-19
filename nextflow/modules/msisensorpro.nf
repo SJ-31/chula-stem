@@ -17,7 +17,7 @@ process MSISENSORPRO {
     //
 
     script:
-    prefix = "${module_number}-${meta.id}_Msisensor" // Is the prefix, but also the summary
+    prefix = "${module_number}-${meta.filename}-Msisensor" // Is the prefix, but also the summary
     //  file
     all = "${prefix}_all"
     unstable = "${prefix}_unstable" // Sites in "all" with statistically significant p-values
