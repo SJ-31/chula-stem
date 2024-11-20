@@ -2,6 +2,20 @@
 + [1] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
 :END:
 * Inbox
+** TODO [#C] Make a presentation of the WES pipeline
+CREATED: [2024-11-20 Wed]
+Can try to make slides in beamer https://orgmode.org/worg/exporters/beamer/tutorial.html
+or just produce another graphviz diagram (gonna need to do this anyway)
+Cite this https://www.nature.com/articles/s41586-019-1913-9#MOESM1 paper to show that SVs are common across different cancer types, show this figure https://www.nature.com/articles/s41586-019-1913-9/figures/2
+** DONE [#B] Another option for structural variants
+CLOSED: [2024-11-20 Wed 14:08]
+CREATED: [2024-11-19 Tue]
+LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Variant calling][Variant calling]]
+https://github.com/PapenfussLab/gridss
+** TODO [#B] Set up the filtering process for mutect2 according to
+CREATED: [2024-11-19 Tue]
+LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Steps][Steps]]
+https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2
 ** TODO [#A] Figure out how to segment the tumor genome
 CREATED: [2024-11-14 Thu]
 LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/modules/templates/delly_cnv.bash::--cnv-size:]]
@@ -12,10 +26,11 @@ Should probably read the delly paper to find out what all of these things mean
 ** TODO [#B] Check out wally for plotting reads
 CREATED: [2024-11-14 Thu]
 https://github.com/tobiasrausch/wally
-** TODO [#C] dndscv keeps failing
-CREATED: [2024-11-14 Thu]
-The error is "Zero coding substitutions found in this dataset", despite your dataset having plenty of snps
-Could this be an issue with the .rda reference file prepared from entrez??
+** TODO [#C] Ask about how to handle multi-allelic sites
+CREATED: [2024-11-19 Tue]
+It seems that callers make the assumption that variant sites are biallelic (you can see this with metrics like BAF), and FilterMutectCalls gets rid of multiallelic sites by default, so
+ask Aj explicitly how to handle these
+ "It is possible a multiallelic site in the case sample represents a somatic event, but it is more likely the site is a germline variant site or an artifactual site." - but why???
 ** TODO [#A] Get capture kit BED files from agilent website
 Website should be up by <2024-11-19 Tue>
 https://earray.chem.agilent.com/suredesign/
@@ -43,6 +58,8 @@ See https://www.nature.com/articles/s41598-020-69772-8#Tab2
 ** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample
 CREATED: [2024-11-11 Mon]
 Especially check the ids
+** TODO Check if delly's format can be read by snpeff and vep
+If not, then see https://github.com/dellytools/sansa?tab=readme-ov-file as an alternative annotator
 ** DONE [#A] Automate preparation of snpEff cancer definition file
 CLOSED: [2024-11-15 Fri 08:44]
 CREATED: [2024-11-11 Mon]
@@ -53,7 +70,12 @@ This page https://gatk.broadinstitute.org/hc/en-us/articles/360037498992--How-to
 
 But you don't know if the downloaded alt index will work with what you have...
 And there is no documentation about how to generate an alt index file
-** TODO [#B] Need a BED file containing the baited genomic regions used to prepare the exome data.
+
+If this doesn't work, you can use https://github.com/Illumina/DRAGMAP which has better support for alt alignment
+https://support-docs.illumina.com/SW/DRAGEN_v38/Content/SW/DRAGEN/GPipelineAltMap_fDG.htm
+https://support-docs.illumina.com/SW/DRAGEN_v41/Content/SW/DRAGEN/GPipelineAltMap_fDG.htm
+** DONE [#B] Need a BED file containing the baited genomic regions used to prepare the exome data.
+CLOSED: [2024-11-19 Tue 12:38]
 CREATED: [2024-11-08 Fri]
 Is required by CNVkit in the =batch= command and Picard CollectHsMetrics
 CollectHsMetrics also needs the target intervals file

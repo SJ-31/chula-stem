@@ -1,6 +1,8 @@
 :REFERENCES:
 + [1] https://support.illumina.com/content/dam/illumina-support/help/Illumina_DRAGEN_Bio_IT_Platform_v3_7_1000000141465/Content/SW/Informatics/Dragen/GPipelineAltMap_fDG.htm
-+ [1] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
++ [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
++ [3] [[https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2][GATK Mutect2 Ho2]]
++ [4] [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
 :END:
 * Workflows
 # All workflows expect an input csv file with
@@ -23,6 +25,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 + Genome: hg38???
   * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
     * And =gatk CreateSequenceDictionary -R <ref>=
+  * Contigs must also be named =chr1=, =chr2= and so on, for use with accucopy
 + Known variants (for BQSR). To use with bqsr, these must be indexed with =gatk IndexFeatureFile=
   * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
   * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
@@ -43,6 +46,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
   * Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
 *** Steps
+**** Preprocessing
 + QC: =fastp= with the following routines
   * Quality filtering
   * Length filtering
@@ -56,31 +60,50 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Reports changes to base scores with =AnalyzeCovariates=
   * Both cancer and normal samples undergo BQSR with the same =known_variants= sources, which will be sources of germline variants (listed fully above)
     * See [[https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets][here]] for the details of known variants
-+ Variant calling
+**** Variant calling
++ Small variants
   * GATK Mutect2: somatic SNVs and indels
+    * Output from Mutect2 is filtered according to best practices [3]
+    * *Note:* Mutect2 raw vcf files do not use the QUAL field
   * [[https://github.com/Illumina/strelka][Strelka2]]: SNVs and indels, up to a predefined maximum size of (49 bases default)
-  * [[https://github.com/Illumina/manta][Manta]]: Strutural variants (paired with strelka2)
-  * [[https://github.com/wwylab/MuSE][MuSE2]]: small variants TODO can't install this
-  * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
-  * [[https://www.bioconductor.org/packages/release/bioc/html/PureCN.html][PureCN]]: copy number variation, tumor purity and ploidy
-  * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
-    * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
-  * [[https://github.com/dellytools/delly][delly]]: structural variants and copy number variation
-    * These are placed in two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
-    * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process
+    * Uses k
   * Notes
     * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
+  * [[https://github.com/wwylab/MuSE][MuSE2]]
+  # * [[https://www.bioconductor.org/packages/release/bioc/html/PureCN.html][PureCN]]: copy number variation, tumor purity and ploidy
+  # * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
+  #   * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
++ Structural variants
+  * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
+  * [[https://github.com/Illumina/manta][Manta]]: Strutural variants (paired with strelka2)
+  * [[https://github.com/dellytools/delly][delly]], uses split-read analysis
+  * [[https://github.com/PapenfussLab/gridss][gridss]]: uses split-read analysis, and a
+    * Can also report single breakends, "breakpoints in which only one side can be unambigiously determined"
+  # * https://github.com/walaj/svaba Haven't done yet
++ Copy number variation
+  * [[https://github.com/dellytools/delly][delly]]
+    * delly has two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
+    * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process
+****  Merging results
 + Concatenate results with =gatk MergeVcfs= and report source in =SOURCE= header
-+ Metrics
-  * Tumor info: with [[https://github.com/VanLoo-lab/ascat][ASCAT]], which provides allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
-    * Replaced with [[https://github.com/dariober/cnv_facets][cnv_facets]], https://pmc.ncbi.nlm.nih.gov/articles/PMC5027494/#SEC2
-  * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution. [[https://github.com/im3sanger/dndscv][dndSCV]]
++ TODO: should probably have something more sophisticated than reporting everything, see notes
+**** Callset quality control
++ Possible options based on [4]
+  * Tumor in normal estimation
+  * Filtering out somatic mutations that are known germline sites
+  * Oxidative artifect filter
+  * kj
+**** Metrics
+  # * TODO: still not decided Tumor info: with [[https://github.com/VanLoo-lab/ascat][ASCAT]], which provides allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
+  #   * Replaced with [[https://github.com/dariober/cnv_facets][cnv_facets]], https://pmc.ncbi.nlm.nih.gov/articles/PMC5027494/#SEC2
+  # * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution. [[https://github.com/im3sanger/dndscv][dndSCV]]
   * QC metrics from =fastp=
   * Various metrics from =Picard=
     * =CountReads=
     * =CollectAlignmentSummaryMetrics=
     * TODO: fill this up
-+ Variant annotation (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
+**** Variant annotation
+  (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
   * [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]]
   * [[https://pcingola.github.io/SnpEff/][snpEff]]
     * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors

@@ -1,4 +1,16 @@
 * Unsorted notes
+** Report format :PROCEDURE:
+CREATED: [2024-11-19 Tue]
++ Can classify variants by clinical significance
++ Metrics to include
+  * VAF, coverage
+** Options for merging VCFs
+Take inspiration from SomaticCombiner and [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
+** Potential tools for driver gene prediction
+There are a bunch described at https://pmc.ncbi.nlm.nih.gov/articles/PMC10805075/#sec12
+But you should ask Aj first to see what the gold standard is
+
+Easiest way is to just compare the variants with a database of known driver mutations, maybe the one prdouced from https://www.nature.com/articles/s41586-020-1969-6
 ** Benchmarking WES :PROCEDURE:
 CREATED: [2024-11-18 Mon]
 LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Steps][Steps]]
@@ -18,6 +30,13 @@ Again, they recommend using multiple callers (because results tend to be variabl
 CREATED: [2024-11-06 Wed]
 LOCATION: [[file:/ssh:shannc@161.200.107.77:~/chula-stem/nextflow/README.org::*RNA-seq uncategorized][RNA-seq uncategorized]]
 [cite:@cortes-cirianoComputationalAnalysisCancer2022] suggest to use STAR and HISAT for aligning RNA-sq data
+** Clonal population structure
+Might be interesting to look into, only after you've set up everything else
+https://www.nature.com/articles/nmeth.2883
+* Rejected tools
++ cnv_facets
+  * Segmentation fault, would not work. Also, seems to rely on a genome build in R that cannot be changed
+* VAR
 # Local Variables:
-# citar-prev-references: ("cortes-cirianoComputationalAnalysisCancer2022")
+# citar-prev-references: ("theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020" "cortes-cirianoComputationalAnalysisCancer2022")
 # End:

@@ -50,7 +50,7 @@ def _vcf_info_add_tag(
     type: str,
     default: str,
     input: str,
-    output: str,
+    output: str, # Uncompressed vcf only
 ):
     reader = vcfpy.Reader.from_path(input)
     new_line = vcfpy.OrderedDict(
