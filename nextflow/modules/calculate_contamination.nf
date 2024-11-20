@@ -1,8 +1,8 @@
 process CALCULATE_CONTAMINATION {
     ext version: params.gatk_version
 
-    publishDir "meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
-    publishDir "meta.log", mode: "copy", pattern: "*.log"
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
     tuple val(meta), path(pileup)

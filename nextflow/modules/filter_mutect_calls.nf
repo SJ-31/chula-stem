@@ -1,8 +1,8 @@
 process FILTER_MUTECT_CALLS {
     ext version: params.gatk_version
 
-    publishDir "meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
-    publishDir "meta.log", mode: "copy", pattern: "*.log"
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
     tuple val(meta), path(vcf), path(ro_model), path(contamination), path(segmentation), path(stats)
