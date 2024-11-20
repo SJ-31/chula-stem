@@ -1,5 +1,5 @@
 process MUTECT2 {
-    ext version: "4.6.1.0"
+    ext version: params.gatk_version
 
     publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
@@ -12,13 +12,15 @@ process MUTECT2 {
 
     output:
     tuple val(meta), path(out), emit: variants
-    path(stats)
+    tuple val(meta), path(raw), emit: raw
+    tuple val(meta), path(stats), emit: stats
     path("*.log")
     //
 
     script:
     out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
     stats = "${module_number}-${meta.filename}-Mutect2_stats.txt"
+    raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
     uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
@@ -26,6 +28,7 @@ process MUTECT2 {
         ln -sr $check .
         ln -sr ${meta.log}/mutect2.log .
         ln -sr "${meta.out}/${stats}" .
+        ln -sr "${meta.out}/${raw}" .
         """
     } else {
         """
@@ -34,6 +37,7 @@ process MUTECT2 {
             -I $tumor \\
             -I $normal \\
             -normal $meta.RGSM_normal \\
+            --f1r2-tar-gz $raw \\
             --output temp.vcf.gz
 
         mv temp.vcf.gz.stats $stats
@@ -53,3 +57,4 @@ process MUTECT2 {
     //
 }
 // Look into using --panel-of-normals flag \\
+// https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2 describes how to create a pon from your own data
