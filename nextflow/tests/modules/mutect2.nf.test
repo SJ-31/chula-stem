@@ -16,11 +16,12 @@ nextflow_process {
                         "log": "$params.log/mutect2",
                     "id": "sample2",
                     "RGSM_normal": "10"
-            ],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam",
-                    ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
-                input[1] = "$params.genome"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
+                input[1] = "$params.genome_filtered"
                 input[2] = 4
                 """
             }
