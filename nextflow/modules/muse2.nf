@@ -1,0 +1,58 @@
+process MUSE2 {
+    ext version: "2.1.2"
+
+    publishDir "meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "meta.log", mode: "copy", pattern: "*.log"
+
+    input:
+    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
+    val(reference)
+    val(dbsnp) // Docs ask for dbSNP vcf specifically
+    val(omics_type)
+    val(module_number)
+    //
+
+    output:
+    tuple val(meta), path(output), emit: variants
+    path("${prefix}.MuSE.txt")
+    path("*.log")
+    //
+
+    script:
+    prefix = "${module_number}-${meta.filename}"
+    output = "${prefix}-MuSE.vcf.gz"
+    check = file("${meta.out}/${output}")
+    if (omics_type == "wgs") {
+        data_flag = " -G "
+    } else if (omics_type == "exome") {
+        data_flag = " -E "
+    } else {
+        throw new Exception("Omics type must be either 'wgs' or 'exome'")
+    }
+    args = task.ext.args.join(" ")
+    if (check.exists()) {
+        """
+        ln -sr ${check} .
+        ln -sr ${meta.log}/muse2.log .
+        """
+    } else {
+        """
+        MuSE call \\
+            -f ${reference} \\
+            -O ${prefix} \\
+            -n ${task.ext.cores} \\
+            ${tumor} \\
+            ${normal}
+
+        MuSE sump \\
+            -I ${prefix}.MuSE.txt \\
+            -O ${output} \\
+            -n ${task.ext.cores} \\
+            -D ${dbsnp} \\
+            ${data_flag}
+
+        get_nextflow_log.bash muse2.log
+        """
+    }
+    //
+}
