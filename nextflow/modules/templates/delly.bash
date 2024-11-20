@@ -31,12 +31,14 @@ delly call !{args} \
 delly filter -f somatic -o tmp2.bcf -s samples.tsv geno.bcf
 bcftools view -O z tmp2.bcf > tmp2.vcf.gz
 
+uncompressed=$(echo "!{out}" | sed 's/.gz//')
 vcf_info_add_tag -n SOURCE \
     -d "!{params.source_description}" \
     -b '.' \
     -t String \
     -a delly \
     -i tmp2.vcf.gz \
-    -o "!{out}"
+    -o "${uncompressed}"
 
+bgzip "${uncompressed}"
 get_nextflow_log.bash dellySV.log
