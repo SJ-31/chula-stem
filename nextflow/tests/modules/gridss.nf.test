@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "Test Process GRIDSS"
+    script "modules/gridss.nf"
+    process "GRIDSS"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/gridss",
+                        "log": "$params.log/gridss",
+                    "id": "sample2",
+                    "RGSM_normal": "10"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
+                input[1] = "$params.genome_filtered"
+                input[2] = "$params.blacklist_filtered"
+                input[3] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}
