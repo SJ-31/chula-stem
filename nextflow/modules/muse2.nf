@@ -1,8 +1,8 @@
 process MUSE2 {
     ext version: "2.1.2"
 
-    publishDir "meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
-    publishDir "meta.log", mode: "copy", pattern: "*.log"
+    publishDir "$meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
@@ -13,15 +13,15 @@ process MUSE2 {
     //
 
     output:
-    tuple val(meta), path(output), emit: variants
+    tuple val(meta), path("${output}.gz"), emit: variants
     path("${prefix}.MuSE.txt")
     path("*.log")
     //
 
     script:
     prefix = "${module_number}-${meta.filename}"
-    output = "${prefix}-MuSE.vcf.gz"
-    check = file("${meta.out}/${output}")
+    output = "${prefix}-MuSE.vcf"
+    check = file("${meta.out}/${output}.gz")
     if (omics_type == "wgs") {
         data_flag = " -G "
     } else if (omics_type == "exome") {
@@ -46,13 +46,23 @@ process MUSE2 {
 
         MuSE sump \\
             -I ${prefix}.MuSE.txt \\
-            -O ${output} \\
+            -O temp.vcf \\
             -n ${task.ext.cores} \\
             -D ${dbsnp} \\
             ${data_flag}
 
+        vcf_info_add_tag -n SOURCE \\
+            -d "$params.source_description" \\
+            -b '.' \\
+            -t String \\
+            -a muse2 \\
+            -i temp.vcf \\
+            -o ${output}
+
+        bgzip ${output}
         get_nextflow_log.bash muse2.log
         """
     }
     //
 }
+
