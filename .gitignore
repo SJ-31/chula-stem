@@ -89,3 +89,4 @@ rust/Cargo.lock
 nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
 .stfolder
 /.snakemake/
+/tests/sample_config
