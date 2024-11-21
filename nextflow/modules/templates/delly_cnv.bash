@@ -17,7 +17,7 @@ delly cnv --segmentation \
     --outfile tumor.bcf \
     --covfile !{covfile} \
     --genome !{reference} \
-    --mappability !{mapfile} \
+    --mappability !{mappability} \
     !{tumor}
 # Detection sensitivity is controlled by
 # --cnv-size (-z):

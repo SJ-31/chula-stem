@@ -13,7 +13,7 @@ process GRIDSS {
     //
 
     output:
-    tuple val(meta), path("${filtered}.gz")
+    tuple val(meta), path("${filtered}.gz"), emit: variants
     path("${all}.gz")
     path("*.log")
     //

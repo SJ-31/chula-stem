@@ -7,7 +7,7 @@ process DELLY_CNV {
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(covfile)
     val(reference)
-    val(mapfile)
+    val(mappability)
     val(module_number)
     //
 
