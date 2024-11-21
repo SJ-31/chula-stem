@@ -90,3 +90,6 @@ nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
 .stfolder
 /.snakemake/
 /tests/sample_config
+/nextflow/bin/bgzip
+/nextflow/bin/vcf_info_add_tag
+/nextflow/bin/split_contigs.bash

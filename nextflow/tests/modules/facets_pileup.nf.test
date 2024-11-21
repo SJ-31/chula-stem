@@ -1,0 +1,36 @@
+nextflow_process {
+
+    name "Test Process FACETS"
+    script "modules/facets_pileup.nf"
+    process "FACETS_PILEUP"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/facets_pileup",
+                        "log": "$params.log/facets_pileup",
+                    "id": "sample2",
+                    "RGSM_normal": "10"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
+                input[1] = "/data/project/stemcell/shannc/reference/variants/ExAC.r1.sites.vep.vcf.gz"
+                input[2] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

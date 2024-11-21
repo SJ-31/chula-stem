@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process FACETS"
+    script "modules/facets.nf"
+    process "FACETS"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/facets",
+                        "log": "$params.log/facets",
+                    "id": "sample2",
+                    "filename": "sample2",
+                    "RGSM_normal": "10"
+            ], "/data/project/stemcell/shannc/tests/wes_test/facets_pileup/5-null-Facets.snp_pileup.gz"]
+                input[1] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
