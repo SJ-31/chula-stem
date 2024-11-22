@@ -5,15 +5,15 @@ process CNVKIT {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
-    val(reference) // A copy number reference file (".cnn") created using
-    // cnvkit.py reference -f <genome_fasta> -o <output>
-    //  Note: if not using WGS, you should prepare a BED file listing genomic coordinates
-    //      of captured regions during sample preparation. Might be able to find from vendor
+    tuple val(meta), path(tumor)
+    val(cnn_reference) // A copy number reference file (".cnn") created with the pooled normal samples
+    val(omics_type) // hybrid, amplicon or wgs
     val(module_number)
     //
 
     output:
+    tuple val(meta), path("${out}/")
+    path(out)
     path("*.log")
     //
 
@@ -22,18 +22,17 @@ process CNVKIT {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        ln -sr $check .
+        cp -r $check .
         ln -sr ${meta.log}/cnvkit.log .
         """
     } else {
         """
         cnvkit.py batch \\
-            --normal ${normal} \\
-            -r ${reference} \\
-            -d ${out} \\
-            ${tumor}
+                ${tumor} \\
+            -r ${cnn_reference} \\
+            -d ${out}
 
-        get_nextflow_log.bash msisensor.log
+        get_nextflow_log.bash cnvkit.log
         """
     }
     //

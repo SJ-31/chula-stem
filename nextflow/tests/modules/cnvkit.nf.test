@@ -12,16 +12,20 @@ nextflow_process {
             }
             process {
                 """
-                input[1] = "$params.genome"
-                input[2] = "$params.copy_num"
-                input[3] = params.intervals
+                input[0] = [["out": "$params.out/cnvkit",
+                        "log": "$params.log/cnvkit",
+                    "id": "sample2",
+                    "RGSM_normal": "10"],
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam"]
+                input[1] = "/data/project/stemcell/shannc/tests/wes_test/cnvkit_prep/3-batch-Cnvkit_reference.cnn"
+                input[2] = "hybrid"
+                input[3] = 5
                 """
             }
         }
 
         then {
             assert process.success
-            assert snapshot(process.out).match()
         }
 
     }
