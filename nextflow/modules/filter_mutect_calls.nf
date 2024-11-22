@@ -6,6 +6,7 @@ process FILTER_MUTECT_CALLS {
 
     input:
     tuple val(meta), path(vcf), path(ro_model), path(contamination), path(segmentation), path(stats)
+    val(reference)
     val(module_number)
     //
 
@@ -25,10 +26,13 @@ process FILTER_MUTECT_CALLS {
         """
     } else {
         """
+        gatk IndexFeatureFile -I ${vcf}
+
         gatk FilterMutectCalls -V ${vcf} \\
             --ob-priors ${ro_model} \\
             --tumor-segmentation ${segmentation} \\
             --contamination-table ${contamination} \\
+            --reference ${reference} \\
             -O ${output}
 
         get_nextflow_log.bash filter_mutect_calls.log

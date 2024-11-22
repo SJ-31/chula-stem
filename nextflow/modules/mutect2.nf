@@ -19,7 +19,7 @@ process MUTECT2 {
 
     script:
     out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
-    stats = "${module_number}-${meta.filename}-Mutect2_stats.txt"
+    stats = "${out}.stats"
     raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
     uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
