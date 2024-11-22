@@ -10,8 +10,8 @@ process FACETS {
     //
 
     output:
-    tuple path(meta), path(prefix)
-    path(prefix)
+    tuple val(meta), path(prefix)
+    tuple val(meta), path("${prefix}/purity.txt"), path("${prefix}/ploidy.txt")
     path("*.log")
     //
 
@@ -29,7 +29,11 @@ process FACETS {
         run-facets-wrapper.R \\
             --counts-file ${counts_file} \\
             --sample-id ${prefix} \\
+            --genome ${task.ext.genome} \\
             ${args}
+
+        cut -f 2 ${prefix}/${prefix}.txt | tail -n 1 > ${prefix}/purity.txt
+        cut -f 3 ${prefix}/${prefix}.txt | tail -n 1 > ${prefix}/ploidy.txt
 
         get_nextflow_log.bash facets.log
         """
