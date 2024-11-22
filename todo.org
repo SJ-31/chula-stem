@@ -2,6 +2,17 @@
 + [1] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
 :END:
 * Inbox
+** TODO [#B] This software might help with sv interpretation
+CREATED: [2024-11-21 Thu]
+https://github.com/vicsanga/Postre
+https://pmc.ncbi.nlm.nih.gov/articles/PMC10201441/
+** TODO [#B] Have a look at this software for annotating cnvs
+CREATED: [2024-11-21 Thu]
+LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/tests/modules/control_freec.nf.test]]
+https://www.nature.com/articles/s41598-020-76425-3
+** TODO [#B] If accucopy doesn't work, try and rerun purecn with the correct bait file for your data
+CREATED: [2024-11-21 Thu]
+LOCATION: [[file:~/Bio_SDD/chula-stem/notes.org::*VAR][VAR]]
 ** TODO [#C] Make a presentation of the WES pipeline
 CREATED: [2024-11-20 Wed]
 Can try to make slides in beamer https://orgmode.org/worg/exporters/beamer/tutorial.html
@@ -52,7 +63,6 @@ See https://www.nature.com/articles/s41598-020-69772-8#Tab2
 - delly_cnv
 - cnvkit
 - mosdepth
-- dndscv
 - multiqc
 - Picard
 ** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample

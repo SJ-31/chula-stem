@@ -26,25 +26,26 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
     * And =gatk CreateSequenceDictionary -R <ref>=
   * Contigs must also be named =chr1=, =chr2= and so on, for use with accucopy
-+ Known variants (for BQSR). To use with bqsr, these must be indexed with =gatk IndexFeatureFile=
++ Known variants. To use with bqsr, these must be indexed with =gatk IndexFeatureFile=
   * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
   * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
     * gnomAD v4.1.0 Exomes for all chromosomes
     * ExAC
       * Can't use this straight from the download, it is mapped to the GRCh37/hg19 reference
   * [[https://www.ncbi.nlm.nih.gov/projects/SNP/get_html.cgi?whichHtml=overview][dbSNP]]
-***** Tool requirements
-+ The following lists tools which require data sources specific to a given assembly
-  * VEP: uses annotation sources to predict consequence types. Can be cached and downloaded with the =INSTALL.pl= script
-    * Depends on what you put for the =species= flag
-    * See [[https://grch37.ensembl.org/info/docs/tools/vep/script/vep_custom.html][here]] for how to supply custom annotation data
-  * snpEff: needs a reference-specific database for annotation (the second argument)
-    * [[https://pcingola.github.io/SnpEff/snpeff/build_db/][Instructions for custom db]]
-  * bwa-mem2: alt index for for alt-aware mapping
-  * MISensorPro: a homopolymers and microsatellites file prepared from the target genome
-  * delly: exclusion file denoting chromosome regions to exclude from analysis and mappability file describing...
-  * CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
-  * Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
+***** Tool-specific requirements
+- VEP: uses annotation sources to predict consequence types. Can be cached and downloaded with the =INSTALL.pl= script
+  * Depends on what you put for the =species= flag
+  * See [[https://grch37.ensembl.org/info/docs/tools/vep/script/vep_custom.html][here]] for how to supply custom annotation data
+- snpEff: needs a reference-specific database for annotation (the second argument)
+  * [[https://pcingola.github.io/SnpEff/snpeff/build_db/][Instructions for custom db]]
+- GATK GetPileupSummaries: a vcf file of common germline variants, with only biallelic snps and a population allele frequence (AF) info tag
+- bwa-mem2: alt index for for alt-aware mapping
+- MISensorPro: a homopolymers and microsatellites file prepared from the target genome
+- delly: bed exclusion file denoting chromosome regions to exclude from analysis and mappability file (for CNV version)
+- gridss: bed exclusion file, recommended to be from the ENCODE project
+- CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
+- Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
 *** Steps
 **** Preprocessing
 + QC: =fastp= with the following routines
@@ -84,6 +85,8 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * [[https://github.com/dellytools/delly][delly]]
     * delly has two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
     * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process
+  * [[https://github.com/mskcc/facets-suite][facets-suite]]
+  *
 ****  Merging results
 + Concatenate results with =gatk MergeVcfs= and report source in =SOURCE= header
 + TODO: should probably have something more sophisticated than reporting everything, see notes
@@ -91,22 +94,23 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 + Possible options based on [4]
   * Tumor in normal estimation
   * Filtering out somatic mutations that are known germline sites
-  * Oxidative artifect filter
-  * kj
+  * Oxidative artifact filter
 **** Metrics
-  # * TODO: still not decided Tumor info: with [[https://github.com/VanLoo-lab/ascat][ASCAT]], which provides allele-specific copy number analysis of tumor samples, estimating tumor ploidy + purity
-  #   * Replaced with [[https://github.com/dariober/cnv_facets][cnv_facets]], https://pmc.ncbi.nlm.nih.gov/articles/PMC5027494/#SEC2
-  # * Somatic evolution: with =dndSCV= package, which provides dN/dS methods to quantify selection in cancer and somatic evolution. [[https://github.com/im3sanger/dndscv][dndSCV]]
-  * QC metrics from =fastp=
-  * Various metrics from =Picard=
-    * =CountReads=
-    * =CollectAlignmentSummaryMetrics=
-    * TODO: fill this up
++ Tumor purity and ploidy
+  * With [[https://github.com/mskcc/facets-suite][facets-suite]]
++ QC metrics from =fastp=
++ Various metrics from =Picard=
+  * =CountReads=
+  * =CollectAlignmentSummaryMetrics=
+  * TODO: fill this up
 **** Variant annotation
   (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
-  * [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]]
-  * [[https://pcingola.github.io/SnpEff/][snpEff]]
-    * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
+- [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]] (SNPs, indels, CNVs and SVs)
+- [[https://pcingola.github.io/SnpEff/][snpEff]] (SNPs, indels, multiple-nucleotide-polymorphisms )
+   * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
+*** Output
++ Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
+
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools
