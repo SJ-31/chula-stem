@@ -29,6 +29,7 @@ process GET_PILEUP_SUMMARIES {
     } else {
         """
         gatk GetPileupSummaries \\
+            --java-options "-Xmx8G" \\
             -I ${bam} \\
             -L ${variants} \\
             -V ${variants} \\
