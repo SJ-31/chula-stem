@@ -44,7 +44,7 @@ def vcf_info_add_tag(
     input: str,
     output: str,
 ):
-    """Add tag <name> to INFO column of <input>, returning bgzipped <output>"""
+    """Add tag <name> to INFO column of <input>, returning uncompressed <output>"""
     _vcf_info_add_tag2(name, description, number, type, default, input, output)
 
 
@@ -62,9 +62,10 @@ def _vcf_info_add_tag2(name, description, number, type, default, input, output):
     }
     """
     fn = STAP(src, "fn")
-    fn.vcf_info_add_tag(name, description, number, type, default, input, output)
+    fn.vcf_info_add_tag(
+        name, description, number, type, default, input, f"{output}.gz"
+    )
     run(f"gunzip {output}", shell=True)
-    run(f"bgzip {output}", shell=True)
 
 
 def _vcf_info_add_tag(
