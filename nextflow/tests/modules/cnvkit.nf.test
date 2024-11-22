@@ -12,13 +12,9 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/cnvkit",
-                    "log": "$params.log/cnvkit", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam"]
                 input[1] = "$params.genome"
                 input[2] = "$params.copy_num"
-                input[3] = 4
+                input[3] = params.intervals
                 """
             }
         }

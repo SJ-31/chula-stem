@@ -1,0 +1,31 @@
+nextflow_process {
+
+    name "Test Process CNVKIT_PREP"
+    script "modules/cnvkit_prep.nf"
+    process "CNVKIT_PREP"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                f = "/data/project/stemcell/shannc/tests/wes_test2/patient_10/normal/4-patient_10_normal-recal.bam"
+                input[0] = [["out": "$params.out/cnvkit_prep", "filename": "batch"], f]
+                input[1] = params.genome_filtered
+                input[2] = params.blacklist_filtered
+                input[3] = params.baits
+                input[4] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
