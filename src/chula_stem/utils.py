@@ -1,10 +1,12 @@
 #!/usr/bin/env ipython
 
 
+from subprocess import run
 from tempfile import TemporaryFile
 
 import click
 import vcfpy
+from rpy2.robjects.packages import STAP
 
 
 @click.command()
@@ -42,7 +44,27 @@ def vcf_info_add_tag(
     input: str,
     output: str,
 ):
-    _vcf_info_add_tag(name, description, number, type, default, input, output)
+    """Add tag <name> to INFO column of <input>, returning bgzipped <output>"""
+    _vcf_info_add_tag2(name, description, number, type, default, input, output)
+
+
+def _vcf_info_add_tag2(name, description, number, type, default, input, output):
+    src: str = """
+    library(vcfR)
+    library(glue)
+    vcf_info_add_tag <- function(name, description, number, type, default, input, output) {
+    vcf <- read.vcfR(input, verbose = FALSE)
+    info <- vcf@fix[, "INFO"]
+    vcf@fix[, "INFO"] <- paste0(info, glue(";SOURCE={default}"))
+    m <- glue("##INFO=<ID={name},Number={number},Type={type},Description=\\"{description}\\">")
+    vcf@meta <- append(vcf@meta, m)
+    write.vcf(vcf, output)
+    }
+    """
+    fn = STAP(src, "fn")
+    fn.vcf_info_add_tag(name, description, number, type, default, input, output)
+    run(f"gunzip {output}", shell=True)
+    run(f"bgzip {output}", shell=True)
 
 
 def _vcf_info_add_tag(
