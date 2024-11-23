@@ -18,6 +18,16 @@ CREATED: [2024-11-20 Wed]
 Can try to make slides in beamer https://orgmode.org/worg/exporters/beamer/tutorial.html
 or just produce another graphviz diagram (gonna need to do this anyway)
 Cite this https://www.nature.com/articles/s41586-019-1913-9#MOESM1 paper to show that SVs are common across different cancer types, show this figure https://www.nature.com/articles/s41586-019-1913-9/figures/2
++ Show Examples of Sequence ontology
+  * https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
++ Tool notes
+  * VEP by default reports SO terms by identifying overlapping Ensembl transcripts and using a "rule-based approach" to predict effects that variant alleles may have on the transcripts
+    * VEP also has tools for de novo predictions
++ Things to discuss/implement in the pipeline
+  * Alt-aware mapping
+  * Driver gene prediction
+  * Using a custom reference genome and variants from the Thai genomes project
+  * Filtering with a panel of normals (could be pooled from the normal samples, or from an external source)
 ** DONE [#B] Another option for structural variants
 CLOSED: [2024-11-20 Wed 14:08]
 CREATED: [2024-11-19 Tue]

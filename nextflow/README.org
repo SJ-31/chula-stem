@@ -111,6 +111,8 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 *** Output
 + Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
 
+*** Motivation
++ Using multiple variant callers is common practice, notably used in the flagship analysis of the Pan-Cancer Analysis of Whole Genomes Consortium [4]
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools
