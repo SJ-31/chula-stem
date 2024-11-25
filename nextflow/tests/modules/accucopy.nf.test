@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "Test Process ACCUCOPY"
+    script "modules/accucopy.nf"
+    process "ACCUCOPY"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/accucopy",
+                        "log": "$params.log/accucopy",
+                    "id": "sample2",
+                    "RGSM_normal": "10"
+                ],
+                    "/data/project/stemcell/shannc/tests/accucopy/normal.bam",
+                    "/data/project/stemcell/shannc/tests/accucopy/tumor.bam",
+                    ["/data/project/stemcell/shannc/tests/accucopy/normal.bam.bai",
+                    "/data/project/stemcell/shannc/tests/accucopy/normal.tumor.bai"]]
+                input[1] = "/data/project/stemcell/shannc/tests/accucopy/ref/reference.fna"
+                input[2] = "/data/project/stemcell/shannc/tests/accucopy/ref/snps.bed.gz"
+                input[3] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "Test Process STANDARDIZE_VCF"
+    script "modules/standardize_vcf.nf"
+    process "STANDARDIZE_VCF"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/standardize",
+                        "log": "$params.log/standardize",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    "/data/project/stemcell/shannc/tests/bcftools_tags/merged.vcf.gz",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam"]
+                input[1] = "$params.genome_filtered"
+                input[2] = params.targets
+                input[3] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

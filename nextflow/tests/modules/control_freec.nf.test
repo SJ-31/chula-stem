@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "Test Process CONTROL_FREEC"
+    script "modules/control_freec.nf"
+    process "CONTROL_FREEC"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/freec",
+                        "log": "$params.log/freec",
+                    "id": "sample2", "sex": "XY",
+                    "RGSM_normal": "10"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
+                input[1] = params.genome_filtered
+                input[2] = params.dbsnp_filtered
+                input[3] = "/data/project/stemcell/shannc/reference/test_target_intervals_sorted.bed"
+                input[4] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

@@ -10,6 +10,8 @@ genome_filtered: "/data/project/stemcell/shannc/tests/wes_test2/GRCh38.p14_filte
 blacklist_filtered: "/data/project/stemcell/shannc/reference/blacklists/ENCFF356LFX_renamed.bed"
 copy_num: "TODO"
 dbsnp_filtered: "/data/project/stemcell/shannc/reference/variants/dbSNP_renamed.vcf.gz"
+targets: "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/Regions.bed.gz"
+baits: "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/Covered.bed.gz"
 
 # * Second test
 input: "/data/project/stemcell/shannc/tests/wes_test2/manifest.csv"
