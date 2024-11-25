@@ -52,7 +52,7 @@ process GRIDSS {
             name="${names[i]}"
             file="${files[i]}"
 
-            vcf_info_add_tag -n SOURCE \\
+            vcf_info_add_tag.r -n SOURCE \\
                 -d '!{params.source_description}' \\
                 -b '.' \\
                 -t String \\
