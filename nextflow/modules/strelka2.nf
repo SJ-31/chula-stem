@@ -7,6 +7,7 @@ process STRELKA2 {
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(manta_indels)
     val(reference)
+    val(target_intervals) // For exome data, path to target intervals file
     val(module_number)
     //
 
@@ -19,6 +20,7 @@ process STRELKA2 {
     shell:
     out = "${module_number}-${meta.filename}-StrelkaOut"
     check = file("${meta.out}/${out}")
+    target_flag = target_intervals == "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
