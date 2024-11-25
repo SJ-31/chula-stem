@@ -62,9 +62,13 @@ workflow "whole_exome" {
                                           "filename": it[0].id,
                                           "log": "${params.logdir}/${it[0].id}/paired"],
                                          it[1]] }
-    tumors = branched.tumor.map { [it[0].id, it[1]] }
+    tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
     indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] }).groupTuple()
-    paired = normals.join(tumors).join(indices) // Order is important for the first two
+    paired = normals.join(tumors)
+        .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
+        .join(indices)
+    // Order is important for the first two
+    paired.view()
     paired_no_id = paired.map { it[1..-1] }
     // paired_no_id is [meta, normal, tumor, indices]
 
@@ -90,7 +94,7 @@ workflow "whole_exome" {
 
     to_strelka = paired.join(MANTA.out.indels)
         .map { it[1..-1] }
-    STRELKA2(to_strelka, params.ref.genome, 5)
+    STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
     // Copy number abberation
