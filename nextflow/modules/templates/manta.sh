@@ -2,6 +2,7 @@ configManta.py \
     --normalBam !{normal} \
     --tumorBam !{tumor} \
     --referenceFasta !{reference} \
+    !{target_flag} \
     !{args} \
     --runDir !{out}
 

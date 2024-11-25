@@ -14,7 +14,7 @@ workflow "MUTECT2_COMPLETE" {
     main:
     def getId = { [it[0].id] + [it[1]] }
 
-    MUTECT2(meta_and_bam, params.ref.genome, module_number)
+    MUTECT2(meta_and_bam, params.ref.genome, params.ref.targets, module_number)
     LEARN_READ_ORIENTATION(MUTECT2.out.raw, module_number)
 
     to_pileup = meta_and_bam.map({ [it[0], it[2], it[3] ] })

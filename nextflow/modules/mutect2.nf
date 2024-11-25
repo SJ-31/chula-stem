@@ -7,6 +7,7 @@ process MUTECT2 {
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
+    val(target_intervals) // For exome data, path to target intervals file
     val(module_number)
     //
 
@@ -21,6 +22,7 @@ process MUTECT2 {
     out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
     stats = "${out}.stats"
     raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
+    target_flag = target_intervals == "" ? " --intervals ${target_intervals} " : ""
     uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
@@ -37,6 +39,7 @@ process MUTECT2 {
             -I $tumor \\
             -I $normal \\
             -normal $meta.RGSM_normal \\
+            ${target_flag} \\
             --f1r2-tar-gz $raw \\
             --output tmp.vcf.gz
 

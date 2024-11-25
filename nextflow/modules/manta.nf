@@ -7,6 +7,7 @@ process MANTA {
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
+    val(target_intervals)
     val(module_number)
     //
 
@@ -25,6 +26,7 @@ process MANTA {
     shell:
     out = "${module_number}-${meta.filename}-MantaOut"
     check = file("${meta.out}/${out}")
+    target_flag = target_intervals == "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''
