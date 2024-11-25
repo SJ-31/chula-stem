@@ -38,16 +38,18 @@ process MUTECT2 {
             -I $normal \\
             -normal $meta.RGSM_normal \\
             --f1r2-tar-gz $raw \\
-            --output temp.vcf.gz
+            --output tmp.vcf.gz
 
-        mv temp.vcf.gz.stats $stats
+        mv tmp.vcf.gz.stats $stats
+
+        bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" -O z tmp.vcf.gz > tmp2.vcf.gz
 
         vcf_info_add_tag -n SOURCE \\
             -d "$params.source_description" \\
             -b '.' \\
             -t String \\
             -a mutect2 \\
-            -i temp.vcf.gz \\
+            -i tmp2.vcf.gz \\
             -o $uncompressed
 
         bgzip $uncompressed

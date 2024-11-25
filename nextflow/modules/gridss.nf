@@ -52,12 +52,14 @@ process GRIDSS {
             name="${names[i]}"
             file="${files[i]}"
 
+            bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z "${file}" > tmp.vcf.gz
+
             vcf_info_add_tag.r -n SOURCE \\
                 -d '!{params.source_description}' \\
                 -b '.' \\
                 -t String \\
                 -a gridss \\
-                -i "$file" \\
+                -i tmp.vcf.gz \\
                 -o "$name"
         done
 

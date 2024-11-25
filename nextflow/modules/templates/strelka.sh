@@ -5,6 +5,7 @@ configureStrelkaSomaticWorkflow.py \
     --tumorBam !{tumor} \
     --referenceFasta !{reference} \
     --indelCandidates !{manta_indels} \
+    !{target_flag} \
     !{args} \
     --runDir !{out}
 
@@ -17,12 +18,15 @@ for variant in *.vcf.gz; do
         base=$(echo $variant | sed 's/\.vcf\.gz//')
         name="!{module_number}-${base}_Strelka.vcf"
 
+        rename_vcf.bash -v -i $variant -o tmp.vcf.gz \
+            -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}"
+
         vcf_info_add_tag -n SOURCE \
             -d "!{params.source_description}" \
             -b '.' \
             -t String \
             -a strelka2 \
-            -i $variant \
+            -i tmp.vcf.gz \
             -o "${name}"
 
         rm "$variant"

@@ -47,17 +47,20 @@ process MUSE2 {
 
         MuSE sump \\
             -I ${prefix}.MuSE.txt \\
-            -O temp.vcf \\
+            -O tmp.vcf \\
             -n ${task.ext.cores} \\
             -D ${dbsnp} \\
             ${data_flag}
+
+        rename_vcf.bash -v -i tmp.vcf -o tmp2.vcf.gz \\
+            -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}"
 
         vcf_info_add_tag -n SOURCE \\
             -d "$params.source_description" \\
             -b '.' \\
             -t String \\
             -a muse2 \\
-            -i temp.vcf \\
+            -i tmp2.vcf.gz \\
             -o ${output}
 
         bgzip ${output}
