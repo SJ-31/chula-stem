@@ -29,7 +29,7 @@ process GRIDSS {
         '''
         ln -sr !{check2} .
         ln -sr !{check1} .
-        ln -sr !{meta.log}/gridss .
+        ln -sr !{meta.log}/gridss.log .
         '''
     } else {
         '''

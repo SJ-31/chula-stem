@@ -33,6 +33,7 @@ process MUSE2 {
     if (check.exists()) {
         """
         ln -sr ${check} .
+        ln -sr ${meta.out}/${prefix}.MuSE.txt .
         ln -sr ${meta.log}/muse2.log .
         """
     } else {
