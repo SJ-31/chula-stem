@@ -10,7 +10,9 @@ https://pmc.ncbi.nlm.nih.gov/articles/PMC10201441/
 CREATED: [2024-11-21 Thu]
 LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/tests/modules/control_freec.nf.test]]
 https://www.nature.com/articles/s41598-020-76425-3
-** TODO [#B] If accucopy doesn't work, try and rerun purecn with the correct bait file for your data
++ You're going to first need to better understand (and choose the correct files from cnvkit, facets and possibly delly)
+** DONE [#B] If accucopy doesn't work, try and rerun purecn with the correct bait file for your data
+CLOSED: [2024-11-25 Mon 10:53]
 CREATED: [2024-11-21 Thu]
 LOCATION: [[file:~/Bio_SDD/chula-stem/notes.org::*VAR][VAR]]
 ** TODO [#C] Make a presentation of the WES pipeline
@@ -27,13 +29,15 @@ Cite this https://www.nature.com/articles/s41586-019-1913-9#MOESM1 paper to show
   * Alt-aware mapping
   * Driver gene prediction
   * Using a custom reference genome and variants from the Thai genomes project
+    * Using in-house exome data could also be useful (see [[https://www.pnas.org/doi/abs/10.1073/pnas.1808403116][this paper]], but note it was not written with somatic data in mind)
   * Filtering with a panel of normals (could be pooled from the normal samples, or from an external source)
 ** DONE [#B] Another option for structural variants
 CLOSED: [2024-11-20 Wed 14:08]
 CREATED: [2024-11-19 Tue]
 LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Variant calling][Variant calling]]
 https://github.com/PapenfussLab/gridss
-** TODO [#B] Set up the filtering process for mutect2 according to
+** DONE [#B] Set up the filtering process for mutect2 according to
+CLOSED: [2024-11-25 Mon 10:53]
 CREATED: [2024-11-19 Tue]
 LOCATION: [[file:~/Bio_SDD/chula-stem/nextflow/README.org::*Steps][Steps]]
 https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2
@@ -52,7 +56,8 @@ CREATED: [2024-11-19 Tue]
 It seems that callers make the assumption that variant sites are biallelic (you can see this with metrics like BAF), and FilterMutectCalls gets rid of multiallelic sites by default, so
 ask Aj explicitly how to handle these
  "It is possible a multiallelic site in the case sample represents a somatic event, but it is more likely the site is a germline variant site or an artifactual site." - but why???
-** TODO [#A] Get capture kit BED files from agilent website
+** DONE [#A] Get capture kit BED files from agilent website
+CLOSED: [2024-11-25 Mon 10:54]
 Website should be up by <2024-11-19 Tue>
 https://earray.chem.agilent.com/suredesign/
 ** TODO [#A] Ask about cancer cell culture
@@ -71,14 +76,13 @@ See https://www.nature.com/articles/s41598-020-69772-8#Tab2
 ** TODO [#A] Remaining tests to write
 - ASCAT
 - delly_cnv
-- cnvkit
 - mosdepth
 - multiqc
 - Picard
 ** TODO [#A] Make sure all reference vcfs and stuff have the same names as the sample
 CREATED: [2024-11-11 Mon]
 Especially check the ids
-** TODO Check if delly's format can be read by snpeff and vep
+** TODO Check if delly's sv format can be read by snpeff and vep
 If not, then see https://github.com/dellytools/sansa?tab=readme-ov-file as an alternative annotator
 ** DONE [#A] Automate preparation of snpEff cancer definition file
 CLOSED: [2024-11-15 Fri 08:44]

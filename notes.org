@@ -1,9 +1,14 @@
 * Unsorted notes
+** Common VCF format fields to be aware of
++ AD: the read depth supporting each allele
 ** Report format :PROCEDURE:
 CREATED: [2024-11-19 Tue]
 + Can classify variants by clinical significance
 + Metrics to include
-  * VAF, coverage
+  * VAF (calculated b),
+     coverage
+  *
+  * VCF-level
 ** Options for merging VCFs
 Take inspiration from SomaticCombiner and [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
 ** Potential tools for driver gene prediction
@@ -41,6 +46,10 @@ https://www.nature.com/articles/nmeth.2883
   * This could also be an issue with bait file incompatibility...
 + freec
   * Wouldn't work with pipeline params, and errors are vague
++ accucopy
+  * Won't run
+* Analysis tools to check out
++ BubbleTree: has nice visuals, thought you were gonna use it to estimate purity + ploidy but can't because it requires CNV data and most CNV prediction needs purity + ploidy to begin with
 * VAR
 # Local Variables:
 # citar-prev-references: ("theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020" "cortes-cirianoComputationalAnalysisCancer2022")

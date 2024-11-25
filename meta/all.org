@@ -1,3 +1,4 @@
 * Exome CRC
 + Sequencing platform: NovaSeq 6000
 + Capture kit: SureSelect Human All Exon V6
+  * In the Agilent download package, *_Covered.bed are taken to be baits and *Regions.bed to be targets

@@ -98,6 +98,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 **** Metrics
 + Tumor purity and ploidy
   * With [[https://github.com/mskcc/facets-suite][facets-suite]]
+    * See [cite:@aroraFACETSFractionAlleleSpecific2022] for how to interpret
 + QC metrics from =fastp=
 + Various metrics from =Picard=
   * =CountReads=
@@ -116,3 +117,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools
+
+# Local Variables:
+# citar-prev-references: ("aroraFACETSFractionAlleleSpecific2022")
+# End:
