@@ -7,7 +7,6 @@ process CONCAT_VCF {
 
     input:
     tuple val(meta), path(vcfs)
-    val(suffix) // Suffix for ouptut file
     val(module_number)
     //
 
@@ -17,6 +16,7 @@ process CONCAT_VCF {
     //
 
     shell:
+    suffix = meta.suffix ? meta.suffix : "All"
     output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
     check = file("${meta.out}/${output}")
     if (check.exists()) {

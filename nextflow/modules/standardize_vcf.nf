@@ -28,7 +28,8 @@ process STANDARDIZE_VCF {
     //
 
     script:
-    output = "${module_number}-${meta.filename}-standardized.vcf.gz"
+    suffix = meta.suffix ? meta.suffix : "Standardized"
+    output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
     check = file("${meta.out}/${output}")
     to_clear = [
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],
@@ -43,7 +44,7 @@ process STANDARDIZE_VCF {
     if (check.exists()) {
         """
         ln -sr ${check} .
-        ln -sr ${meta.log}/standardize_vcf.log .
+        ln -sr ${meta.log}/${suffix}.log .
         """
     } else {
         """
