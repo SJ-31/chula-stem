@@ -12,10 +12,18 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/delly_cnv", "RGSM_normal": "10",
-                    "log": "$params.log/delly_cnv_sv", "id": "sample2"],
-                    "$params.out2/patient_10_cancer/3-patient_10_dedup.bam",
-                    ["$params.out2/patient_10_cancer/3-patient_10_dedup.bam.bai"]]
+                input[0] = [["out": "$params.out/delly_cnv",
+                        "log": "$params.log/delly_cnv",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"],
+                    "$params.out2/patient_10/cancer/3-patient_10_cancer-Delly.cov.gz",
+                    0.7, 2]
                 input[1] = params.genome_filtered
                 input[2] = params.mappability
                 input[3] = 3

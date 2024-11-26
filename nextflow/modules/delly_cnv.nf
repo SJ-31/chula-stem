@@ -5,7 +5,7 @@ process DELLY_CNV {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(covfile)
+    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(covfile), val(purity), val(ploidy)
     val(reference)
     val(mappability)
     val(module_number)

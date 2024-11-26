@@ -6,14 +6,10 @@ get_sample_file () {
 }
 
 # Segment tumor genome
-# TODO: can't fill these parameters until you have software that estimates ploidy and purity
-# purity=$()
-# ploidy=
 delly cnv --segmentation \
-    --cnv-size "TODO" \
-    --cn_offset "TODO" \
-    --sdrd "TODO" \
-    --purity "TODO" \
+    !{args} \
+    --ploidy !{ploidy} \
+    --purity !{purity} \
     --outfile tumor.bcf \
     --covfile !{covfile} \
     --genome !{reference} \
@@ -33,10 +29,11 @@ delly cnv --segmentation \
     --vcffile tumor.bcf \
     --outfile normal.bcf \
     --genome !{reference} \
-    --mappability \
+    --mappability !{mappability} \
     !{normal}
 
 bcftools merge -m id -O b -o tmp.bcf tumor.bcf normal.bcf
+bcftools index tmp.bcf
 get_sample_file tmp.bcf
 
 delly classify --pass --filter somatic --outfile !{out} -s samples.tsv tmp.bcf
