@@ -3,6 +3,7 @@
 + [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
 + [3] [[https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2][GATK Mutect2 Ho2]]
 + [4] [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
++ [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and identifies SAV1 as a potential driver]]
 :END:
 * Workflows
 # All workflows expect an input csv file with
@@ -22,6 +23,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * =fastq_2=
   * =source=  [tumor|normal]
 **** Reference data
++ *WARNING:* every single resource below MUST have the same contig names
 + Genome: hg38???
   * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
     * And =gatk CreateSequenceDictionary -R <ref>=
@@ -46,6 +48,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 - gridss: bed exclusion file, recommended to be from the ENCODE project
 - CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
 - Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
+- FACETS: needs a snps file for
 *** Steps
 **** Preprocessing
 + QC: =fastp= with the following routines
@@ -95,6 +98,12 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Tumor in normal estimation
   * Filtering out somatic mutations that are known germline sites
   * Oxidative artifact filter
++ General options (Validate this)
+  * Minimum read depth in tumor, TODO: but do you need this?
+    * If you impose a minimum read depth, then you may get rid of variants with low VAF
+      * [4] uses a read depth of 4 and VAF of 10% for one of their tools
+      * [5] requires that variants are supported by at least 4% of total reads in the tumor, and at least three reads, and less than 1% of total reads in normal
+  * Maximum read depth in normal
 **** Metrics
 + Tumor purity and ploidy
   * With [[https://github.com/mskcc/facets-suite][facets-suite]]
