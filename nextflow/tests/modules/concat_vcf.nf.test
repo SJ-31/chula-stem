@@ -1,0 +1,36 @@
+nextflow_process {
+
+    name "Test Process CONCAT_VCF"
+    script "modules/concat_vcf.nf"
+    process "CONCAT_VCF"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/concat",
+                        "log": "$params.log/concat",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    ["$params.out/mutect2/4-null-Mutect2.vcf.gz",
+                     "$params.out/muse2/4-null-MuSE.vcf.gz",
+                    "$params.out/strelka2/strelka.vcf.gz"]]
+                input[1] = "concat"
+                input[2] = 7
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
