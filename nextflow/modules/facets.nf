@@ -10,8 +10,8 @@ process FACETS {
     //
 
     output:
-    tuple val(meta), path(prefix)
-    tuple val(meta), path("${prefix}/purity.txt"), path("${prefix}/ploidy.txt")
+    tuple val(meta), path(prefix), emit: cnv
+    tuple val(meta), path("${prefix}/purity.txt"), path("${prefix}/ploidy.txt"), emit: purity_ploidy
     path("*.log")
     //
 

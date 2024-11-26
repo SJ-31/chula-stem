@@ -6,7 +6,8 @@ process FACETS_PILEUP {
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
-    val(snps)
+    val(snps) // "should contain polymorphic SNPs, so that FACETS can infer changes in allelic configuration at genomic loci from changes in allele ratios"
+    // Docs recommend dbSNP
     val(module_number)
     //
 
