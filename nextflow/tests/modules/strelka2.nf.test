@@ -13,9 +13,11 @@ nextflow_process {
             process {
                 """
                 input[0] = [["out": "$params.out/strelka2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer",
                     "log": "$params.log/strelka2", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam",
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
                     ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"],
                     "$params.out/manta/4-candidateSmallIndels_Manta.vcf.gz"]
                 input[1] = "$params.genome"
