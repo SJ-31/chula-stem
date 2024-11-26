@@ -2,7 +2,7 @@ process MOSDEPTH {
     ext version: "0.3.9"
  
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
     input:

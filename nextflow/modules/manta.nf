@@ -1,7 +1,7 @@
 process MANTA {
     ext version: "1.6.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
@@ -26,7 +26,7 @@ process MANTA {
     shell:
     out = "${module_number}-${meta.filename}-MantaOut"
     check = file("${meta.out}/${out}")
-    target_flag = target_intervals == "" ? " --callRegions=${target_intervals} " : ""
+    target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''

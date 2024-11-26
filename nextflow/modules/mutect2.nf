@@ -1,7 +1,7 @@
 process MUTECT2 {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
@@ -22,7 +22,7 @@ process MUTECT2 {
     out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
     stats = "${out}.stats"
     raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
-    target_flag = target_intervals == "" ? " --intervals ${target_intervals} " : ""
+    target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {

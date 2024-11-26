@@ -1,7 +1,11 @@
 process FILTER_MUTECT_CALLS {
+    // By default, applies filtering based on...
+    //  - contamination (includes the `segmentation` argument)
+    //  - read orientation biases (ob-priors)
+    //  - whether or not a read is "well-formed", see https://gatk.broadinstitute.org/hc/en-us/articles/360042911951-WellformedReadFilter
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:

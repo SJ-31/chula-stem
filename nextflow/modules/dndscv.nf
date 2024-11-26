@@ -1,7 +1,7 @@
 process DNDSCV {
     ext version: "0.1.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:

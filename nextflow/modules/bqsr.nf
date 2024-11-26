@@ -1,7 +1,7 @@
 process BQSR {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     // Recalibrate and also obtain covariate plot

@@ -1,7 +1,7 @@
 process STRELKA2 {
     ext version: "2.9.10"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ ? null : x }
+    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
@@ -20,7 +20,7 @@ process STRELKA2 {
     shell:
     out = "${module_number}-${meta.filename}-StrelkaOut"
     check = file("${meta.out}/${out}")
-    target_flag = target_intervals == "" ? " --callRegions=${target_intervals} " : ""
+    target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''

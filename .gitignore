@@ -96,3 +96,4 @@ nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
 /nextflow/bin/R
 /tests/5-sample2-Facets/
 /nextflow/bin/rename_vcf.bash
+/stats.vchk
