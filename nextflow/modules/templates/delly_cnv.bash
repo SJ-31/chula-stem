@@ -19,7 +19,6 @@ delly cnv --segmentation \
 # --cnv-size (-z):
 # --cn_offset (-t):
 #   Is the minimum copy-number shift for segmentation and somatic classification
-#   Can calculate as purity * ploidy + 2 (diploid number) * (1-purity)
 # --sdrd (read-depth shift, -x):
 #
 # which should be determined dynamically for each tumor sample
@@ -36,6 +35,16 @@ bcftools merge -m id -O b -o tmp.bcf tumor.bcf normal.bcf
 bcftools index tmp.bcf
 get_sample_file tmp.bcf
 
-delly classify --pass --filter somatic --outfile !{out} -s samples.tsv tmp.bcf
+delly classify --pass --filter somatic --outfile tmp.vcf.gz -s samples.tsv tmp.bcf
+
+vcf_info_add_tag -n !{params.source_name} \
+    -d "!{params.source_description}" \
+    -b '.' \
+    -t String \
+    -a dellyCNV \
+    -i tmp.vcf.gz \
+    -o tmp2.vcf
+
+bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z tmp2.vcf > !{out}
 
 get_nextflow_log.bash dellyCNV.log

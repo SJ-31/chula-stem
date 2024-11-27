@@ -34,7 +34,7 @@ bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z tmp2.bcf > tmp2.v
 
 uncompressed=$(echo "!{out}" | sed 's/.gz//')
 
-vcf_info_add_tag -n SOURCE \
+vcf_info_add_tag -n !{params.source_name} \
     -d "!{params.source_description}" \
     -b '.' \
     -t String \
