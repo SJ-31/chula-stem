@@ -9,10 +9,10 @@ include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
-include { SNPEFF } from "../modules/snpeff.nf"
-include { SNPSIFT } from "../modules/snpsift.nf"
-include { MERGE_VCFS as MERGE_A } from "../modules/merge_vcfs.nf"
-include { MERGE_VCFS as MERGE_B } from "../modules/merge_vcfs.nf"
+include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
+include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
+include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
+include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
@@ -68,21 +68,18 @@ workflow "whole_exome" {
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
     // Order is important for the first two
-    paired.view()
     paired_no_id = paired.map { it[1..-1] }
     // paired_no_id is [meta, normal, tumor, indices]
 
     to_delly_cov = branched.tumor.map({ [it[0].id] + it[0..-1] }).join(indices).map { it[1..-1] }
-    DELLY_COV(to_delly_cov, params.ref.genome, params.ref.mappability, 3)
+    DELLY_COV(to_delly_cov, params.ref.genome, params.ref.mappability, 4)
 
     /*
      * Variant calling
      */
-    def getId = { [it[0].id] + it[1] }
-
     // Structural variants
 
-    MANTA(paired_no_id, params.ref.genome, 5)
+    MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
     DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude, 5)
     MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 5)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
@@ -97,42 +94,91 @@ workflow "whole_exome" {
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
-    // Copy number abberation
-
-    to_delly_cnv = paired.join(DELLY_COV.out.cov).map {it[1..-1]}
-    // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.mappability, 5)
-    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
-    FACETS(FACETS_PILEUP.out.pileup, 5)
-
-    // TODO need cnvkit copy number file
-    // CNVKIT(paired_no_id, params.ref.cnvkit_copy_number, 5)
+    def toConcat = { suffix, outdir_name, variant_class, it ->
+        [it[0] + ["suffix": suffix,
+                  "vclass": variant_class,
+                  "out": "${params.outdir}/${it[0].id}/${outdir_name}",
+                  "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
+    }
 
     // Combine variants by type
+    small_variants = MUTECT2_COMPLETE.out.map(params.prependId)
+        .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
+        .join(MUSE2.out.variants.map(params.getId))
+        .map({ it[1..-1] })
+        .map({ toConcat("Small_std", "annotations", "small", it) })
 
-    // small_variants = STRELKA2.out.somatic
-    //  .map({ [it[0].id] + it })
-    //  .join(MUTECT2_COMPLETE.out.somatic.map(getId))
-    //  .join(MUSE2.out.variants.map(getId))
-    //  .map { it[1..-1] }
-    // TODO: This is incomplete cause you don't know the output of the other callers
-    // MERGE_A(small_variants, 6)
+    CONCAT_SMALL(small_variants, 6)
 
-    // structural_variants = MANTA.out.somatic.map({ [it[0].id] + it })
-    //  .join(DELLY_SV.out.variants.map(getId))
+    structural_variants = MANTA.out.somatic.map(params.prependId)
+        .join(DELLY_SV.out.variants.map(params.getId))
+        .join(GRIDSS.out.variants.map(params.getId))
+        .map({ it[1..-1] })
+        .map({ toConcat("SV_std", "annotations", "SV", it) })
+
+    CONCAT_SV(structural_variants, 6)
+
+    def withBams = { n, t, it -> it.map(params.prependId)
+                    .join(n.map(params.getId))
+                    .join(t.map(params.getId))
+                    .map( { it[1..-1] } ) }
+
+    std_small_variants = withBams(branched.normal, branched.tumor, CONCAT_SMALL.out.vcf)
+    std_svs = withBams(branched.normal, branched.tumor, CONCAT_SV.out.vcf)
+    to_standardize = std_small_variants.mix(std_svs)
+
+    /*
+     * Metric collection and QC
+     */
+    // TODO: concat, get basic stats, then run qc on the whole thing before effect prediction
+    // CONCAT_SMALL.out.vcf
+    STANDARDIZE_VCF(to_standardize, params.ref.genome, 7)
+
+    standardized = STANDARDIZE_VCF.out.vcf.branch { meta, files ->
+        small: meta.vclass == "small"
+        SV: meta.vclass == "SV"
+    }
+
+    // TODO: qc must be done differently for SVs
+
+    // QC_SMALL(standardized.small.map({ addSuffix("Small_high_conf", it) }),
+        // params.small_qc, 8)
+    // callset_qc(???, ???, ???, ???)
+    //
+
+    /*
+    * Copy number abberation
+    */
+
+    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5) // TODO: this is only temporary,
+    // in the real run use dbSNP or the combined snps file instead
+    FACETS(FACETS_PILEUP.out.pileup, 5)
+
+    def nullIfNotNum = { it.text.isNumber() ? it.text : null }
+    purity_ploidy = FACETS.out.purity_ploidy
+        .map({ [it[0], nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+
+    to_delly_cnv = paired.join(DELLY_COV.out.cov).join(purity_ploidy).map({it[1..-1]})
+    // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.delly_mappability, 5)
+
+    // collected_normals = normals.map({ it[1] }).collect()
+    // CNVKIT_PREP([["filename": "cohort"], collected_normals], params.ref.baits,
+    //             params.ref.genome_blacklist, 4)
+
+    // final_small = ??? TODO: the small variants after callset qc
+    // to_cnvkit = paired.join(final_small, purity_ploidy)
+    // CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "wgs", 5)
 
     /*
      * Variant annotation
      */
-    // SNPEFF(CONCAT_VCF_1.out.vcf, params.ref.snpEff_db, true, 7)
-    // VEP(all_variants.out.vcf, params.ref.genome, 7)
+    // VEP(???, params.ref.genome, 7)
+    //
     // TODO: need to transfer annotations between them
     //      Check if merge1 works for this
     // annotated = SNPEFF.out.vcf.join(VEP.map(getId))
     // MERGE_B(annotated, 8)
 
-    /*
-     * Metric collection
-     */
 
     // PICARD("???", "exome", params.ref.genome, params.ref.targets, params.ref.baits,
     //      null, 8)

@@ -12,8 +12,6 @@ workflow "MUTECT2_COMPLETE" {
     module_number
 
     main:
-    def getId = { [it[0].id] + [it[1]] }
-
     MUTECT2(meta_and_bam, params.ref.genome, params.ref.targets, module_number)
     LEARN_READ_ORIENTATION(MUTECT2.out.raw, module_number)
 
@@ -24,10 +22,10 @@ workflow "MUTECT2_COMPLETE" {
     CALCULATE_CONTAMINATION(GET_PILEUP_SUMMARIES.out.pileup, module_number)
 
     to_filter = MUTECT2.out.variants.map({ [it[0].id] + it })
-        .join(LEARN_READ_ORIENTATION.out.ro.map(getId))
-        .join(CALCULATE_CONTAMINATION.out.c.map(getId))
-        .join(CALCULATE_CONTAMINATION.out.s.map(getId))
-        .join(MUTECT2.out.stats.map(getId))
+        .join(LEARN_READ_ORIENTATION.out.ro.map(params.getId))
+        .join(CALCULATE_CONTAMINATION.out.c.map(params.getId))
+        .join(CALCULATE_CONTAMINATION.out.s.map(params.getId))
+        .join(MUTECT2.out.stats.map(params.getId))
         .map { it[1..-1] }
 
     FILTER_MUTECT_CALLS(to_filter, params.ref.genome, module_number)

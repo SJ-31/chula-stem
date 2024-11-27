@@ -6,7 +6,7 @@ process CONCAT_VCF {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(vcfs)
+    tuple val(meta), path(vcfs, arity: "2..*")
     val(module_number)
     //
 
