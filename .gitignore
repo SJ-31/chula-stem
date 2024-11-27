@@ -1,4 +1,5 @@
 /target
+tests/patient*
 .github
 *.nf.test.snap
 *.nf-test*
