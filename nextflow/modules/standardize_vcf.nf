@@ -48,7 +48,9 @@ process STANDARDIZE_VCF {
         """
     } else {
         """
-        bcftools annotate -x ${clear_flag} ${vcf} -O z > tmp.vcf.gz
+        bcftools norm --fasta-ref ${reference} --atomize ${vcf} | \\
+            bcftools annotate -x ${clear_flag} -O z > tmp.vcf.gz
+
         gatk IndexFeatureFile -I tmp.vcf.gz
         gatk VariantAnnotator -R ${reference} -V tmp.vcf.gz \\
             -I ${tumor_bam} -I ${normal_bam} \\
