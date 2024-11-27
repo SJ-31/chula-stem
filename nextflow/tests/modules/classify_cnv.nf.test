@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process CLASSIFY_CNV"
+    script "modules/classify_cnv.nf"
+    process "CLASSIFY_CNV"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("${baseDir}/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/classify_cnv",
+                        "log": "$params.log/classify_cnv",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+            ], "/data/home/shannc/tools/ClassifyCNV/Examples/1000Genomes.hg38.bed"]
+                input[1] = 8
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
