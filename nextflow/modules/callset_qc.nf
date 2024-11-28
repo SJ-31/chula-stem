@@ -28,8 +28,8 @@ process CALLSET_QC {
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 
-    ndepth = qc.max_normal_depth ? "FORMAT/DP[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
-    tdepth = qc.min_tumor_depth ? "FORMAT/DP[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
+    ndepth = qc.max_normal_depth ? "FORMAT/AD[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
+    tdepth = qc.min_tumor_depth ? "FORMAT/AD[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
     vaf = qc.min_VAF ? "INFO/AF > ${qc.min_VAF} | INFO/AF == \".\"" : ""
     filter = qc.accepted_filters.collect({ "FILTER~\"${it}\"" }).join(" && ")
 
