@@ -5,8 +5,17 @@ from subprocess import run
 from tempfile import TemporaryFile
 
 import click
+import rpy2.robjects as ro
 import vcfpy
-from rpy2.robjects.packages import STAP
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import STAP, importr
+
+# rx method is equivalent to [], rx2 is [[]]
+
+
+def r2pd(robject):
+    with (ro.default_converter + pandas2ri.converter).context():
+        return ro.conversion.get_conversion().rpy2py(robject)
 
 
 @click.command()
@@ -92,6 +101,57 @@ def _vcf_info_add_tag(
         record: vcfpy.Record
         record.INFO[name] = [default]
         writer.write_record(record)
+
+
+@click.command()
+@click.option("-i", "--input", required=True, help="Input file")
+@click.option("-o", "--output", required=True, help="Output")
+@click.option("-c", "--caller", required=True, help="Tool producing CNV calls")
+def classify_cnv_format(caller: str, input: str, output: str):
+    _classify_cnv(caller, input, output)
+
+
+def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
+    import polars as pl
+
+    def dup_or_del(x):
+        return "DEL" if x < 2 else "DUP"
+
+    if caller.lower() == "cnvkit":
+        df = pl.read_csv(input, separator="\t").select(
+            ["chromosome", "start", "end", "cn"]
+        )
+    elif caller.lower() == "facets":
+        base = importr("base")
+        df: pl.DataFrame = (
+            pl.from_pandas(r2pd(base.readRDS(input).rx2("segs")))
+            .select(["chrom", "start", "end", "tcn.em"])
+            .rename({"tcn.em": "cn"})
+        )
+    elif caller.lower() == "delly":
+        from subprocess import run
+
+        if not tumor_sample:
+            raise ValueError("Tumor sample name must be provided")
+        qstring = f"bcftools query -f '%CHROM\t%POS0\t%END\t[%CN]\n' -s {tumor_sample} {input} > tmp.bed"
+        print(qstring)
+        run(
+            qstring,
+            shell=True,
+        )
+        df = pl.read_csv(
+            "tmp.bed",
+            separator="\t",
+            new_columns=["chromosome", "start", "end", "cn"],
+            dtypes=[pl.String, pl.Int64, pl.Int64, pl.Int64],
+        )
+        run("rm tmp.bed", shell=True)
+    else:
+        raise ValueError("Unknown caller provided")
+
+    df.filter(pl.col("cn") != 2).with_columns(
+        type=pl.col("cn").map_elements(dup_or_del, return_dtype=pl.String)
+    ).drop("cn").write_csv(output, separator="\t", include_header=False)
 
 
 @click.command()

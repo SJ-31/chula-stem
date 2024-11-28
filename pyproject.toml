@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.8"
-dependencies = ["vcfpy", "rpy2", "pandas", "click", "toml"]
+dependencies = ["vcfpy", "rpy2", "pandas", "click", "toml", "polars"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -20,3 +20,4 @@ module-name = "chula_stem._rust"
 vcf_info_add_tag = "chula_stem.utils:vcf_info_add_tag"
 dndscv_buildref = "chula_stem.dndscv:buildref"
 make_freec_config = "chula_stem.utils:make_freec_config"
+classify_cnv_format = "chula_stem.utils:classify_cnv_format"
