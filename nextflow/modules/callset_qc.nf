@@ -8,32 +8,34 @@ process CALLSET_QC {
 
     input:
     tuple val(meta), path(vcf)
-    val(suffix)
-    val(min_tumor_depth)
-    val(max_normal_depth)
-    val(accepted_filters) // List of values in the FILTER column that would permit a call
+    val(qc) // A map specifying filters to apply
+    // Currently supported are..
+    // - min_tumor_depth: the minimum number of ALT reads found in the tumor (FORMAT/DP)
+    // - max_normal_depth: the maximum number of ALT reads found in the normal (FORMAT/DP)
+    // - min_VAF: minimum variant allele frequency (INFO/AF)
+    // - accepted_filters: A list of FILTER flags that calls must have to be accepted
     val(module_number)
     //
 
     output:
-    tuple val(meta), path(output)
+    tuple val(meta), path(output), emit: vcf
     path("*.log")
     //
 
     script:
-    suffix = suffix == "" ? "QC" : suffix
+    suffix = meta.suffix ? meta.suffix : "QC"
     output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 
-    if (min_tumor_depth && max_normal_depth) {
-        depth_flag = "-i 'FORMAT/DP[@normal.txt] <= ${max_normal_depth} && FORMAT/DP[@tumor.txt] >= ${min_tumor_depth}' " // SV callers don't have FORMAT/DP
-    } else {
-        depth_flag = ""
-    }
+    ndepth = qc.max_normal_depth ? "FORMAT/DP[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
+    tdepth = qc.min_tumor_depth ? "FORMAT/DP[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
+    vaf = qc.min_VAF ? "INFO/AF > ${qc.min_VAF} | INFO/AF == \".\"" : ""
+    filter = qc.accepted_filters.collect({ "FILTER~\"${it}\"" }).join(" && ")
 
-    filter_flag = accepted_filters.collect({ "FILTER~'${it}'" }).join(" && ")
-
+    all = [ndepth, tdepth, filter, vaf].findAll({ it != "" && it != null })
+        .collect({ "bcftools filter -i '${it}'" }).join(" | ")
+    all = all != "" && all != null ? "${all} -O z > ${output}" : "bcftools view -O z > ${output}"
     if (check.exists()) {
         """
         ln -sr ${check} .
@@ -44,9 +46,7 @@ process CALLSET_QC {
         echo ${meta.RGSM_normal} > normal.txt
         echo ${meta.RGSM_tumor} > tumor.txt
 
-        bcftools filter -e 'FILTER="."' ${vcf} | \
-            bcftools filter -i "${filter_flag}" | \
-            bcftools filter ${depth_flag} -O z > ${output}
+        bcftools filter -e 'FILTER="."' ${vcf} | ${all}
 
         get_nextflow_log.bash filter_qc.log
         """
