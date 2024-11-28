@@ -52,14 +52,19 @@ process GRIDSS {
             name="${names[i]}"
             file="${files[i]}"
 
-            bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z "${file}" > tmp.vcf.gz
+            if [[ "${file}" == "confident.vcf.bgz" ]]; then
+                bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z "${file}" > tmp.vcf.gz
+                f="tmp.vcf.gz"
+            else
+                f="${file}"
+            fi
 
-            vcf_info_add_tag.r -n SOURCE \\
+            vcf_info_add_tag.bash.r -n !{params.source_name} \\
                 -d '!{params.source_description}' \\
                 -b '.' \\
                 -t String \\
                 -a gridss \\
-                -i tmp.vcf.gz \\
+                -i "${f}" \\
                 -o "$name"
         done
 

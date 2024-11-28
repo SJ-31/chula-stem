@@ -20,7 +20,7 @@ for variant in somatic*.vcf.gz; do
     rename_vcf.bash -v -i $variant -o tmp.vcf.gz \
         -n "!{meta.RGSM_normal}" -t "!{meta.RGSM_tumor}"
 
-    vcf_info_add_tag -n "!{params.source_name}" \
+    vcf_info_add_tag.bash -n "!{params.source_name}" \
         -d "!{params.source_description}" \
         -b '.' \
         -t String \

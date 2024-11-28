@@ -47,7 +47,7 @@ process MUTECT2 {
 
         bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" -O z tmp.vcf.gz > tmp2.vcf.gz
 
-        vcf_info_add_tag -n ${params.source_name} \\
+        vcf_info_add_tag.bash -n ${params.source_name} \\
             -d "$params.source_description" \\
             -b '.' \\
             -t String \\

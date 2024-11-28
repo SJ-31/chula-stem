@@ -101,3 +101,4 @@ nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
 /nextflow/bin/bcftools
 /tests/classify_cnv/
 docs
+/nextflow/bin/vcf_info_add_tag.bash
