@@ -1,14 +1,12 @@
 #!/usr/bin/env ipython
 
 
-from subprocess import run
 from tempfile import TemporaryFile
 
 import click
 import rpy2.robjects as ro
-import vcfpy
 from rpy2.robjects import pandas2ri
-from rpy2.robjects.packages import STAP, importr
+from rpy2.robjects.packages import importr
 
 # rx method is equivalent to [], rx2 is [[]]
 
@@ -16,91 +14,6 @@ from rpy2.robjects.packages import STAP, importr
 def r2pd(robject):
     with (ro.default_converter + pandas2ri.converter).context():
         return ro.conversion.get_conversion().rpy2py(robject)
-
-
-@click.command()
-@click.option("-n", "--name", required=True, help="Name of INFO tag")
-@click.option(
-    "-d", "--description", required=True, help="Description of INFO tag in header"
-)
-@click.option(
-    "-b",
-    "--number",
-    required=True,
-    help="Number of characters included with this tag",
-)
-@click.option(
-    "-t",
-    "--type",
-    required=True,
-    help="Tag type (Integer, Float, Flag, Character, String)",
-)
-@click.option(
-    "-a",
-    "--default",
-    required=True,
-    help="Default value of tag in each record",
-    type=str,
-)
-@click.option("-i", "--input", required=True, help="VCF file to annotate")
-@click.option("-o", "--output", required=True, help="Output file")
-def vcf_info_add_tag(
-    name: str,
-    description: str,
-    number: str,
-    type: str,
-    default: str,
-    input: str,
-    output: str,
-):
-    """Add tag <name> to INFO column of <input>, returning uncompressed <output>"""
-    _vcf_info_add_tag2(name, description, number, type, default, input, output)
-
-
-def _vcf_info_add_tag2(name, description, number, type, default, input, output):
-    src: str = """
-    library(vcfR)
-    library(glue)
-    vcf_info_add_tag <- function(name, description, number, type, default, input, output) {
-    vcf <- read.vcfR(input, verbose = FALSE)
-    info <- vcf@fix[, "INFO"]
-    vcf@fix[, "INFO"] <- paste0(info, glue(";SOURCE={default}"))
-    m <- glue("##INFO=<ID={name},Number={number},Type={type},Description=\\"{description}\\">")
-    vcf@meta <- append(vcf@meta, m)
-    write.vcf(vcf, output)
-    }
-    """
-    fn = STAP(src, "fn")
-    fn.vcf_info_add_tag(
-        name, description, number, type, default, input, f"{output}.gz"
-    )
-    run(f"gunzip {output}", shell=True)
-
-
-def _vcf_info_add_tag(
-    name: str,
-    description: str,
-    number: str,
-    type: str,
-    default: str,
-    input: str,
-    output: str,  # Uncompressed vcf only
-):
-    reader = vcfpy.Reader.from_path(input)
-    new_line = vcfpy.OrderedDict(
-        [
-            ("ID", name),
-            ("Number", number),
-            ("Type", type),
-            ("Description", description),
-        ]
-    )
-    reader.header.add_info_line(new_line)
-    writer = vcfpy.Writer.from_path(output, reader.header)
-    for record in reader:
-        record: vcfpy.Record
-        record.INFO[name] = [default]
-        writer.write_record(record)
 
 
 @click.command()
@@ -128,7 +41,7 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
             .select(["chrom", "start", "end", "tcn.em"])
             .rename({"tcn.em": "cn"})
         )
-    elif caller.lower() == "delly":
+    elif caller.lower() == "dellycnv":
         from subprocess import run
 
         if not tumor_sample:
