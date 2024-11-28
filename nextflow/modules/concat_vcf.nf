@@ -26,11 +26,15 @@ process CONCAT_VCF {
         '''
     } else {
         '''
-        for i in *.vcf.gz; do
-            bcftools index "${i}"
+        i=0
+        for v in *.vcf.gz; do
+            name="${i}.bcf.gz"
+            bcftools annotate -x 'INFO/HOMLEN,INFO/SVLEN,FORMAT/SR' "${v}" -O b > "${name}"
+            bcftools index "${name}"
+            i=$((i+1))
         done
 
-        bcftools concat -a *.vcf.gz -O z -o !{output}
+        bcftools concat -a *.bcf.gz -O z -o !{output}
 
         get_nextflow_log.bash concat_vcf.log
         '''
