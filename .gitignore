@@ -2,7 +2,7 @@
 tests/patient*
 .github
 *.nf.test.snap
-*.nf-test*
+*.nf-test.log*
 *.vcf.gz*
 *.tsv
 *_Session.py
