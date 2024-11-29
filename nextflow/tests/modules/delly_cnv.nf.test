@@ -23,7 +23,7 @@ nextflow_process {
                     ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"],
                     "$params.out2/patient_10/cancer/3-patient_10_cancer-Delly.cov.gz",
-                    0.7, 2]
+                    0.05, 2]
                 input[1] = params.genome_filtered
                 input[2] = params.mappability
                 input[3] = 3

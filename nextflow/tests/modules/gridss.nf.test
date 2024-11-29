@@ -15,7 +15,8 @@ nextflow_process {
                 input[0] = [["out": "$params.out/gridss",
                         "log": "$params.log/gridss",
                     "id": "sample2",
-                    "RGSM_normal": "10"
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
                 ],
                     "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",

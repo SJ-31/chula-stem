@@ -12,12 +12,17 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/delly_sv", "RGSM_normal": "10",
-                    "log": "$params.log/delly_sv", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam",
-                    ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
-                input[1] = params.genome
+                input[0] = [["out": "$params.out/delly_sv",
+                        "log": "$params.log/delly_sv",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
+                input[1] = params.genome_filtered
                 input[2] = ""
                 input[3] = 4
                 """
