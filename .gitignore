@@ -5,6 +5,7 @@ tests/patient*
 *.nf-test*
 *.vcf.gz*
 *.tsv
+*_Session.py
 output
 
 # Byte-compiled / optimized / DLL files
@@ -102,3 +103,5 @@ nextflow/.nf-test-50fbaeee4aa9e21364025286e71f47c.nf
 /tests/classify_cnv/
 docs
 /nextflow/bin/vcf_info_add_tag.bash
+/tests/filtering/
+/tests/vep/

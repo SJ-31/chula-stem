@@ -36,5 +36,9 @@ else
 fi
 
 echo -e "${rename_str}" > rename.txt
-bcftools reheader -s rename.txt "${input}" | \
-    bcftools view -s "${order_str}" -O z > "${output}"
+if [[ -z "${output}" ]]; then
+    bcftools reheader -s rename.txt "${input}" | bcftools view -s "${order_str}"
+else
+    bcftools reheader -s rename.txt "${input}" | \
+        bcftools view -s "${order_str}" -O z > "${output}"
+fi
