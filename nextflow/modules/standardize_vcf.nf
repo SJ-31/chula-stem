@@ -58,7 +58,7 @@ process STANDARDIZE_VCF {
             -O ${output} \\
             --add-output-vcf-command-line
 
-        get_nextflow_log.bash standardize_vcf.log
+        get_nextflow_log.bash ${suffix}.log
         """
     }
     //
