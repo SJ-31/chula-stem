@@ -30,7 +30,8 @@ process CALLSET_QC {
 
     ndepth = qc.max_normal_depth ? "FORMAT/AD[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
     tdepth = qc.min_tumor_depth ? "FORMAT/AD[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
-    vaf = qc.min_VAF ? "FORMAT/VAF[@tumor.txt] > ${qc.min_VAF}" : ""
+    vaf = qc.min_VAF ? "FORMAT/AF[@tumor.txt] > ${qc.min_VAF}" : ""
+    // Note: VAF is calculated with GATK, which calls it FORMAT/AF
     filter = qc.accepted_filters.collect({ "FILTER~\"${it}\"" }).join(" && ")
 
     all = [ndepth, tdepth, filter, vaf].findAll({ it != "" && it != null })

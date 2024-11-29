@@ -35,7 +35,7 @@ process STANDARDIZE_VCF {
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],
         "FORMAT": ["AD"],
     ]
-    annotations = ["ChromosomeCounts", "Coverage",
+    annotations = ["ChromosomeCounts", "Coverage", "AlleleFraction",
                    "DepthPerAlleleBySample", "MappingQuality", "BaseQuality"]
 
     annotation_flag = annotations.collect({" -A ${it} "}).join(" ")
@@ -48,8 +48,7 @@ process STANDARDIZE_VCF {
         """
     } else {
         """
-        bcftools norm --fasta-ref ${reference} --atomize ${vcf} | \\
-            bcftools annotate -x ${clear_flag} -O z > tmp.vcf.gz
+        bcftools annotate -x ${clear_flag} -O z ${vcf} > tmp.vcf.gz
 
         gatk IndexFeatureFile -I tmp.vcf.gz
         gatk VariantAnnotator -R ${reference} -V tmp.vcf.gz \\
