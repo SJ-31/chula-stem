@@ -89,10 +89,8 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
     * delly has two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
     * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process
   * [[https://github.com/mskcc/facets-suite][facets-suite]]
-  *
 ****  Merging results
-+ Concatenate results with =gatk MergeVcfs= and report source in =SOURCE= header
-+ TODO: should probably have something more sophisticated than reporting everything, see notes
++ Concatenate results with =bcftools concat= and report source in =SOURCE= header
 **** Callset quality control
 + Possible options based on [4]
   * Tumor in normal estimation
@@ -104,6 +102,8 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
       * [4] uses a read depth of 4 and VAF of 10% for one of their tools
       * [5] requires that variants are supported by at least 4% of total reads in the tumor, and at least three reads, and less than 1% of total reads in normal
   * Maximum read depth in normal
+  * Checking for PASS filter
+    * *Note:* Since the INFO/FORMAT fields for the above can't be calculated with SVs, and because SV callers use different fields, SVs will only be filtered with PASS
 **** Metrics
 + Tumor purity and ploidy
   * With [[https://github.com/mskcc/facets-suite][facets-suite]]
@@ -115,9 +115,14 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * TODO: fill this up
 **** Variant annotation
   (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
-- [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]] (SNPs, indels, CNVs and SVs)
+- [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]] (SNPs, indels and SVs)
+- [[https://github.com/Genotek/ClassifyCNV][ClassifyCNV]] (CNVs)
+  * Attempts to estimate CNV pathogenicity using the American College of Medical Genetics and Genomics (ACMG) guidelines
+    * This works by scoring the CNV, based on its overlap with protein-coding and noncoding genes, as well as with a set of dosage-sensitive genes (haploinsufficient and triplosensitive) curated by ClinGen.
+      * If there is no such overlap, the algorithm checks for overlap with benign CNVs from gnomAD and DGV
+  * Is cautious about assigning clinical significance, will place CNV as uncertain "if convincing data are not available"
 - [[https://pcingola.github.io/SnpEff/][snpEff]] (SNPs, indels, multiple-nucleotide-polymorphisms )
-   * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
+  * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
 *** Output
 + Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
 
