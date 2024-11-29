@@ -17,7 +17,10 @@ process VEP {
     //
 
     script:
-    output = "${module_number}-${meta.filename}-vep.vcf.gz"
+    suffix = meta.suffix ? meta.suffix : "VEP"
+    prefix = "${module_number}-${meta.filename}-${suffix}"
+    output = "${prefix}.vcf.gz"
+    tsv = "${prefix}.tsv"
     check = file("$meta.out/$output")
     args = task.ext.args.join(" ")
     if (check.exists()) {
@@ -40,8 +43,10 @@ process VEP {
             --compress_output bgzip \\
             --output_file $output
 
+        format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} -v ANN
+
         get_nextflow_log.bash vep.log
         """
     }
-    //
+    // use --synonyms flag to unify the naming systems (can just use your existing renaming files)
 }

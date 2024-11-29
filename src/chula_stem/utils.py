@@ -167,3 +167,66 @@ def make_freec_config(
     with open(output, "w") as w:
         modified: list[str] = [l.replace('"', "").replace("'", "") for l in lines]
         w.write("".join(modified))
+
+
+@click.command()
+@click.option("-i", "--input", required=True, help="Input vcf file")
+@click.option("-o", "--output", required=True, help="Output tsv")
+@click.option(
+    "-t",
+    "--tool_source_tag",
+    required=False,
+    help="Info tag designating caller of origin",
+)
+@click.option(
+    "-v",
+    "--vep_info_field",
+    required=True,
+    help="Info field in vcf containing VEP annotations",
+)
+def format_vep_vcf(input, output, vep_info_field, tool_source_tag):
+    _format_vep_vcf(input, output, vep_info_field, tool_source_tag)
+
+
+def _format_vep_vcf(
+    input: str,
+    output: str,
+    vep_info_field: str = "ANN",
+    tool_source_tag: str = "TOOL_SOURCE",
+):
+    import io
+    import re
+    from subprocess import CompletedProcess, run
+
+    import polars as pl
+
+    proc: CompletedProcess = run(
+        f"bcftools head {input} | grep 'INFO=<ID={vep_info_field}'",
+        shell=True,
+        capture_output=True,
+        check=True,
+    )
+    columns = re.findall('.*Format: (.*)">', proc.stdout.decode())[0].split("|")
+    qstring = rf"%CHROM:%POS\t%REF\t%ALT\t%INFO/{tool_source_tag}\t%INFO/{vep_info_field}"
+    runstr = rf"bcftools query -f '{qstring}' {input}"
+    proc2: CompletedProcess = run(
+        runstr, shell=True, capture_output=True, check=True
+    )
+    df = (
+        pl.read_csv(
+            io.StringIO(proc2.stdout.decode()),
+            separator="\t",
+            new_columns=["Loc", "Ref", "Alt", tool_source_tag, "ANN"],
+        )
+        .with_columns(pl.col("ANN").str.split(","))
+        .explode("ANN")
+        .with_columns(pl.col("ANN").str.split("|").list.to_struct(fields=columns))
+        .unnest("ANN")
+        .with_columns(
+            pl.when(pl.col(pl.String).str.len_chars() == 0)
+            .then(None)
+            .otherwise(pl.col(pl.String))
+            .name.keep()
+        )
+    )
+    df.write_csv(output, separator="\t", null_value="NA")

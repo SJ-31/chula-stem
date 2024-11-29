@@ -19,4 +19,5 @@ module-name = "chula_stem._rust"
 [project.scripts]
 dndscv_buildref = "chula_stem.dndscv:buildref"
 make_freec_config = "chula_stem.utils:make_freec_config"
+format_vep_vcf = "chula_stem.utils:format_vep_vcf"
 classify_cnv_format = "chula_stem.utils:classify_cnv_format"
