@@ -13,17 +13,17 @@ process GRIDSS {
     //
 
     output:
-    tuple val(meta), path("${filtered}.gz"), emit: variants
-    path("${all}.gz")
+    tuple val(meta), path(filtered), emit: variants
+    path(all)
     path("*.log")
     //
 
     shell:
     prefix = "${module_number}-${meta.filename}"
-    all = "${prefix}-Gridss_all.vcf"
-    filtered = "${prefix}-Gridss_confident.vcf"
-    check1 = file("${meta.out}/${all}.gz")
-    check2 = file("${meta.out}/${filtered}.gz")
+    all = "${prefix}-Gridss_all.vcf.gz"
+    filtered = "${prefix}-Gridss_confident.vcf.gz"
+    check1 = file("${meta.out}/${all}")
+    check2 = file("${meta.out}/${filtered}")
     args = task.ext.args.join(" ")
     if (check1.exists() && check2.exists()) {
         '''
@@ -67,9 +67,6 @@ process GRIDSS {
                 -i "${f}" \\
                 -o "$name"
         done
-
-        bgzip !{filtered}
-        bgzip !{all}
 
         get_nextflow_log.bash gridss.log
         '''

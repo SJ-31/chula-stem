@@ -23,7 +23,6 @@ process MUTECT2 {
     stats = "${out}.stats"
     raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
-    uncompressed = out.replace(".gz", "")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
@@ -45,17 +44,14 @@ process MUTECT2 {
 
         mv tmp.vcf.gz.stats $stats
 
-        bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" -O z tmp.vcf.gz > tmp2.vcf.gz
+        bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" tmp.vcf.gz | \\
+            vcf_info_add_tag.bash -n ${params.source_name} \\
+                -d "$params.source_description" \\
+                -b '.' \\
+                -t String \\
+                -a mutect2 \\
+                -o ${out}
 
-        vcf_info_add_tag.bash -n ${params.source_name} \\
-            -d "$params.source_description" \\
-            -b '.' \\
-            -t String \\
-            -a mutect2 \\
-            -i tmp2.vcf.gz \\
-            -o $uncompressed
-
-        bgzip $uncompressed
         get_nextflow_log.bash mutect2.log
         """
     }

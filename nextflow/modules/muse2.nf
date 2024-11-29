@@ -13,15 +13,15 @@ process MUSE2 {
     //
 
     output:
-    tuple val(meta), path("${output}.gz"), emit: variants
+    tuple val(meta), path(output), emit: variants
     path("${prefix}.MuSE.txt")
     path("*.log")
     //
 
     script:
     prefix = "${module_number}-${meta.filename}"
-    output = "${prefix}-MuSE.vcf"
-    check = file("${meta.out}/${output}.gz")
+    output = "${prefix}-MuSE.vcf.gz"
+    check = file("${meta.out}/${output}")
     if (omics_type == "wgs") {
         data_flag = " -G "
     } else if (omics_type == "exome") {
@@ -52,18 +52,14 @@ process MUSE2 {
             -D ${dbsnp} \\
             ${data_flag}
 
-        rename_vcf.bash -v -i tmp.vcf -o tmp2.vcf.gz \\
-            -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}"
+        rename_vcf.bash -v -i tmp.vcf -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}" | \\
+            vcf_info_add_tag.bash -n ${params.source_name} \\
+                -d "$params.source_description" \\
+                -b '.' \\
+                -t String \\
+                -a muse2 \\
+                -o ${output}
 
-        vcf_info_add_tag.bash -n ${params.source_name} \\
-            -d "$params.source_description" \\
-            -b '.' \\
-            -t String \\
-            -a muse2 \\
-            -i tmp2.vcf.gz \\
-            -o ${output}
-
-        bgzip ${output}
         get_nextflow_log.bash muse2.log
         """
     }
