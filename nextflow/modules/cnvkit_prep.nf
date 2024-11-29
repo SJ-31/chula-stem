@@ -6,7 +6,7 @@ process CNVKIT_PREP {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(cohort) // To analyze cohort sequenced on single platform, documentation recommends
+    tuple val(meta), path(cohort, arity: "1..*") // To analyze cohort sequenced on single platform, documentation recommends
     // combining all normal samples into a pooled reference, regardless of whether or not
     // matching tumor-normal pairs were sequenced
     val(reference)
