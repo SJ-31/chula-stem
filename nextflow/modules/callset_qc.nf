@@ -12,7 +12,7 @@ process CALLSET_QC {
     // Currently supported are..
     // - min_tumor_depth: the minimum number of ALT reads found in the tumor (FORMAT/DP)
     // - max_normal_depth: the maximum number of ALT reads found in the normal (FORMAT/DP)
-    // - min_VAF: minimum variant allele frequency (INFO/AF)
+    // - min_VAF: minimum variant allele frequency in the tumor (FORMAT/VAF)
     // - accepted_filters: A list of FILTER flags that calls must have to be accepted
     val(module_number)
     //
@@ -30,7 +30,7 @@ process CALLSET_QC {
 
     ndepth = qc.max_normal_depth ? "FORMAT/AD[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
     tdepth = qc.min_tumor_depth ? "FORMAT/AD[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
-    vaf = qc.min_VAF ? "INFO/AF > ${qc.min_VAF} | INFO/AF == \".\"" : ""
+    vaf = qc.min_VAF ? "FORMAT/VAF[@tumor.txt] > ${qc.min_VAF}" : ""
     filter = qc.accepted_filters.collect({ "FILTER~\"${it}\"" }).join(" && ")
 
     all = [ndepth, tdepth, filter, vaf].findAll({ it != "" && it != null })
