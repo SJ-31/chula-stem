@@ -12,18 +12,22 @@ process DELLY_CNV {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(with_caller), path(out)
+    path(segmentation)
     path("*.log")
     //
 
     shell:
     out = "${module_number}-${meta.filename}-DellyCNV.vcf.gz"
-    // the output of this is yet
+    segmentation = "${module_number}-${meta.filename}-DellySegmentation.bcf.gz"
+    with_caller = meta + ["caller": "dellyCNV"]
     check = file("${meta.out}/${out}")
+    check2 = file("${meta.out}/${segmentation}")
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (check.exists() && check2.exists()) {
         '''
         ln -sr !{check} .
+        ln -sr !{check2} .
         ln -sr !{meta.log}/dellyCNV.log .
         '''
     } else {

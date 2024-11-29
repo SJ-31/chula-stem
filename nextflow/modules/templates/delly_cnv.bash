@@ -37,17 +37,14 @@ get_sample_file tmp.bcf
 
 delly classify --pass --filter somatic --outfile tmp.vcf.gz -s samples.tsv tmp.bcf
 
-vcf_info_add_tag.bash -n !{params.source_name} \
-    -d "!{params.source_description}" \
-    -b '.' \
-    -t String \
-    -a dellyCNV \
-    -i tmp.vcf.gz \
-    -o tmp2.vcf
-
-bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z tmp2.vcf > !{out}
+bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" tmp.vcf.gz | \
+    vcf_info_add_tag.bash -n !{params.source_name} \
+        -d "!{params.source_description}" \
+        -b '.' \
+        -t String \
+        -a dellyCNV \
+        -o !{out}
 
 mv tumor.bcf "!{segmentation}"
-bgzip "!{segmentation}"
 
 get_nextflow_log.bash dellyCNV.log

@@ -30,17 +30,12 @@ delly call !{args} \
 # Post-filter
 delly filter -f somatic -o tmp2.bcf -s samples.tsv geno.bcf
 
-bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" -O z tmp2.bcf > tmp2.vcf.gz
+bcftools view -s "!{meta.RGSM_normal},!{meta.RGSM_tumor}" tmp2.bcf | \
+    vcf_info_add_tag.bash -n !{params.source_name} \
+        -d "!{params.source_description}" \
+        -b '.' \
+        -t String \
+        -a delly \
+        -o "!{out}"
 
-uncompressed=$(echo "!{out}" | sed 's/.gz//')
-
-vcf_info_add_tag.bash -n !{params.source_name} \
-    -d "!{params.source_description}" \
-    -b '.' \
-    -t String \
-    -a delly \
-    -i tmp2.vcf.gz \
-    -o "${uncompressed}"
-
-bgzip "${uncompressed}"
 get_nextflow_log.bash dellySV.log
