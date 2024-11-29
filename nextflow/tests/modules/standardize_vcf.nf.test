@@ -18,11 +18,11 @@ nextflow_process {
                     "RGSM_normal": "10_blood",
                     "RGSM_tumor": "10_cancer"
                 ],
-                    "/data/project/stemcell/shannc/tests/bcftools_tags/merged.vcf.gz",
+                    "$params.out2/patient_10/annotations/6-patient_10-Small_all.vcf.gz",
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
                     "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam"]
-                input[1] = "$params.genome_filtered"
-                input[2] = 5
+                input[1] = params.genome_filtered
+                input[2] = 4
                 """
             }
         }

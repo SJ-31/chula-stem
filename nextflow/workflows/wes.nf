@@ -7,11 +7,13 @@ include { MANTA } from "../modules/manta.nf"
 include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
+include { CNVKIT_PREP } from "../modules/cnvkit_prep.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
 include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
+include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
@@ -94,9 +96,8 @@ workflow "whole_exome" {
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
-    def toConcat = { suffix, outdir_name, variant_class, it ->
+    def toConcat = { suffix, outdir_name, it ->
         [it[0] + ["suffix": suffix,
-                  "vclass": variant_class,
                   "out": "${params.outdir}/${it[0].id}/${outdir_name}",
                   "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
     }
@@ -106,17 +107,17 @@ workflow "whole_exome" {
         .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
         .join(MUSE2.out.variants.map(params.getId))
         .map({ it[1..-1] })
-        .map({ toConcat("Small_std", "annotations", "small", it) })
+        .map({ toConcat("Small_all", "annotations", it) })
 
-    CONCAT_SMALL(small_variants, 6)
+    CONCAT_SMALL(small_variants, params.ref.genome, 6)
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(DELLY_SV.out.variants.map(params.getId))
         .join(GRIDSS.out.variants.map(params.getId))
         .map({ it[1..-1] })
-        .map({ toConcat("SV_std", "annotations", "SV", it) })
+        .map({ toConcat("SV_all", "annotations", it) })
 
-    CONCAT_SV(structural_variants, 6)
+    CONCAT_SV(structural_variants, params.ref.genome, 6)
 
     def withBams = { n, t, it -> it.map(params.prependId)
                     .join(n.map(params.getId))
@@ -124,27 +125,17 @@ workflow "whole_exome" {
                     .map( { it[1..-1] } ) }
 
     std_small_variants = withBams(branched.normal, branched.tumor, CONCAT_SMALL.out.vcf)
-    std_svs = withBams(branched.normal, branched.tumor, CONCAT_SV.out.vcf)
-    to_standardize = std_small_variants.mix(std_svs)
 
     /*
      * Metric collection and QC
      */
-    // TODO: concat, get basic stats, then run qc on the whole thing before effect prediction
-    // CONCAT_SMALL.out.vcf
-    STANDARDIZE_VCF(to_standardize, params.ref.genome, 7)
+    STANDARDIZE_VCF(std_small_variants.map({ params.addSuffix("Small_std", it) }),
+                    params.ref.genome, 6)
 
-    standardized = STANDARDIZE_VCF.out.vcf.branch { meta, files ->
-        small: meta.vclass == "small"
-        SV: meta.vclass == "SV"
-    }
-
-    // TODO: qc must be done differently for SVs
-
-    // QC_SMALL(standardized.small.map({ addSuffix("Small_high_conf", it) }),
-        // params.small_qc, 8)
-    // callset_qc(???, ???, ???, ???)
-    //
+    QC_SMALL(STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("Small_high_conf", it) }),
+        params.small_qc, 7)
+    QC_SV(CONCAT_SV.out.vcf.map({ params.addSuffix("SV_high_conf", it) }),
+          params.sv_qc, 7)
 
     /*
     * Copy number abberation
@@ -156,31 +147,39 @@ workflow "whole_exome" {
 
     def nullIfNotNum = { it.text.isNumber() ? it.text : null }
     purity_ploidy = FACETS.out.purity_ploidy
-        .map({ [it[0], nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+        .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
     to_delly_cnv = paired.join(DELLY_COV.out.cov).join(purity_ploidy).map({it[1..-1]})
     // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.delly_mappability, 5)
 
-    // collected_normals = normals.map({ it[1] }).collect()
-    // CNVKIT_PREP([["filename": "cohort"], collected_normals], params.ref.baits,
-    //             params.ref.genome_blacklist, 4)
+    collected_normals = normals.map({ it[2] }).toList()
+    CNVKIT_PREP(Channel.of(["filename": "cohort",
+                            "out": "${params.outdir}/cnvkit_reference",
+                            "log": "${params.outdir}/cnvkit_reference"])
+                            .merge(collected_normals),
+                params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
 
-    // final_small = ??? TODO: the small variants after callset qc
-    // to_cnvkit = paired.join(final_small, purity_ploidy)
-    // CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "wgs", 5)
 
+    to_cnvkit = paired.map({ it[0..1] + [it[2]] })
+            .join(QC_SMALL.out.vcf.map(params.getId))
+            .join(purity_ploidy)
+            .map({ it[1..-1] })
+
+    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
+
+    // TODO: Can't add these in until you can unify the two cnv callers
+    // CLASSIFY_CNV_FORMAT
+    // CLASSIFY_CNV
     /*
      * Variant annotation
      */
-    // VEP(???, params.ref.genome, 7)
-    //
-    // TODO: need to transfer annotations between them
-    //      Check if merge1 works for this
-    // annotated = SNPEFF.out.vcf.join(VEP.map(getId))
-    // MERGE_B(annotated, 8)
-
+    VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
+        .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
+        params.ref.genome, 7)
 
     // PICARD("???", "exome", params.ref.genome, params.ref.targets, params.ref.baits,
     //      null, 8)
+    //      mosdepth
+    //      multiqc
 
 }
