@@ -19,7 +19,7 @@ process MUSE2 {
     //
 
     script:
-    prefix = "${module_number}-${meta.filename}"
+    prefix = params.getName(module_number, meta)
     output = "${prefix}-MuSE.vcf.gz"
     check = file("${meta.out}/${output}")
     if (omics_type == "wgs") {

@@ -19,9 +19,8 @@ process GRIDSS {
     //
 
     shell:
-    prefix = "${module_number}-${meta.filename}"
-    all = "${prefix}-Gridss_all.vcf.gz"
-    filtered = "${prefix}-Gridss_confident.vcf.gz"
+    all = params.getName(module_number, meta, "Gridss_all", "vcf.gz")
+    filtered = params.getName(module_number, meta, "Gridss_confident", "vcf.gz")
     check1 = file("${meta.out}/${all}")
     check2 = file("${meta.out}/${filtered}")
     args = task.ext.args.join(" ")

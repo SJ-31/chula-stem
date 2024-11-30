@@ -15,7 +15,7 @@ process MERGE_VCFS {
     //
 
     script:
-    output = "${module_number}-${meta.filename}-All_annotations.vcf.gz"
+    output = params.getName(module_number, meta, "All_annotations", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     def file_list = []

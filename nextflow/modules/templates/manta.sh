@@ -11,7 +11,7 @@ configManta.py \
 mv !{out}/results/variants/*.vcf.gz .
 for variant in *.vcf.gz; do
     base=$(echo $variant | sed -e 's/\.vcf\.gz//' -e 's/somatic\.//')
-    name="!{module_number}-!{meta.filename}-${base}_Manta.vcf"
+    name="!{prefix}-${base}_Manta.vcf"
 
     vcf_info_add_tag.bash -n "!{params.source_name}" \
         -d "!{params.source_description}" \

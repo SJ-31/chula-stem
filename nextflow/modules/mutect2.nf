@@ -19,9 +19,9 @@ process MUTECT2 {
     //
 
     script:
-    out = "${module_number}-${meta.filename}-Mutect2.vcf.gz"
+    out = params.getName(module_number, meta, "Mutect2", "vcf.gz")
     stats = "${out}.stats"
-    raw = "${module_number}-${meta.filename}-Mutect2_raw.tar.gz"
+    raw = params.getName(module_number, meta, "Mutect2_raw", "tar.gz")
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     if (check.exists()) {

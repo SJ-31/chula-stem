@@ -18,7 +18,7 @@ process GET_PILEUP_SUMMARIES {
     //
 
     script:
-    output = "${module_number}-${meta.filename}-Pileup.table"
+    output = params.getName(module_number, meta, "Pileup", "table")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

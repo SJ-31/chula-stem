@@ -17,10 +17,8 @@ process VEP {
     //
 
     script:
-    suffix = meta.suffix ? meta.suffix : "VEP"
-    prefix = "${module_number}-${meta.filename}-${suffix}"
-    output = "${prefix}.vcf.gz"
-    tsv = "${prefix}.tsv"
+    output = params.getName(module_number, meta, "VEP", "vcf.gz")
+    tsv = params.getName(module_number, meta, "VEP", "tsv")
     check = file("$meta.out/$output")
     args = task.ext.args.join(" ")
     if (check.exists()) {

@@ -18,8 +18,8 @@ process BQSR {
     path("*.log")
 
     script:
-    recal = "${module_number}-${meta.filename}-recal.bam"
-    report = "${module_number}-${meta.filename}-AnalyzeCovariates.pdf"
+    recal = params.getName(module_number, meta, "recal", "bam")
+    report = params.getName(module_number, meta, "AnalayzeCovariates", "pdf")
     recal_dir = "${module_number}-recalibration_tables"
     check = file("${meta.out}/$recal")
     check2 = file("${meta.out}/$report")

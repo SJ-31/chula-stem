@@ -18,7 +18,8 @@ process STRELKA2 {
     //
 
     shell:
-    out = "${module_number}-${meta.filename}-StrelkaOut"
+    out = params.getName(module_number, meta, "StrelkaOut")
+    prefix = params.getName(module_number, meta)
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")

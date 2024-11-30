@@ -17,8 +17,7 @@ process CONCAT_VCF {
     //
 
     shell:
-    suffix = meta.suffix ? meta.suffix : "All"
-    output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
+    output = params.getName(module_number, meta, "All", "vcf.gz")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         '''

@@ -19,7 +19,7 @@ process SNPSIFT {
 
     script:
     def annotate_expr = known_variants.join(" ")
-    output = "${module_number}-${meta.filename}-SnpSift.vcf"
+    output = params.getName(module_number, meta, "SnpSift", "vcf")
     check = file("$meta.out/${output}.gz")
     if (check.exists()) {
         """

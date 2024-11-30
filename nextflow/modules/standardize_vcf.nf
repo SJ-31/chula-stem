@@ -29,7 +29,7 @@ process STANDARDIZE_VCF {
 
     script:
     suffix = meta.suffix ? meta.suffix : "Standardized"
-    output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
+    output = params.getName(module_number, meta, "Standardize", "vcf.gz")
     check = file("${meta.out}/${output}")
     to_clear = [
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],

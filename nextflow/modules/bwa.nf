@@ -18,7 +18,7 @@ process BWA {
     //
 
     script:
-    out = "${module_number}-${meta.filename}.bam"
+    out = params.getName(module_number, meta, "bam")
     check = file("${meta.out}/$out")
     if (check.exists()) {
         """

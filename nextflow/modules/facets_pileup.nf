@@ -17,7 +17,7 @@ process FACETS_PILEUP {
     //
 
     script:
-    prefix = "${module_number}-${meta.filename}-Facets"
+    prefix = params.getName(module_number, meta, "Facets_pileup")
     output = "${prefix}.snp_pileup.gz"
     check = file("${meta.out}/${output}")
     if (check.exists()) {

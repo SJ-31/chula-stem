@@ -23,8 +23,7 @@ process CALLSET_QC {
     //
 
     script:
-    suffix = meta.suffix ? meta.suffix : "QC"
-    output = "${module_number}-${meta.filename}-${suffix}.vcf.gz"
+    output = params.getName(module_number, meta, "QC", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 

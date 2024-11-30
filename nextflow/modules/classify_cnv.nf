@@ -21,7 +21,7 @@ process CLASSIFY_CNV {
     //
 
     script:
-    prefix = "${module_number}-${meta.filename}-ClassifyCNV"
+    prefix = params.getName(module_number, meta, "ClassifyCNV")
     tsv = "${prefix}.tsv"
     intermediate = "${prefix}_intermediate"
     check = file("${meta.out}/${tsv}")

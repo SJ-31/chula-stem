@@ -15,7 +15,7 @@ configureStrelkaSomaticWorkflow.py \
 mv !{out}/results/variants/*.vcf.gz .
 for variant in somatic*.vcf.gz; do
     base=$(echo $variant | sed -e 's/\.vcf\.gz//' -e 's/somatic\.//')
-    name="!{module_number}-!{meta.filename}-${base}_Strelka.vcf"
+    name="!{prefix}-${base}_Strelka.vcf"
 
     rename_vcf.bash -v -i $variant -o tmp.vcf.gz \
         -n "!{meta.RGSM_normal}" -t "!{meta.RGSM_tumor}"
