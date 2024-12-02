@@ -20,7 +20,7 @@ nextflow_process {
                 ],
                     "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
                     "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai"]
-                input[1] = "exome"
+                input[1] = "hs"
                 input[2] = params.genome_filtered
                 input[3] = params.targets_header
                 input[4] = params.baits_header

@@ -22,9 +22,9 @@ process PICARD {
     out2 = Utils.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${out2}")
-    if (check.exists()) {
+    if (check.exists() && check2.exists()) {
         '''
-        ln -sr "!{meta.out}/!{module_number}"-Picard_*_metrics.txt" .
+        ln -sr "!{meta.out}/!{module_number}-Picard_*_metrics.txt" .
         ln -sr "!{meta.log}/picard.log" .
         '''
     } else {

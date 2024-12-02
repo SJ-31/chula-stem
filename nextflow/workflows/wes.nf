@@ -201,7 +201,7 @@ workflow whole_exome {
         .join(SAMTOOLS_INDEX.out.index.map(getIdType), by: [0, 1]) // [id, type, meta, bam, meta, bai]
         .map({ [it[2], it[3], it[5]] })
         .map(replaceOut)
-    // PICARD(to_metrics, "exome", params.ref.genome, params.ref.targets, params.ref.baits,
+    // PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets, params.ref.baits,
     //      null, 8)
     // MOSDEPTH(to_metrics, params.ref.targets, 8)
     // BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(concat_sv.out.vcf), params.ref.targets, 8)
