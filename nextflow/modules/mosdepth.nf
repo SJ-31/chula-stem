@@ -6,12 +6,15 @@ process MOSDEPTH {
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
     input:
-    tuple val(meta), path(bam)
+    tuple val(meta), path(bam), path(index)
     val(target_regions)
     val(module_number)
 
     output:
     tuple val(meta), path("${prefix}*")
+    tuple val(meta), path("${prefix}.region.dist.txt"), emit: region
+    tuple val(meta), path("${prefix}.global.dist.txt"), emit: global
+    path("*log")
     //
 
     script:
