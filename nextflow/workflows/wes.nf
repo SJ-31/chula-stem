@@ -205,5 +205,11 @@ workflow whole_exome {
     //      null, 8)
     // MOSDEPTH(to_metrics, params.ref.targets, 8)
     // BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(concat_sv.out.vcf), params.ref.targets, 8)
+    // to_multiqc = FASTP.out.json.mix(VEP.out.report,
+    //                                 MOSDEPTH.out.region,
+    //                                 PICARD.out.metrics,
+    //                                 BCFTOOLS_STATS.out.py)
+    //     .flatten().collect().map({ [["out": params.outdir, "log": params.logdir], it] })
+    // MULTIQC(to_multiqc, 8)
 
 }

@@ -14,7 +14,7 @@ process PICARD {
     val(module_number)
 
     output:
-    tuple val(meta), path(out), path(out2), emit: metrics
+    tuple path(out), path(out2), emit: metrics
     path("*.log")
 
     shell:

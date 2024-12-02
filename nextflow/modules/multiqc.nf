@@ -5,7 +5,7 @@ process MULTIQC {
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
     input:
-    tuple val(meta), path(metrics)
+    tuple val(meta), path(files)
     val(module_number)
     // Will aggregate metrics from
     // - fastp

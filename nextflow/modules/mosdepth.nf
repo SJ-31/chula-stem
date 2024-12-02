@@ -12,8 +12,8 @@ process MOSDEPTH {
 
     output:
     tuple val(meta), path("${prefix}*")
-    tuple val(meta), path("${prefix}.region.dist.txt"), emit: region
-    tuple val(meta), path("${prefix}.global.dist.txt"), emit: global
+    path("${prefix}.region.dist.txt"), emit: region
+    path("${prefix}.global.dist.txt"), emit: global
     path("*log")
     //
 
