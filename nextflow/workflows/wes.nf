@@ -11,6 +11,8 @@ include { CNVKIT_PREP } from "../modules/cnvkit_prep.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
 include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
+include { CLASSIFY_CNV_FORMAT } from "../modules/classify_cnv_format.nf"
+include { CLASSIFY_CNV } from "../modules/classify_cnv.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
@@ -167,16 +169,27 @@ workflow "whole_exome" {
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
 
-    // TODO: Can't add these in until you can unify the two cnv callers
-    // CLASSIFY_CNV_FORMAT
-    // CLASSIFY_CNV
+    CLASSIFY_CNV_FORMAT(CNVKIT.out.cnv.mix(FACETS.out.rds), 5)
+    cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
+        .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
+                     keepHeader: true, skip: 1)
+        .map({ id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
+        [["filename": id,
+          "out": "${params.outdir}/${id}/annotations",
+          "log": "${params.logdir}/${id}/annotations"], it]
+        })
+    // TODO: should have a better way of unifying CNV callers
     /*
      * Variant annotation
      */
     VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
         .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
         params.ref.genome, 7)
+    CLASSIFY_CNV(cnv_bed, 7)
 
+    /*
+     * Metric collection
+     */
     // PICARD("???", "exome", params.ref.genome, params.ref.targets, params.ref.baits,
     //      null, 8)
     //      mosdepth

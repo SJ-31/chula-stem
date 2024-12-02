@@ -104,3 +104,5 @@ docs
 /nextflow/bin/vcf_info_add_tag.bash
 /tests/filtering/
 /tests/vep/
+/tests/normal.txt
+/nextflow/bin/format_vep_vcf
