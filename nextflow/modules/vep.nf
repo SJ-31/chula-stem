@@ -2,7 +2,7 @@ process VEP {
     ext version: "113"
 
     publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
-    publishDir "$meta.log", mode: "copy", pattern: "*.{log,html}"
+    publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
     tuple val(meta), path(vcf)
@@ -20,6 +20,7 @@ process VEP {
     script:
     output = Utils.getName(module_number, meta, "VEP", "vcf.gz")
     tsv = Utils.getName(module_number, meta, "VEP", "tsv")
+    html = Utils.getName(module_number, meta, "VEP_summary", "html")
     check = file("$meta.out/$output")
     check2 = file("$meta.out/$tsv")
     args = task.ext.args.join(" ")
@@ -28,7 +29,7 @@ process VEP {
         ln -sr $check .
         ln -sr $check2 .
         ln -sr $meta.log/vep.log .
-        ln -sr $meta.log/vep_stats.html .
+        ln -sr $meta.out/${html} .
         """
     } else {
         """
@@ -38,7 +39,7 @@ process VEP {
             --dir_cache ${task.ext.cache} \\
             --species ${task.ext.species} \\
             --fasta $reference \\
-            --stats_file vep_stats.html \\
+            --stats_file ${html} \\
             --vcf \\
             --vcf_info_field ANN \\
             --compress_output bgzip \\
