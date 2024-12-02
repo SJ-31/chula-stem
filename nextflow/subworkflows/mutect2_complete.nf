@@ -6,7 +6,7 @@ include { FILTER_MUTECT_CALLS } from "../modules/filter_mutect_calls.nf"
 
 // Subworkflow for somatic variant calling with Gatk's mutect2 and filtering its output
 // according to best practices
-workflow "MUTECT2_COMPLETE" {
+workflow MUTECT2_COMPLETE {
     take:
     meta_and_bam
     module_number
