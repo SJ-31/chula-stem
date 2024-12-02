@@ -5,61 +5,29 @@ process PICARD {
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
 
     input:
-    tuple val(meta), path(bam)
-    val(omics_type)
+    tuple val(meta), path(bam), path(index)
+    val(omics_type) // One of `hs` (exome), `wgs` or `rnaseq`
     val(reference)
-    val(target_intervals)
+    val(target_intervals) // TODO: Requires interval_list format, generated
     val(bait_intervals)
     val(gene_annotations_refFlat)
     val(module_number)
 
     output:
-    tuple (val(meta),
-	path("${pair_id}_alignment_metrics.txt"),
-	path("${pair_id}_insert_metrics.txt"),
-	path("${pair_id}_insert_size_histogram.pdf"),
-	path("${pair_id}_depth_out.txt"))
+    tuple val(meta), path(out), path(out2), emit: metrics
+    path("*.log")
 
-    script:
+    shell:
     out = Utils.getName(module_number, meta, "Picard_alignment_metrics", "txt")
-    exome = Utils.getName(module_number, meta, "Picard_hs_metrics", "txt")
-    wgs = Utils.getName(module_number, meta, "Picard_wgs_metrics", "txt")
-    rnaseq = Utils.getName(module_number, meta, "Picard_rnaseq_metrics", "txt")
-    check = file(${meta.out}/"${out}")
+    out2 = Utils.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
+    check = file("${meta.out}/${out}")
+    check2 = file("${meta.out}/${out2}")
     if (check.exists()) {
-        """
-        ln -sr "${meta.out}/${module_number}"-Picard_*_metrics.txt" .
-        ln -sr "${meta.log}/picard.log" .
-        """
+        '''
+        ln -sr "!{meta.out}/!{module_number}"-Picard_*_metrics.txt" .
+        ln -sr "!{meta.log}/picard.log" .
+        '''
     } else {
-        """
-        gatk CollectAlignmentSummaryMetrics -I $bam \\
-            -O $out
-        """
-        if (omics_type == "exome") {
-            """
-            gatk CollectHsMetrics -I $bam \\
-                --BAIT_INTERVALS $bait_intervals \\
-                --TARGET_INTERVALS $target_intervals \\
-                -O ${exome}
-            """
-        } else if (omics_type == "wgs") {
-            """
-            gatk CollectWgsMetrics -I $bam \\
-                --REFERENCE_SEQUENCE $reference \\
-                -O ${wgs}
-            """
-        } else if (omics_type == "rna-seq") {
-            """
-            gatk CollectRnaSeqMetrics -I $bam \\
-                --REF_FLAT $gene_annotations_refFlat \\
-                -O ${rnaseq}
-            """
-        } else {
-            throw new Exception("'omics_type' must be one of wgs|rna-seq|exome")
-        }
-        """
-        get_nextflow_log.bash picard.log
-        """
+        template 'picard.bash'
     }
 }
