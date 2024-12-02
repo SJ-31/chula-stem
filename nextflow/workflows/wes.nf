@@ -25,7 +25,8 @@ include { DELLY_COV } from "../modules/delly_cov.nf"
 include { VEP } from "../modules/vep.nf"
 include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
-workflow "whole_exome" {
+
+workflow whole_exome {
 
     main:
     input = Channel.fromPath(params.input)
@@ -44,6 +45,10 @@ workflow "whole_exome" {
     /*
      * Preprocessing
      */
+    def branchSources = branchCriteria { meta, files ->
+        tumor: meta.type == "cancer" || meta.type == "tumor"
+        normal: meta.type == "normal"
+    }
 
     FASTP(input, 1)
     BWA(FASTP.out.passed, params.ref.genome, 2)
@@ -54,10 +59,7 @@ workflow "whole_exome" {
     //  index
     output = BQSR.out.bam
     SAMTOOLS_INDEX(output) // Required by certain callers
-    branched = output.branch { meta, files ->
-        tumor: meta.type == "cancer" || meta.type == "tumor"
-        normal: meta.type == "normal"
-    }
+    branched = output.branch(branchSources)
     normals = branched.normal.map { [it[0].id,
                                          ["type": "paired",
                                           "id": it[0].id,
@@ -151,7 +153,7 @@ workflow "whole_exome" {
     purity_ploidy = FACETS.out.purity_ploidy
         .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
-    to_delly_cnv = paired.join(DELLY_COV.out.cov).join(purity_ploidy).map({it[1..-1]})
+    // to_delly_cnv = paired.join(DELLY_COV.out.cov).join(purity_ploidy).map({it[1..-1]})
     // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.delly_mappability, 5)
 
     collected_normals = normals.map({ it[2] }).toList()
@@ -173,7 +175,7 @@ workflow "whole_exome" {
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)
-        .map({ id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
+        .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
         [["filename": id,
           "out": "${params.outdir}/${id}/annotations",
           "log": "${params.logdir}/${id}/annotations"], it]
@@ -190,9 +192,18 @@ workflow "whole_exome" {
     /*
      * Metric collection
      */
-    // PICARD("???", "exome", params.ref.genome, params.ref.targets, params.ref.baits,
+    def replaceOut = { [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
+                                 "log": "${params.logdir}/${it[0].id}/metrics"],
+                        it[1], it[2]] }
+
+    def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
+    to_metrics = output.map(getIdType)
+        .join(SAMTOOLS_INDEX.out.index.map(getIdType), by: [0, 1]) // [id, type, meta, bam, meta, bai]
+        .map({ [it[2], it[3], it[5]] })
+        .map(replaceOut)
+    // PICARD(to_metrics, "exome", params.ref.genome, params.ref.targets, params.ref.baits,
     //      null, 8)
-    //      mosdepth
-    //      multiqc
+    // MOSDEPTH(to_metrics, params.ref.targets, 8)
+    // BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(concat_sv.out.vcf), params.ref.targets, 8)
 
 }

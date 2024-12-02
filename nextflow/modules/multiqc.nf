@@ -9,9 +9,16 @@ process MULTIQC {
     val(module_number)
     // Will aggregate metrics from
     // - fastp
-    // - Picard & GATK (AlignmentSummaryMetrics, MarkDuplicates,
+    //      from json file
+    // - Picard (AlignmentSummaryMetrics,
     //                  CollectHsMetrics|CollectWgsMetrics|CollectRnaSeqMetrics)
+    //                  from
     // - mosdepth (coverage of reference, sequencing depth)
+    //    Ideally "region.dist.txt", but "global.dist.txt" if region is unavailable
+    // - bcftools stats
+    //    from plot.py
+    // - VEP
+    //  from html summary file
 
     output:
     path("multiqc")
