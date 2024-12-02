@@ -13,8 +13,8 @@ process MANTA {
 
     output:
     tuple val(meta), path("*.vcf.gz"), emit: variants
-    tuple val(meta), path("${module_number}-somaticSV_Manta.vcf.gz"), emit: somatic
-    tuple val(meta.id), path("${module_number}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
+    tuple val(meta), path("${module_number}-${meta.filename}-somaticSV_Manta.vcf.gz"), emit: somatic
+    tuple val(meta.id), path("${module_number}-${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     path(out)
     path("*.log")
     // Produces 4 files

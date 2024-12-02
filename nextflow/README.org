@@ -74,9 +74,6 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Notes
     * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
   * [[https://github.com/wwylab/MuSE][MuSE2]]
-  # * [[https://www.bioconductor.org/packages/release/bioc/html/PureCN.html][PureCN]]: copy number variation, tumor purity and ploidy
-  # * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
-  #   * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
 + Structural variants
   * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
   * [[https://github.com/Illumina/manta][Manta]]: Strutural variants (paired with strelka2)
@@ -85,6 +82,8 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
     * Can also report single breakends, "breakpoints in which only one side can be unambigiously determined"
   # * https://github.com/walaj/svaba Haven't done yet
 + Copy number variation
+  * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
+    * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
   * [[https://github.com/dellytools/delly][delly]]
     * delly has two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
     * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process

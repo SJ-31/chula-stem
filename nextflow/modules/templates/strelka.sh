@@ -17,19 +17,15 @@ for variant in somatic*.vcf.gz; do
     base=$(echo $variant | sed -e 's/\.vcf\.gz//' -e 's/somatic\.//')
     name="!{prefix}-${base}_Strelka.vcf"
 
-    rename_vcf.bash -v -i $variant -o tmp.vcf.gz \
-        -n "!{meta.RGSM_normal}" -t "!{meta.RGSM_tumor}"
-
-    vcf_info_add_tag.bash -n "!{params.source_name}" \
-        -d "!{params.source_description}" \
-        -b '.' \
-        -t String \
-        -a strelka2 \
-        -i tmp.vcf.gz \
-        -o "${name}"
+    rename_vcf.bash -v -i $variant -n "!{meta.RGSM_normal}" -t "!{meta.RGSM_tumor}" | \
+        vcf_info_add_tag.bash -n "!{params.source_name}" \
+            -d "!{params.source_description}" \
+            -b '.' \
+            -t String \
+            -a strelka2 \
+            -o "${name}"
 
     rm "$variant"
-    bgzip "${name}"
 done
 
 get_nextflow_log.bash strelka.log
