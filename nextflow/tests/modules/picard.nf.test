@@ -1,0 +1,40 @@
+nextflow_process {
+
+    name "Test Process PICARD"
+    script "modules/picard.nf"
+    process "PICARD"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/picard",
+                        "log": "$params.log/picard",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai"]
+                input[1] = "exome"
+                input[2] = params.genome_filtered
+                input[3] = params.targets_header
+                input[4] = params.baits_header
+                input[5] = ""
+                input[6] = 4
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}

@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process MULTIQC"
+    script "modules/multiqc.nf"
+    process "MULTIQC"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [
+                "${params.out}/mosdepth/3-null-Mosdepth.mosdepth.region.dist.txt"
+                "${params.out}/bcftools_stats/3-null-Bcftools_stats.py",
+                "${params.out2}/patient_10/normal/1-patient_10_normal-fastp.json",
+                "${params.out2}/patient_10/cancer/1-patient_10_cancer-fastp.json",
+                "${params.out2}/patient_10/annotations/6-patient_10-VEP_summary.html"
+            ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
