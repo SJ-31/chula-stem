@@ -1,0 +1,34 @@
+nextflow_process {
+
+    name "Test Process BCFTOOLS_STATS"
+    script "modules/bcftools_stats.nf"
+    process "BCFTOOLS_STATS"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/bcftools_stats",
+                        "log": "$params.log/bcftools_stats",
+                    "id": "sample2",
+                    "RGSM_normal": "10_blood",
+                    "RGSM_tumor": "10_cancer"
+                ],
+                    "$params.out2/patient_10/annotations/6-patient_10-Small_all.vcf.gz"]
+                input[1] = params.targets
+                input[2] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
