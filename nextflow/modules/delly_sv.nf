@@ -18,7 +18,6 @@ process DELLY_SV {
 
     shell:
     out = Utils.getName(module_number, meta, "DellySV", "vcf.gz")
-    println out
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")
     exclude_flag = exclude == "" ? "" : "-x ${exclude}"

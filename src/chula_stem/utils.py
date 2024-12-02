@@ -2,16 +2,15 @@
 
 
 from tempfile import TemporaryFile
-
 import click
-import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.packages import importr
 
 # rx method is equivalent to [], rx2 is [[]]
 
 
 def r2pd(robject):
+    import rpy2.robjects as ro
+    from rpy2.robjects import pandas2ri
+
     with (ro.default_converter + pandas2ri.converter).context():
         return ro.conversion.get_conversion().rpy2py(robject)
 
@@ -26,6 +25,7 @@ def classify_cnv_format(caller: str, input: str, output: str):
 
 def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
     import polars as pl
+    from rpy2.robjects.packages import importr
 
     def dup_or_del(x):
         return "DEL" if x < 2 else "DUP"

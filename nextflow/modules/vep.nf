@@ -13,6 +13,7 @@ process VEP {
     output:
     tuple val(meta), path(output), emit: vcf
     tuple val(meta), path("*.html"), emit: report
+    path(tsv)
     path("*.log")
     //
 
@@ -20,10 +21,12 @@ process VEP {
     output = Utils.getName(module_number, meta, "VEP", "vcf.gz")
     tsv = Utils.getName(module_number, meta, "VEP", "tsv")
     check = file("$meta.out/$output")
+    check2 = file("$meta.out/$tsv")
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (check.exists() && check2.exists()) {
         """
         ln -sr $check .
+        ln -sr $check2 .
         ln -sr $meta.log/vep.log .
         ln -sr $meta.log/vep_stats.html .
         """
