@@ -17,8 +17,8 @@ process VEP {
     //
 
     script:
-    output = params.getName(module_number, meta, "VEP", "vcf.gz")
-    tsv = params.getName(module_number, meta, "VEP", "tsv")
+    output = Utils.getName(module_number, meta, "VEP", "vcf.gz")
+    tsv = Utils.getName(module_number, meta, "VEP", "tsv")
     check = file("$meta.out/$output")
     args = task.ext.args.join(" ")
     if (check.exists()) {

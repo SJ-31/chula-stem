@@ -19,7 +19,7 @@ process CNVKIT {
     //
 
     shell:
-    out = params.getName(module_number, meta, "Cnvkit")
+    out = Utils.getName(module_number, meta, "Cnvkit")
     check = file("${meta.out}/${out}")
     with_caller = meta + ["caller": "cnvkit"]
     ploidy_val = ploidy ? ploidy : params.defaults.ploidy

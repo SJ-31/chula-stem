@@ -18,8 +18,8 @@ process DELLY_CNV {
     //
 
     shell:
-    out = params.getName(module_number, meta, "DellyCNV", ".vcf.gz")
-    segmentation = params.getName(module_number, meta, "DellySegmentation", "vcf.gz")
+    out = Utils.getName(module_number, meta, "DellyCNV", ".vcf.gz")
+    segmentation = Utils.getName(module_number, meta, "DellySegmentation", "vcf.gz")
     with_caller = meta + ["caller": "dellyCNV"]
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${segmentation}")

@@ -16,8 +16,8 @@ process CALCULATE_CONTAMINATION {
     //
 
     script:
-    segmentation = params.getName(module_number, meta, "Segmentation", "table")
-    contamination = params.getName(module_number, meta, "Contamination", "table")
+    segmentation = Utils.getName(module_number, meta, "Segmentation", "table")
+    contamination = Utils.getName(module_number, meta, "Contamination", "table")
     check1 = file("${meta.out}/${segmentation}")
     check2 = file("${meta.out}/${contamination}")
     args = task.ext.args.join(" ")

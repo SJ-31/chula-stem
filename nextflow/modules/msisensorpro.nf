@@ -17,7 +17,7 @@ process MSISENSORPRO {
     //
 
     script:
-    prefix = params.getName(module_number, meta, "Msisensor") // Is the prefix, but also the summary file
+    prefix = Utils.getName(module_number, meta, "Msisensor") // Is the prefix, but also the summary file
     all = "${prefix}_all"
     unstable = "${prefix}_unstable" // Sites in "all" with statistically significant p-values
     distribution_file = "${prefix}_dis"

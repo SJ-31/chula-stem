@@ -17,7 +17,7 @@ process CONCAT_VCF {
     //
 
     shell:
-    output = params.getName(module_number, meta, "All", "vcf.gz")
+    output = Utils.getName(module_number, meta, "All", "vcf.gz")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         '''
@@ -34,8 +34,7 @@ process CONCAT_VCF {
             i=$((i+1))
         done
 
-        bcftools concat -a *.bcf.gz  | \\
-            bcftools norm --fasta-ref !{reference} --atomize -O z -o !{output}
+        bcftools concat -a *.bcf.gz -O z -o !{output}
 
         get_nextflow_log.bash concat_vcf.log
         '''

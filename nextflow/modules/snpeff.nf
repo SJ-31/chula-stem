@@ -18,9 +18,9 @@ process SNPEFF {
     //
 
     shell:
-    output = params.getName(module_number, meta, "snpeFF", "vcf")
-    report = params.getName(module_number, meta, "snpEff_summary", "html")
-    genes_file = params.getName(module_number, meta, "snpEff_genes", "txt")
+    output = Utils.getName(module_number, meta, "snpeFF", "vcf")
+    report = Utils.getName(module_number, meta, "snpEff_summary", "html")
+    genes_file = Utils.getName(module_number, meta, "snpEff_genes", "txt")
     check = file("$meta.out/${output}.gz")
     args = task.ext.args.join(" ")
     if (check.exists()) {

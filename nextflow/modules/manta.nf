@@ -24,10 +24,10 @@ process MANTA {
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
 
     shell:
-    out = params.getName(module_number, meta, "Manta")
+    out = Utils.getName(module_number, meta, "MantaOut")
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
-    prefix = params.getName(module_number, meta)
+    prefix = Utils.getName(module_number, meta)
     args = task.ext.args.join(" ")
     if (check.exists()) {
         '''

@@ -23,7 +23,7 @@ process CNVKIT_PREP {
     //
 
     script:
-    prefix = params.getName(module_number, meta, "CnvkitPrep")
+    prefix = Utils.getName(module_number, meta, "CnvkitPrep")
     out = "${prefix}_reference.cnn"
     target = "${prefix}_target.bed"
     antitarget = "${prefix}_antitarget.bed"

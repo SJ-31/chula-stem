@@ -18,7 +18,7 @@ process FACETS {
     //
 
     script:
-    prefix = params.getName(module_number, meta, "Facets")
+    prefix = Utils.getName(module_number, meta, "Facets")
     check = file("${meta.out}/${prefix}")
     tsv = "${prefix}/${prefix}_hisens.tsv"
     check2 = file("${meta.out}/${tsv}")

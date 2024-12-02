@@ -21,10 +21,10 @@ process PICARD {
 	path("${pair_id}_depth_out.txt"))
 
     script:
-    out = params.getName(module_number, meta, "Picard_alignment_metrics", "txt")
-    exome = params.getName(module_number, meta, "Picard_hs_metrics", "txt")
-    wgs = params.getName(module_number, meta, "Picard_wgs_metrics", "txt")
-    rnaseq = params.getName(module_number, meta, "Picard_rnaseq_metrics", "txt")
+    out = Utils.getName(module_number, meta, "Picard_alignment_metrics", "txt")
+    exome = Utils.getName(module_number, meta, "Picard_hs_metrics", "txt")
+    wgs = Utils.getName(module_number, meta, "Picard_wgs_metrics", "txt")
+    rnaseq = Utils.getName(module_number, meta, "Picard_rnaseq_metrics", "txt")
     check = file(${meta.out}/"${out}")
     if (check.exists()) {
         """

@@ -15,7 +15,7 @@ process LEARN_READ_ORIENTATION {
     //
 
     script:
-    output = params.getName(module_number, meta, "RO_model", "tar.gz")
+    output = Utils.getName(module_number, meta, "RO_model", "tar.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {
