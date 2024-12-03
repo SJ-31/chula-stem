@@ -24,7 +24,6 @@ include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
-include { DELLY_COV } from "../modules/delly_cov.nf"
 include { VEP } from "../modules/vep.nf"
 include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
@@ -65,13 +64,13 @@ workflow whole_exome {
     SAMTOOLS_INDEX(output) // Required by certain callers
     branched = output.branch(branchSources)
     normals = branched.normal.map { [it[0].id,
-                                         ["type": "paired",
-                                          "id": it[0].id,
-                                          "out": "${params.outdir}/${it[0].id}/paired",
-                                          "RGSM_normal": it[0].RGSM,
-                                          "filename": it[0].id,
-                                          "log": "${params.logdir}/${it[0].id}/paired"],
-                                         it[1]] }
+                                        ["type": "paired",
+                                        "id": it[0].id,
+                                        "out": "${params.outdir}/${it[0].id}/paired",
+                                        "RGSM_normal": it[0].RGSM,
+                                        "filename": it[0].id,
+                                        "log": "${params.logdir}/${it[0].id}/paired"],
+                                        it[1]] }
     tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
     indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] }).groupTuple()
     paired = normals.join(tumors)
@@ -79,10 +78,8 @@ workflow whole_exome {
         .join(indices)
     // Order is important for the first two
     paired_no_id = paired.map { it[1..-1] }
-    // paired_no_id is [meta, normal, tumor, indices]
+        // paired_no_id is [meta, normal, tumor, indices]
 
-    to_delly_cov = branched.tumor.map({ [it[0].id] + it[0..-1] }).join(indices).map { it[1..-1] }
-    DELLY_COV(to_delly_cov, params.ref.genome, params.ref.mappability, 4)
 
     /*
      * Variant calling
@@ -91,7 +88,7 @@ workflow whole_exome {
 
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
     DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude, 5)
-    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, 5)
+    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome", 5)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
@@ -157,16 +154,12 @@ workflow whole_exome {
     purity_ploidy = FACETS.out.purity_ploidy
         .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
-    // to_delly_cnv = paired.join(DELLY_COV.out.cov).join(purity_ploidy).map({it[1..-1]})
-    // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.delly_mappability, 5)
-
     collected_normals = normals.map({ it[2] }).toList()
     CNVKIT_PREP(Channel.of(["filename": cohort_name,
                             "out": "${params.outdir}/cnvkit_reference",
                             "log": "${params.outdir}/cnvkit_reference"])
                             .merge(collected_normals),
                 params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
-
 
     to_cnvkit = paired.map({ it[0..1] + [it[2]] })
             .join(QC_SMALL.out.vcf.map(params.getId))
@@ -184,7 +177,7 @@ workflow whole_exome {
           "out": "${params.outdir}/${id}/annotations",
           "log": "${params.logdir}/${id}/annotations"], it]
         })
-    // TODO: should have a better way of unifying CNV callers
+
     /*
      * Variant annotation
      */
