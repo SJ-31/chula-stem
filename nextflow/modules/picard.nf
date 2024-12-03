@@ -24,7 +24,8 @@ process PICARD {
     check2 = file("${meta.out}/${out2}")
     if (check.exists() && check2.exists()) {
         """
-        ln -sr "${meta.out}/${module_number}-Picard_*_metrics.txt" .
+        ln -sr ${check} .
+        ln -sr ${check2} .
         ln -sr "${meta.log}/picard.log" .
         """
     } else {
