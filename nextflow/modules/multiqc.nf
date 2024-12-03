@@ -21,19 +21,26 @@ process MULTIQC {
     //  from html summary file
 
     output:
-    path("multiqc")
+    path(out)
+    path(data)
+    path("multiqc.log")
     //
 
     script:
-    check = file("${meta.out}/multiqc")
+    out = Utils.getName(module_number, meta, "MultiQC", "html")
+    data = Utils.getName(module_number, meta, "MultiQC_data")
+    check = file("${meta.out}/${out}")
+    check2 = file("${meta.out}/${data}")
     if (check.exists()) {
         """
-        ln -sr -r $check .
+        cp -r ${check2} .
+        ln -sr ${check} .
         ln -sr "${meta.log}/multiqc.log" .
         """
     } else {
         """
-        multiqc . --config "$params.configdir/multiqc_config.yaml"
+        multiqc . --config "$params.configdir/multiqc_config.yaml" \\
+            --filename ${out}
 
         get_nextflow_log.bash multiqc.log
         """

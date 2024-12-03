@@ -12,14 +12,15 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [
-                "${params.out}/mosdepth/3-null-Mosdepth.mosdepth.region.dist.txt"
-                "${params.out}/bcftools_stats/3-null-Bcftools_stats.py",
-                "${params.out}/picard/",
-                "${params.out2}/patient_10/normal/1-patient_10_normal-fastp.json",
-                "${params.out2}/patient_10/cancer/1-patient_10_cancer-fastp.json",
-                "${params.out2}/patient_10/annotations/6-patient_10-VEP_summary.html"
-            ]
+                input[0] = [["out": "${params.out}/multiqc", "log": "${params.out}/multiqc"],
+                    ["${params.out}/mosdepth/3-null-Mosdepth.mosdepth.region.dist.txt",
+                    "${params.out}/bcftools_stats/3-null-Bcftools_stats.py",
+                    "${params.out}/picard/4-null-Picard_alignment_metrics.txt",
+                    "${params.out}/picard/4-null-Picard_hs_metrics.txt",
+                    "${params.out2}/patient_10/normal/1-patient_10_normal-fastp.json",
+                    "${params.out2}/patient_10/cancer/1-patient_10_cancer-fastp.json",
+                    "${params.out2}/patient_10/annotations/6-patient_10-VEP_summary.html"]]
+                input[1] = 8
                 """
             }
         }
