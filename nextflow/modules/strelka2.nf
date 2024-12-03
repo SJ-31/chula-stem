@@ -17,20 +17,38 @@ process STRELKA2 {
     path("*.log")
     //
 
-    shell:
+    script:
     out = Utils.getName(module_number, meta, "StrelkaOut")
     prefix = Utils.getName(module_number, meta)
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
-        '''
-        cp -r !{check} .
-        ln -sr !{meta.out}/*_Strelka.vcf.gz .
-        ln -sr !{meta.log}/strelka.log .
-        '''
+        """
+        cp -r ${check} .
+        ln -sr ${meta.out}/*_Strelka.vcf.gz .
+        ln -sr ${meta.log}/strelka.log .
+        """
     } else {
-        template 'strelka.sh'
+        """
+        tabix -f ${manta_indels}
+
+        configureStrelkaSomaticWorkflow.py \\
+            --normalBam ${normal} \\
+            --tumorBam ${tumor} \\
+            --referenceFasta ${reference} \\
+            --indelCandidates ${manta_indels} \\
+            ${target_flag} \\
+            ${args} \\
+            --runDir ${out}
+
+        ${out}/runWorkflow.py -m local
+
+        rename_strelka.bash -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}" \\
+            -o "${out}" -e "${params.source_name}" -d "${params.source_description}" -p "${prefix}"
+
+        get_nextflow_log.bash strelka.log
+        """
     }
     //
 }

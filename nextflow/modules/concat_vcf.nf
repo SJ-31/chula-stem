@@ -16,28 +16,28 @@ process CONCAT_VCF {
     path("*.log")
     //
 
-    shell:
+    script:
     output = Utils.getName(module_number, meta, "All", "vcf.gz")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
-        '''
-        ln -sr !{check} .
-        ln -sr !{meta.log}/concat_vcf.log .
-        '''
+        """
+        ln -sr ${check} .
+        ln -sr ${meta.log}/concat_vcf.log .
+        """
     } else {
-        '''
+        """
         i=0
         for v in *.vcf.gz; do
-            name="${i}.bcf.gz"
-            bcftools annotate -x 'INFO/HOMLEN,INFO/SVLEN,FORMAT/SR' "${v}" -O b > "${name}"
-            bcftools index "${name}"
-            i=$((i+1))
+            name="\${i}.bcf.gz"
+            bcftools annotate -x 'INFO/HOMLEN,INFO/SVLEN,FORMAT/SR' "\${v}" -O b > "\${name}"
+            bcftools index "\${name}"
+            i=\$((i+1))
         done
 
-        bcftools concat -a *.bcf.gz -O z -o !{output}
+        bcftools concat -a *.bcf.gz -O z -o ${output}
 
         get_nextflow_log.bash concat_vcf.log
-        '''
+        """
     }
     //
 }

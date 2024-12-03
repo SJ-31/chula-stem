@@ -23,20 +23,33 @@ process MANTA {
     // - candidateSV: unscored SV and indel candidates
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
 
-    shell:
+    script:
     out = Utils.getName(module_number, meta, "MantaOut")
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     prefix = Utils.getName(module_number, meta)
     args = task.ext.args.join(" ")
     if (check.exists()) {
-        '''
-        cp -r !{check} .
-        ln -sr !{meta.out}/*_Manta.vcf.gz .
-        ln -sr !{meta.log}/manta.log .
-        '''
+        """
+        cp -r ${check} .
+        ln -sr ${meta.out}/*_Manta.vcf.gz .
+        ln -sr ${meta.log}/manta.log .
+        """
     } else {
-        template 'manta.sh'
+        """
+        configManta.py \
+            --normalBam ${normal} \
+            --tumorBam ${tumor} \
+            --referenceFasta ${reference} \
+            ${target_flag} \
+            ${args} \
+            --runDir ${out}
+
+        ${out}/runWorkflow.py
+
+        rename_manta.bash -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}" \
+            -o "${out}" -e "${params.source_name}" -d "${params.source_description}" -p "${prefix}"
+        """
     }
     //
 }
