@@ -8,6 +8,9 @@ include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
 include { CNVKIT_PREP } from "../modules/cnvkit_prep.nf"
+include { MOSDEPTH } from "../modules/mosdepth.nf"
+include { BCFTOOLS_STATS } from "../modules/bcftools_stats.nf"
+include { MULTIQC } from "../modules/multiqc.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
 include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
@@ -29,6 +32,7 @@ include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 workflow whole_exome {
 
     main:
+    def cohort_name = params.cohort ? params.cohort : "cohort"
     input = Channel.fromPath(params.input)
         .splitCsv(header: true)
         .map { [["id": it.patient,
@@ -157,7 +161,7 @@ workflow whole_exome {
     // DELLY_CNV(to_delly_cnv, params.ref.genome, params.ref.delly_mappability, 5)
 
     collected_normals = normals.map({ it[2] }).toList()
-    CNVKIT_PREP(Channel.of(["filename": "cohort",
+    CNVKIT_PREP(Channel.of(["filename": cohort_name,
                             "out": "${params.outdir}/cnvkit_reference",
                             "log": "${params.outdir}/cnvkit_reference"])
                             .merge(collected_normals),
@@ -201,15 +205,18 @@ workflow whole_exome {
         .join(SAMTOOLS_INDEX.out.index.map(getIdType), by: [0, 1]) // [id, type, meta, bam, meta, bai]
         .map({ [it[2], it[3], it[5]] })
         .map(replaceOut)
-    // PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets, params.ref.baits,
-    //      null, 8)
-    // MOSDEPTH(to_metrics, params.ref.targets, 8)
-    // BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(concat_sv.out.vcf), params.ref.targets, 8)
-    // to_multiqc = FASTP.out.json.mix(VEP.out.report,
-    //                                 MOSDEPTH.out.region,
-    //                                 PICARD.out.metrics,
-    //                                 BCFTOOLS_STATS.out.py)
-    //     .flatten().collect().map({ [["out": params.outdir, "log": params.logdir], it] })
-    // MULTIQC(to_multiqc, 8)
+
+    PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets_il, params.ref.baits_il,
+           "", 8)
+    MOSDEPTH(to_metrics, params.ref.targets, 8)
+    BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf), params.ref.targets, 8)
+
+    to_multiqc = FASTP.out.json.mix(VEP.out.report,
+                                    MOSDEPTH.out.dist,
+                                    PICARD.out.metrics,
+                                    BCFTOOLS_STATS.out.py)
+        .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
+        "filename": cohort_name], it] })
+    MULTIQC(to_multiqc, 8)
 
 }
