@@ -20,7 +20,7 @@ done
 mv "${out}"/results/variants/*.vcf.gz .
 for variant in *.vcf.gz; do
     base=$(echo "$variant" | sed -e 's/\.vcf\.gz//' -e 's/somatic\.//')
-    name="${prefix}-${base}_Manta.vcf"
+    name="${prefix}-${base}_Manta.vcf.gz"
 
     has_format=$( bcftools head "${variant}" | tail -n 1 | grep FORMAT )
     if [[ -n "${has_format}" && ! $variant =~ "diploid" ]]; then

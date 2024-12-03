@@ -18,7 +18,7 @@ done
 mv ${out}/results/variants/*.vcf.gz .
 for variant in somatic*.vcf.gz; do
     base=$(echo "$variant" | sed -e 's/\.vcf\.gz//' -e 's/somatic\.//')
-    name="${prefix}-${base}_Strelka.vcf"
+    name="${prefix}-${base}_Strelka.vcf.gz"
 
     rename_vcf.bash -v -i $variant -n "${normal}" -t "${tumor}" | \
         vcf_info_add_tag.bash -n "${source_name}" \

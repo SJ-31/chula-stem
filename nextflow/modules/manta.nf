@@ -49,6 +49,7 @@ process MANTA {
 
         rename_manta.bash -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}" \
             -o "${out}" -e "${params.source_name}" -d "${params.source_description}" -p "${prefix}"
+        get_nextflow_log.bash manta.log
         """
     }
     //
