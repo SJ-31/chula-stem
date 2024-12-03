@@ -17,17 +17,17 @@ process PICARD {
     tuple path(out), path(out2), emit: metrics
     path("*.log")
 
-    shell:
+    script:
     out = Utils.getName(module_number, meta, "Picard_alignment_metrics", "txt")
     out2 = Utils.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${out2}")
     if (check.exists() && check2.exists()) {
-        '''
-        ln -sr "!{meta.out}/!{module_number}-Picard_*_metrics.txt" .
-        ln -sr "!{meta.log}/picard.log" .
-        '''
+        """
+        ln -sr "${meta.out}/${module_number}-Picard_*_metrics.txt" .
+        ln -sr "${meta.log}/picard.log" .
+        """
     } else {
-        template 'picard.bash'
+        template "picard.bash"
     }
 }
