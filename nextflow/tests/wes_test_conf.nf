@@ -13,6 +13,8 @@ params.ref = ["genome": "$t/wes_test2/GRCh38.p14_filtered.fna",
               "genome_blacklist": "$refdir/blacklists/ENCFF356LFX_renamed.bed",
               "targets": "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38/Regions.bed.gz",
               "baits": "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38/Covered.bed.gz",
+            "baits_il": "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38/Covered.interval_list",
+            "targets_il": "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38/Regions.interval_list",
               "baits_unzipped": "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38/Unzipped_covered.bed"
 ]
 params.routine = "wes"
