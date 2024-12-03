@@ -13,8 +13,8 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/gridss",
-                        "log": "$params.log/gridss",
+                input[0] = [["out": "$params.out/gridss_t",
+                        "log": "$params.log/gridss_t",
                     "id": "sample2",
                     "RGSM_normal": "10_blood",
                     "RGSM_tumor": "10_cancer"

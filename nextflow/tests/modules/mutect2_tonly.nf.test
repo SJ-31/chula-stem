@@ -13,8 +13,8 @@ nextflow_process {
             }
             process {
                 """
-                input[0] = [["out": "$params.out/mutect2",
-                        "log": "$params.log/mutect2",
+                input[0] = [["out": "$params.out/mutect2_t",
+                        "log": "$params.log/mutect2_t",
                     "id": "sample2",
                     "RGSM_normal": "10_blood",
                     "RGSM_tumor": "10_cancer"

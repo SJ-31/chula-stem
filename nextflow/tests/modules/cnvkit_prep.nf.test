@@ -16,7 +16,7 @@ nextflow_process {
                 input[0] = [["out": "$params.out/cnvkit_prep", "filename": "batch"], f]
                 input[1] = params.genome_filtered
                 input[2] = params.blacklist_filtered
-                input[3] = params.baits
+                input[3] = params.baits_unzipped
                 input[4] = 3
                 """
             }
