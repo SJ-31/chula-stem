@@ -8,6 +8,7 @@ process MSISENSORPRO {
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference) // A homopolymers and microsatellites tsv file, generated
     // with msisensor-pro scan -d <reference genome> -o <tsv>
+    val(omics_type) // Either exome or wgs
     val(module_number)
     //
 
@@ -21,6 +22,10 @@ process MSISENSORPRO {
     all = "${prefix}_all"
     unstable = "${prefix}_unstable" // Sites in "all" with statistically significant p-values
     distribution_file = "${prefix}_dis"
+
+    command = !params.tumor_only ? "msi" : "pro"
+    n_flag = !params.tumor_only ? " -n ${normal} " : ""
+    cov_threshold = omics_type == "exome" ? 20 : 15
 
     check_summary = file("${meta.out}/${prefix}_summary.tsv")
     check_all = file("${meta.out}/${all}.tsv")
@@ -37,11 +42,12 @@ process MSISENSORPRO {
         """
     } else {
         """
-        msisensor-pro msi \\
-            -n ${normal} \\
+        msisensor-pro ${command} \\
+            ${n_flag} \\
             -t ${tumor} \\
             -d ${reference} \\
-            -o ${prefix}
+            -o ${prefix} \\
+            -c ${cov_threshold}
 
         mv "${prefix}" "${prefix}"_summary.tsv
         mv "${all}" "${all}".tsv
