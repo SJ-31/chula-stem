@@ -12,14 +12,18 @@ process MOSDEPTH {
 
     output:
     tuple val(meta), path("${prefix}*")
-    path("${prefix}.region.dist.txt"), emit: region
-    path("${prefix}.global.dist.txt"), emit: global
+    path(out), emit: dist
     path("*log")
     //
 
     script:
     prefix = Utils.getName(module_number, meta, "Mosdepth")
-    check = file("${meta.out}/${prefix}.mosdepth.global.dist.txt")
+    if (target_regions) {
+        out = "${prefix}.mosdepth.global.dist.txt"
+    } else {
+        out = "${prefix}.mosdepth.global.dist.txt"
+    }
+    check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
         ln -sr "${meta.out}/${prefix}*" .
