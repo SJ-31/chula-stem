@@ -8,10 +8,11 @@ process PICARD {
     tuple val(meta), path(bam), path(index)
     val(omics_type) // One of `hs` (exome), `wgs` or `rnaseq`
     val(reference)
-    val(target_intervals) // TODO: Requires interval_list format, generated
+    val(target_intervals)
     val(bait_intervals)
     val(gene_annotations_refFlat)
     val(module_number)
+    // Both baits and targets must be in interval list format
 
     output:
     tuple path(out), path(out2), emit: metrics

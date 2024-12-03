@@ -3,6 +3,7 @@ tests/patient*
 .github
 *.nf.test.snap
 *.nf-test.log*
+/nextflow/.nf-test*
 *.vcf.gz*
 *.tsv
 *_Session.py

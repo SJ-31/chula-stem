@@ -48,7 +48,9 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
 - gridss: bed exclusion file, recommended to be from the ENCODE project
 - CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
 - Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
-- FACETS: needs a snps file for
+  * The BED file must be converted into =interval_list=  format using the [[https://gatk.broadinstitute.org/hc/en-us/articles/360036883931-BedToIntervalList-Picard][BedToIntervalList]] tool
+- FACETS: needs a snps file for to infer changes in allelic configuration. Docs recommend dbSNP
+- Mutect2: a population-level germline resource with allele fraction, such as gnomad
 *** Steps
 **** Preprocessing
 + QC: =fastp= with the following routines
@@ -65,29 +67,28 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Both cancer and normal samples undergo BQSR with the same =known_variants= sources, which will be sources of germline variants (listed fully above)
     * See [[https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets][here]] for the details of known variants
 **** Variant calling
+Callers with support for tumor-only data are marked with *T*. Note that this is not ideal and typically inflates false positives
 + Small variants
-  * GATK Mutect2: somatic SNVs and indels
+  * GATK Mutect2: somatic SNVs and indels *T*
     * Output from Mutect2 is filtered according to best practices [3]
     * *Note:* Mutect2 raw vcf files do not use the QUAL field
   * [[https://github.com/Illumina/strelka][Strelka2]]: SNVs and indels, up to a predefined maximum size of (49 bases default)
-    * Uses k
   * Notes
     * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
   * [[https://github.com/wwylab/MuSE][MuSE2]]
 + Structural variants
-  * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability
-  * [[https://github.com/Illumina/manta][Manta]]: Strutural variants (paired with strelka2)
+  * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability *T*
+  * [[https://github.com/Illumina/manta][Manta]] : Strutural variants (paired with strelka2) *T*
   * [[https://github.com/dellytools/delly][delly]], uses split-read analysis
-  * [[https://github.com/PapenfussLab/gridss][gridss]]: uses split-read analysis, and a
+    * *Note:* is specialized for WGS, might need to replace
+  * [[https://github.com/PapenfussLab/gridss][gridss]]: uses split-read analysis *T*
     * Can also report single breakends, "breakpoints in which only one side can be unambigiously determined"
-  # * https://github.com/walaj/svaba Haven't done yet
+  * *Note:* do not expect this to have high number of calls due to low off-target coverage and SVs mostly occurring in noncoding regions
 + Copy number variation
-  * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation
+  * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation (designed for hybrid capture platforms, RD-based method) *T*
     * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
-  * [[https://github.com/dellytools/delly][delly]]
-    * delly has two separate nextflow processes (=DELLY_SV=  and =DELLY_CNV=)
-    * Somatic CNV detection requires a read-depth profile of the tumor sample, generated from the tumor alignment file with the =DELLY_COV= process
-  * [[https://github.com/mskcc/facets-suite][facets-suite]]
+  * [[https://github.com/mskcc/facets-suite][facets-suite]] (CNV detection for several omics platforms, including WES)
+    * RD-based method
 ****  Merging results
 + Concatenate results with =bcftools concat= and report source in =SOURCE= header
 **** Callset quality control
@@ -124,6 +125,16 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
 *** Output
 + Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
+****  Report format
++ TODO: format based on what P'thip sent you
++ Relevant variants table
+  * Must have existing variation,
+    Filter variants by those that have existing variation, ideally with clinical significance. Include read support and allele frequency in the
+  * Cols for variant type, genes, read support and allele frequency too
+  * Actionable drugs and mutation type if available
++ Table of mutational signatures
+  * Relevant signatures - those mapped with specific processes and that have known treatments available
+  * Everything else
 
 *** Motivation
 + Using multiple variant callers is common practice, notably used in the flagship analysis of the Pan-Cancer Analysis of Whole Genomes Consortium [4]
