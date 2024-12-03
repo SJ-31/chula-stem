@@ -24,7 +24,8 @@ nextflow_process {
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
                 input[1] = "$params.genome_filtered"
                 input[2] = params.targets
-                input[3] = 4
+                input[3] = params.germline
+                input[4] = 4
                 """
             }
         }
