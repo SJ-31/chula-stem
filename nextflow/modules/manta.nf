@@ -13,7 +13,7 @@ process MANTA {
 
     output:
     tuple val(meta), path("*.vcf.gz"), emit: variants
-    tuple val(meta), path("${module_number}-${meta.filename}-somaticSV_Manta.vcf.gz"), emit: somatic
+    tuple val(meta), path(callfile), emit: somatic
     tuple val(meta.id), path("${module_number}-${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     path(out)
     path("*.log")
@@ -25,9 +25,13 @@ process MANTA {
 
     script:
     out = Utils.getName(module_number, meta, "MantaOut")
+    call_suffix = !params.tumor_only ? "somaticSV_Manta" : "tumorSV_Manta"
+    callfile = Utils.getName(module_number, meta, call_suffix, "vcf.gz")
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     prefix = Utils.getName(module_number, meta)
+    n = !params.tumor_only ? meta.normal : "none"
+    normal_flag = !params.tumor_only ? " --normalBam ${normal} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
@@ -37,18 +41,19 @@ process MANTA {
         """
     } else {
         """
-        configManta.py \
-            --normalBam ${normal} \
-            --tumorBam ${tumor} \
-            --referenceFasta ${reference} \
-            ${target_flag} \
-            ${args} \
+        configManta.py \\
+            ${normal_flag} \\
+            --tumorBam ${tumor} \\
+            --referenceFasta ${reference} \\
+            ${target_flag} \\
+            ${args} \\
             --runDir ${out}
 
         ${out}/runWorkflow.py
 
-        rename_manta.bash -n "${meta.RGSM_normal}" -t "${meta.RGSM_tumor}" \
-            -o "${out}" -e "${params.source_name}" -d "${params.source_description}" -p "${prefix}"
+        rename_manta.bash -n "${n}" -t "${meta.RGSM_tumor}" \\
+            -o "${out}" -e "${params.source_name}" \\
+            -d "${params.source_description}" -p "${prefix}"
         get_nextflow_log.bash manta.log
         """
     }

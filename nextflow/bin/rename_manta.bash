@@ -23,7 +23,7 @@ for variant in *.vcf.gz; do
     name="${prefix}-${base}_Manta.vcf.gz"
 
     has_format=$( bcftools head "${variant}" | tail -n 1 | grep FORMAT )
-    if [[ -n "${has_format}" && ! $variant =~ "diploid" ]]; then
+    if [[ "${normal}" != "none" && -n "${has_format}" && ! $variant =~ "diploid" ]]; then
         rename_vcf.bash -v -i "$variant" -n "${normal}" -t "${tumor}" | \
             vcf_info_add_tag.bash -n "${source_name}" \
                 -d "${source_description}" \
