@@ -45,7 +45,8 @@ process VEP {
             --compress_output bgzip \\
             --output_file $output
 
-        format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} -v ANN
+        format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} \\
+            -v ANN -r ${meta.RGSM_tumor}
 
         get_nextflow_log.bash vep.log
         """

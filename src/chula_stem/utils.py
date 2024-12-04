@@ -2,7 +2,9 @@
 
 
 from tempfile import TemporaryFile
+
 import click
+from polars import col
 
 # rx method is equivalent to [], rx2 is [[]]
 
@@ -179,6 +181,12 @@ def make_freec_config(
     help="Info tag designating caller of origin",
 )
 @click.option(
+    "-r",
+    "--tumor_sample",
+    required=True,
+    help="Name of the tumor sample in the vcf file",
+)
+@click.option(
     "-v",
     "--vep_info_field",
     required=True,
@@ -188,11 +196,22 @@ def format_vep_vcf(input, output, vep_info_field, tool_source_tag):
     _format_vep_vcf(input, output, vep_info_field, tool_source_tag)
 
 
+def in_vcf_header(vcf: str, string: str) -> bool:
+    from subprocess import run
+
+    return (
+        run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
+    )
+
+
 def _format_vep_vcf(
     input: str,
     output: str,
+    tumor_sample: str,
     vep_info_field: str = "ANN",
     tool_source_tag: str = "TOOL_SOURCE",
+    vaf_tag: str = "AF",
+    ad_tag: str = "AD",
 ):
     import io
     import re
@@ -206,21 +225,40 @@ def _format_vep_vcf(
         capture_output=True,
         check=True,
     )
-    columns = re.findall('.*Format: (.*)">', proc.stdout.decode())[0].split("|")
-    qstring = rf"%CHROM:%POS\t%REF\t%ALT\t%INFO/{tool_source_tag}\t%INFO/{vep_info_field}"
-    runstr = rf"bcftools query -f '{qstring}' {input}"
+    vep_columns: list = re.findall('.*Format: (.*)">', proc.stdout.decode())[
+        0
+    ].split("|")
+    vaf: str = "[%AF]" if in_vcf_header(input, f"##FORMAT=<ID={vaf_tag}") else ""
+    ad: str = "[%AD]" if in_vcf_header(input, f"##FORMAT=<ID={ad_tag}") else ""
+    vcf_cols: list = [
+        "%CHROM:%POS",
+        "%REF",
+        "%ALT",
+        vaf,
+        ad,
+        rf"%INFO/{tool_source_tag}",
+        rf"%INFO/{vep_info_field}",
+    ]
+    vaf_ad_cols = list(
+        filter(lambda x: x, ["VAF" if vaf else "", "Alt_depth" if ad else ""])
+    )
+    qstring = "\t".join(list(filter(lambda x: x, vcf_cols)))
+    runstr = rf"bcftools query -f '{qstring}' -s '{tumor_sample}' {input}"
     proc2: CompletedProcess = run(
         runstr, shell=True, capture_output=True, check=True
     )
+    columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "ANN"]
     df = (
         pl.read_csv(
             io.StringIO(proc2.stdout.decode()),
             separator="\t",
-            new_columns=["Loc", "Ref", "Alt", tool_source_tag, "ANN"],
+            new_columns=columns,
         )
         .with_columns(pl.col("ANN").str.split(","))
         .explode("ANN")
-        .with_columns(pl.col("ANN").str.split("|").list.to_struct(fields=columns))
+        .with_columns(
+            pl.col("ANN").str.split("|").list.to_struct(fields=vep_columns)
+        )
         .unnest("ANN")
         .with_columns(
             pl.when(pl.col(pl.String).str.len_chars() == 0)
@@ -228,5 +266,14 @@ def _format_vep_vcf(
             .otherwise(pl.col(pl.String))
             .name.keep()
         )
+    )
+    if not vaf:
+        df = df.with_columns(VAF=pl.lit(None))
+    if not ad:
+        df = df.with_columns(Alt_depth=pl.lit(None))
+    else:
+        df = df.with_columns(pl.col("Alt_depth").str.split(",").list.get(1))
+    df = df.select(
+        ["Loc", "Ref", "Alt", "Alt_depth", "VAF", tool_source_tag] + vep_columns
     )
     df.write_csv(output, separator="\t", null_value="NA")
