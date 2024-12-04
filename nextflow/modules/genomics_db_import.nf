@@ -12,7 +12,7 @@ process GENOMICS_DB_IMPORT {
     //
 
     output:
-    tuple val(meta), path(output)
+    tuple val(meta), path(output), emit: db
     path("*.log")
     //
 
