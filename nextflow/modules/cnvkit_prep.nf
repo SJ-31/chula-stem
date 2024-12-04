@@ -29,6 +29,7 @@ process CNVKIT_PREP {
     antitarget = "${prefix}_antitarget.bed"
     check = file("${meta.out}/${out}")
     access = "${prefix}_access.bed"
+    normal_flag = !params.tumor_only ? " --normal *.bam " : ""
     if (check.exists()) {
         """
         ln -sr $check .
@@ -40,16 +41,22 @@ process CNVKIT_PREP {
     } else {
         """
         cnvkit.py access ${reference} -x ${exclude} -o ${access}
+
         cnvkit.py target --split ${bait_intervals} -o ${target}
         cnvkit.py antitarget ${target} -g ${access} -o ${antitarget}
 
-        cnvkit.py batch \\
-            --normal *.bam \\
-            --fasta ${reference} \\
-            --output-reference ${out} \\
-            --access ${access} \\
-            --targets ${target} \\
-            --antitargets ${antitarget}
+        if [[ "${params.tumor_only}" == "false" ]]; then
+            cnvkit.py batch \\
+                ${normal_flag} \\
+                --fasta ${reference} \\
+                --output-reference ${out} \\
+                --access ${access} \\
+                --targets ${target} \\
+                --antitargets ${antitarget}
+        else
+            cnvkit.py reference --output ${out} --fasta ${reference} \\
+                --targets ${target} --antitargets ${antitarget}
+        fi
 
         get_nextflow_log.bash cnvkit_prep.log
         """
