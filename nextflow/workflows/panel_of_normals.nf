@@ -40,7 +40,13 @@ workflow panel_of_normals {
         .map({ it[1..-1] })
 
     MUTECT2(to_mutect, params.ref.genome, params.ref.targets, params.ref.germline, 5)
-    GENOMICS_DB_IMPORT(MUTECT2.out.variants, params.ref.genome, params.ref.targets_il, 6)
+
+    to_genomics_db = MUTECT2.out.variants.map({ it[1] })
+        .collect().map({ [["filename": params.cohort,
+                           "out": params.outdir,
+                           "log": params.logdir ], it] })
+
+    GENOMICS_DB_IMPORT(to_genomics_db, params.ref.genome, params.ref.targets_il, 6)
     CREATE_PANEL_OF_NORMALS(GENOMICS_DB_IMPORT.out.db, params.ref.genome, 7)
 
 }

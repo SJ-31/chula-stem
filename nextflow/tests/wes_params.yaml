@@ -1,7 +1,7 @@
 references: "/data/project/stemcell/shannc/reference"
 genome: "/data/project/stemcell/shannc/tests/wes_test/GCF_000001405.40_GRCh38.p14_genomic.fna"
 out: "/data/project/stemcell/shannc/tests/wes_test"
-tools: "/data/home/shannc/chula-stem/nextflow/input/wes_tools.nf"
+tools: "/data/home/shannc/chula-stem/nextflow/input/wes_tools.config.nf"
 log: "/data/project/stemcell/shannc/tests/wes_test/log"
 homopoly: "/data/project/stemcell/shannc/reference/tool_specific/mishomopoly_GRCh38_filtered.tsv"
 delly_exclude: "/data/project/stemcell/shannc/reference/tool_specific/hg38.excl.tsv"
