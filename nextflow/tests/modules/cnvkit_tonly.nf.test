@@ -1,0 +1,35 @@
+nextflow_process {
+
+    name "Test Process CNVKIT"
+    script "modules/cnvkit.nf"
+    process "CNVKIT"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/cnvkit_t",
+                        "log": "$params.log/cnvkit_t",
+                    "id": "sample2",
+                    "RGSM_normal": "10"],
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    "$params.out/mutect2_t/4-null-Mutect2.vcf.gz",
+                    1, 2]
+                input[1] = "/data/project/stemcell/shannc/tests/wes_test/cnvkit_prep_t/3-batch-CnvkitPrep_reference.cnn"
+                input[2] = "hybrid"
+                input[3] = 5
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

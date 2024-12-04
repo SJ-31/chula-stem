@@ -18,21 +18,47 @@ process CNVKIT {
     path("*.log")
     //
 
-    shell:
+    script:
     out = Utils.getName(module_number, meta, "Cnvkit")
     check = file("${meta.out}/${out}")
     with_caller = meta + ["caller": "cnvkit"]
     ploidy_val = ploidy ? ploidy : params.defaults.ploidy
     purity_val = purity ? purity : params.defaults.purity
+    name = tumor.baseName
 
     clonal = !ploidy_val && !purity_val ? "false" : "true"
     if (check.exists()) {
-        '''
-        cp -r !{check} .
-        ln -sr !{meta.log}/cnvkit.log .
-        '''
+        """
+        cp -r ${check} .
+        ln -sr ${meta.log}/cnvkit.log .
+        """
     } else {
-        template 'cnvkit.bash'
+        """
+        cnvkit.py batch \
+                ${tumor} \
+            -r ${cnn_reference} \
+            -d ${out}
+
+        cd "${out}"
+        for file in ${name}*; do
+            prefix=\$(echo "\${file}" | sed 's/${name}//')
+            mv \${file} "${out}\${prefix}"
+        done
+        cd ..
+
+        if [[ "${clonal}" == "true" ]]; then
+            cnvkit.py call \
+                "${out}/${out}.call.cns" \
+                --vcf "${snps}" \
+                --purity "${purity_val}" \
+                --ploidy "${ploidy_val}" \
+                --method clonal \
+                --output "${out}.call.clonal.cns"
+            mv "${out}.call.clonal.cns" "${out}"
+        fi
+
+        get_nextflow_log.bash cnvkit.log
+        """
     }
     // Will perform a second call to adjust original with information of tumor purity, ploidy
     // and allele frequencies from known variants
