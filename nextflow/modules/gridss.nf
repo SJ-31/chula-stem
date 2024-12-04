@@ -24,6 +24,7 @@ process GRIDSS {
     check1 = file("${meta.out}/${all}")
     check2 = file("${meta.out}/${filtered}")
     args = task.ext.args.join(" ")
+    bam_input = !params.tumor_only ? " ${normal} ${tumor} " : tumor
     if (check1.exists() && check2.exists()) {
         """
         ln -sr ${check2} .
@@ -36,8 +37,7 @@ process GRIDSS {
             --threads ${task.ext.threads} \\
             --reference ${reference} \\
             --output tmp.vcf \\
-            ${normal} \\
-            ${tumor}
+            ${bam_input}
 
         gridss_somatic_filter \\
             --input tmp.vcf \\
@@ -51,14 +51,14 @@ process GRIDSS {
             name="\${names[i]}"
             file="\${files[i]}"
 
-            if [[ "${file}" == "confident.vcf.bgz" ]]; then
-                bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" -O z "${file}" > tmp.vcf.gz
+            if [[ "\${file}" == "confident.vcf.bgz" && ${params.tumor_only} == "false" ]]; then
+                bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" -O z "\${file}" > tmp.vcf.gz
                 f="tmp.vcf.gz"
             else
-                f="${file}"
+                f="\${file}"
             fi
 
-            vcf_info_add_tag.bash.r -n ${params.source_name} \\
+            vcf_info_add_tag.bash -n ${params.source_name} \\
                 -d '${params.source_description}' \\
                 -b '.' \\
                 -t String \\
