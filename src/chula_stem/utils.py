@@ -192,8 +192,8 @@ def make_freec_config(
     required=True,
     help="Info field in vcf containing VEP annotations",
 )
-def format_vep_vcf(input, output, vep_info_field, tool_source_tag):
-    _format_vep_vcf(input, output, vep_info_field, tool_source_tag)
+def format_vep_vcf(input, output, tumor_sample, vep_info_field, tool_source_tag):
+    _format_vep_vcf(input, output, tumor_sample, vep_info_field, tool_source_tag)
 
 
 def in_vcf_header(vcf: str, string: str) -> bool:
