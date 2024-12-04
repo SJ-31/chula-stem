@@ -1,5 +1,5 @@
 // * Required params
-params.tools = "" // Path to tool tool configuration
+params.tools = "" // Path to tool configuration
 params.outdir = "" // Directory for output
 params.input = "" // Path to manifest file of sample information. See routine-specific documentation for input format
 params.logdir = "" // Directory for logging process output

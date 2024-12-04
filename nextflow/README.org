@@ -4,6 +4,7 @@
 + [3] [[https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2][GATK Mutect2 Ho2]]
 + [4] [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
 + [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and identifies SAV1 as a potential driver]]
++ [6] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
 :END:
 * Workflows
 # All workflows expect an input csv file with
@@ -63,6 +64,9 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
     * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
   * [[https://github.com/wwylab/MuSE][MuSE2]]
     * Takes into account dbSNP information "by requiring a cutoff that is two times more stringent for a dbSNP position than for a non-dbSNP position"
+  * [[https://luntergroup.github.io/octopus/][Octopus]] *T*
+  * [[https://github.com/HKU-BAL/ClairS][ClairS]]/[[https://github.com/HKU-BAL/ClairS-TO][ClairS-TO]]: deep-learning based variant caller *T*
+    * Although designed for long-read data, has models that allow it to be used with short read data
 + Structural variants
   * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability *T*
   * [[https://github.com/Illumina/manta][Manta]] : Strutural variants (paired with strelka2) *T*
@@ -74,6 +78,7 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
 + Copy number variation
   * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation (designed for hybrid capture platforms, RD-based method) *T*
     * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
+    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [6]
   * [[https://github.com/mskcc/facets-suite][facets-suite]] (CNV detection for several omics platforms, including WES)
     * RD-based method
 ****  Merging results

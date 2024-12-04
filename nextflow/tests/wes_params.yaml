@@ -7,6 +7,7 @@ homopoly: "/data/project/stemcell/shannc/reference/tool_specific/mishomopoly_GRC
 delly_exclude: "/data/project/stemcell/shannc/reference/tool_specific/hg38.excl.tsv"
 mappability: "/data/project/stemcell/shannc/reference/tool_specific/delly_mappability_GRCh38.fna.gz"
 genome_filtered: "/data/project/stemcell/shannc/tests/wes_test2/GRCh38.p14_filtered.fna"
+octo: /data/project/stemcell/shannc/tests/wes_test2/octo_test.fasta
 blacklist_filtered: "/data/project/stemcell/shannc/reference/blacklists/ENCFF356LFX_renamed.bed"
 copy_num: "TODO"
 dbsnp_filtered: "/data/project/stemcell/shannc/reference/variants/dbSNP_renamed.vcf.gz"

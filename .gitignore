@@ -4,6 +4,7 @@ tests/patient*
 *.nf.test.snap
 *.nf-test.log*
 /nextflow/.nf-test*
+*slurm-*.out
 *.vcf.gz*
 *.tsv
 *_Session.py

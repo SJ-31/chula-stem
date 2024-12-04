@@ -11,4 +11,8 @@ class Utils {
             return "${module_number}-${meta.filename}.${ext}"
         }
     }
+
+    // public static String saveFn(x, String patterns = /.*\.log/) {
+    //     x ==~ patterns ||
+    // }
 }
