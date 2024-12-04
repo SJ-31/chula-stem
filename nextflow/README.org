@@ -10,10 +10,6 @@
 Outputs are prefixed with "<module_number>-" representing their order in the pipeline (roughly)
 
 Must be submitted to the job queue
-** scRNA-seq
-Standard scRNA-seq raw data processing worfklow
-+ QC:
-+ Mapping
 ** WES
 Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.4.4/ and GATK best practices
 *** Input
@@ -22,35 +18,25 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * =fastq_1= path to raw reads
   * =fastq_2=
   * =source=  [tumor|normal]
-**** Reference data
+**** =params.ref= fields
 + *WARNING:* every single resource below MUST have the same contig names
-+ Genome: hg38???
-  * Needs to be indexed with =bwa-mem2 index= and =samtools faidx=
-    * And =gatk CreateSequenceDictionary -R <ref>=
-  * Contigs must also be named =chr1=, =chr2= and so on, for use with accucopy
-+ Known variants. To use with bqsr, these must be indexed with =gatk IndexFeatureFile=
-  * [[http://cancer.sanger.ac.uk/cosmic][COSMIC]] (see /data/project/sirasris_shared/)
-  * [[https://gnomad.broadinstitute.org/downloads#exac][Broad Institute data]]
-    * gnomAD v4.1.0 Exomes for all chromosomes
-    * ExAC
-      * Can't use this straight from the download, it is mapped to the GRCh37/hg19 reference
-  * [[https://www.ncbi.nlm.nih.gov/projects/SNP/get_html.cgi?whichHtml=overview][dbSNP]]
-***** Tool-specific requirements
-- VEP: uses annotation sources to predict consequence types. Can be cached and downloaded with the =INSTALL.pl= script
-  * Depends on what you put for the =species= flag
++ =genome=: reference genome
++ =vep_species=: species of annotation sources
+  * Can be cached and downloaded with the =INSTALL.pl= script
   * See [[https://grch37.ensembl.org/info/docs/tools/vep/script/vep_custom.html][here]] for how to supply custom annotation data
-- snpEff: needs a reference-specific database for annotation (the second argument)
-  * [[https://pcingola.github.io/SnpEff/snpeff/build_db/][Instructions for custom db]]
-- GATK GetPileupSummaries: a vcf file of common germline variants, with only biallelic snps and a population allele frequence (AF) info tag
-- bwa-mem2: alt index for for alt-aware mapping
-- MISensorPro: a homopolymers and microsatellites file prepared from the target genome
-- delly: bed exclusion file denoting chromosome regions to exclude from analysis and mappability file (for CNV version)
-- gridss: bed exclusion file, recommended to be from the ENCODE project
-- CNVkit: with exome data, needs BED file containing baited genomic regions of the target capture kit
-- Picard: with exome data, needs BED file containing baited genomic regions of the target capture kit and the target intervals file
-  * The BED file must be converted into =interval_list=  format using the [[https://gatk.broadinstitute.org/hc/en-us/articles/360036883931-BedToIntervalList-Picard][BedToIntervalList]] tool
-- FACETS: needs a snps file for to infer changes in allelic configuration. Docs recommend dbSNP
-- Mutect2: a population-level germline resource with allele fraction, such as gnomad
++ =baits=: bgzipped and indexed BED file of baited regions in exome capture kit
+  * =baits_il=: the same file as =baits= converted into GATK =interval_list= format the [[https://gatk.broadinstitute.org/hc/en-us/articles/360036883931-BedToIntervalList-Picard][BedToIntervalList]] tool
++ =targets=: bgzipped and indexed BED file of target regions in exome capture kit
+  * =targets_il=: same processing as =baits_il=
++ =baits_unzipped=: unzipped version of =baits=, defaults to =baits= without the =.gz= extension
++ =genome_blacklist=: genomic regions to ignore, such as the ENCODE blacklist
+  * Though shouldn't make much of a difference on exome data
++ =known_variants=: list of file paths to known germline variants
++ =delly_exclude=: BED file containing genomic regions to ignore for the tool delly. Recommended to be centromeric and telomeric regions
++ =dbsnp=: bgzipped and indexed dbSNP VCF file. Filtered for somatic variants
++ =homopolymers_microsatellites=:  a homopolymers and microsatellites file prepared from the target genome with the =msisensor-pro scan= command
++ =germline=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, such as those from gnomAD
++ =pileup=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, filtered for only biallelic SNPs
 *** Steps
 **** Preprocessing
 + QC: =fastp= with the following routines
@@ -76,6 +62,7 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
   * Notes
     * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
   * [[https://github.com/wwylab/MuSE][MuSE2]]
+    * Takes into account dbSNP information "by requiring a cutoff that is two times more stringent for a dbSNP position than for a non-dbSNP position"
 + Structural variants
   * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability *T*
   * [[https://github.com/Illumina/manta][Manta]] : Strutural variants (paired with strelka2) *T*
@@ -138,6 +125,7 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
 
 *** Motivation
 + Using multiple variant callers is common practice, notably used in the flagship analysis of the Pan-Cancer Analysis of Whole Genomes Consortium [4]
+** WES tumor-only
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools

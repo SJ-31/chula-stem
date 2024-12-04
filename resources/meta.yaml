@@ -3,6 +3,7 @@ dir:
   pytest: "/data/home/shannc/chula-stem/tests"
   test: "/data/project/stemcell/shannc/tests"
   wes_test: "/data/project/stemcell/shannc/tests/wes_test"
+  ref: "/data/project/stemcell/shannc/reference"
   tool_ref: "/data/project/stemcell/shannc/reference/tool_specific"
 
 # * Tools
@@ -17,5 +18,7 @@ links:
   delly_mappability_GRCh38: "https://gear-genomics.embl.de/data/delly/Homo_sapiens.GRCh38.dna.primary_assembly.fa.r101.s501.blacklist.gz" # Retrieved 15 Nov 2024
 
 # * Misc.
+rename:
+  remove_chr: "/data/project/stemcell/shannc/reference/rename/remove_chr.tsv"
 grch38_rename_file: "/data/project/stemcell/shannc/reference/rename/GRCh38.p14_rename.tsv"
 mutect2_out: "/data/project/stemcell/shannc/tests/wes_test/mutect2/temp.vcf.gz"

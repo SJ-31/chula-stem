@@ -9,6 +9,6 @@ if [[ -z $( bcftools head "${vcf}" | grep "ID=AF,") ]]; then
     echo "The given file has no population allele frequencies (AF) in the INFO field!"
     exit 1
 fi
-bcftools view -m2 -M2 -v snps "$1" > "$output"
+bcftools view -m2 -M2 -v snps "$1" -O z > "$output"
 # -m2 = min alleles 2
 # -M2 = Max alleles 2
