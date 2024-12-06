@@ -13,9 +13,11 @@ include { BCFTOOLS_STATS } from "../modules/bcftools_stats.nf"
 include { MULTIQC } from "../modules/multiqc.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
-include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
 include { CLASSIFY_CNV_FORMAT } from "../modules/classify_cnv_format.nf"
+include { OCTOPUS } from "../modules/octopus.nf"
 include { CLASSIFY_CNV } from "../modules/classify_cnv.nf"
+include { CONCAT_VCF as CONCAT_SMALL_1 } from "../modules/concat_vcf.nf"
+include { CONCAT_VCF as CONCAT_SMALL_2 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
@@ -101,20 +103,30 @@ workflow whole_exome {
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
+
     def toConcat = { suffix, outdir_name, it ->
         [it[0] + ["suffix": suffix,
                   "out": "${params.outdir}/${it[0].id}/${outdir_name}",
                   "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
     }
 
+
     // Combine variants by type
-    small_variants = MUTECT2_COMPLETE.out.map(params.prependId)
+    small_variants_to_oct = MUTECT2_COMPLETE.out.map(params.prependId)
         .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
         .join(MUSE2.out.variants.map(params.getId))
         .map({ it[1..-1] })
-        .map({ toConcat("Small_all", "annotations", it) })
+        .map({ toConcat("Concat_to_oct", "paired", it) })
 
-    CONCAT_SMALL(small_variants, params.ref.genome, 6)
+    CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
+
+    // Octopus uses previous variants to aid calling
+    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
+    OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
+
+    CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
+                    .join(OCTOPUS.out.variants.map(params.getId)),
+                    params.ref.genome, 6)
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(DELLY_SV.out.variants.map(params.getId))
@@ -129,11 +141,12 @@ workflow whole_exome {
                     .join(t.map(params.getId))
                     .map( { it[1..-1] } ) }
 
-    std_small_variants = withBams(branched.normal, branched.tumor, CONCAT_SMALL.out.vcf)
+    std_small_variants = withBams(branched.normal, branched.tumor, CONCAT_SMALL_2.out.vcf)
 
     /*
-     * Metric collection and QC
+     * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
      */
+
     STANDARDIZE_VCF(std_small_variants.map({ params.addSuffix("Small_std", it) }),
                     params.ref.genome, 6)
 
@@ -202,7 +215,10 @@ workflow whole_exome {
     PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets_il, params.ref.baits_il,
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
-    BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf), params.ref.targets, 8)
+
+    to_bcftools_stats =STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf)
+        .map({ [it[0] + ["suffix": null], it[1..-1]] })
+    BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = FASTP.out.json.mix(VEP.out.report,
                                     MOSDEPTH.out.dist,
