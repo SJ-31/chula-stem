@@ -34,7 +34,7 @@ process GRIDSS {
     } else {
         """
         gridss \\
-            --threads ${task.ext.threads} \\
+            --threads ${task.cpus} \\
             --reference ${reference} \\
             --output tmp.vcf \\
             ${bam_input}
