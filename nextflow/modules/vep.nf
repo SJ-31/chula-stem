@@ -40,6 +40,8 @@ process VEP {
             --species ${task.ext.species} \\
             --fasta $reference \\
             --stats_file ${html} \\
+            --hgvs \\
+            --hgvsg \\
             --vcf \\
             --vcf_info_field ANN \\
             --compress_output bgzip \\
