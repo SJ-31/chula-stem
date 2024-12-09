@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "Test Process SIGPROFILERASSIGNMENT"
+    script "modules/sigprofilerassignment.nf"
+    process "SIGPROFILERASSIGNMENT"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/sigprofile",
+                    "log": "$params.log/sigprofile", "id": "sample2",
+                    "RGSM_normal": "10"],
+                    ["$params.out2/patient_10/annotations/7-patient_10-Small_high_conf.vcf.gz"]]
+                input[1] = true
+                input[2] = ""
+                input[3] = 6
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
