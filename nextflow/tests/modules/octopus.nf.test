@@ -24,7 +24,7 @@ nextflow_process {
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"],
                     "$params.out2/patient_10/annotations/6-patient_10-Small_all.vcf.gz"
             ]
-                input[1] = params.octo
+                input[1] = params.oct
                 input[2] = params.targets
                 input[3] = 4
                 """
