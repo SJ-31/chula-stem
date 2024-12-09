@@ -24,6 +24,7 @@ include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
+include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { VEP } from "../modules/vep.nf"
 
 
@@ -176,6 +177,7 @@ workflow whole_exome {
     VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
         .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
         params.ref.genome, 7)
+    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
     /*

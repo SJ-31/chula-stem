@@ -1,5 +1,6 @@
 include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
+include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { MANTA } from "../modules/manta.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { EMPTY_FILES as EMPTY_FILES_1 } from "../modules/empty_files.nf"
@@ -30,19 +31,6 @@ workflow whole_exome_tumor_only {
 
     main:
     def cohort_name = params.cohort ? params.cohort : "cohort"
-    input = Channel.fromPath(params.input)
-        .splitCsv(header: true)
-        .map { [["id": it.patient,
-                "out": "${params.outdir}/${it.patient}/${it.source}",
-                "type": it.source,
-                "log": "${params.logdir}/${it.patient}/${it.source}",
-                "filename": "${it.patient}_${it.source}", // Output filename
-                "RGLB": it.read_group_library, // Read group info used by GATK tools
-                "RGPL": it.read_group_platform,
-                "RGPU": it.read_group_platform_unit,
-                "RGSM": it.read_group_sample_name
-            ], [file(it.fastq_1), file(it.fastq_2)]] }
-
     /*
      * Preprocessing
      */
@@ -84,6 +72,7 @@ workflow whole_exome_tumor_only {
 
     to_clairs = tumors.map(params.prependId)
         .join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
+        .join(MUTECT2_COMPLETE.out.map(params.getId))
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
@@ -170,6 +159,7 @@ workflow whole_exome_tumor_only {
     VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
         .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
         params.ref.genome, 7)
+    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
     // CLASSIFY_CNV(cnv_bed, 7)
 
     /*
