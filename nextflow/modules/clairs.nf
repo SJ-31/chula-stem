@@ -5,14 +5,14 @@ process CLAIRS {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
+    tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(previous_variants)
     val(reference)
     val(target_intervals)
     val(module_number)
     //
 
     output:
-    tuple val(meta), path(output)
+    tuple val(meta), path(output), emit: variants
     path("*.log")
     //
 
@@ -20,6 +20,7 @@ process CLAIRS {
     output = Utils.getName(module_number, meta, "ClairS", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
+    prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
@@ -35,15 +36,16 @@ process CLAIRS {
             --threads ${task.cpus} \\
             --platform ${task.ext.platform} \\
             --sample_name ${meta.RGSM_tumor} \\
+            ${prev_flag} \\
             ${target_flag} \\
             --output_dir .
 
         echo -e "${meta.RGSM_tumor}\t${meta.RGSM_normal}" > rename.txt
-        bcftools filter -i 'FILTER~\"Germline\"' temp.vcf.gz -O z | \\
+        bcftools filter -i 'FILTER~\"Germline\"' output.vcf.gz -O z | \\
             bcftools reheader -s rename.txt > germline.vcf.gz
 
         bcftools index germline.vcf.gz
-        bcftools filter -i 'FILTER!~\"Germline\"' temp.vcf.gz -O z > somatic.vcf.gz
+        bcftools filter -i 'FILTER!~\"Germline\"' output.vcf.gz -O z > somatic.vcf.gz
         bcftools index somatic.vcf.gz
 
         bcftools merge germline.vcf.gz somatic.vcf.gz | \\
