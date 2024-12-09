@@ -28,13 +28,12 @@ workflow  PREPROCESS_FASTQ {
     BWA(FASTP.out.passed, params.ref.genome, 2)
     MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
     BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
-
-    output = BQSR.out.bam
-    SAMTOOLS_INDEX(output) // Required by certain callers
+    SAMTOOLS_INDEX(BQSR.out.bam) // indices are required by certain callers
 
 
     emit:
-    bam = output
+    bam = BQSR.out.bam
     bam_index = SAMTOOLS_INDEX.out.index
+    fastp_json = FASTP.out.json
 
 }

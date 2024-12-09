@@ -1,7 +1,4 @@
-include { FASTP } from "../modules/fastp.nf"
-include { BWA } from "../modules/bwa.nf"
-include { MARK_DUPLICATES } from "../modules/mark_duplicates.nf"
-include { BQSR } from "../modules/bqsr.nf"
+include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
 include { MANTA } from "../modules/manta.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
@@ -27,7 +24,6 @@ include { GRIDSS } from "../modules/gridss.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
-include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
 
 workflow whole_exome_tumor_only {
@@ -50,16 +46,10 @@ workflow whole_exome_tumor_only {
     /*
      * Preprocessing
      */
-    FASTP(input, 1)
-    BWA(FASTP.out.passed, params.ref.genome, 2)
-    MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
-    BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir)
 
-    output = BQSR.out.bam
-
-    SAMTOOLS_INDEX(output)
-    empty_normals = EMPTY_FILES_1(output, 1)
-    tumors = output.map { [it[0].id,
+    empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
+    tumors = PREPROCESS_FASTQ.out.bam.map { [it[0].id,
                         ["type": "paired",
                         "id": it[0].id,
                         "out": "${params.outdir}/${it[0].id}/variant_calling",
@@ -68,8 +58,8 @@ workflow whole_exome_tumor_only {
                         "log": "${params.logdir}/${it[0].id}/variant_calling"],
                                         it[1]] }
 
-    indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] })
-    empty_indices = EMPTY_FILES_2(SAMTOOLS_INDEX.out.index, 1)
+    indices = PREPROCESS_FASTQ.out.bam_index.map({ [it[0].id, it[1]] })
+    empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
 
     paired = empty_normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
@@ -93,7 +83,7 @@ workflow whole_exome_tumor_only {
     MUTECT2_COMPLETE(to_mutect, 5)
 
     to_clairs = tumors.map(params.prependId)
-        .join(SAMTOOLS_INDEX.out.index.map(params.getId))
+        .join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
@@ -107,7 +97,7 @@ workflow whole_exome_tumor_only {
         .join(CLAIRS_TO.out.variants.map(params.getId))
         .map({ it[1..-1] })
         .map({ toConcat("Small_all", "annotations", it) })
-        .join(output.map(params.getId))
+        .join(PREPROCESS_FASTQ.out.bam.map(params.getId))
 
     CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
 
@@ -190,8 +180,9 @@ workflow whole_exome_tumor_only {
                         it[1], it[2]] }
 
     def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-    to_metrics = output.map(getIdType)
-        .join(SAMTOOLS_INDEX.out.index.map(getIdType), by: [0, 1]) // [id, type, meta, bam, meta, bai]
+    to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
+        .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
+              by: [0, 1]) // [id, type, meta, bam, meta, bai]
         .map({ [it[2], it[3], it[5]] })
         .map(replaceOut)
 
@@ -200,10 +191,10 @@ workflow whole_exome_tumor_only {
     MOSDEPTH(to_metrics, params.ref.targets, 8)
     BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf), params.ref.targets, 8)
 
-    to_multiqc = FASTP.out.json.mix(VEP.out.report,
-                                    MOSDEPTH.out.dist,
-                                    PICARD.out.metrics,
-                                    BCFTOOLS_STATS.out.py)
+    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,
+                                                    MOSDEPTH.out.dist,
+                                                    PICARD.out.metrics,
+                                                    BCFTOOLS_STATS.out.py)
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
         "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 8)

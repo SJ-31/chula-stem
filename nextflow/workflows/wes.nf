@@ -1,8 +1,5 @@
-include { FASTP } from "../modules/fastp.nf"
-include { BWA } from "../modules/bwa.nf"
-include { MARK_DUPLICATES } from "../modules/mark_duplicates.nf"
-include { BQSR } from "../modules/bqsr.nf"
 include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
+include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MANTA } from "../modules/manta.nf"
 include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
@@ -15,6 +12,7 @@ include { DELLY_SV } from "../modules/delly_sv.nf"
 include { PICARD } from "../modules/picard.nf"
 include { CLASSIFY_CNV_FORMAT } from "../modules/classify_cnv_format.nf"
 include { OCTOPUS } from "../modules/octopus.nf"
+include { CLAIRS } from "../modules/clairs.nf"
 include { CLASSIFY_CNV } from "../modules/classify_cnv.nf"
 include { CONCAT_VCF as CONCAT_SMALL_1 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SMALL_2 } from "../modules/concat_vcf.nf"
@@ -27,44 +25,23 @@ include { GRIDSS } from "../modules/gridss.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
-include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 
 
 workflow whole_exome {
 
     main:
     def cohort_name = params.cohort ? params.cohort : "cohort"
-    input = Channel.fromPath(params.input)
-        .splitCsv(header: true)
-        .map { [["id": it.patient,
-                "out": "${params.outdir}/${it.patient}/${it.source}",
-                "type": it.source,
-                "log": "${params.logdir}/${it.patient}/${it.source}",
-                "filename": "${it.patient}_${it.source}", // Output filename
-                "RGLB": it.read_group_library, // Read group info used by GATK tools
-                "RGPL": it.read_group_platform,
-                "RGPU": it.read_group_platform_unit,
-                "RGSM": it.read_group_sample_name
-            ], [file(it.fastq_1), file(it.fastq_2)]] }
-
-    /*
-     * Preprocessing
-     */
     def branchSources = branchCriteria { meta, files ->
         tumor: meta.type == "cancer" || meta.type == "tumor"
         normal: meta.type == "normal"
     }
-
-    FASTP(input, 1)
-    BWA(FASTP.out.passed, params.ref.genome, 2)
-    MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
-    BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
-
+    /*
+     * Preprocessing
+     */
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir)
     // After preprocessing, branch data into tumor and normal then pair up by id and join with
     //  index
-    output = BQSR.out.bam
-    SAMTOOLS_INDEX(output) // Required by certain callers
-    branched = output.branch(branchSources)
+    branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
     normals = branched.normal.map { [it[0].id,
                                         ["type": "paired",
                                         "id": it[0].id,
@@ -74,7 +51,7 @@ workflow whole_exome {
                                         "log": "${params.logdir}/${it[0].id}/paired"],
                                         it[1]] }
     tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
-    indices = SAMTOOLS_INDEX.out.index.map({ [it[0].id, it[1]] }).groupTuple()
+    indices = PREPROCESS_FASTQ.out.bam_index.map({ [it[0].id, it[1]] }).groupTuple()
     paired = normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
@@ -112,20 +89,22 @@ workflow whole_exome {
 
 
     // Combine variants by type
-    small_variants_to_oct = MUTECT2_COMPLETE.out.map(params.prependId)
+    small_variants_to_geno = MUTECT2_COMPLETE.out.map(params.prependId)
         .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
         .join(MUSE2.out.variants.map(params.getId))
         .map({ it[1..-1] })
         .map({ toConcat("Concat_to_oct", "paired", it) })
 
-    CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
+    CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
 
-    // Octopus uses previous variants to aid calling
-    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
-    OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
+    // Octopus and Clairs uses previous variants to aid calling
+    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
+    OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
+    CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
 
     CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
-                    .join(OCTOPUS.out.variants.map(params.getId)),
+                    .join(OCTOPUS.out.variants.map(params.getId))
+                    .join(CLAIRS.out.variants.map(params.getId)),
                     params.ref.genome, 6)
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
@@ -207,8 +186,9 @@ workflow whole_exome {
                         it[1], it[2]] }
 
     def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-    to_metrics = output.map(getIdType)
-        .join(SAMTOOLS_INDEX.out.index.map(getIdType), by: [0, 1]) // [id, type, meta, bam, meta, bai]
+    to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
+        .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
+              by: [0, 1]) // [id, type, meta, bam, meta, bai]
         .map({ [it[2], it[3], it[5]] })
         .map(replaceOut)
 
@@ -220,10 +200,10 @@ workflow whole_exome {
         .map({ [it[0] + ["suffix": null], it[1..-1]] })
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
-    to_multiqc = FASTP.out.json.mix(VEP.out.report,
-                                    MOSDEPTH.out.dist,
-                                    PICARD.out.metrics,
-                                    BCFTOOLS_STATS.out.py)
+    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,
+                                                    MOSDEPTH.out.dist,
+                                                    PICARD.out.metrics,
+                                                    BCFTOOLS_STATS.out.py)
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
         "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 8)
