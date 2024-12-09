@@ -2,7 +2,6 @@
 
 from SigProfilerAssignment import Analyzer as Analyze
 
-
 def parse_args():
     import argparse
 
@@ -10,7 +9,11 @@ def parse_args():
     parser.add_argument("-i", "--input_folder")
     parser.add_argument("-o", "--output_folder")
     parser.add_argument(
-        "-t", "--input_type", default="vcf", help="type of input files", action="store"
+        "-t",
+        "--input_type",
+        default="vcf",
+        help="type of input files",
+        action="store",
     )
     parser.add_argument(
         "-g",
@@ -44,7 +47,10 @@ if __name__ == "__main__":
         with open(args["exclude_file"], "r") as r:
             to_exclude = [s.strip() for s in r.read().splitlines()]
     Analyze.cosmic_fit(
-        args["input_folder"], args["output_folder"], input_type=args["input_type"],
-        exome = args["exome"], genome_build = args["genome_build"],
-        exclude_signature_subgroups = to_exclude
+        args["input_folder"],
+        args["output_folder"],
+        input_type=args["input_type"],
+        exome=args["exome"],
+        genome_build=args["genome_build"],
+        exclude_signature_groups=to_exclude,
     )
