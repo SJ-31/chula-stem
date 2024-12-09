@@ -13,11 +13,13 @@ include { MOSDEPTH } from "../modules/mosdepth.nf"
 include { BCFTOOLS_STATS } from "../modules/bcftools_stats.nf"
 include { MULTIQC } from "../modules/multiqc.nf"
 include { PICARD } from "../modules/picard.nf"
-include { CONCAT_VCF as CONCAT_SMALL } from "../modules/concat_vcf.nf"
+include { CONCAT_VCF as CONCAT_SMALL_1 } from "../modules/concat_vcf.nf"
+include { CONCAT_VCF as CONCAT_SMALL_2 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CLAIRS_TO } from "../modules/clairs_to.nf"
 include { CLASSIFY_CNV_FORMAT } from "../modules/classify_cnv_format.nf"
 include { CLASSIFY_CNV } from "../modules/classify_cnv.nf"
+include { OCTOPUS } from "../modules/octopus.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
@@ -90,7 +92,9 @@ workflow whole_exome_tumor_only {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
-    CLAIRS_TO(paired_no_id, params.ref.genome, params.ref.targets, 5)
+    to_clairs = tumors.map(params.prependId)
+        .join(SAMTOOLS_INDEX.out.index.map(params.getId))
+    CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
         [it[0] + ["suffix": suffix,
@@ -99,11 +103,20 @@ workflow whole_exome_tumor_only {
     }
 
     // Combine variants by type
-    small_variants = MUTECT2_COMPLETE.out.map(params.prependId)
+    small_variants_to_oct = MUTECT2_COMPLETE.out.map(params.prependId)
         .join(CLAIRS_TO.out.variants.map(params.getId))
         .map({ it[1..-1] })
         .map({ toConcat("Small_all", "annotations", it) })
         .join(output.map(params.getId))
+
+    CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
+
+    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
+    OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
+
+    small_variants = CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
+                    .join(OCTOPUS.out.variants.map(params.getId)),
+                    params.ref.genome, 6)
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(GRIDSS.out.variants.map(params.getId))
