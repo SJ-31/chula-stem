@@ -44,6 +44,9 @@ process SIGPROFILERASSIGNMENT {
             ${exome_flag} \\
             ${exclude_flag}
 
+        mv ${output}/Assignment_Solution/* ${output}
+        rmdir ${output}/Assignment_Solution
+
         get_nextflow_log.bash sigprofilerassignment.log
         """
     }
