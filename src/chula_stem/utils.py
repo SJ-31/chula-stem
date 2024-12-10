@@ -4,6 +4,7 @@
 from tempfile import TemporaryFile
 
 import click
+import polars as pl
 from polars import col
 
 # rx method is equivalent to [], rx2 is [[]]
@@ -277,3 +278,77 @@ def _format_vep_vcf(
         ["Loc", "Ref", "Alt", "Alt_depth", "VAF", tool_source_tag] + vep_columns
     )
     df.write_csv(output, separator="\t", null_value="NA")
+
+
+# def
+
+
+def merge_variant_calls(
+    input: str,
+    tool_source_tag: str = "TOOL_SOURCE",
+    minimum_callers: int = 3,
+    vaf_adaptive: bool = False,
+    separator: str = ";",
+) -> pl.DataFrame:
+    """Merge variant calling results
+
+    By default, merge variant calling results with a "majority vote" strategy, where
+    variants are accepted if they have been called by n = `minimum_callers` callers
+
+    With `vaf_adaptive` mode, proposed by Wang et. al 2020 in SomaticCombiner
+    variants are accepted if
+    - called by Strelka + Mutect2 and 0.03 <= tumor VAF <= 0.1
+    - called by Mutect2 and VAF < 0.03
+    - called by >= minimum_callers
+
+    :param: minimum_callers Variants must be called by this number of different callers
+    :param: tool_source_tag col containing the variant caller names
+
+    :returns: filtered tsv file
+    """
+    df = pl.read_csv(input, separator="\t")
+    original_cols: list = df.columns
+    to_split_amp = []  # TODO: cols to split with &
+    grouping_cols: list = ["Loc", "Ref", "Alt"]
+    to_average: list = ["VAF", "Alt_depth"]
+    vep_cols = list(
+        filter(
+            lambda x: not (x in grouping_cols or x in to_average), original_cols
+        )
+    )
+    split_unique: list = [tool_source_tag] + vep_cols
+    # TODO: put in all the VEP columns here
+    keep_all: list = to_average + split_unique
+
+    split_amp_expr: list = [pl.col(s).str.split("&") for s in to_split_amp]
+    unique_expr: list = [
+        pl.col(u).list.unique() for u in split_unique
+    ]  # TODO: using list.unique might not be necessary
+    avg_expr: list = [pl.col(x).list.mean() for x in to_average]
+    grouped = (
+        df.with_columns(split_amp_expr)
+        .group_by(grouping_cols)
+        .agg(keep_all)
+        .with_columns(avg_expr + unique_expr)
+        .with_columns(n_callers=pl.col(tool_source_tag).list.len())
+    )
+    if vaf_adaptive:
+        mutect_strelka_cols = [
+            (pl.col(tool_source_tag) == c).alias(f"has_{c}")
+            for c in ["mutect2", "strelka2"]
+        ]
+        grouped = grouped.with_columns(mutect_strelka_cols).filter(
+            (pl.col("has_mutect2") & (pl.col("VAF") < 0.03))
+            | (
+                ((pl.col("has_mutect2") & pl.col("has_strelka2")))
+                & (pl.col("VAF") <= 0.1)
+                & (pl.col("VAF") >= 0.03)
+            )
+            | (pl.col("n_callers") >= minimum_callers)
+        )
+    else:
+        grouped = grouped.filter(pl.col("n_callers") >= minimum_callers)
+    grouped = grouped.with_columns(
+        pl.col(split_unique).list.join(separator)
+    ).select(original_cols)
+    return grouped
