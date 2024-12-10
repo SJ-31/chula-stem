@@ -64,6 +64,7 @@ def filter_format_vep(input: str, sep="\t"):
 
 
 ##
+## * Civic database
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 
@@ -116,3 +117,24 @@ sym = "BRAF"
 response = CIVIC.execute(query, variable_values={"entrez_symbol": sym})
 # Tue Dec 10 15:50:22 2024 This is all working, just wrap it up in a function and
 # sort the results
+
+## * Pandrugs 2
+import requests
+
+url = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
+allowed_status = "APPROVED"
+gene = "KDR"
+response = requests.get(
+    url=url,
+    params={
+        "gene": gene,
+        # The following are all required
+        "directTarget": True,
+        "cancerDrugStatus": allowed_status,
+        "biomarker": True,
+        "pathwayMember": False,
+        "geneDependency": False,
+    },
+)
+data = response.json()
+data["geneDrugGroup"][0]
