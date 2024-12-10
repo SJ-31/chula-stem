@@ -8,10 +8,11 @@
 import os
 
 import polars as pl
-import pyensembl as pe
 
-os.environ["PYENSEMBL_CACHE_DIR"] = "/home/shannc/Bio_SDD/.cache"
-REL: pe.EnsemblRelease = pe.EnsemblRelease()
+# import pyensembl as pe
+
+# os.environ["PYENSEMBL_CACHE_DIR"] = "/home/shannc/Bio_SDD/.cache"
+# REL: pe.EnsemblRelease = pe.EnsemblRelease()
 
 
 def ensembl_id2name(id: str) -> str | None:
@@ -60,3 +61,58 @@ def filter_format_vep(input: str, sep="\t"):
         .rename(to_rename)
     )
     return df
+
+
+##
+from gql import Client, gql
+from gql.transport.aiohttp import AIOHTTPTransport
+
+transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
+CIVIC = Client(transport=transport, fetch_schema_from_transport=True)
+
+query = gql(
+    """
+query ($entrez_symbol: String) {
+  gene(entrezSymbol: $entrez_symbol) {
+    variants {
+      nodes {
+        clinvarIds
+        variantAliases
+        ... on GeneVariant {
+          coordinates {
+            start
+            stop
+            chromosome
+          }
+        }
+        molecularProfiles {
+          nodes {
+            name
+            evidenceItems(includeRejected: false) {
+              nodes {
+                link
+                therapies {
+                  name
+                }
+                evidenceRating
+                source {
+                  ascoAbstractId
+                  citationId
+                  pmcId
+                  sourceType
+                  title
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+)
+sym = "BRAF"
+response = CIVIC.execute(query, variable_values={"entrez_symbol": sym})
+# Tue Dec 10 15:50:22 2024 This is all working, just wrap it up in a function and
+# sort the results
