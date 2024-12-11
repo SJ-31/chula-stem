@@ -1,11 +1,10 @@
 #!/usr/bin/env ipython
 
 
+from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
-import polars as pl
-from polars.selectors import cs
 
 # rx method is equivalent to [], rx2 is [[]]
 
@@ -50,7 +49,6 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
         if not tumor_sample:
             raise ValueError("Tumor sample name must be provided")
         qstring = f"bcftools query -f '%CHROM\t%POS0\t%END\t[%CN]\n' -s {tumor_sample} {input} > tmp.bed"
-        print(qstring)
         run(
             qstring,
             shell=True,
@@ -182,6 +180,13 @@ def make_freec_config(
     help="Info tag designating caller of origin",
 )
 @click.option(
+    "-n",
+    "--normal_sample",
+    required=False,
+    default="",
+    help="Name of the normal sample in the vcf file",
+)
+@click.option(
     "-r",
     "--tumor_sample",
     required=True,
@@ -193,8 +198,17 @@ def make_freec_config(
     required=True,
     help="Info field in vcf containing VEP annotations",
 )
-def format_vep_vcf(input, output, tumor_sample, vep_info_field, tool_source_tag):
-    _format_vep_vcf(input, output, tumor_sample, vep_info_field, tool_source_tag)
+def format_vep_vcf(
+    input, output, tumor_sample, normal_sample, vep_info_field, tool_source_tag
+):
+    _format_vep_vcf(
+        input,
+        output,
+        tumor_sample,
+        normal_sample,
+        vep_info_field,
+        tool_source_tag,
+    )
 
 
 def in_vcf_header(vcf: str, string: str) -> bool:
@@ -209,6 +223,7 @@ def _format_vep_vcf(
     input: str,
     output: str,
     tumor_sample: str,
+    normal_sample: str = "",
     vep_info_field: str = "ANN",
     tool_source_tag: str = "TOOL_SOURCE",
     vaf_tag: str = "AF",
@@ -216,7 +231,6 @@ def _format_vep_vcf(
 ):
     import io
     import re
-    from subprocess import CompletedProcess, run
 
     import polars as pl
 
@@ -229,8 +243,10 @@ def _format_vep_vcf(
     vep_columns: list = re.findall('.*Format: (.*)">', proc.stdout.decode())[
         0
     ].split("|")
-    vaf: str = "[%AF]" if in_vcf_header(input, f"##FORMAT=<ID={vaf_tag}") else ""
-    ad: str = "[%AD]" if in_vcf_header(input, f"##FORMAT=<ID={ad_tag}") else ""
+    vaf: str = (
+        "[%AF\t]" if in_vcf_header(input, f"##FORMAT=<ID={vaf_tag}") else ""
+    )
+    ad: str = "[%AD\t]" if in_vcf_header(input, f"##FORMAT=<ID={ad_tag}") else ""
     vcf_cols: list = [
         "%CHROM:%POS",
         "%REF",
@@ -240,15 +256,28 @@ def _format_vep_vcf(
         rf"%INFO/{tool_source_tag}",
         rf"%INFO/{vep_info_field}",
     ]
-    vaf_ad_cols = list(
-        filter(lambda x: x, ["VAF" if vaf else "", "Alt_depth" if ad else ""])
+    vaf_ad_cols: list = []
+    if vaf:
+        vaf_ad_cols.append("VAF")
+    if vaf and normal_sample:
+        vaf_ad_cols.append("VAF_normal")
+    if ad:
+        vaf_ad_cols.append("AD")
+    if ad and normal_sample:
+        vaf_ad_cols.append("AD_normal")
+
+    sample_flag: str = (
+        f"{tumor_sample},{normal_sample}" if normal_sample else tumor_sample
     )
-    qstring = "\t".join(list(filter(lambda x: x, vcf_cols)))
-    runstr = rf"bcftools query -f '{qstring}' -s '{tumor_sample}' {input}"
+    qstring = "\t".join(list(filter(lambda x: x, vcf_cols))).replace("]\t", "]")
+    runstr = rf"bcftools query -f '{qstring}' -s '{sample_flag}' {input}"
     proc2: CompletedProcess = run(
         runstr, shell=True, capture_output=True, check=True
     )
     columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "ANN"]
+    print(runstr)
+    print(columns)
+
     df = (
         pl.read_csv(
             io.StringIO(proc2.stdout.decode()),
@@ -271,10 +300,18 @@ def _format_vep_vcf(
     if not vaf:
         df = df.with_columns(VAF=pl.lit(None))
     if not ad:
-        df = df.with_columns(Alt_depth=pl.lit(None))
+        df = df.with_columns(Alt_depth=pl.lit(None), AD=pl.lit(None))
+        vaf_ad_cols.append("AD")
     else:
-        df = df.with_columns(pl.col("Alt_depth").str.split(",").list.get(1))
+        replace_dots: list = [
+            pl.col(v).str.replace("^.$", "NA") for v in vaf_ad_cols
+        ]
+        df = df.with_columns(
+            pl.col("AD").str.split(",").list.get(1).alias("Alt_depth")
+        ).with_columns(replace_dots)
     df = df.select(
-        ["Loc", "Ref", "Alt", "Alt_depth", "VAF", tool_source_tag] + vep_columns
+        ["Loc", "Ref", "Alt", "Alt_depth", tool_source_tag]
+        + vaf_ad_cols
+        + vep_columns
     )
     df.write_csv(output, separator="\t", null_value="NA")
