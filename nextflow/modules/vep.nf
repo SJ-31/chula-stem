@@ -13,7 +13,7 @@ process VEP {
     output:
     tuple val(meta), path(output), emit: vcf
     path("*.html"), emit: report
-    path(tsv)
+    tuple val(meta), path(tsv), emit: tsv
     path("*.log")
     //
 
@@ -48,7 +48,7 @@ process VEP {
             --output_file $output
 
         format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} \\
-            -v ANN -r ${meta.RGSM_tumor}
+            -v ANN -r ${meta.RGSM_tumor} -n ${meta.RGSM_normal}
 
         get_nextflow_log.bash vep.log
         """
