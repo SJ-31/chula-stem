@@ -135,17 +135,10 @@ def resolve_transcripts(
 
     def by_informative(df: pl.DataFrame) -> pl.DataFrame:
         original_cols: list = df.columns
-        str_cols: list = df.select(cs.by_dtype(pl.String)).columns
-        pref: str = "__notna__"
-        replace_expr = [
-            pl.col(s).replace_strict({"NA": 0}, default=1).alias(f"{pref}{s}")
-            for s in str_cols
-        ]
-        sum_col: str = "notna_sum"
+        sum_col: str = "na_count"
         df = (
-            df.with_columns(replace_expr)
-            .with_columns(pl.sum_horizontal(cs.starts_with(pref)).alias(sum_col))
-            .filter(pl.col(sum_col) == pl.col(sum_col).max())
+            df.with_columns(pl.sum_horizontal(pl.all().is_null()).alias(sum_col))
+            .filter(pl.col(sum_col) == pl.col(sum_col).min())
             .select(original_cols)
         )
         return df
@@ -165,7 +158,9 @@ def resolve_transcripts(
 
 
 def qc_main(input_tsv: str) -> None:
-    df: pl.DataFrame = pl.read_csv(input_tsv, separator="\t")
+    df: pl.DataFrame = pl.read_csv(
+        input_tsv, separator="\t", infer_schema_length=None, null_values="NA"
+    )
     grouping_cols: list = ["Loc", "Ref", "Alt"]
     df = merge_variant_calls(df, grouping_cols)
     df = resolve_transcripts(df, grouping_cols)
