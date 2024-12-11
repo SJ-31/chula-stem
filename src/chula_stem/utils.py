@@ -233,6 +233,7 @@ def _format_vep_vcf(
     import re
 
     import polars as pl
+    import polars.selectors as cs
 
     proc: CompletedProcess = run(
         f"bcftools head {input} | grep 'INFO=<ID={vep_info_field}'",
@@ -263,9 +264,9 @@ def _format_vep_vcf(
     if vaf and normal_sample:
         vaf_ad_cols.append("VAF_normal")
     if ad:
-        vaf_ad_cols.append("AD")
+        vaf_ad_cols.append("Alt_depth")
     if ad and normal_sample:
-        vaf_ad_cols.append("AD_normal")
+        vaf_ad_cols.append("Alt_depth_normal")
 
     sample_flag: str = (
         f"{tumor_sample},{normal_sample}" if normal_sample else tumor_sample
@@ -278,9 +279,6 @@ def _format_vep_vcf(
     columns = (
         ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
     )
-    print(runstr)
-    print(columns)
-
     df = (
         pl.read_csv(
             io.StringIO(proc2.stdout.decode()),
@@ -303,17 +301,18 @@ def _format_vep_vcf(
     if not vaf:
         df = df.with_columns(VAF=pl.lit(None))
     if not ad:
-        df = df.with_columns(Alt_depth=pl.lit(None), AD=pl.lit(None))
-        vaf_ad_cols.append("AD")
+        df = df.with_columns(Alt_depth=pl.lit(None))
     else:
-        replace_dots: list = [
-            pl.col(v).str.replace("^.$", "NA") for v in vaf_ad_cols
-        ]
-        df = df.with_columns(
-            pl.col("AD").str.split(",").list.get(1).alias("Alt_depth")
-        ).with_columns(replace_dots)
+        replace_dots = cs.starts_with("VAF").str.replace("^.$", "NA")
+        alt_cols = list(filter(lambda x: "Alt_depth" in x, vaf_ad_cols))
+        ad_split = [pl.col(x).str.split(",").list.get(1) for x in alt_cols]
+        df = (
+            df.with_columns(ad_split)
+            .cast({a: pl.Int32 for a in alt_cols})
+            .with_columns(replace_dots)
+        )
     df = df.select(
-        ["Loc", "Ref", "Alt", "Alt_depth", tool_source_tag, "FILTER"]
+        ["Loc", "Ref", "Alt", tool_source_tag, "FILTER"]
         + vaf_ad_cols
         + vep_columns
     )
