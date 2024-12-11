@@ -14,6 +14,8 @@ import polars as pl
 # os.environ["PYENSEMBL_CACHE_DIR"] = "/home/shannc/Bio_SDD/.cache"
 # REL: pe.EnsemblRelease = pe.EnsemblRelease()
 
+# def filter_classify_cnv()
+
 
 def ensembl_id2name(id: str) -> str | None:
     """Convert ensembl gene id to HGNC gene name
@@ -68,55 +70,148 @@ def filter_format_vep(input: str, sep="\t"):
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 
-transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
-CIVIC = Client(transport=transport, fetch_schema_from_transport=True)
 
-query = gql(
-    """
-query ($entrez_symbol: String) {
-  gene(entrezSymbol: $entrez_symbol) {
-    variants {
-      nodes {
-        clinvarIds
-        variantAliases
-        ... on GeneVariant {
-          coordinates {
-            start
-            stop
-            chromosome
-          }
-        }
-        molecularProfiles {
-          nodes {
-            name
-            evidenceItems(includeRejected: false) {
-              nodes {
-                link
-                therapies {
-                  name
-                }
-                evidenceRating
-                source {
-                  ascoAbstractId
-                  citationId
-                  pmcId
-                  sourceType
-                  title
-                }
-              }
+class Civic:
+    def __init__(self) -> None:
+        transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
+        self.client = Client(
+            transport=transport, fetch_schema_from_transport=True
+        )
+        self.gene_query: str = gql(
+            """
+        query ($entrez_symbol: String, $next_page: String) {
+        gene(entrezSymbol: $entrez_symbol) {
+            variants(after: $next_page) {
+            pageInfo {
+                hasNextPage
+                endCursor
             }
-          }
+            nodes {
+                clinvarIds
+                variantAliases
+                ... on GeneVariant {
+                coordinates {
+                    start
+                    stop
+                    chromosome
+                }
+                }
+                molecularProfiles {
+                nodes {
+                    name
+                    evidenceItems(includeRejected: false) {
+                    nodes {
+                        link
+                        therapies {
+                        name
+                        }
+                        evidenceRating
+                        source {
+                        sourceType
+                        sourceUrl
+                        title
+                        }
+                    }
+                    }
+                }
+                }
+            }
+            }
         }
-      }
-    }
-  }
-}
-"""
-)
-sym = "BRAF"
-response = CIVIC.execute(query, variable_values={"entrez_symbol": sym})
-# Tue Dec 10 15:50:22 2024 This is all working, just wrap it up in a function and
-# sort the results
+        }
+        """
+        )
+
+    @staticmethod
+    def format_source(source_info: dict) -> str:
+        """Get markdown-formatted url from `source_info`"""
+        url = source_info.get("sourceUrl", "")
+        title = source_info.get("title", "NONE")
+        return f"[{title}]({url})"
+
+    @staticmethod
+    def get_loc(coordinates: dict) -> str | None:
+        if not all(coordinates.values()):
+            return None
+        return f"{coordinates['chromosome']}:{coordinates['start']}-{coordinates['stop']}"
+
+    @staticmethod
+    def parse_gene_response(data: list) -> pl.DataFrame:
+        cols: dict = {
+            "Loc": [],
+            "molecularProfile": [],
+            "therapy": [],
+            "evidenceRating": [],
+            "source": [],
+            "variantAliases": [],
+            "clinvarIds": [],
+        }
+        for entry in data:
+            loc: str = Civic.get_loc(entry["coordinates"])
+            for mp in entry["molecularProfiles"]["nodes"]:
+                for ev in mp["evidenceItems"]["nodes"]:
+                    for ther in ev["therapies"]:
+                        cols["clinvarIds"].append(entry["clinvarIds"])
+                        cols["variantAliases"].append(entry["variantAliases"])
+                        cols["molecularProfile"].append(mp["name"])
+                        cols["evidenceRating"].append(ev["evidenceRating"])
+                        cols["source"].append(Civic.format_source(ev["source"]))
+                        cols["Loc"].append(loc)
+                        cols["therapy"].append(ther["name"])
+        entry_df: pl.DataFrame = pl.DataFrame(cols)
+        return entry_df
+
+    def get_confident(df: pl.DataFrame, existing_variation: list) -> pl.DataFrame:
+        df = df.filter(
+            (pl.col("evidenceRating") == pl.col("evidenceRating").max())
+            & (pl.col("Loc").is_not_null())
+        )
+        return df
+
+    #     return gene_df
+
+    def get_gene(
+        self, gene: str, existing_variation: list, confident: bool = True
+    ) -> pl.DataFrame:
+        """Retrieve civic therapeutic data for a Gene
+        By default, will only return the 'most confident' therapy, which is determined
+            by the 'get_confident' function
+
+        :param gene: gene id (HUGO format)
+        :param variant_aliases: existing
+
+        :returns:
+        """
+        has_next: bool = True
+        query_input: dict = {"entrez_symbol": gene, "next_page": ""}
+        dfs: list[pl.DataFrame] = []
+        while has_next:
+            response: dict = self.client.execute(
+                self.gene_query, variable_values=query_input
+            )
+            if not response["gene"]:
+                break
+            variants: dict = response["gene"]["variants"]
+            data: list = variants["nodes"]
+            has_next: bool = variants["pageInfo"]["hasNextPage"]
+            if has_next:
+                query_input["next_page"] = variants["pageInfo"]["endCursor"]
+            dfs.append(Civic.parse_gene_response(data))
+        if not dfs:
+            return pl.DataFrame()
+        df: pl.DataFrame = pl.concat(dfs).with_columns(Gene=pl.lit(gene))
+        if confident:
+            return Civic.get_confident(df, existing_variation)
+        else:
+            return df
+
+    # def get_genes(self, gene_list: str)
+    # TODO: this function needs to have API delays
+
+
+civ = Civic()
+braf = civ.get_gene("BRAF", [], False)
+
 
 ## * Pandrugs 2
 import requests
