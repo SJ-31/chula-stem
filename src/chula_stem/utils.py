@@ -254,6 +254,7 @@ def _format_vep_vcf(
         vaf,
         ad,
         rf"%INFO/{tool_source_tag}",
+        "%FILTER",
         rf"%INFO/{vep_info_field}",
     ]
     vaf_ad_cols: list = []
@@ -274,7 +275,9 @@ def _format_vep_vcf(
     proc2: CompletedProcess = run(
         runstr, shell=True, capture_output=True, check=True
     )
-    columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "ANN"]
+    columns = (
+        ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
+    )
     print(runstr)
     print(columns)
 
@@ -310,7 +313,7 @@ def _format_vep_vcf(
             pl.col("AD").str.split(",").list.get(1).alias("Alt_depth")
         ).with_columns(replace_dots)
     df = df.select(
-        ["Loc", "Ref", "Alt", "Alt_depth", tool_source_tag]
+        ["Loc", "Ref", "Alt", "Alt_depth", tool_source_tag, "FILTER"]
         + vaf_ad_cols
         + vep_columns
     )
