@@ -5,7 +5,7 @@ process CLAIRS_TO {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(tumor), path(index)
+    tuple val(meta), path(tumor), path(index), path(previous_variants)
     val(reference)
     val(target_intervals)
     val(module_number)
@@ -20,6 +20,7 @@ process CLAIRS_TO {
     output = Utils.getName(module_number, meta, "ClairS-TO", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
+    prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
@@ -34,15 +35,31 @@ process CLAIRS_TO {
             --threads ${task.cpus} \\
             --platform ${task.ext.platform} \\
             ${target_flag} \\
+            ${prev_flag} \\
             --output_dir .
 
-        bcftools concat snv.vcf.gz indel.vcf.gz -a | \\
+        if [[ -e snv.vcf.gz && -e indel.vcf.gz ]]; then
+            bcftools concat snv.vcf.gz indel.vcf.gz -a | \\
+                vcf_info_add_tag.bash -n ${params.source_name} \\
+                    -d "$params.source_description" \\
+                    -b '.' \\
+                    -t String \\
+                    -a clairs-to \\
+                    -o ${output}
+        else
+            if [[ -e snv.vcf.gz ]]; then
+                result=snv.vcf.gz
+            else
+                result=indel.vcf.gz
+            fi
             vcf_info_add_tag.bash -n ${params.source_name} \\
                 -d "$params.source_description" \\
                 -b '.' \\
+                -i \$result \\
                 -t String \\
                 -a clairs-to \\
                 -o ${output}
+        fi
 
         get_nextflow_log.bash clairs-to.log
         """

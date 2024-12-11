@@ -19,7 +19,8 @@ nextflow_process {
                     "RGSM_tumor": "10_cancer"
                 ],
                     "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
-                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai",
+                    "$params.out/mutect2_t/4-null-Mutect2.vcf.gz"]
                 input[1] = "$params.genome_filtered"
                 input[2] = params.targets
                 input[3] = 4
