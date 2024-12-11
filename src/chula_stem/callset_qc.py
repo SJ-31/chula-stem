@@ -1,31 +1,5 @@
+import click
 import polars as pl
-import polars.selectors as cs
-
-
-def print_df(df: pl.DataFrame) -> pl.DataFrame:
-    print(df)
-    return df
-
-
-def save_df(df: pl.DataFrame) -> pl.DataFrame:
-    """Save the current polars dataframe to a temporary file for debugging purposes
-    Can be used in a pipe
-    """
-    import datetime
-    import os
-    import sys
-
-    import polars as pl
-    import polars.selectors as cs
-
-    time = datetime.datetime.now().strftime("%Y-%m-%d-%M_%S")
-    out = f"{time}_{os.path.basename(sys.argv[0])}"
-    try:
-        df.write_csv(f"{out}.tsv", separator="\t")
-    except pl.exceptions.ComputeError:
-        df.write_json(f"{out}.json", pretty=True)
-        os.unlink(f"{out}.tsv")
-    return df
 
 
 def merge_variant_calls(
@@ -157,10 +131,111 @@ def resolve_transcripts(
     return resolved
 
 
-def qc_main(input_tsv: str) -> None:
+def standard_filters(
+    df: pl.DataFrame,
+    min_tumor_depth: int,
+    max_normal_depth: int,
+    min_VAF: float,
+    accepted_filters: str,
+) -> pl.DataFrame:
+    filters = accepted_filters.split(",")
+    if "Alt_depth_normal" in df.columns:
+        df = df.filter(pl.col("Alt_depth_normal") <= max_normal_depth)
+    if "Alt_depth" in df.columns:
+        df = df.filter(pl.col("Alt_depth") >= min_tumor_depth)
+    if "VAF" in df.columns:
+        df = df.filter(pl.col("VAF") >= min_VAF)
+    if filters:
+        df = df.filter(
+            pl.col("FILTER")
+            .str.split(";")
+            .list.set_intersection(filters)
+            .list.len()
+            >= 1
+        )
+    return df
+
+
+@click.command()
+@click.option("-o", "--output", required=True, help="Output tsv path")
+@click.option("-i", "--input", required=True, help="Input tsv path")
+@click.option("--min_tumor_depth", required=True)
+@click.option("--max_normal_depth", required=True)
+@click.option("--min_VAF", required=True)
+@click.option("--impact", required=False, default=False, is_flag=True)
+@click.option("--canonical", required=False, default=False, is_flag=True)
+@click.option("--accepted_filters", required=True)
+@click.option("--informative", required=False, default=False, is_flag=True)
+@click.option("--min_callers", required=False, default=2)
+@click.option("--vaf_adaptive", required=False, default=False, is_flag=True)
+@click.option("--tool_source_tag", required=False, default="TOOL_SOURCE")
+def qc_main(
+    input_tsv: str,
+    output: str,
+    min_tumor_depth: int,
+    max_normal_depth: int,
+    min_VAF: float,
+    accepted_filters: list,
+    impact: bool,
+    canonical: bool,
+    informative: bool,
+    min_callers: bool,
+    vaf_adaptive: bool,
+    tool_source_tag: str = "TOOL_SOURCE",
+):
+    _qc_main(
+        input_tsv,
+        output,
+        min_tumor_depth,
+        max_normal_depth,
+        min_VAF,
+        accepted_filters,
+        impact,
+        canonical,
+        informative,
+        min_callers,
+        vaf_adaptive,
+        tool_source_tag,
+    )
+
+
+def _qc_main(
+    input_tsv: str,
+    output: str,
+    min_tumor_depth: int,
+    max_normal_depth: int,
+    min_VAF: float,
+    accepted_filters: list,
+    impact: bool,
+    canonical: bool,
+    informative: bool,
+    min_callers: bool,
+    vaf_adaptive: bool,
+    tool_source_tag: str = "TOOL_SOURCE",
+) -> None:
     df: pl.DataFrame = pl.read_csv(
         input_tsv, separator="\t", infer_schema_length=None, null_values="NA"
     )
     grouping_cols: list = ["Loc", "Ref", "Alt"]
-    df = merge_variant_calls(df, grouping_cols)
-    df = resolve_transcripts(df, grouping_cols)
+    df = standard_filters(
+        df,
+        min_tumor_depth=min_tumor_depth,
+        max_normal_depth=max_normal_depth,
+        min_VAF=min_VAF,
+        accepted_filters=accepted_filters,
+    )
+    df = resolve_transcripts(
+        df,
+        grouping_cols,
+        impact=impact,
+        canonical=canonical,
+        informative=informative,
+    )
+    df = merge_variant_calls(
+        df,
+        grouping_cols,
+        tool_source_tag=tool_source_tag,
+        minimum_callers=min_callers,
+        vaf_adaptive=vaf_adaptive,
+    )
+    df.write_csv(output, separator="\t", null_value="NA")
