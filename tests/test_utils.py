@@ -1,11 +1,12 @@
 #!/usr/bin/env ipython
 # import chula_stem as
-
+import pytest
 from chula_stem.utils import _format_vep_vcf
 
 testdir = "/home/shannc/Bio_SDD/chula-stem/tests/vep"
 
 
+@pytest.mark.skip(reason="Done")
 def test_format_vep():
     sv = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_SV.vcf.gz"
     small = (

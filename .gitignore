@@ -9,6 +9,7 @@ tests/patient*
 *.tsv
 *_Session.py
 output
+tests/*_pytest*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
