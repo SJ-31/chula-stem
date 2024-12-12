@@ -5,8 +5,10 @@
 #   * Relevant therapies
 #     * In this, and other cancer types
 #   * VCF-level
+from abc import ABC, abstractmethod
 from pathlib import Path
 from time import sleep
+from typing import override
 
 import polars as pl
 from gql import Client, gql
@@ -68,12 +70,66 @@ def filter_format_vep(input: str, sep="\t"):
     return df
 
 
+## * Therapy db parent class
+
+
+class TherapyDB(ABC):
+
+    api_wait: float
+    cache: Path
+
+    @abstractmethod
+    def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
+        pass
+
+    def get_genes(self, gene_list: str, confident: bool = True) -> pl.DataFrame:
+        results: list = []
+        results[0], gene_list = self.read_cache(gene_list)
+        for g in gene_list:
+            results.append(self.get_gene(g, confident))
+            sleep(self.api_wait)  # API permits 2 requests per second
+        df = pl.concat(results)
+        self.write_cache(df)
+        return df
+
+    @staticmethod
+    @abstractmethod
+    def parse_gene_response(data: list) -> pl.DataFrame:
+        pass
+
+    def read_cache(self, gene_list) -> tuple[pl.DataFrame, list[str]]:
+        """Retrieve entries from `gene_list` found in the cache, and filter
+        `gene_list` so that only unknown entries remain
+        """
+        if self.cache.exists():
+            previous: pl.DataFrame = pl.read_csv(
+                self.cache, separator="\t", null_values="NA"
+            ).filter(pl.col("Gene").is_in(gene_list))
+            found: list[str] = list(
+                filter(lambda x: x in previous["Gene"], gene_list)
+            )
+            return previous, found
+        else:
+            return pl.DataFrame(), gene_list
+
+    def write_cache(self, df: pl.DataFrame) -> None:
+        if not self.cache.exists():
+            df.write_csv(self.cache, separator="\t", null_value="NA")
+        else:
+            previous: pl.DataFrame = pl.read_csv(
+                self.cache, separator="\t", null_values="NA"
+            )
+            write: pl.DataFrame = pl.concat([previous, df]).unique("Gene")
+            write.write_csv(self.cache, separator="\t", null_value="NA")
+
+
 ## * Civic database
 
 
-class Civic:
+class Civic(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
+        self.api_wait: float = 0.5
         self.cache: Path = (
             Path(cache)
             if cache
@@ -142,6 +198,7 @@ class Civic:
         return f"{coordinates['chromosome']}:{coordinates['start']}-{coordinates['stop']}"
 
     @staticmethod
+    @override
     def parse_gene_response(data: list) -> pl.DataFrame:
         cols: dict = {
             "Loc": [],
@@ -196,6 +253,7 @@ class Civic:
             return df.head(1)
         return df
 
+    @override
     def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
         """Retrieve civic therapeutic data for a Gene
         By default, will only return the 'most confident' therapy, which is determined
@@ -229,44 +287,12 @@ class Civic:
         else:
             return df
 
-    def read_cache(self, gene_list) -> tuple[pl.DataFrame, list[str]]:
-        if self.cache.exists():
-            previous: pl.DataFrame = pl.read_csv(
-                self.cache, separator="\t", null_values="NA"
-            ).filter(pl.col("Gene").is_in(gene_list))
-            found: list[str] = list(
-                filter(lambda x: x in previous["Gene"], gene_list)
-            )
-            return previous, found
-        else:
-            return pl.DataFrame(), gene_list
-
-    def write_cache(self, df: pl.DataFrame) -> None:
-        if not self.cache.exists():
-            df.write_csv(self.cache, separator="\t", null_value="NA")
-        else:
-            previous: pl.DataFrame = pl.read_csv(
-                self.cache, separator="\t", null_values="NA"
-            )
-            write: pl.DataFrame = pl.concat([previous, df]).unique("Gene")
-            write.write_csv(self.cache, separator="\t", null_value="NA")
-
-    def get_genes(self, gene_list: str, confident: bool = True) -> pl.DataFrame:
-        results: list = []
-        results[0], gene_list = self.read_cache(gene_list)
-        for g in gene_list:
-            results.append(self.get_gene(g, confident))
-            sleep(0.5)  # API permits 2 requests per second
-        df = pl.concat(results)
-        self.write_cache(df)
-        return df
-
 
 ## * Pandrugs 2
 import requests
 
 url = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
-allowed_status = "APPROVED"
+allowed_status = ["APPROVED", "CLINICAL_TRIALS"]
 gene = "KDR"
 response = requests.get(
     url=url,
@@ -276,9 +302,27 @@ response = requests.get(
         "directTarget": True,
         "cancerDrugStatus": allowed_status,
         "biomarker": True,
-        "pathwayMember": False,
+        "pathwayMember": False,  # DO NOT permit indirect gene-drug interactions
         "geneDependency": False,
-    },
+    },  # DO permit gene-drug interactions where the gene is a gene dependency
 )
+
+
+class Pandrugs(TherapyDB):
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    @override
+    def parse_gene_response(data: list) -> pl.DataFrame:
+        cols: dict = {"status": [], "therapies": [], "source": []}
+        return
+
+    @override
+    def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
+        pass
+        # TODO: get the Gene here pl.col("Gene") = pl.lit(gene)
+
+
 data = response.json()
 data["geneDrugGroup"][0]
