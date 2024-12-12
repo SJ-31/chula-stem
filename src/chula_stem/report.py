@@ -74,13 +74,21 @@ def filter_format_vep(input: str, sep="\t"):
 
 
 class TherapyDB(ABC):
-    # All dfs returned must have at least the columns gene, source and disease
 
     api_wait: float
     cache: Path
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    @staticmethod
+    def get_confident(df: pl.DataFrame) -> pl.DataFrame:
+        """Retrieve the most confident and useful Evidence Item from the `get_gene` operation
+        Criteria are database-specific
+        :return: a df of one row
+        """
         pass
 
     def get_genes(self, gene_list: str, confident: bool = True) -> pl.DataFrame:
@@ -96,6 +104,15 @@ class TherapyDB(ABC):
     @staticmethod
     @abstractmethod
     def parse_gene_response(data: list) -> pl.DataFrame:
+        """
+        :param: data a list of evidence entries associated with a gene, such as the result
+        of an API call
+        :return: a df with at least the columns
+            - gene: str
+            - source: str
+            - disease: list[str]
+            - therapies: list[str]
+        """
         pass
 
     def read_cache(self, gene_list) -> tuple[pl.DataFrame, list[str]]:
@@ -224,9 +241,9 @@ class Civic(TherapyDB):
                 for ev in mp["evidenceItems"]["nodes"]:
                     ther: list = [t["name"] for t in ev["therapies"]]
                     if d := ev.get("disease"):
-                        disease = d["name"]
+                        disease = [d["name"]]
                     else:
-                        disease = "NA"
+                        disease = ["NA"]
                     cols["clinvarIds"].append(entry["clinvarIds"])
                     cols["variantAliases"].append(entry["variantAliases"])
                     cols["molecularProfile"].append(mp["name"])
@@ -246,8 +263,9 @@ class Civic(TherapyDB):
         return entry_df
 
     @staticmethod
+    @override
     def get_confident(df: pl.DataFrame) -> pl.DataFrame:
-        """Retrieve the most confident and useful Evidence Item from the `get_gene` operation
+        """
         Criteria are...
             - Entry whose associated gene variant has a known location
             - Has the highest evidence rating within the evidence set, and at least 4
@@ -302,41 +320,100 @@ class Civic(TherapyDB):
             return df
 
 
-## * Pandrugs 2
 import requests
 
-url = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
-allowed_status = ["APPROVED", "CLINICAL_TRIALS"]
-gene = "KDR"
-response = requests.get(
-    url=url,
-    params={
-        "gene": gene,
-        # The following are all required
-        "directTarget": True,
-        "cancerDrugStatus": allowed_status,
-        "biomarker": True,
-        "pathwayMember": False,  # DO NOT permit indirect gene-drug interactions
-        "geneDependency": False,
-    },  # DO permit gene-drug interactions where the gene is a gene dependency
-)
+## * Pandrugs 2
+from requests import Session
 
 
-class Pandrugs(TherapyDB):
-    def __init__(self) -> None:
-        pass
+class PanDrugs2(TherapyDB):
+    def __init__(self, cache: str = "") -> None:
+        self.url: str = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
+        self.api_wait: float = 1
+        self.session: Session = Session()
+        self.cache: Path = (
+            Path(cache)
+            if cache
+            else Path.home().joinpath(".cache/pandrug_genes.tsv")
+        )
 
     @staticmethod
     @override
     def parse_gene_response(data: list) -> pl.DataFrame:
-        cols: dict = {"status": [], "therapies": [], "source": []}
-        return
+        cols: dict = {
+            "status": [],
+            "therapies": [],
+            "therapyType": [],
+            "disease": [],
+            "gScore": [],
+            "dScore": [],
+        }
+        for entry in data:
+            cols["disease"].append(entry["cancer"])
+            cols["dScore"].append(entry["dScore"])
+            cols["status"].append(entry["status"])
+            cols["gScore"].append(entry["gScore"])
+            cols["therapies"].append(entry["showDrugName"])
+            cols["therapyType"].append(entry["therapy"])
+        return pl.DataFrame(cols).with_columns(
+            source=pl.lit("[PanDrugs2](https://pandrugs.org/#!/)")
+        )
+
+    @override
+    @staticmethod
+    def get_confident(df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Criteria are...
+            - Has the highest dScore, and dScore > 0.7
+            - Has gScore > 0.6
+            - Drug's status is either "APPROVED" or "CLINICAL_TRIALS"
+        """
+        df = df.filter(
+            (pl.col("gScore") >= 0.6)
+            & (pl.col("gScore") >= 0.7)
+            & (
+                (pl.col("status") == "APPROVED")
+                | (pl.col("status") == "CLINIAL_TRIALS")
+            )
+        )
+        df = df.filter(pl.col("dScore") == pl.col("dScore").max())
+
+        if df.shape[0] > 1:
+            get_first: list = ["source", "gene", "status"]
+            make_unique: list = ["disease", "gScore", "therapyType"]
+            others: list = list(
+                filter(lambda x: x not in make_unique, df.columns)
+            )
+            others.remove("dScore")
+            df = (
+                df.group_by(pl.col("dScore"))
+                .agg(pl.col(make_unique).flatten(), pl.col(others))
+                .with_columns(
+                    pl.col(get_first).list.first(),
+                    pl.col(make_unique).list.unique(),
+                )
+            )
+        return df
 
     @override
     def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
-        pass
-        # TODO: get the Gene here pl.col("gene") = pl.lit(gene)
-
-
-data = response.json()
-data["geneDrugGroup"][0]
+        response: requests.Response = self.session.get(
+            url=self.url,
+            params={
+                "gene": gene,
+                # The following are all required
+                "directTarget": True,
+                "biomarker": True,
+                "pathwayMember": False,  # DO NOT permit indirect gene-drug interactions
+                "geneDependency": False,
+            },
+        )
+        if not response.ok or not (data := response.json().get("geneDrugGroup")):
+            return pl.DataFrame()
+        df: pl.DataFrame = PanDrugs2.parse_gene_response(data).with_columns(
+            gene=pl.lit(gene)
+        )
+        if confident:
+            return self.get_confident(df)
+        else:
+            return df
