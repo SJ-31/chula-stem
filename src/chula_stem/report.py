@@ -5,9 +5,12 @@
 #   * Relevant therapies
 #     * In this, and other cancer types
 #   * VCF-level
-import os
+from pathlib import Path
+from time import sleep
 
 import polars as pl
+from gql import Client, gql
+from gql.transport.aiohttp import AIOHTTPTransport
 
 # import pyensembl as pe
 
@@ -65,15 +68,17 @@ def filter_format_vep(input: str, sep="\t"):
     return df
 
 
-##
 ## * Civic database
-from gql import Client, gql
-from gql.transport.aiohttp import AIOHTTPTransport
 
 
 class Civic:
-    def __init__(self) -> None:
+    def __init__(self, cache: str = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
+        self.cache: Path = (
+            Path(cache)
+            if cache
+            else Path.home().joinpath(".cache/civic_genes.tsv")
+        )
         self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
@@ -224,12 +229,37 @@ class Civic:
         else:
             return df
 
-    # def get_genes(self, gene_list: str)
-    # TODO: this function needs to have API delays
+    def read_cache(self, gene_list) -> tuple[pl.DataFrame, list[str]]:
+        if self.cache.exists():
+            previous: pl.DataFrame = pl.read_csv(
+                self.cache, separator="\t", null_values="NA"
+            ).filter(pl.col("Gene").is_in(gene_list))
+            found: list[str] = list(
+                filter(lambda x: x in previous["Gene"], gene_list)
+            )
+            return previous, found
+        else:
+            return pl.DataFrame(), gene_list
 
+    def write_cache(self, df: pl.DataFrame) -> None:
+        if not self.cache.exists():
+            df.write_csv(self.cache, separator="\t", null_value="NA")
+        else:
+            previous: pl.DataFrame = pl.read_csv(
+                self.cache, separator="\t", null_values="NA"
+            )
+            write: pl.DataFrame = pl.concat([previous, df]).unique("Gene")
+            write.write_csv(self.cache, separator="\t", null_value="NA")
 
-civ = Civic()
-braf = civ.get_gene("BRAF", False)
+    def get_genes(self, gene_list: str, confident: bool = True) -> pl.DataFrame:
+        results: list = []
+        results[0], gene_list = self.read_cache(gene_list)
+        for g in gene_list:
+            results.append(self.get_gene(g, confident))
+            sleep(0.5)  # API permits 2 requests per second
+        df = pl.concat(results)
+        self.write_cache(df)
+        return df
 
 
 ## * Pandrugs 2
