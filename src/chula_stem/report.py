@@ -74,7 +74,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 class Civic:
     def __init__(self) -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
-        self.client = Client(
+        self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
         self.gene_query: str = gql(
@@ -106,6 +106,7 @@ class Civic:
                         name
                         }
                         evidenceRating
+                        evidenceLevel
                         source {
                         sourceType
                         sourceUrl
@@ -140,8 +141,10 @@ class Civic:
         cols: dict = {
             "Loc": [],
             "molecularProfile": [],
-            "therapy": [],
+            "therapies": [],
+            "evidenceLevel": [],
             "evidenceRating": [],
+            "civicLink": [],
             "source": [],
             "variantAliases": [],
             "clinvarIds": [],
@@ -150,29 +153,45 @@ class Civic:
             loc: str = Civic.get_loc(entry["coordinates"])
             for mp in entry["molecularProfiles"]["nodes"]:
                 for ev in mp["evidenceItems"]["nodes"]:
-                    for ther in ev["therapies"]:
-                        cols["clinvarIds"].append(entry["clinvarIds"])
-                        cols["variantAliases"].append(entry["variantAliases"])
-                        cols["molecularProfile"].append(mp["name"])
-                        cols["evidenceRating"].append(ev["evidenceRating"])
-                        cols["source"].append(Civic.format_source(ev["source"]))
-                        cols["Loc"].append(loc)
-                        cols["therapy"].append(ther["name"])
-        entry_df: pl.DataFrame = pl.DataFrame(cols)
+                    ther: list = [t["name"] for t in ev["therapies"]]
+                    cols["clinvarIds"].append(entry["clinvarIds"])
+                    cols["variantAliases"].append(entry["variantAliases"])
+                    cols["molecularProfile"].append(mp["name"])
+                    cols["civicLink"].append(ev["link"])
+                    cols["evidenceRating"].append(ev["evidenceRating"])
+                    cols["evidenceLevel"].append(ev["evidenceLevel"])
+                    cols["source"].append(Civic.format_source(ev["source"]))
+                    cols["Loc"].append(loc)
+                    cols["therapies"].append(ther)
+
+        level_mapping: dict = {"E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
+        entry_df: pl.DataFrame = pl.DataFrame(cols).with_columns(
+            pl.col("evidenceLevel").replace_strict(level_mapping)
+        )
         return entry_df
 
-    def get_confident(df: pl.DataFrame, existing_variation: list) -> pl.DataFrame:
+    @staticmethod
+    def get_confident(df: pl.DataFrame) -> pl.DataFrame:
+        """Retrieve the most confident and useful Evidence Item from the `get_gene` operation
+        Criteria are...
+            - Entry whose associated gene variant has a known location
+            - Has the highest evidence rating within the evidence set, and at least 4
+            - Has the highest evidence level and at least least B (encoded as 4)
+            - Has a named therapy
+        """
         df = df.filter(
-            (pl.col("evidenceRating") == pl.col("evidenceRating").max())
+            (pl.col("therapies").list.len() >= 1)
+            & (pl.col("evidenceRating") == pl.col("evidenceRating").max())
+            & (pl.col("evidenceLevel") == pl.col("evidenceLevel").max())
             & (pl.col("Loc").is_not_null())
+            & (pl.col("evidenceRating") >= 4)
+            & (pl.col("evidenceLevel") >= 4)
         )
+        if df.shape[0] > 1:
+            return df.head(1)
         return df
 
-    #     return gene_df
-
-    def get_gene(
-        self, gene: str, existing_variation: list, confident: bool = True
-    ) -> pl.DataFrame:
+    def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
         """Retrieve civic therapeutic data for a Gene
         By default, will only return the 'most confident' therapy, which is determined
             by the 'get_confident' function
@@ -193,7 +212,7 @@ class Civic:
                 break
             variants: dict = response["gene"]["variants"]
             data: list = variants["nodes"]
-            has_next: bool = variants["pageInfo"]["hasNextPage"]
+            has_next = variants["pageInfo"]["hasNextPage"]
             if has_next:
                 query_input["next_page"] = variants["pageInfo"]["endCursor"]
             dfs.append(Civic.parse_gene_response(data))
@@ -201,7 +220,7 @@ class Civic:
             return pl.DataFrame()
         df: pl.DataFrame = pl.concat(dfs).with_columns(Gene=pl.lit(gene))
         if confident:
-            return Civic.get_confident(df, existing_variation)
+            return Civic.get_confident(df)
         else:
             return df
 
@@ -210,7 +229,7 @@ class Civic:
 
 
 civ = Civic()
-braf = civ.get_gene("BRAF", [], False)
+braf = civ.get_gene("BRAF", False)
 
 
 ## * Pandrugs 2
