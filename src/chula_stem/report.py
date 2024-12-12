@@ -74,6 +74,7 @@ def filter_format_vep(input: str, sep="\t"):
 
 
 class TherapyDB(ABC):
+    # All dfs returned must have at least the columns gene, source and disease
 
     api_wait: float
     cache: Path
@@ -167,11 +168,15 @@ class Civic(TherapyDB):
                         name
                         }
                         evidenceRating
+                        variantOrigin
+                        disease {
+                            name
+                        }
                         evidenceLevel
                         source {
-                        sourceType
-                        sourceUrl
-                        title
+                            sourceType
+                            sourceUrl
+                            title
                         }
                     }
                     }
@@ -201,12 +206,14 @@ class Civic(TherapyDB):
     @override
     def parse_gene_response(data: list) -> pl.DataFrame:
         cols: dict = {
-            "Loc": [],
+            "loc": [],
             "molecularProfile": [],
             "therapies": [],
             "evidenceLevel": [],
             "evidenceRating": [],
             "civicLink": [],
+            "origin": [],
+            "disease": [],
             "source": [],
             "variantAliases": [],
             "clinvarIds": [],
@@ -216,14 +223,20 @@ class Civic(TherapyDB):
             for mp in entry["molecularProfiles"]["nodes"]:
                 for ev in mp["evidenceItems"]["nodes"]:
                     ther: list = [t["name"] for t in ev["therapies"]]
+                    if d := ev.get("disease"):
+                        disease = d["name"]
+                    else:
+                        disease = "NA"
                     cols["clinvarIds"].append(entry["clinvarIds"])
                     cols["variantAliases"].append(entry["variantAliases"])
                     cols["molecularProfile"].append(mp["name"])
                     cols["civicLink"].append(ev["link"])
+                    cols["origin"].append(ev["variantOrigin"])
+                    cols["disease"].append(disease)
                     cols["evidenceRating"].append(ev["evidenceRating"])
                     cols["evidenceLevel"].append(ev["evidenceLevel"])
                     cols["source"].append(Civic.format_source(ev["source"]))
-                    cols["Loc"].append(loc)
+                    cols["loc"].append(loc)
                     cols["therapies"].append(ther)
 
         level_mapping: dict = {"E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
@@ -245,9 +258,10 @@ class Civic(TherapyDB):
             (pl.col("therapies").list.len() >= 1)
             & (pl.col("evidenceRating") == pl.col("evidenceRating").max())
             & (pl.col("evidenceLevel") == pl.col("evidenceLevel").max())
-            & (pl.col("Loc").is_not_null())
+            & (pl.col("loc").is_not_null())
             & (pl.col("evidenceRating") >= 4)
             & (pl.col("evidenceLevel") >= 4)
+            & ((pl.col("origin") == "SOMATIC") | (pl.col("origin") == "COMBINED"))
         )
         if df.shape[0] > 1:
             return df.head(1)
@@ -281,7 +295,7 @@ class Civic(TherapyDB):
             dfs.append(Civic.parse_gene_response(data))
         if not dfs:
             return pl.DataFrame()
-        df: pl.DataFrame = pl.concat(dfs).with_columns(Gene=pl.lit(gene))
+        df: pl.DataFrame = pl.concat(dfs).with_columns(gene=pl.lit(gene))
         if confident:
             return Civic.get_confident(df)
         else:
@@ -321,7 +335,7 @@ class Pandrugs(TherapyDB):
     @override
     def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
         pass
-        # TODO: get the Gene here pl.col("Gene") = pl.lit(gene)
+        # TODO: get the Gene here pl.col("gene") = pl.lit(gene)
 
 
 data = response.json()
