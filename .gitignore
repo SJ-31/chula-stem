@@ -109,3 +109,4 @@ docs
 /tests/vep/
 /tests/normal.txt
 /nextflow/bin/format_vep_vcf
+/tests/msisensor/
