@@ -110,3 +110,5 @@ docs
 /tests/normal.txt
 /nextflow/bin/format_vep_vcf
 /tests/msisensor/
+/tests/civic.json
+/tests/pandrugs2.json

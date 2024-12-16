@@ -9,6 +9,8 @@ from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from requests import Session
 
+from chula_stem.callset_qc import IMPACT_MAP
+
 
 def ensembl_id2name(id: str) -> str | None:
     """Convert ensembl gene id to HGNC gene name
@@ -424,6 +426,46 @@ class PanDrugs2(TherapyDB):
         if confident:
             df = self.get_confident(df)
         return df.select(sorted(df.columns))
+
+
+def add_therapy_info(
+    vep_out: str, civic_cache: str = "", pandrugs2_cache: str = ""
+) -> pl.DataFrame:
+    """Add therapeutic information
+
+    :param vep_out: the filtered tsv from VEP reporting the effects of small and
+    structural variants
+
+    :returns: the input dataframe with additional information about therapeutic
+    options for each gene
+    """
+    df: pl.DataFrame = pl.read_csv(
+        vep_out, separator="\t", null_values="NA", infer_schema_length=None
+    ).with_columns(
+        pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias(
+            "VAR_ID"
+        )
+    )
+    therapy_dbs: list[TherapyDB] = [
+        Civic(civic_cache),
+        PanDrugs2(pandrugs2_cache),
+    ]
+    gene_list = list(df["SYMBOL"].unique())
+
+    temp: list[pl.DataFrame] = []
+    for db in therapy_dbs:
+        find_info: pl.DataFrame = db.get_genes(gene_list, True)
+        if not find_info.is_empty():
+            found = find_info["gene"]
+            gene_list = list(filter(lambda x: x not in found, gene_list))
+            temp.append(find_info.select(TherapyDB.shared_cols))
+        if not gene_list:
+            break
+    all_drug_info: pl.DataFrame = pl.concat(temp)
+    with_therapeutics = df.join(
+        all_drug_info, how="left", left_on="SYMBOL", right_on="gene"
+    )
+    return with_therapeutics
 
 
 ## * Report formatter
