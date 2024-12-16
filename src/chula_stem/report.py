@@ -66,6 +66,7 @@ class TherapyDB(ABC):
     api_wait: float
     cache: Path
     shared_cols: tuple = ("gene", "source", "disease", "therapies")
+    all_cached: pl.DataFrame
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
@@ -75,7 +76,7 @@ class TherapyDB(ABC):
     def _cache_default(name: str, cache: str) -> Path:
         return (
             Path(cache)
-            if Path(cache).exists()
+            if cache
             else Path.home().joinpath(f".cache/{name}_cache.json")
         )
 
@@ -90,7 +91,8 @@ class TherapyDB(ABC):
 
     def get_genes(self, gene_list: list, confident: bool = True) -> pl.DataFrame:
         results: list = []
-        previous, gene_list = self.read_cache(gene_list)
+        previous, gene_list = self.read_cache(gene_list)  # Get cached results
+        # and filter gene list for those that weren't cached
         for g in gene_list:
             current: pl.DataFrame = self.get_gene(g, confident)
             if not current.is_empty():
@@ -98,9 +100,9 @@ class TherapyDB(ABC):
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
             df = pl.concat(results)
-            self.write_cache(df)
             if not previous.is_empty():
                 df = pl.concat([previous, df])
+            self.write_cache(df)
             return df
         if not previous.is_empty():
             return previous
@@ -124,20 +126,25 @@ class TherapyDB(ABC):
         """Retrieve entries from `gene_list` found in the cache, and filter
         `gene_list` so that only unknown entries remain
         """
+        self.all_cached = pl.DataFrame()
         if self.cache.exists():
             previous = pl.read_json(self.cache, infer_schema_length=None)
+            self.all_cached = previous
             if not previous.is_empty():
                 previous = previous.filter(pl.col("gene").is_in(gene_list))
-                found: list[str] = list(
+                not_found: list[str] = list(
                     filter(lambda x: x not in previous["gene"], gene_list)
                 )
             else:
-                found = gene_list
-            return previous, found
+                not_found = gene_list
+            return previous, not_found
         else:
             return pl.DataFrame(), gene_list
 
     def write_cache(self, df: pl.DataFrame) -> None:
+        if not self.all_cached.is_empty():
+            df = pl.concat([self.all_cached, df])
+            df = df.filter(~df.is_duplicated())
         df.write_json(self.cache)
 
 
