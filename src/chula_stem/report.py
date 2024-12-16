@@ -273,11 +273,9 @@ class Civic(TherapyDB):
             - Entry whose associated gene variant has a known location
             - Has the highest evidence rating within the evidence set, and at least 4
             - Has the highest evidence level and at least least B (encoded as 4)
-            - Has a named therapy
         """
         df = df.filter(
-            (pl.col("therapies").list.len() >= 1)
-            & (pl.col("evidenceRating") == pl.col("evidenceRating").max())
+            (pl.col("evidenceRating") == pl.col("evidenceRating").max())
             & (pl.col("evidenceLevel") == pl.col("evidenceLevel").max())
             & (pl.col("loc").is_not_null())
             & (pl.col("evidenceRating") >= 4)
@@ -309,6 +307,9 @@ class Civic(TherapyDB):
             if response["gene"] and response["gene"].get("variants"):
                 variants: dict = response["gene"]["variants"]
                 data: list = variants["nodes"]
+                if not data:
+                    print(f"No civic entry for gene {gene} found")
+                    break
                 has_next = variants["pageInfo"]["hasNextPage"]
                 if has_next:
                     query_input["next_page"] = variants["pageInfo"]["endCursor"]
@@ -351,7 +352,7 @@ class PanDrugs2(TherapyDB):
             cols["dScore"].append(entry["dScore"])
             cols["status"].append(entry["status"])
             cols["gScore"].append(entry["gScore"])
-            cols["therapies"].append([entry["showDrugName"]])
+            cols["therapies"].append(entry["showDrugName"])
             cols["therapyType"].append(entry["therapy"])
         return pl.DataFrame(cols).with_columns(
             source=pl.lit("[PanDrugs2](https://pandrugs.org/#!/)")
@@ -376,9 +377,9 @@ class PanDrugs2(TherapyDB):
         )
         df = df.filter(pl.col("dScore") == pl.col("dScore").max())
 
+        get_first: list = ["source", "gene", "status"]
+        make_unique: list = ["disease", "gScore", "therapyType"]
         if df.shape[0] > 1:
-            get_first: list = ["source", "gene", "status"]
-            make_unique: list = ["disease", "gScore", "therapyType"]
             others: list = list(
                 filter(lambda x: x not in make_unique, df.columns)
             )
@@ -391,6 +392,15 @@ class PanDrugs2(TherapyDB):
                     pl.col(make_unique).list.unique(),
                 )
             )
+        elif not df.is_empty():
+            to_list = list(
+                filter(
+                    lambda x: x not in get_first + ["dScore", "disease"],
+                    df.columns,
+                )
+            )
+            list_exprs = [pl.col(u).map_elements(lambda x: [x]) for u in to_list]
+            df = df.with_columns(list_exprs)
         return df
 
     @override
@@ -412,9 +422,8 @@ class PanDrugs2(TherapyDB):
             gene=pl.lit(gene)
         )
         if confident:
-            return self.get_confident(df)
-        else:
-            return df
+            df = self.get_confident(df)
+        return df.select(sorted(df.columns))
 
 
 ## * Report formatter
