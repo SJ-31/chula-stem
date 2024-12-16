@@ -1,18 +1,13 @@
-# + Can classify variants by clinical significance
-# + Metrics to include
-#   * VAF (calculated b), coverage
-#   * Common gene name if available
-#   * Relevant therapies
-#     * In this, and other cancer types
-#   * VCF-level
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import sleep
 from typing import override
 
 import polars as pl
+import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+from requests import Session
 
 # import pyensembl as pe
 
@@ -82,8 +77,8 @@ class TherapyDB(ABC):
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
         pass
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def get_confident(df: pl.DataFrame) -> pl.DataFrame:
         """Retrieve the most confident and useful Evidence Item from the `get_gene` operation
         Criteria are database-specific
@@ -91,15 +86,19 @@ class TherapyDB(ABC):
         """
         pass
 
-    def get_genes(self, gene_list: str, confident: bool = True) -> pl.DataFrame:
+    def get_genes(self, gene_list: list, confident: bool = True) -> pl.DataFrame:
         results: list = []
-        results[0], gene_list = self.read_cache(gene_list)
+        previous, gene_list = self.read_cache(gene_list)
+        if not previous.is_empty():
+            results.append(previous)
         for g in gene_list:
             results.append(self.get_gene(g, confident))
             sleep(self.api_wait)  # API permits 2 requests per second
-        df = pl.concat(results)
-        self.write_cache(df)
-        return df
+        if results:
+            df = pl.concat(results)
+            self.write_cache(df)
+            return df
+        return pl.DataFrame()
 
     @staticmethod
     @abstractmethod
@@ -121,11 +120,15 @@ class TherapyDB(ABC):
         """
         if self.cache.exists():
             previous: pl.DataFrame = pl.read_csv(
-                self.cache, separator="\t", null_values="NA"
-            ).filter(pl.col("Gene").is_in(gene_list))
-            found: list[str] = list(
-                filter(lambda x: x in previous["Gene"], gene_list)
+                self.cache, separator="\t", null_values="NA", raise_if_empty=False
             )
+            if not previous.is_empty():
+                previous = previous.filter(pl.col("Gene").is_in(gene_list))
+                found: list[str] = list(
+                    filter(lambda x: x not in previous["Gene"], gene_list)
+                )
+            else:
+                found = []
             return previous, found
         else:
             return pl.DataFrame(), gene_list
@@ -256,7 +259,7 @@ class Civic(TherapyDB):
                     cols["loc"].append(loc)
                     cols["therapies"].append(ther)
 
-        level_mapping: dict = {"E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
+        level_mapping: dict = {None: 0, "E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
         entry_df: pl.DataFrame = pl.DataFrame(cols).with_columns(
             pl.col("evidenceLevel").replace_strict(level_mapping)
         )
@@ -303,14 +306,16 @@ class Civic(TherapyDB):
             response: dict = self.client.execute(
                 self.gene_query, variable_values=query_input
             )
-            if not response["gene"]:
+            if response["gene"] and response["gene"].get("variants"):
+                variants: dict = response["gene"]["variants"]
+                data: list = variants["nodes"]
+                has_next = variants["pageInfo"]["hasNextPage"]
+                if has_next:
+                    query_input["next_page"] = variants["pageInfo"]["endCursor"]
+                    dfs.append(Civic.parse_gene_response(data))
+            else:
+                print(f"No civic entry for gene {gene} found")
                 break
-            variants: dict = response["gene"]["variants"]
-            data: list = variants["nodes"]
-            has_next = variants["pageInfo"]["hasNextPage"]
-            if has_next:
-                query_input["next_page"] = variants["pageInfo"]["endCursor"]
-            dfs.append(Civic.parse_gene_response(data))
         if not dfs:
             return pl.DataFrame()
         df: pl.DataFrame = pl.concat(dfs).with_columns(gene=pl.lit(gene))
@@ -320,10 +325,7 @@ class Civic(TherapyDB):
             return df
 
 
-import requests
-
 ## * Pandrugs 2
-from requests import Session
 
 
 class PanDrugs2(TherapyDB):
@@ -417,3 +419,6 @@ class PanDrugs2(TherapyDB):
             return self.get_confident(df)
         else:
             return df
+
+
+## * Report formatter
