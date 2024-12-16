@@ -70,9 +70,8 @@ workflow whole_exome_tumor_only {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
-    to_clairs = tumors.map(params.prependId)
-        .join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
-        .join(MUTECT2_COMPLETE.out.map(params.getId))
+    to_clairs = tumors.join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
+            .join(MUTECT2_COMPLETE.out.map(params.getId))
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
