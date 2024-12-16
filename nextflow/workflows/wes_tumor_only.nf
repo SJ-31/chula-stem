@@ -90,12 +90,13 @@ workflow whole_exome_tumor_only {
 
     CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
 
-    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
+    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
     OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
 
-    small_variants = CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
+     CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
                     .join(OCTOPUS.out.variants.map(params.getId)),
                     params.ref.genome, 6)
+    small_variants = CONCAT_SMALL_2.out.vcf
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(GRIDSS.out.variants.map(params.getId))
