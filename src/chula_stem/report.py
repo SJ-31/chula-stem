@@ -9,13 +9,6 @@ from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from requests import Session
 
-# import pyensembl as pe
-
-# os.environ["PYENSEMBL_CACHE_DIR"] = "/home/shannc/Bio_SDD/.cache"
-# REL: pe.EnsemblRelease = pe.EnsemblRelease()
-
-# def filter_classify_cnv()
-
 
 def ensembl_id2name(id: str) -> str | None:
     """Convert ensembl gene id to HGNC gene name
@@ -72,10 +65,19 @@ class TherapyDB(ABC):
 
     api_wait: float
     cache: Path
+    shared_cols: tuple = ("gene", "source", "disease", "therapies")
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
         pass
+
+    @staticmethod
+    def _cache_default(name: str, cache: str) -> Path:
+        return (
+            Path(cache)
+            if Path(cache).exists()
+            else Path.home().joinpath(f".cache/{name}_cache.json")
+        )
 
     @staticmethod
     @abstractmethod
@@ -89,15 +91,19 @@ class TherapyDB(ABC):
     def get_genes(self, gene_list: list, confident: bool = True) -> pl.DataFrame:
         results: list = []
         previous, gene_list = self.read_cache(gene_list)
-        if not previous.is_empty():
-            results.append(previous)
         for g in gene_list:
-            results.append(self.get_gene(g, confident))
+            current: pl.DataFrame = self.get_gene(g, confident)
+            if not current.is_empty():
+                results.append(current)
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
             df = pl.concat(results)
             self.write_cache(df)
+            if not previous.is_empty():
+                df = pl.concat([previous, df])
             return df
+        if not previous.is_empty():
+            return previous
         return pl.DataFrame()
 
     @staticmethod
@@ -114,34 +120,25 @@ class TherapyDB(ABC):
         """
         pass
 
-    def read_cache(self, gene_list) -> tuple[pl.DataFrame, list[str]]:
+    def read_cache(self, gene_list: list) -> tuple[pl.DataFrame, list[str]]:
         """Retrieve entries from `gene_list` found in the cache, and filter
         `gene_list` so that only unknown entries remain
         """
         if self.cache.exists():
-            previous: pl.DataFrame = pl.read_csv(
-                self.cache, separator="\t", null_values="NA", raise_if_empty=False
-            )
+            previous = pl.read_json(self.cache, infer_schema_length=None)
             if not previous.is_empty():
-                previous = previous.filter(pl.col("Gene").is_in(gene_list))
+                previous = previous.filter(pl.col("gene").is_in(gene_list))
                 found: list[str] = list(
-                    filter(lambda x: x not in previous["Gene"], gene_list)
+                    filter(lambda x: x not in previous["gene"], gene_list)
                 )
             else:
-                found = []
+                found = gene_list
             return previous, found
         else:
             return pl.DataFrame(), gene_list
 
     def write_cache(self, df: pl.DataFrame) -> None:
-        if not self.cache.exists():
-            df.write_csv(self.cache, separator="\t", null_value="NA")
-        else:
-            previous: pl.DataFrame = pl.read_csv(
-                self.cache, separator="\t", null_values="NA"
-            )
-            write: pl.DataFrame = pl.concat([previous, df]).unique("Gene")
-            write.write_csv(self.cache, separator="\t", null_value="NA")
+        df.write_json(self.cache)
 
 
 ## * Civic database
@@ -151,11 +148,7 @@ class Civic(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
         self.api_wait: float = 0.5
-        self.cache: Path = (
-            Path(cache)
-            if cache
-            else Path.home().joinpath(".cache/civic_genes.tsv")
-        )
+        self.cache: Path = self._cache_default("civic", cache)
         self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
@@ -333,11 +326,7 @@ class PanDrugs2(TherapyDB):
         self.url: str = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
         self.api_wait: float = 1
         self.session: Session = Session()
-        self.cache: Path = (
-            Path(cache)
-            if cache
-            else Path.home().joinpath(".cache/pandrug_genes.tsv")
-        )
+        self.cache: Path = self._cache_default("pandrugs2", cache)
 
     @staticmethod
     @override
@@ -355,7 +344,7 @@ class PanDrugs2(TherapyDB):
             cols["dScore"].append(entry["dScore"])
             cols["status"].append(entry["status"])
             cols["gScore"].append(entry["gScore"])
-            cols["therapies"].append(entry["showDrugName"])
+            cols["therapies"].append([entry["showDrugName"]])
             cols["therapyType"].append(entry["therapy"])
         return pl.DataFrame(cols).with_columns(
             source=pl.lit("[PanDrugs2](https://pandrugs.org/#!/)")
