@@ -1,6 +1,14 @@
 import click
 import polars as pl
 
+IMPACT_MAP: dict = {
+    "HIGH": 3,
+    "MODERATE": 2,
+    "LOW": 1,
+    "MODIFIER": 1,
+    None: 0,
+}
+
 
 def merge_variant_calls(
     df: pl.DataFrame,
@@ -86,16 +94,9 @@ def resolve_transcripts(
     """
 
     def by_impact(df: pl.DataFrame) -> pl.DataFrame:
-        impact_map: dict = {
-            "HIGH": 3,
-            "MODERATE": 2,
-            "LOW": 1,
-            "MODIFIER": 1,
-            None: 0,
-        }
         v = "IMPACT_VAL"
         df = (
-            df.with_columns(pl.col("IMPACT").replace_strict(impact_map).alias(v))
+            df.with_columns(pl.col("IMPACT").replace_strict(IMPACT_MAP).alias(v))
             .filter(pl.col(v) == pl.col(v).max())
             .drop(v)
         )
@@ -238,4 +239,6 @@ def _qc_main(
         minimum_callers=min_callers,
         vaf_adaptive=vaf_adaptive,
     )
-    df.write_csv(output, separator="\t", null_value="NA")
+    df.unique(["Loc", "Feature"], keep="first", maintain_order=True).write_csv(
+        output, separator="\t", null_value="NA"
+    )
