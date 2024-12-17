@@ -3,9 +3,11 @@ import polars as pl
 from chula_stem.callset_qc import IMPACT_MAP
 from chula_stem.report import Civic, PanDrugs2, TherapyDB
 
-small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/small.tsv"
+small_path = (
+    "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
+)
 df: pl.DataFrame = pl.read_csv(
-    small_path, separator="\t", null_values="NA", infer_schema_length=None
+    small_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
 ).with_columns(
     pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias(
         "VAR_ID"
@@ -33,6 +35,7 @@ gene_list: list = [
     "KRAS",
 ]
 
+## * Get therapy data
 temp: list[pl.DataFrame] = []
 for db in therapy_dbs:
     find_info: pl.DataFrame = db.get_genes(gene_list, True)
@@ -63,24 +66,24 @@ VTABLE_RENAME: dict = {
     "Loc": "Locus",
     "HGVSc": "HGVS",
     "Existing_variation": "Database Name",
-    "Consequence": "Variant Effect",
+    "Consequence": "Variant Type",
     "CLIN_SIG": "ClinVar",
 }
-## Report generation
+## * Report generation
 VTABLE_COL_WIDTHS: dict = {
     "Gene": 70,
-    "Variant Allele Frequency": 80,
+    "Variant Allele Frequency": 60,
     "Variant Read Support": 50,
-    "Locus": 100,
-    "HGVS": 100,
-    "Variant Effect": 100,
+    "Locus": 80,
+    "HGVS": 90,
+    "Variant Type": 90,
     "ClinVar": 100,
 }
 
-from reportlab.lib import colors
+from reportlab.lib import colors, units
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfgen import canvas
-from reportlab.platypus import LongTable, Paragraph, Spacer
+from reportlab.platypus import LongTable, Paragraph, SimpleDocTemplate, Spacer
 
 # (0, 0) is the bottom left of the page by default
 
@@ -112,25 +115,36 @@ class ResultsReport:
 import polars.selectors as cs
 
 res = (
-    confident.drop("Gene")
+    with_therapeutics.drop("Gene")
     .rename(VTABLE_RENAME)
     .select(VTABLE_RENAME.values())
+    .with_columns(
+        pl.col("HGVS").str.extract(r".*:(.*)$", 1),
+        pl.col("Variant Type").str.replace("_variant$", ""),
+        (pl.col("Variant Allele Frequency").cast(pl.Float64) * 100)
+        .round(3)
+        .map_elements(lambda x: f"{x}%", return_dtype=pl.String),
+    )
     .with_columns(
         cs.by_dtype(pl.String)
         .fill_null("-")
         .str.replace_all("&", ", ", literal=True)
+        .str.replace_all("_", " ", literal=True),
     )
 )
 
 # Using Paragraphs to format text for word wrap
-column_style: ParagraphStyle = ParagraphStyle("cols", wordWrap="CJK")
+column_style: ParagraphStyle = ParagraphStyle("cols")
 
 to_data = rp.add_pstyles(res, column_style)
 cols = rp.add_pstyles(res.columns, column_style)
 to_data.insert(0, cols)
 
-T = LongTable(to_data, colWidths=list(VTABLE_COL_WIDTHS.values()), repeatRows=0)
+# repeatRows=1 repeats the first row at every split
+T = LongTable(to_data, colWidths=list(VTABLE_COL_WIDTHS.values()), repeatRows=1)
 ncols: int = len(res.columns)
+
+# Dummy styles for now
 col_styles = rp.style_cells(
     (0, 0),
     ncols,
@@ -140,12 +154,15 @@ col_styles = rp.style_cells(
     underline=(3, colors.black),
     background=colors.lightgrey,
 )
-style_all = rp.style_cells((0, 1), background=colors.lightcyan)
+style_all = rp.style_cells((0, 1), background=colors.lightcyan, valign="TOP")
 
-
-C = canvas.Canvas("/home/shannc/Bio_SDD/chula-stem/test.pdf")
+# Use a doc template to enable the table to be split across multiple pages
+pdf = SimpleDocTemplate(
+    "/home/shannc/Bio_SDD/chula-stem/test.pdf", rightMargin=3, leftMargin=3
+)
 T.setStyle(col_styles + style_all)
-T.splitOn(C, 1000, 100)
-T.drawOn(C, 10, 10)
-C.showPage()  # Save state of the canvas page, and any further operations are done
-C.save()  # Write pdf
+loc: tuple = (10, 10)
+# splits = T.splitOn(pdf, 500, 100)
+elements = []
+elements.append(T)
+pdf.build(elements)
