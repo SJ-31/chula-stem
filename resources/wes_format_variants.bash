@@ -13,23 +13,67 @@ dbsnp_renamed="${dir}/variants/dbSNP_renamed.vcf.gz"
 gnomad_dir="${dir}/variants/gnomADv4.1.0_Exomes"
 
 # Filter dbSNP to retain only known germline variants
+# Completed Fri Dec  6 08:39:35 2024
 dbsnp_g="${dir}/variants/dbSNP_renamed_germline.vcf.gz"
 if [[ ! -e "${dbsnp_g}" ]]; then
+    echo "Starting germline filter"
     bcftools filter -i "INFO/SAO != 2" "${dbsnp_renamed}" -O z > "${dbsnp_g}"
     bcftools index "${dbsnp_g}"
+else
+    echo "dbSNP germline completed"
 fi
 
 # Combine and rename gnomad files
-all_gnomad="${dir}/variants/gnomADv4.1.0_all.vcf.gz"
-if [[ ! -e "${all_gnomad}" ]]; then
-    bcftools concat "${gnomad_dir}"/*.vcf.bgz | \
-        bcftools annotate --rename-chrs "${rename}" -O z > "${all_gnomad}"
-    bcftools index "${all_gnomad}"
-fi
+# Completed Fri Dec  6 08:39:56 2024
+# all_gnomad="${dir}/variants/gnomADv4.1.0_all.vcf.gz"
+# if [[ ! -e "${all_gnomad}" ]]; then
+#     echo "Starting gnomad concat"
+#     bcftools concat "${gnomad_dir}"/*.vcf.bgz | \
+#         bcftools annotate --rename-chrs "${rename}" -O z > "${all_gnomad}"
+#     bcftools index "${all_gnomad}"
+# else
+#     echo "Gnomad concatenation completed"
+# fi
 
-# Create GATK pileup file
-pileup="${dir}/variants/gnomADv4.1.0_all_biallelic.vcf.gz"
-if [[ ! -e "${pileup}" ]]; then
-    ./prepare_pileup.bash "${all_gnomad}" "${pileup}"
-    bcftools index "${pileup}"
-fi
+# # Create GATK pileup file
+# pileup="${dir}/variants/gnomADv4.1.0_all_biallelic.vcf.gz"
+# if [[ ! -e "${pileup}" ]]; then
+#     ./prepare_pileup.bash "${all_gnomad}" "${pileup}"
+#     bcftools index "${pileup}"
+# else
+#     echo "Pileup completed"
+# fi
+
+# Randomly sample from gnomad variants and get biallelic
+random="${dir}/variants/gnomADv4.1.0_Exomes/random"
+biallelic="${dir}/variants/gnomADv4.1.0_Exomes/biallelic"
+for g in "${dir}"/variants/gnomADv4.1.0_Exomes/*vcf.bgz; do
+    basename=$(echo "${g}" | sed -r 's/.*(chr[0-9XY]+.*)/\1/')
+    uncompressed=$(echo "${basename}" | sed 's/\.bgz//')
+
+    if [[ ! -e "${random}/${basename}" ]]; then
+       echo "Randomly sampling from ${g}"
+       gatk IndexFeatureFile -I "${g}"
+       gatk SelectVariants --variant "${g}" \
+           --select-random-fraction 0.1 \
+           --output "${random}/${uncompressed}"
+       bcftools annotate --rename-chrs "${rename}" -O z "${random}/${uncompressed}" \
+           > "${random}/${basename}"
+       rm "${random}/${uncompressed}"
+    else
+        echo "${g} already sampled"
+    fi
+
+    if [[ ! -e "${biallelic}/${basename}" ]]; then
+       echo "Getting biallelic sites from ${g}"
+       gatk IndexFeatureFile -I "${random}/${basename}"
+       gatk SelectVariants --variant "${random}/${basename}" \
+           --output "${biallelic}/${uncompressed}" \
+           --restrict-alleles-to BIALLELIC
+       bcftools view -m2 -M2 -v snps "${random}/${basename}" -O z \
+           > "${biallelic}/${basename}"
+       gatk IndexFeatureFile -i "${biallelic}/${basename}"
+    else
+        echo "Biallelic from ${g} retrieved"
+    fi
+done
