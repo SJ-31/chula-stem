@@ -5,7 +5,9 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.8"
-dependencies = ["rpy2", "pandas", "click", "toml", "polars==1"]
+dependencies = ["rpy2", "pandas", "click", "toml", "polars==1",
+"reportlab",
+"gql[aiohttp]"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
