@@ -17,6 +17,7 @@ include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CLAIRS_TO } from "../modules/clairs_to.nf"
 include { CLASSIFY_CNV_FORMAT } from "../modules/classify_cnv_format.nf"
 include { CLASSIFY_CNV } from "../modules/classify_cnv.nf"
+include { CALLSET_QC_TSV } from "../modules/callset_qc_tsv.nf"
 include { OCTOPUS } from "../modules/octopus.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
@@ -143,25 +144,30 @@ workflow whole_exome_tumor_only {
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
 
-    // CLASSIFY_CNV_FORMAT(CNVKIT.out.cnv.mix(FACETS.out.rds), 5)
-    // cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
-    //     .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
-    //                  keepHeader: true, skip: 1)
-    //     .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
-    //     [["filename": id,
-    //       "out": "${params.outdir}/${id}/annotations",
-    //       "log": "${params.logdir}/${id}/annotations"], it]
-    //     })
+    cnv_ch = CNVKIT.out.cnv
+    // TODO: maybe add in facets?
+
+    CLASSIFY_CNV_FORMAT(cnv_ch, 5)
+    cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
+        .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
+                     keepHeader: true, skip: 1)
+        .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
+        [["filename": id,
+          "out": "${params.outdir}/${id}/annotations",
+          "log": "${params.logdir}/${id}/annotations"], it]
+        })
 
     /*
      * Variant annotation
      */
-    VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
-        .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
+    // QC for VEP will be carried out separately
+    VEP(STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("VEP_small", it) })
+        .mix(CONCAT_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
         params.ref.genome, 7)
     SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
-    // CLASSIFY_CNV(cnv_bed, 7)
+    CLASSIFY_CNV(cnv_bed, 7)
 
+    CALLSET_QC_TSV(VEP.out.tsv, params.qc, 8)
     /*
      * Metric collection
      */

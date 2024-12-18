@@ -18,7 +18,8 @@ include { CONCAT_VCF as CONCAT_SMALL_1 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SMALL_2 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
-include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
+// include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
+include { CALLSET_QC_TSV } from "../modules/callset_qc_tsv.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
@@ -99,7 +100,7 @@ workflow whole_exome {
     CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
 
     // Octopus and Clairs uses previous variants to aid calling
-    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.map(params.getId))
+    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
     OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
 
@@ -121,19 +122,19 @@ workflow whole_exome {
                     .join(t.map(params.getId))
                     .map( { it[1..-1] } ) }
 
-    std_small_variants = withBams(branched.normal, branched.tumor, CONCAT_SMALL_2.out.vcf)
+    to_std_small = withBams(branched.normal, branched.tumor, CONCAT_SMALL_2.out.vcf)
 
     /*
      * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
      */
 
-    STANDARDIZE_VCF(std_small_variants.map({ params.addSuffix("Small_std", it) }),
+    STANDARDIZE_VCF(to_std_small.map({ params.addSuffix("Small_std", it) }),
                     params.ref.genome, 6)
 
-    QC_SMALL(STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("Small_high_conf", it) }),
-        params.small_qc, 7)
-    QC_SV(CONCAT_SV.out.vcf.map({ params.addSuffix("SV_high_conf", it) }),
-          params.sv_qc, 7)
+    small_all = STANDARDIZE_VCF.out.vcf.map(params.delSuffix)
+    sv_all = CONCAT_SV.out.vcf.map(params.delSuffix)
+    small_high_conf = QC_SMALL(small_all.map({ params.addSuffix("Small_high_conf", it) }),
+                               params.small_qc, 7)
 
     /*
     * Copy number abberation
@@ -155,7 +156,7 @@ workflow whole_exome {
                 params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
 
     to_cnvkit = paired.map({ it[0..1] + [it[2]] })
-            .join(QC_SMALL.out.vcf.map(params.getId))
+            .join(small_high_conf.map(params.getId))
             .join(purity_ploidy)
             .map({ it[1..-1] })
 
@@ -174,12 +175,14 @@ workflow whole_exome {
     /*
      * Variant annotation
      */
-    VEP(QC_SMALL.out.vcf.map({ params.addSuffix("VEP_small", it) })
-        .mix(QC_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
+    VEP(small_all.map({ params.addSuffix("VEP_small", it) })
+        .mix(sv_all.map({ params.addSuffix("VEP_SV", it) })),
         params.ref.genome, 7)
-    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
+
+    SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true, "", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
+    CALLSET_QC_TSV(VEP.out.tsv, params.qc, 8)
     /*
      * Metric collection
      */
@@ -198,8 +201,8 @@ workflow whole_exome {
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
-    to_bcftools_stats =STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf)
-        .map({ [it[0] + ["suffix": null], it[1..-1]] })
+    to_bcftools_stats = small_all.mix(sv_all)
+        .map({ [it[0], it[1..-1]] })
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,
