@@ -305,7 +305,10 @@ def _format_vep_vcf(
     else:
         replace_dots = cs.starts_with("VAF").str.replace("^.$", "NA")
         alt_cols = list(filter(lambda x: "Alt_depth" in x, vaf_ad_cols))
-        ad_split = [pl.col(x).str.split(",").list.get(1) for x in alt_cols]
+        ad_split = [
+            pl.col(x).str.split(",").list.get(1, null_on_oob=True)
+            for x in alt_cols
+        ]
         df = (
             df.with_columns(ad_split)
             .cast({a: pl.Int32 for a in alt_cols})
