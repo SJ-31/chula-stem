@@ -1,0 +1,267 @@
+* aggregated_msi.tsv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/aggregated_msi.tsv=
+*Date added*: <2024-12-18 Wed>
+*Source:* Custom
+** Description
+dbVar and clinVar repetitive element data, combined using a custom script. Intended to help identify when observed repetitive elements (mainly microsatellites and tandem duplications) in the data have been found in other experiments
+Includes somatic tandem duplications from dbVar and microsatellites from clinvar
+#+begin_src text
+chr\tstart\tstop\tgenes\tsource\ttype\taccession
+#+end_src
+
+* aggregated_cnv.tsv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/aggregated_cnv.tsv=
+*Date added*: <2024-12-18 Wed>
+*Source:* Custom
+** Description
+dbVar and gnomAD CNV data, combined using a custom script. Intended to help identify when observed CNVs in the data have been found in other experiments
+Includes somatic cnvs from dbVar and gnomad.v4.1 non-neuro cnvs
+#+begin_src text
+chr\tstart\tstop\tgenes\tsource\ttype\taccession
+#+end_src
+* gnomADv4.1.0_Exomes
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/gnomADv4.1.0_Exomes=
+*Date added*: <2024-11-6>
+*Source:* https://gnomad.broadinstitute.org/downloads#v4
+** Description
+GnomAD exome data for all available chromosomes
+* Cosmic_CompleteCNA_v101_GRCh38.tsv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/Cosmic_CompleteCNA_v101_GRCh38.tsv=
+*Date added*: <2024-12-13 Fri>
+*Source:* https://cancer.sanger.ac.uk/cosmic/download/cosmic/v101/completecna
+** Description
+Cosmic copy number data
+* gnomADv4.1.0/random
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/gnomADv4.1.0_Exomes/random=
+*Date added*: <2024-12-18 Wed>
+*Source:* Custom
+** Description
+Randomly sampled subsets of all the gnomAD exome data, taking 10% of the original variants. To resolve memory issues with running on the complete gnomAD set
+
+* gatk_resources
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/gatk_resources=
+*Date added*: <2024-12-17 Tue>
+*Source:* https://gatk.broadinstitute.org/hc/en-us/articles/360035890811-Resource-bundle
+** Description
+Contains 1000G project data, and Mills gold standard indels. Recommended for use with BQSR, as described in [[https://github.com/broadinstitute/gatk-docs/blob/master/gatk3-faqs/What_should_I_use_as_known_variants_sites_for_running_tool_X%3F.md][this faq]]
+* gnomad.v4.1.cnv.non_neuro.vcf.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/gnomad.v4.1.cnv.non_neuro.vcf.gz=
+*Date added:* <2024-12-17 Tue>
+*Source:* https://datasetgnomad.blob.core.windows.net/dataset/release/4.1/genome_sv/gnomad.v4.1.sv.sites.vcf.gz.tbi
+** Description
+Gnomad Copy number data, generated in the same way as the SV data
+* gnomad.v4.1.sv.sites.vcf.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/gnomad.v4.1.sv.sites.vcf.gz=
+*Date added*: FILL
+*Source:* https://datasetgnomad.blob.core.windows.net/dataset/release/4.1/genome_sv/gnomad.v4.1.sv.sites.vcf.gz.tbi
+** Description
+Structural variants from gnomAD, see [[https://gnomad.broadinstitute.org/help/sv-overview][this]] for an overview of the data generation
+
+#+begin_src text
+##FILTER=<ID=PASS,Description="All filters passed">
+##ALT=<ID=CNV,Description="Copy Number Polymorphism">
+##CPX_TYPE_INS_iDEL="Insertion with deletion at insertion site."
+##CPX_TYPE_INVdel="Complex inversion with 3' flanking deletion."
+##CPX_TYPE_INVdup="Complex inversion with 3' flanking duplication."
+##CPX_TYPE_dDUP="Dispersed duplication."
+##CPX_TYPE_dDUP_iDEL="Dispersed duplication with deletion at insertion site."
+##CPX_TYPE_delINV="Complex inversion with 5' flanking deletion."
+##CPX_TYPE_delINVdel="Complex inversion with 5' and 3' flanking deletions."
+##CPX_TYPE_delINVdup="Complex inversion with 5' flanking deletion and 3' flanking duplication."
+##CPX_TYPE_dupINV="Complex inversion with 5' flanking duplication."
+##CPX_TYPE_dupINVdel="Complex inversion with 5' flanking duplication and 3' flanking deletion."
+##CPX_TYPE_dupINVdup="Complex inversion with 5' and 3' flanking duplications."
+##CPX_TYPE_piDUP_FR="Palindromic inverted tandem duplication, forward-reverse orientation."
+##CPX_TYPE_piDUP_RF="Palindromic inverted tandem duplication, reverse-forward orientation."
+##FILTER=<ID=FAIL_MANUAL_REVIEW,Description="Low-quality variant that did not pass manual review of supporting evidence">
+##FILTER=<ID=HIGH_NCR,Description="Unacceptably high rate of no-call GTs">
+##FILTER=<ID=IGH_MHC_OVERLAP,Description="SVs that are overlapped by over 50% by IGH or MCH regions, these variants are of low confidence">
+##FILTER=<ID=LOWQUAL_WHAM_SR_DEL,Description="deletions under1Kb that are uniquely from wham and have SR-only support">
+##FILTER=<ID=MULTIALLELIC,Description="Multiallelic site">
+##FILTER=<ID=OUTLIER_SAMPLE_ENRICHED,Description="SVs that are enriched for non-reference genotypes in outlier samples, likely indicating noisy or unreliable genotypes">
+##FILTER=<ID=REDUNDANT_LG_CNV,Description="Multiple large CNVs called at the same locus likely indicates unreliable clustering and/or low-quality multiallelic locus">
+##FILTER=<ID=REFERENCE_ARTIFACT,Description="Likely reference artifact sites that are homozygous alternative in over 99% of the samples">
+##FILTER=<ID=UNRESOLVED,Description="Variant is unresolved">
+##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Predicted copy state">
+##FORMAT=<ID=CNQ,Number=1,Type=Integer,Description="Read-depth genotype quality">
+##FORMAT=<ID=EV,Number=.,Type=String,Description="Classes of evidence supporting final genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=MANUAL,Number=1,Type=String,Description="Reason for a failure from manual review">
+##FORMAT=<ID=PE_GQ,Number=1,Type=Integer,Description="Paired-end genotype quality">
+##FORMAT=<ID=PE_GT,Number=1,Type=Integer,Description="Paired-end genotype">
+##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Predicted copy state">
+##FORMAT=<ID=RD_GQ,Number=1,Type=Integer,Description="Read-depth genotype quality">
+##FORMAT=<ID=SR_GQ,Number=1,Type=Integer,Description="Split read genotype quality">
+##FORMAT=<ID=SR_GT,Number=1,Type=Integer,Description="Split-read genotype">
+##INFO=<ID=ALGORITHMS,Number=.,Type=String,Description="Source algorithms">
+##INFO=<ID=BOTHSIDES_SUPPORT,Number=0,Type=Flag,Description="Variant has read-level support for both sides of breakpoint.Indicates higher-confidence variants.">
+##INFO=<ID=CHR2,Number=1,Type=String,Description="Chromosome for END coordinate">
+##INFO=<ID=CPX_INTERVALS,Number=.,Type=String,Description="Genomic intervals constituting complex variant.">
+##INFO=<ID=CPX_TYPE,Number=1,Type=String,Description="Class of complex variant.">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the structural variant">
+##INFO=<ID=END2,Number=1,Type=Integer,Description="End position of the structural variant on CHR2">
+##INFO=<ID=EVIDENCE,Number=.,Type=String,Description="Classes of random forest support.">
+##INFO=<ID=LOW_CONFIDENCE_REPETITIVE_LARGE_DUP,Number=0,Type=Flag,Description="Duplications over 5Kb that are overlapped by segmental duplicates or simple repeats, these variants are not as high confident as others because of the affect by the repetitive sequences">
+And more...
+#+end_src
+* clinvar.vcf.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/clinvar.vcf.gz=
+*Date added*:  2024-12-12
+*Source:* https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar_20241208.vcf.gz
+** Description
+All vcf data from clinVar for GRCh38
+
+#+begin_src text
+##fileformat=VCFv4.1
+##FILTER=<ID=PASS,Description="All filters passed">
+##fileDate=2024-12-08
+##source=ClinVar
+##reference=GRCh38
+##ID=<Description="ClinVar Variation ID">
+##INFO=<ID=AF_ESP,Number=1,Type=Float,Description="allele frequencies from GO-ESP">
+##INFO=<ID=AF_EXAC,Number=1,Type=Float,Description="allele frequencies from ExAC">
+##INFO=<ID=AF_TGP,Number=1,Type=Float,Description="allele frequencies from TGP">
+##INFO=<ID=ALLELEID,Number=1,Type=Integer,Description="the ClinVar Allele ID">
+##INFO=<ID=CLNDN,Number=.,Type=String,Description="ClinVar's preferred disease name for the concept specified by disease identifiers in CLNDISDB">
+##INFO=<ID=CLNDNINCL,Number=.,Type=String,Description="For included Variant : ClinVar's preferred disease name for the concept specified by disease identifiers in CLNDISDB">
+##INFO=<ID=CLNDISDB,Number=.,Type=String,Description="Tag-value pairs of disease database name and identifier submitted for germline classifications, e.g. OMIM:NNNNNN">
+##INFO=<ID=CLNDISDBINCL,Number=.,Type=String,Description="For included Variant: Tag-value pairs of disease database name and identifier for germline classifications, e.g. OMIM:NNNNNN">
+##INFO=<ID=CLNHGVS,Number=.,Type=String,Description="Top-level (primary assembly, alt, or patch) HGVS expression.">
+##INFO=<ID=CLNREVSTAT,Number=.,Type=String,Description="ClinVar review status of germline classification for the Variation ID">
+##INFO=<ID=CLNSIG,Number=.,Type=String,Description="Aggregate germline classification for this single variant; multiple values are separated by a vertical bar">
+##INFO=<ID=CLNSIGCONF,Number=.,Type=String,Description="Conflicting germline classification for this single variant; multiple values are separated by a vertical bar">
+##INFO=<ID=CLNSIGINCL,Number=.,Type=String,Description="Germline classification for a haplotype or genotype that includes this variant. Reported as pairs of VariationID:classification; multiple values are separated by a vertical bar">
+##INFO=<ID=CLNVC,Number=1,Type=String,Description="Variant type">
+##INFO=<ID=CLNVCSO,Number=1,Type=String,Description="Sequence Ontology id for variant type">
+##INFO=<ID=CLNVI,Number=.,Type=String,Description="the variant's clinical sources reported as tag-value pairs of database and variant identifier">
+##INFO=<ID=DBVARID,Number=.,Type=String,Description="nsv accessions from dbVar for the variant">
+##INFO=<ID=GENEINFO,Number=1,Type=String,Description="Gene(s) for the variant reported as gene symbol:gene id. The gene symbol and id are delimited by a colon (:) and each pair is delimited by a vertical bar (|)">
+##INFO=<ID=MC,Number=.,Type=String,Description="comma separated list of molecular consequence in the form of Sequence Ontology ID|molecular_consequence">
+##INFO=<ID=ONCDN,Number=.,Type=String,Description="ClinVar's preferred disease name for the concept specified by disease identifiers in ONCDISDB">
+##INFO=<ID=ONCDNINCL,Number=.,Type=String,Description="For included variant: ClinVar's preferred disease name for the concept specified by disease identifiers in ONCDISDBINCL">
+##INFO=<ID=ONCDISDB,Number=.,Type=String,Description="Tag-value pairs of disease database name and identifier submitted for oncogenicity classifications, e.g. MedGen:NNNNNN">
+##INFO=<ID=ONCDISDBINCL,Number=.,Type=String,Description="For included variant: Tag-value pairs of disease database name and identifier for oncogenicity classifications, e.g. OMIM:NNNNNN">
+##INFO=<ID=ONC,Number=.,Type=String,Description="Aggregate oncogenicity classification for this single variant; multiple values are separated by a vertical bar">
+##INFO=<ID=ONCINCL,Number=.,Type=String,Description="Oncogenicity classification for a haplotype or genotype that includes this variant. Reported as pairs of VariationID:classification; multiple values are separated by a vertical bar">
+##INFO=<ID=ONCREVSTAT,Number=.,Type=String,Description="ClinVar review status of oncogenicity classification for the Variation ID">
+##INFO=<ID=ONCCONF,Number=.,Type=String,Description="Conflicting oncogenicity classification for this single variant; multiple values are separated by a vertical bar">
+##INFO=<ID=ORIGIN,Number=.,Type=String,Description="Allele origin. One or more of the following values may be added: 0 - unknown; 1 - germline; 2 - somatic; 4 - inherited; 8 - paternal; 16 - maternal; 32 - de-novo; 64 - biparental; 128 - uniparental; 256 - not-tested; 512 - tested-inconclusive; 1073741824 - other">
+##INFO=<ID=RS,Number=.,Type=String,Description="dbSNP ID (i.e. rs number)">
+##INFO=<ID=SCIDN,Number=.,Type=String,Description="ClinVar's preferred disease name for the concept specified by disease identifiers in SCIDISDB">
+##INFO=<ID=SCIDNINCL,Number=.,Type=String,Description="For included variant: ClinVar's preferred disease name for the concept specified by disease identifiers in SCIDISDBINCL">
+##INFO=<ID=SCIDISDB,Number=.,Type=String,Description="Tag-value pairs of disease database name and identifier submitted for somatic clinial impact classifications, e.g. MedGen:NNNNNN">
+##INFO=<ID=SCIDISDBINCL,Number=.,Type=String,Description="For included variant: Tag-value pairs of disease database name and identifier for somatic clinical impact classifications, e.g. OMIM:NNNNNN">
+##INFO=<ID=SCIREVSTAT,Number=.,Type=String,Description="ClinVar review status of somatic clinical impact for the Variation ID">
+##INFO=<ID=SCI,Number=.,Type=String,Description="Aggregate somatic clinical impact for this single variant; multiple values are separated by a vertical bar">
+##INFO=<ID=SCIINCL,Number=.,Type=String,Description="Somatic clinical impact classification for a haplotype or genotype that includes this variant. Reported as pairs of VariationID:classification; multiple values are separated by a vertical bar">
+#+end_src
+
+* nstd102_clinical_sv.csv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/nstd102_clinical_sv.csv=
+*Date added*: 2024-12-17
+*Source:* [[https://www.ncbi.nlm.nih.gov/dbvar/studies/nstd102/]]
+** Description
+"Structural Variants with clinical assertions, submitted to ClinVar by external labs. dbVar now imports all placements from ClinVar as "submitted" and only remaps what is missing in order to place all variants on both GRCh37 and GRCh38. See Variant Summary counts for nstd102 in dbVar Variant Summary. See the latest statistics for nstd102 in Summary of nstd102 (Clinical Structural Variants)."
+
+#+begin_src text
+Study ID,Variant ID,Variant Region type,Variant Call type,Sampleset ID,Method,Analysis ID,Validation,Variant Samples,Subject Phenotype,Clinical Interpretation,Assembly Name,Chromosome Accession,Chromosome,Outer Start,Start,Inner Start,Inner End,End,Outer End,Placement Type,Remap Score
+#+end_src
+* somatic_sv.bed
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/somatic_sv.bed=
+*Date added*: 2024-12-16
+*Source:* [[https://ftp.ncbi.nlm.nih.gov/pub/dbVar/sandbox/dbvarhub/hg38/somatic_sv.bed]]
+** Description
+Somatic structural variants from dbVar
+
+#+begin_src text
+# First line
+chr1    61734   248930189       nssv459313      1000    .       61734   248930189       0,0,255      SNP array       copy number gain        Over 1MB        Gene(s) affected: Multiple, Position: chr1:61735-248930189, Size: 248868455, Type: copy number gain, Study: Walter et al 2009, Method: SNP array  Walter et al 2009       90 to 100       nssv15156970
+#+end_src
+
+Column explanation
+#+begin_src text
+1 string chrom; "Reference sequence chromosome or scaffold"
+uint chromStart; "Start position of feature on chromosome"
+uint chromEnd; "End position of feature on chromosome"
+string name; "dbVar Variant Accession"
+5 uint score; "Score"
+char[1] strand; "+ or - for strand"
+uint thickStart; "Start position of feature on chromosome"
+uint thickEnd; "End position of feature on chromosome"
+uint reserved; "Colors indicate Variant Type and Clinical Significance."
+10 string method; "Discovery Method type"
+string type; "Variant Type"
+string length; "Variant Length Range"
+string label; "Gene, Position, Size, Type, Study, Method"
+string study; "dbVar Study"
+string overlap; "Range of Reciprocal Overlap with Pathogenic Variant"
+string pathogenic_acc; "dbVar Pathogenic Variant Accession with highest reciprocal overlap"
+#+end_src
+
+Contains data from
+estd192 (COSMIC), Date: 2017-03-29
+nstd102 (Clinical_Structural_Variants), Date: 2023-09-30
+nstd202 (Ghazali_et_al_2021), Date: 2021-04-08
+nstd94 (Helman_et_al_2014), Date: 2014-05-12
+nstd11 (Walter_et_al_2009), Date: 2009-10-13
+nstd125 (Wills_et_al_2016), Date: 2016-09-20
+* dbvar.GRCh38.variant_call.somatic.vcf.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/dbvar.GRCh38.variant_call.somatic.vcf.gz=
+*Date added*: FILL
+*Source:* [[https://ftp.ncbi.nlm.nih.gov/pub/dbVar/data/Homo_sapiens/by_assembly/GRCh38/vcf/GRCh38.variant_call.somatic.vcf.gz][dbVar]]
+** Description
+All somatic variant calls on GRCh38 from dbVar
+#+begin_src text
+##fileformat=VCFv4.1
+##FILTER=<ID=PASS,Description="All filters passed">
+##fileDate=20231030
+##reference=GCF_000001405.39
+##ALT=<ID=<CNV>,Description="Copy number variable region">
+##ALT=<ID=<DEL>,Description="Deletion relative to the reference">
+##ALT=<ID=<DUP>,Description="Region of elevated copy number relative to the reference">
+##ALT=<ID=<INS>,Description="Insertion of sequence relative to the reference">
+##ALT=<ID=<INV>,Description="Inversion of reference sequence">
+##INFO=<ID=DBVARID,Number=1,Type=String,Description="ID of this element in dbVar">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
+##INFO=<ID=DESC,Number=1,Type=String,Description="Any additional information about this call (free text, enclose in double quotes)">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=SVLEN,Number=.,Type=String,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=CHR2,Number=1,Type=String,Description="Second (To) Chromosome in a translocation pair">
+##INFO=<ID=REGIONID,Number=.,Type=String,Description="The parent variant region accession(s)">
+##INFO=<ID=EXPERIMENT,Number=1,Type=Integer,Description="The experiment_id (from EXPERIMENTS tab) of the experiment that was used to generate this call">
+##INFO=<ID=EVENT,Number=.,Type=String,Description="The parent variant region accession of a mutation event">
+##INFO=<ID=LINKS,Number=.,Type=String,Description="Link(s) to external database(s) - see LINKS tab of dbVar submission template for examples">
+##INFO=<ID=CLNSIG,Number=.,Type=String,Description="Clinical significance for this single variant">
+##INFO=<ID=CLNACC,Number=.,Type=String,Description="Accessions and version numbers assigned by ClinVar">
+##INFO=<ID=clinical_source,Number=1,Type=String,Description="Source of clinical significance">
+##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="Indicates that the record is a somatic mutation. NOT for clinical assertions, i.e. cancer. See also ORIGIN.">
+##INFO=<ID=ORIGIN,Number=1,Type=String,Description="Origin of allele, if known; should be one of (biparental, de novo, germline, inherited, maternal, not applicable, not provided, not-reported, paternal, tested-inconclusive, uniparental, unknown, see ClinVar for details). See also SOMATIC">
+##INFO=<ID=PHENO,Number=.,Type=String,Description="Phenotype(s) thought to associated with this call. NOT for clinical assertions (submit to ClinVar). (free text, enclose in double quotes)">
+##INFO=<ID=SAMPLE,Number=1,Type=String,Description="sample_id from dbVar submission; every call must have SAMPLE or SAMPLESET, but NOT BOTH">
+##INFO=<ID=SAMPLESET,Number=1,Type=Integer,Description="sampleset_id from dbVar submission; every call must have SAMPLESET or SAMPLE but NOT BOTH">
+##INFO=<ID=VALIDATED,Number=0,Type=Flag,Description="Validated by follow-up experiment">
+##INFO=<ID=SEQ,Number=1,Type=String,Description="Variation sequence">
+##INFO=<ID=AC,Number=.,Type=Integer,Description="Global Allele count">
+##INFO=<ID=AF,Number=.,Type=Float,Description="Global Allele frequency">
+##INFO=<ID=AN,Number=.,Type=String,Description="Global Allele name">
+#CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO
+#+end_src
+* ENCFF356LFX.bed
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/blacklists/ENCFF356LFX.bed=
+*Date added*: ???
+*Source:* [[https://www.encodeproject.org/files/ENCFF356LFX/][Encode project]]
+** Description
+Blacklisted regions provided b the Encode project for the GRCh38 assembly
+* Clingen-Dosage-Sensitivity-2024-12-16.csv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
+*Date added*: 2024-12-16
+*Source:* [[https://search.clinicalgenome.org/kb/gene-dosage/downloadall][Clingen curated dosage sensitivity regions]]
+** Description
+Contains curated assignments of dosage sensitivity to genes and regions
+#+begin_src text
+"GENE/REGION","HGNC/ISCA","GRCh37","GRCh38","HAPLOINSUFFICIENCY","TRIPLOSENSITIVITY","ONLINE REPORT","DATE"
+#+end_src
