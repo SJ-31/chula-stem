@@ -15,8 +15,8 @@ nextflow_process {
                 input[0] = [["out": "$params.out/vep",
                     "log": "$params.log/vep", "id": "sample2",
                     "RGSM_normal": "10"],
-                    "$params.out/merged.vcf.gz"]
-                input[1] = "$params.genome"
+                    "$params.out2/patient_10/annotations/6-patient_10-Small_all.vcf.gz"]
+                input[1] = "$params.genome_filtered"
                 input[2] = 6
                 """
             }
