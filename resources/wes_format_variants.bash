@@ -23,27 +23,6 @@ else
     echo "dbSNP germline completed"
 fi
 
-# Combine and rename gnomad files
-# Completed Fri Dec  6 08:39:56 2024
-# all_gnomad="${dir}/variants/gnomADv4.1.0_all.vcf.gz"
-# if [[ ! -e "${all_gnomad}" ]]; then
-#     echo "Starting gnomad concat"
-#     bcftools concat "${gnomad_dir}"/*.vcf.bgz | \
-#         bcftools annotate --rename-chrs "${rename}" -O z > "${all_gnomad}"
-#     bcftools index "${all_gnomad}"
-# else
-#     echo "Gnomad concatenation completed"
-# fi
-
-# # Create GATK pileup file
-# pileup="${dir}/variants/gnomADv4.1.0_all_biallelic.vcf.gz"
-# if [[ ! -e "${pileup}" ]]; then
-#     ./prepare_pileup.bash "${all_gnomad}" "${pileup}"
-#     bcftools index "${pileup}"
-# else
-#     echo "Pileup completed"
-# fi
-
 # Randomly sample from gnomad variants and get biallelic
 random="${dir}/variants/gnomADv4.1.0_Exomes/random"
 biallelic="${dir}/variants/gnomADv4.1.0_Exomes/biallelic"
