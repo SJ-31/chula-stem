@@ -284,6 +284,8 @@ def _format_vep_vcf(
             io.StringIO(proc2.stdout.decode()),
             separator="\t",
             new_columns=columns,
+            null_values=".",
+            infer_schema_length=None,
         )
         .with_columns(pl.col("ANN").str.split(","))
         .explode("ANN")
@@ -303,7 +305,7 @@ def _format_vep_vcf(
     if not ad:
         df = df.with_columns(Alt_depth=pl.lit(None))
     else:
-        replace_dots = cs.starts_with("VAF").str.replace("^.$", "NA")
+        replace_dots = cs.starts_with("VAF").str.replace(",.", "", literal=True)
         alt_cols = list(filter(lambda x: "Alt_depth" in x, vaf_ad_cols))
         ad_split = [
             pl.col(x).str.split(",").list.get(1, null_on_oob=True)
