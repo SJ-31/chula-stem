@@ -1,6 +1,8 @@
 import click
 import polars as pl
 
+from chula_stem.utils import empty_string2null
+
 IMPACT_MAP: dict = {
     "HIGH": 3,
     "MODERATE": 2,
@@ -47,7 +49,6 @@ def merge_variant_calls(
     )
     split_unique: list = vep_cols
     keep_all: list = to_average + split_unique
-
     unique_expr: list = [pl.col(u).list.unique() for u in split_unique]
     avg_expr: list = [pl.col(x).list.mean() for x in to_average]
     grouped = (
@@ -58,7 +59,7 @@ def merge_variant_calls(
     )
     if vaf_adaptive:
         mutect_strelka_cols = [
-            (pl.col(tool_source_tag) == c).alias(f"has_{c}")
+            (pl.col(tool_source_tag).list.contains(c)).alias(f"has_{c}")
             for c in ["mutect2", "strelka2"]
         ]
         grouped = grouped.with_columns(mutect_strelka_cols).filter(
@@ -73,7 +74,7 @@ def merge_variant_calls(
     else:
         grouped = grouped.filter(pl.col("n_callers") >= minimum_callers)
     grouped = grouped.with_columns(
-        pl.col(split_unique).list.join(separator)
+        pl.col(split_unique).cast(pl.List(pl.String)).list.join(separator)
     ).select(original_cols)
     new_shape = grouped.shape
     print(f"Shape before merging: {original_shape}\nShape after: {new_shape}")
@@ -119,7 +120,7 @@ def resolve_transcripts(
         return df
 
     dfs: list[pl.DataFrame] = []
-    for group in df.group_by(grouping_cols):
+    for _, group in df.group_by(grouping_cols):
         group: pl.DataFrame
         if canonical and "CANONICAL" in df.columns:
             group = by_canonical(group)
@@ -206,7 +207,7 @@ def _qc_main(
     min_tumor_depth: int,
     max_normal_depth: int,
     min_VAF: float,
-    accepted_filters: list,
+    accepted_filters: str,
     impact: bool,
     canonical: bool,
     informative: bool,
@@ -215,7 +216,10 @@ def _qc_main(
     tool_source_tag: str = "TOOL_SOURCE",
 ) -> None:
     df: pl.DataFrame = pl.read_csv(
-        input_tsv, separator="\t", infer_schema_length=None, null_values="NA"
+        input_tsv,
+        separator="\t",
+        infer_schema_length=None,
+        null_values=["NA", "."],
     )
     grouping_cols: list = ["Loc", "Ref", "Alt"]
     df = standard_filters(
@@ -239,6 +243,6 @@ def _qc_main(
         minimum_callers=min_callers,
         vaf_adaptive=vaf_adaptive,
     )
-    df.unique(["Loc", "Feature"], keep="first", maintain_order=True).write_csv(
-        output, separator="\t", null_value="NA"
-    )
+    df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
+        empty_string2null
+    ).write_csv(output, separator="\t", null_value="NA")
