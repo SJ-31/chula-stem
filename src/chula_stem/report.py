@@ -4,11 +4,12 @@ from time import sleep
 from typing import override
 
 import polars as pl
+import polars.selectors as cs
 import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import Paragraph
+from reportlab.platypus import Paragraph, SimpleDocTemplate
 from requests import Session
 
 from chula_stem.callset_qc import IMPACT_MAP
@@ -442,7 +443,7 @@ def add_therapy_info(
     options for each gene
     """
     df: pl.DataFrame = pl.read_csv(
-        vep_out, separator="\t", null_values="NA", infer_schema_length=None
+        vep_out, separator="\t", null_values=["NA", "."], infer_schema_length=None
     ).with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias(
             "VAR_ID"
@@ -463,11 +464,13 @@ def add_therapy_info(
             temp.append(find_info.select(TherapyDB.shared_cols))
         if not gene_list:
             break
-    all_drug_info: pl.DataFrame = pl.concat(temp)
-    with_therapeutics = df.join(
-        all_drug_info, how="left", left_on="SYMBOL", right_on="gene"
-    )
-    return with_therapeutics
+    if temp:
+        all_drug_info: pl.DataFrame = pl.concat(temp)
+        with_therapeutics = df.join(
+            all_drug_info, how="left", left_on="SYMBOL", right_on="gene"
+        )
+        return with_therapeutics
+    return df.with_columns([pl.lit(None).alias(c) for c in TherapyDB.shared_cols])
 
 
 ## * Report formatter
@@ -513,10 +516,112 @@ def style_cells(
     return styles
 
 
-def add_pstyles(data: pl.DataFrame | list, style: ParagraphStyle) -> list:
+def add_pstyles(data: pl.DataFrame | list, style: ParagraphStyle | dict) -> list:
+    """Helepr for adding paragraph styles to lists or data in dfs
+
+    :param style: A single style which is then applied to all data.
+    Alternatively, a map of column_index -> style specifying styles to
+    apply to specific columns. A key for 'None' is the default and applied to columns
+    not explicitly given
+
+    :returns:
+    """
+    if isinstance(style, dict):
+        if not style.get(None):
+            raise ValueError("A default key `None` must be provided!")
+
+        style_fn = lambda x, index=None: Paragraph(str(x), style.get(index))
+    else:
+        style_fn = lambda x, index=None: Paragraph(str(x), style)
+
     if isinstance(data, pl.DataFrame):
         return [
-            [Paragraph(str(s), style) for s in row] for row in data.iter_rows()
+            [Paragraph(str(s), style.get(i)) for i, s in enumerate(row)]
+            for row in data.iter_rows()
         ]
     else:
-        return [Paragraph(text, style) for text in data]
+        return [style_fn(row, i) for i, row in enumerate(data)]
+
+
+## Report configuration
+VTABLE_RENAME: dict = {
+    "SYMBOL": "Gene",
+    "VAF": "Variant Allele Frequency",
+    "Alt_depth": "Variant Read Support",
+    "Loc": "Locus",
+    "HGVSc": "HGVS",
+    "Existing_variation": "Database Name",
+    "Consequence": "Variant Type",
+    "CLIN_SIG": "ClinVar",
+}
+VTABLE_COL_WIDTHS: dict = {
+    "Gene": 60,
+    "Variant Allele Frequency": 55,
+    "Variant Read Support": 45,
+    "Locus": 80,
+    "HGVS": 90,
+    "Variant Type": 90,
+    "ClinVar": 100,
+}
+
+## ** Report class
+
+
+class ResultsReport:
+    def __init__(
+        self,
+        filename: str,
+        pandrugs2_cache: str,
+        civic_cache: str,
+        vep_small: str,
+        vep_sv: str,
+    ) -> None:
+        self.doc: SimpleDocTemplate = SimpleDocTemplate(
+            filename, rightMargin=2, leftMargin=2
+        )
+        self.civic_cache = civic_cache
+        self.pandrugs2_cache = pandrugs2_cache
+        self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
+
+        self._format_vep(vep_small, "small")
+        self._format_vep(vep_sv, "sv")
+
+    def _format_vep(self, df_path: str, variant_class: str) -> None:
+        """Format and filter vep output into a dataframe with values ready to write
+        into a reportlab table
+        """
+        var_col: str = "Database Name"  # New column for 'Existing_variation'
+        with_therapeutics: pl.DataFrame = add_therapy_info(
+            df_path, self.civic_cache, self.pandrugs2_cache
+        )
+        wanted_cols: list = list(VTABLE_RENAME.values())
+        with_therapeutics = (
+            with_therapeutics.drop("Gene")
+            .rename(VTABLE_RENAME)
+            .with_columns(
+                pl.col("HGVS").str.extract(r".*:(.*)$", 1),
+                pl.col("Variant Type").str.replace("_variant$", ""),
+                (pl.col("Variant Allele Frequency").cast(pl.Float64) * 100)
+                .round(3)
+                .map_elements(lambda x: f"{x}%", return_dtype=pl.String),
+            )
+            .with_columns(
+                cs.by_dtype(pl.String)
+                .fill_null("-")
+                .str.replace_all("&", ",\n", literal=True)
+                .str.replace_all("_", " ", literal=True),
+            )
+        )
+        confident = (
+            with_therapeutics.filter(
+                (pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1")
+            )
+            .with_columns(
+                impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP)
+            )
+            .sort(pl.col("impact_score"), descending=True)
+        )
+        others = confident.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
+        self.data["relevant"][variant_class] = confident.select(wanted_cols)
+        self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
+        self.data["all"][variant_class] = with_therapeutics.select(wanted_cols)
