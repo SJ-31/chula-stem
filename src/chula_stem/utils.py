@@ -5,8 +5,18 @@ from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
+import polars as pl
 
 # rx method is equivalent to [], rx2 is [[]]
+
+
+def empty_string2null(df: pl.DataFrame) -> pl.DataFrame:
+    return df.with_columns(
+        pl.when(pl.col(pl.String).str.len_chars() == 0)
+        .then(None)
+        .otherwise(pl.col(pl.String))
+        .name.keep()
+    )
 
 
 def r2pd(robject):
