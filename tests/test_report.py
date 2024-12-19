@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import chula_stem.report as rp
 import polars as pl
 from chula_stem.callset_qc import IMPACT_MAP
@@ -21,14 +23,19 @@ from reportlab.platypus import LongTable, Paragraph, SimpleDocTemplate, Spacer
 # Flowables
 # - Flowable.drawOn(canvas, x, y)
 
-R = rp.ResultsReport(
-    "dummy",
-    civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
-    pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
-    vep_small=small_path,
-    vep_sv=sv_pat,
-)
-res = R.data["all"]["small"]
+sample = "/home/shannc/Bio_SDD/chula-stem/tests/report_sample.tsv"
+if not Path(sample).exists():
+    R = rp.ResultsReport(
+        "dummy",
+        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
+        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
+        vep_small=small_path,
+        vep_sv=sv_pat,
+    )
+    res = R.data["all"]["small"]
+    res.write_csv(sample, separator="\t", null_value="NA")
+else:
+    res = pl.read_csv(sample, separator="\t", null_values="NA")
 
 # Using Paragraphs to format text for word wrap
 column_style: ParagraphStyle = ParagraphStyle("cols", fontSize=9)
