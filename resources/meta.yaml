@@ -17,17 +17,6 @@ links:
   delly_exclude: "https://raw.githubusercontent.com/dellytools/delly/refs/heads/main/excludeTemplates/human.hg38.excl.tsv" # Retrieved 14 Nov 2024
   delly_mappability_GRCh38: "https://gear-genomics.embl.de/data/delly/Homo_sapiens.GRCh38.dna.primary_assembly.fa.r101.s501.blacklist.gz" # Retrieved 15 Nov 2024
   grch38_gff: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.gff.gz" # Retrieved 12 Dec 2024
-  clinvar: "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar_20241208.vcf.gz" # 2024-12-12
-  dbvar:
-    somatic_sv: "https://ftp.ncbi.nlm.nih.gov/pub/dbVar/sandbox/dbvarhub/hg38/somatic_sv.bed" # 2024-12-12
-  cosmic:
-    cnvs: "https://cancer.sanger.ac.uk/cosmic/download/cosmic/v101/completecna" # 2024-12-13
-  gnomad:
-    v4_svs: "https://datasetgnomad.blob.core.windows.net/dataset/release/4.1/genome_sv/gnomad.v4.1.sv.sites.vcf.gz.tbi" # 2024-12-13
-    exome_data: "https://gnomad.broadinstitute.org/downloads#v4" # 2024-11-06
-  clingen:
-    dosage_sensitivity_curations_genes_regions: "ftp://ftp.clinicalgenome.org/ClinGen_region_curation_list_GRCh38.tsv" # 2024-12-16
-
 # * Misc.
 rename:
   remove_chr: "/data/project/stemcell/shannc/reference/rename/remove_chr.tsv"

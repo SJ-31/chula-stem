@@ -1,3 +1,8 @@
+* Clingen-Dosage-Sensitivity-2024-12-16.csv
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
+*Date added*: <2024-12-19 Thu>
+*Source:* [[https://search.clinicalgenome.org/kb/gene-validity/download][ClinGen]]
+A summary of Gene-Disease validity curations by ClinGen. Used primarily to identify potentially important genes that are affected by called repetitive regions
 * aggregated_msi.tsv
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/aggregated_msi.tsv=
 *Date added*: <2024-12-18 Wed>

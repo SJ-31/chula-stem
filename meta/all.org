@@ -1,3 +1,4 @@
+Have 10TB of shared space in the =/data/project/stemcell= directory
 * Exome CRC
 + Sequencing platform: NovaSeq 6000
 + Capture kit: SureSelect Human All Exon V6

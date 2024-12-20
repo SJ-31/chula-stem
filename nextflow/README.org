@@ -118,7 +118,6 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
 *** Output
 + Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
 ****  Report format
-+ TODO: format based on what P'thip sent you
 + Relevant variants table
   * Must have existing variation,
     Filter variants by those that have existing variation, ideally with clinical significance. Include read support and allele frequency in the
@@ -127,7 +126,6 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
 + Table of mutational signatures
   * Relevant signatures - those mapped with specific processes and that have known treatments available
   * Everything else
-
 *** Motivation
 + Using multiple variant callers is common practice, notably used in the flagship analysis of the Pan-Cancer Analysis of Whole Genomes Consortium [4]
 ** WES tumor-only
