@@ -1,7 +1,8 @@
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, override
+from typing import Callable, override
 
 import polars as pl
 import polars.selectors as cs
@@ -20,25 +21,10 @@ from reportlab.platypus import (
     SimpleDocTemplate,
 )
 from requests import Session
-from sqlalchemy import values
 
 STYLES = getSampleStyleSheet()
 
 from chula_stem.callset_qc import IMPACT_MAP
-
-
-def ensembl_id2name(id: str) -> str | None:
-    """Convert ensembl gene id to HGNC gene name
-
-    :param id: id to convert
-
-    :returns: name of gene according to HGNC, None if gene could not be converted
-    """
-    try:
-        gene: pe.Gene = REL.gene_by_id(id)
-        return gene.gene_name
-    except ValueError:
-        return None
 
 
 def filter_format_vep(input: str, sep="\t"):
@@ -605,11 +591,19 @@ class ResultsReport:
         civic_cache: str,
         vep_small: str,
         vep_sv: str,
+        tmpdir: str = "temp",
     ) -> None:
         self.civic_cache = civic_cache
         self.pandrugs2_cache = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
+        self.tmpdir = tmpdir
 
+        previous = os.getcwd()
+        try:
+            os.makedirs(self.tmpdir)
+        except FileExistsError:
+            print("WARNING: directory exists")
+        os.chdir(self.tmpdir)
         self._format_vep(vep_small, "small")
         self._format_vep(vep_sv, "sv")
 
@@ -617,6 +611,16 @@ class ResultsReport:
         """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table
         """
+        r_out = f"{self.tmpdir}/{variant_class}_relevant.tsv"
+        nr_out = f"{self.tmpdir}/{variant_class}_non-relevant.tsv"
+        if os.path.exists(r_out) and os.path.exists(nr_out):
+            self.data["relevant"][variant_class] = pl.read_csv(
+                r_out, separator="\t", null_values="NA"
+            )
+            self.data["nonrelevant"][variant_class] = pl.read_csv(
+                nr_out, separator="\t", null_values="NA"
+            )
+            return
         var_col: str = "Database Name"  # New column for 'Existing_variation'
         with_therapeutics: pl.DataFrame = add_therapy_info(
             df_path, self.civic_cache, self.pandrugs2_cache
@@ -652,6 +656,12 @@ class ResultsReport:
         self.data["relevant"][variant_class] = confident.select(wanted_cols)
         self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
         self.data["all"][variant_class] = with_therapeutics.select(wanted_cols)
+        self.data["relevant"][variant_class].to_csv(
+            r_out, separator="\t", null_value="NA"
+        )
+        self.data["nonrelevant"][variant_class].to_csv(
+            nr_out, separator="\t", null_value="NA"
+        )
 
     @staticmethod
     def build_table(
@@ -674,13 +684,33 @@ class ResultsReport:
         and add header (time + page number)
         """
         table_spec = {"header_pos": (inch * 7, A4[1] - 1.5 * inch)}
-        pass
+        column_style: ParagraphStyle = ParagraphStyle("cols", fontSize=9)
+        numeric_style: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
+        text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
+
+        cell_pstyles: dict = {
+            1: numeric_style,
+            2: numeric_style,
+            None: text_style,
+        }
+        cell_styles = style_cells(
+            (0, 1), background=colors.lightcyan, valign="TOP"
+        )
+        header_styles = style_cells(
+            (0, 0),
+            8,
+            1,
+            textcolor=colors.red,
+            underline=(3, colors.black),
+            background=colors.lightgrey,
+        )
         # Variant table styles
+
         vtable_styles: dict = {
-            "cell_pstyles": None,
-            "header_pstyles": None,
-            "cell_styles": None,
-            "header_styles": None,
+            "cell_pstyles": cell_pstyles,
+            "header_pstyles": ParagraphStyle("cols", fontSize=9),
+            "cell_styles": cell_styles,
+            "header_styles": header_styles,
             "col_widths": list(VTABLE_COL_WIDTHS.values),
         }
         # Report is in the following order
