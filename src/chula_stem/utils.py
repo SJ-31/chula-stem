@@ -5,11 +5,11 @@ from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
+import pandas as pd
 import polars as pl
 
+
 # rx method is equivalent to [], rx2 is [[]]
-
-
 def empty_string2null(df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(
         pl.when(pl.col(pl.String).str.len_chars() == 0)
@@ -24,7 +24,10 @@ def r2pd(robject):
     from rpy2.robjects import pandas2ri
 
     with (ro.default_converter + pandas2ri.converter).context():
-        return ro.conversion.get_conversion().rpy2py(robject)
+        obj = ro.conversion.get_conversion().rpy2py(robject)
+        if isinstance(obj, tuple) and isinstance(obj[0], pd.DataFrame):
+            return obj[0]
+        return obj
 
 
 @click.command()
@@ -303,12 +306,7 @@ def _format_vep_vcf(
             pl.col("ANN").str.split("|").list.to_struct(fields=vep_columns)
         )
         .unnest("ANN")
-        .with_columns(
-            pl.when(pl.col(pl.String).str.len_chars() == 0)
-            .then(None)
-            .otherwise(pl.col(pl.String))
-            .name.keep()
-        )
+        .pipe(empty_string2null)
     )
     if not vaf:
         df = df.with_columns(VAF=pl.lit(None))
