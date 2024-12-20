@@ -113,3 +113,7 @@ docs
 /tests/civic.json
 /tests/pandrugs2.json
 /test.pdf
+/tests/report_tmp/
+/tests/sample.hdf5
+/tests/sample.parquet
+/test2.pdf

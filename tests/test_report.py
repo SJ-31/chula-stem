@@ -1,8 +1,12 @@
+import os
+from collections import Counter
 from pathlib import Path
 from typing import Callable
 
 import chula_stem.report as rp
+import h5py
 import polars as pl
+import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
 from chula_stem.report import VTABLE_COL_WIDTHS, Civic, PanDrugs2, TherapyDB
 
@@ -59,15 +63,6 @@ out = "/home/shannc/Bio_SDD/chula-stem/test.pdf"
 # For doc coordinates, (0, 0) is the bottom left corner
 
 
-# TODO: want a fn that allows you to draw a multi-page table that has repeated headers
-# so the first page the table is introduced has a different header e.g. FOO
-# and all others are like FOO (continued)
-# Reportlab doesn't support this well, but you can hack this by creating separate
-# pdf files for each table. Then merge everything together and the header and footer
-# This will be a generic fn to reuse will all the tables in the report
-# def table_with_headers() -> :
-
-
 def default_shapes(canvas, doc: BaseDocTemplate):
     canvas.saveState()
     bottom_line_h = inch * 1
@@ -110,5 +105,17 @@ test_table.add_table(
     col_styles,
     col_widths=list(VTABLE_COL_WIDTHS.values()),
 )
-test_table.add_decorator(default_shapes)
-test_table.build()
+# test_table.add_decorator(default_shapes)
+# test_table.build()
+
+
+def test_full():
+    R = rp.ResultsReport(
+        "/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
+        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
+        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
+        vep_small=small_path,
+        vep_sv=sv_pat,
+        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
+    )
+    R.build()

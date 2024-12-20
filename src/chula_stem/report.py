@@ -243,6 +243,18 @@ class Civic(TherapyDB):
             "variantAliases": [],
             "clinvarIds": [],
         }
+        schema: dict = {
+            "loc": pl.String,
+            "molecularProfile": pl.String,
+            "therapies": pl.List(pl.String),
+            "evidenceRating": pl.Int64,
+            "civicLink": pl.String,
+            "origin": pl.String,
+            "disease": pl.List(pl.String),
+            "source": pl.String,
+            "variantAliases": pl.List(pl.String),
+            "clinvarIds": pl.List(pl.String),
+        }
         for entry in data:
             loc: str = Civic.get_loc(entry["coordinates"])
             for mp in entry["molecularProfiles"]["nodes"]:
@@ -264,10 +276,22 @@ class Civic(TherapyDB):
                     cols["loc"].append(loc)
                     cols["therapies"].append(ther)
 
-        level_mapping: dict = {None: 0, "E": 1, "D": 2, "C": 3, "B": 4, "A": 5}
-        entry_df: pl.DataFrame = pl.DataFrame(cols).with_columns(
-            pl.col("evidenceLevel").replace_strict(level_mapping)
-        )
+        level_mapping: dict = {
+            "": 0,
+            None: 0,
+            "E": 1,
+            "D": 2,
+            "C": 3,
+            "B": 4,
+            "A": 5,
+        }
+        entry_df: pl.DataFrame = pl.DataFrame(cols).cast(schema)
+        if entry_df.shape[0] > 0:
+            entry_df = entry_df.with_columns(
+                pl.col("evidenceLevel").replace_strict(level_mapping)
+            )
+        else:
+            entry_df = entry_df.cast({"evidenceLevel": pl.Int64})
         return entry_df
 
     @staticmethod
@@ -315,10 +339,10 @@ class Civic(TherapyDB):
                 if not data:
                     print(f"No civic entry for gene {gene} found")
                     break
+                dfs.append(Civic.parse_gene_response(data))
                 has_next = variants["pageInfo"]["hasNextPage"]
                 if has_next:
                     query_input["next_page"] = variants["pageInfo"]["endCursor"]
-                    dfs.append(Civic.parse_gene_response(data))
             else:
                 print(f"No civic entry for gene {gene} found")
                 break
@@ -426,7 +450,10 @@ class PanDrugs2(TherapyDB):
         if not response.ok or not (data := response.json().get("geneDrugGroup")):
             return pl.DataFrame()
         df: pl.DataFrame = PanDrugs2.parse_gene_response(data).with_columns(
-            gene=pl.lit(gene)
+            pl.lit(gene).alias("gene"),
+            pl.col("therapies").map_elements(
+                lambda x: [x], return_dtype=pl.List(pl.String)
+            ),
         )
         if confident:
             df = self.get_confident(df)
