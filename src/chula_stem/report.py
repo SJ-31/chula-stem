@@ -9,6 +9,7 @@ import polars.selectors as cs
 import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm, inch
@@ -608,7 +609,6 @@ class ResultsReport:
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.tmpdir = tmpdir
 
-        previous = os.getcwd()
         try:
             os.makedirs(self.tmpdir)
         except FileExistsError:
@@ -621,15 +621,19 @@ class ResultsReport:
         """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table
         """
-        r_out = f"{self.tmpdir}/{variant_class}_relevant.tsv"
-        nr_out = f"{self.tmpdir}/{variant_class}_non-relevant.tsv"
-        if os.path.exists(r_out) and os.path.exists(nr_out):
-            self.data["relevant"][variant_class] = pl.read_csv(
-                r_out, separator="\t", null_values="NA"
-            )
-            self.data["nonrelevant"][variant_class] = pl.read_csv(
-                nr_out, separator="\t", null_values="NA"
-            )
+        r_out = f"{self.tmpdir}/{variant_class}_relevant.parquet"
+        nr_out = f"{self.tmpdir}/{variant_class}_non-relevant.parquet"
+        all_out = f"{self.tmpdir}/{variant_class}_all.parquet"
+        if (
+            os.path.exists(r_out)
+            and os.path.exists(nr_out)
+            and os.path.exists(all_out)
+        ):
+            # self._read_vep_saved(r_out, nr_out, all_out, variant_class)
+            for c, p in zip(
+                ["relevant", "nonrelevant", "all"], [r_out, nr_out, all_out]
+            ):
+                self.data[c][variant_class] = pl.read_parquet(p)
             return
         var_col: str = "Database Name"  # New column for 'Existing_variation'
         with_therapeutics: pl.DataFrame = add_therapy_info(
@@ -662,16 +666,20 @@ class ResultsReport:
             )
             .sort(pl.col("impact_score"), descending=True)
         )
-        others = confident.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
+        others = with_therapeutics.filter(
+            ~pl.col("VAR_ID").is_in(confident["VAR_ID"])
+        )
         self.data["relevant"][variant_class] = confident.select(wanted_cols)
         self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
-        self.data["all"][variant_class] = with_therapeutics.select(wanted_cols)
-        self.data["relevant"][variant_class].to_csv(
-            r_out, separator="\t", null_value="NA"
-        )
-        self.data["nonrelevant"][variant_class].to_csv(
-            nr_out, separator="\t", null_value="NA"
-        )
+        self.data["all"][variant_class] = with_therapeutics
+        for category, path in zip(
+            ["relevant", "nonrelevant", "all"], [r_out, nr_out, all_out]
+        ):
+            self.data[category][variant_class].write_parquet(path)
+
+            # self.data[category][variant_class].with_columns(
+            #     cs.by_dtype(pl.List(pl.String)).list.join(";")
+            # ).write_csv(path, separator="\t", null_value="NA")
 
     @staticmethod
     def build_table(
@@ -721,7 +729,7 @@ class ResultsReport:
             "header_pstyles": ParagraphStyle("cols", fontSize=9),
             "cell_styles": cell_styles,
             "header_styles": header_styles,
-            "col_widths": list(VTABLE_COL_WIDTHS.values),
+            "col_widths": list(VTABLE_COL_WIDTHS.values()),
         }
         # Report is in the following order
         # TODO: create universal footer/header spec for tables
@@ -752,7 +760,7 @@ class ResultsReport:
         self.build_table(
             table_spec,
             vtable_styles,
-            self.data["nonrelevant"]["Structural"],
+            self.data["nonrelevant"]["sv"],
             "Non-relevant Structural Variants",
             "Non-relevant Structural Variants (Continued)",
             table_decorator,
@@ -761,7 +769,7 @@ class ResultsReport:
         self.build_table(
             table_spec,
             vtable_styles,
-            self.data["nonrelevant"]["Structural"],
+            self.data["nonrelevant"]["sv"],
             "Non-relevant Structural Variants",
             "Non-relevant Structural Variants (Continued)",
             table_decorator,
