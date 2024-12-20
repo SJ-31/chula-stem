@@ -102,9 +102,9 @@ class TherapyDB(ABC):
                 results.append(current)
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
-            df = pl.concat(results)
+            df = pl.concat(results, how="vertical_relaxed")
             if not previous.is_empty():
-                df = pl.concat([previous, df])
+                df = pl.concat([previous, df], how="vertical_relaxed")
             self.write_cache(df)
             return df
         if not previous.is_empty():
@@ -146,7 +146,7 @@ class TherapyDB(ABC):
 
     def write_cache(self, df: pl.DataFrame) -> None:
         if not self.all_cached.is_empty():
-            df = pl.concat([self.all_cached, df])
+            df = pl.concat([self.all_cached, df], how="vertical_relaxed")
             df = df.filter(~df.is_duplicated())
         df.write_json(self.cache)
 
@@ -162,6 +162,7 @@ class Civic(TherapyDB):
         self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
+
         self.gene_query: str = gql(
             """
         query ($entrez_symbol: String, $next_page: String) {
@@ -322,7 +323,9 @@ class Civic(TherapyDB):
                 break
         if not dfs:
             return pl.DataFrame()
-        df: pl.DataFrame = pl.concat(dfs).with_columns(gene=pl.lit(gene))
+        df: pl.DataFrame = pl.concat(dfs, how="vertical_relaxed").with_columns(
+            gene=pl.lit(gene)
+        )
         if confident:
             return Civic.get_confident(df)
         else:
@@ -438,7 +441,12 @@ def add_therapy_info(
     structural variants
 
     :returns: the input dataframe with additional information about therapeutic
-    options for each gene
+    options for each gene.
+    Specifically, adds the columns
+    - "VAR_ID" to uniquely identify variants,
+    - "source" database or paper source
+    - "disease": disease(s) the gene is implicated in
+    - "therapies": validated therapies for the gene
     """
     df: pl.DataFrame = pl.read_csv(
         vep_out, separator="\t", null_values=["NA", "."], infer_schema_length=None
@@ -455,7 +463,9 @@ def add_therapy_info(
 
     temp: list[pl.DataFrame] = []
     for db in therapy_dbs:
-        find_info: pl.DataFrame = db.get_genes(gene_list, True)
+        # <2024-12-20 Fri>
+        # BUG: setting the confidence filters off is temporary, for testing
+        find_info: pl.DataFrame = db.get_genes(gene_list, False)
         if not find_info.is_empty():
             found = find_info["gene"]
             gene_list = list(filter(lambda x: x not in found, gene_list))
@@ -463,7 +473,7 @@ def add_therapy_info(
         if not gene_list:
             break
     if temp:
-        all_drug_info: pl.DataFrame = pl.concat(temp)
+        all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
         with_therapeutics = df.join(
             all_drug_info, how="left", left_on="SYMBOL", right_on="gene"
         )
