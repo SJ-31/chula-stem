@@ -90,16 +90,17 @@ col_styles = rp.style_cells(
     ncols,
     1,
     textcolor=colors.red,
-    fontsize=13,
     underline=(3, colors.black),
     background=colors.lightgrey,
 )
 style_all = rp.style_cells((0, 1), background=colors.lightcyan, valign="TOP")
 test_table = rp.ReportElement(
     "/home/shannc/Bio_SDD/chula-stem/test2.pdf",
-    {"header_pos": (inch * 5, A4[1] - cm)},
-    header_first="Relevant Variants",
-    header_later="Relevant Variants (continued)",
+    {
+        "header_pos": (inch * 5, A4[1] - cm),
+        "header_first": "Relevant Variants",
+        "header_later": "Relevant Variants (continued)",
+    },
 )
 test_table.add_table(
     res,

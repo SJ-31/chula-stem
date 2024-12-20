@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import sleep
-from typing import Callable, override
+from typing import Any, Callable, override
 
 import polars as pl
 import polars.selectors as cs
@@ -20,6 +20,7 @@ from reportlab.platypus import (
     SimpleDocTemplate,
 )
 from requests import Session
+from sqlalchemy import values
 
 STYLES = getSampleStyleSheet()
 
@@ -605,9 +606,6 @@ class ResultsReport:
         vep_small: str,
         vep_sv: str,
     ) -> None:
-        self.doc: SimpleDocTemplate = SimpleDocTemplate(
-            filename, rightMargin=2, leftMargin=2
-        )
         self.civic_cache = civic_cache
         self.pandrugs2_cache = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
@@ -655,6 +653,81 @@ class ResultsReport:
         self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
         self.data["all"][variant_class] = with_therapeutics.select(wanted_cols)
 
+    @staticmethod
+    def build_table(
+        spec: dict,
+        table_styles: dict,
+        data: pl.DataFrame,
+        first: str,
+        later: str,
+        decorator: None,
+        filename: str,
+    ) -> None:
+        spec = {**spec, "header_first": first, "header_later": later}
+        R = ReportElement(filename, spec)
+        R.add_table(data, **table_styles)
+        R.add_decorator(decorator)
+        R.build()
+
+    def build(self) -> None:
+        """Create pdf files for all report elements individually, concatenate them
+        and add header (time + page number)
+        """
+        table_spec = {"header_pos": (inch * 7, A4[1] - 1.5 * inch)}
+        pass
+        # Variant table styles
+        vtable_styles: dict = {
+            "cell_pstyles": None,
+            "header_pstyles": None,
+            "cell_styles": None,
+            "header_styles": None,
+            "col_widths": list(VTABLE_COL_WIDTHS.values),
+        }
+        # Report is in the following order
+        # TODO: create universal footer/header spec for tables
+        # TODO: build the pdf for Therapeutic information
+        # TODO: build the pdf for Copy number
+        # TODO: build the pdf for signature analysis
+        # TODO: create universal styles for variant tables
+        # front_page: ReportElement =
+        table_decorator = None
+        self.build_table(
+            table_spec,
+            vtable_styles,
+            self.data["relevant"]["small"],
+            "Relevant Small Variants",
+            "Relevant Small Variants (Continued)",
+            table_decorator,
+            "rs.pdf",
+        )
+        self.build_table(
+            table_spec,
+            vtable_styles,
+            self.data["nonrelevant"]["small"],
+            "Non-relevant Small Variants",
+            "Non-relevant Small Variants (Continued)",
+            table_decorator,
+            "nrs.pdf",
+        )
+        self.build_table(
+            table_spec,
+            vtable_styles,
+            self.data["nonrelevant"]["Structural"],
+            "Non-relevant Structural Variants",
+            "Non-relevant Structural Variants (Continued)",
+            table_decorator,
+            "rv.pdf",
+        )
+        self.build_table(
+            table_spec,
+            vtable_styles,
+            self.data["nonrelevant"]["Structural"],
+            "Non-relevant Structural Variants",
+            "Non-relevant Structural Variants (Continued)",
+            table_decorator,
+            "nrv.pdf",
+        )
+
 
 class ReportElement:
     """Generic class to use to add report elements
@@ -663,6 +736,13 @@ class ReportElement:
 
     Used to give more control over how flowables and canvas interact with one another
     e.g. making a table that has repeated headers that change depending on the page number
+
+    Important fields in `spec`
+    - [left|right|bottom|top]_margin
+    - header|footer: text for the header and footer
+    - [header|footer]_[first|later]: this overrides header and footer
+    - [header|footer]_pos: positions of header and footer
+    - [header|footer]_style: ParagraphStyle used for headers and footers
     """
 
     def __init__(
@@ -670,28 +750,16 @@ class ReportElement:
         filename: str,
         spec: dict,
         pagesize=A4,
-        rmargin=inch,
-        lmargin=inch,
-        tmargin=inch,
-        bmargin=inch,
         w_page_break=True,
-        header_first: str = "",
-        header_later: str = "",
-        footer_later: str = "",
-        footer_first: str = "",
     ) -> None:
         self.pdf = SimpleDocTemplate(
             filename,
             pagesize=pagesize,
-            rightMargin=rmargin,
-            leftMargin=lmargin,
-            topMargin=tmargin,
-            bmargin=bmargin,
+            rightMargin=spec.get("right_margin", inch),
+            leftMargin=spec.get("left_margin", inch),
+            topMargin=spec.get("top_margin", inch),
+            bmargin=spec.get("bottom_margin", inch),
         )
-        self.header_first = header_first
-        self.header_later = header_later
-        self.footer_later = footer_later
-        self.footer_first = footer_first
         self.spec = spec
         self.width = pagesize[0]
         self.decorator: Callable[[Canvas, BaseDocTemplate], None] = None
@@ -717,7 +785,7 @@ class ReportElement:
         def fn(c, d):
             if self.decorator:
                 self.decorator(c, d)
-            if htext := self.spec.get("header_text", h):
+            if htext := self.spec.get("header", h):
                 draw_paragraph(
                     htext,
                     self.spec.get(
@@ -728,7 +796,7 @@ class ReportElement:
                     d,
                 )
             # Draw the footer
-            if ftext := self.spec.get("footer_text", f):
+            if ftext := self.spec.get("footer", f):
                 draw_paragraph(
                     ftext,
                     self.spec.get(
@@ -775,6 +843,12 @@ class ReportElement:
             self.elements.append(PageBreak())
         self.pdf.build(
             self.elements,
-            onFirstPage=self.draw_pages(self.header_first, self.footer_first),
-            onLaterPages=self.draw_pages(self.header_later, self.footer_later),
+            onFirstPage=self.draw_pages(
+                self.spec.get("header_first", ""),
+                self.spec.get("footer_first", ""),
+            ),
+            onLaterPages=self.draw_pages(
+                self.spec.get("header_later", ""),
+                self.spec.get("footer_later", ""),
+            ),
         )
