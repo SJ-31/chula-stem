@@ -14,6 +14,7 @@ from requests import Session
 class TherapyDB(ABC):
 
     api_wait: float
+    name: str
     cache: Path
     shared_cols: tuple = ("gene", "source", "disease", "therapies")
     all_cached: pl.DataFrame
@@ -44,7 +45,7 @@ class TherapyDB(ABC):
         for g in gene_list:
             current: pl.DataFrame = self.get_gene(g, confident)
             if not current.is_empty():
-                results.append(current)
+                results.append(current.with_columns(db = pl.lit(self.name)))
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
             df = pl.concat(results, how="vertical_relaxed")
@@ -102,6 +103,7 @@ class TherapyDB(ABC):
 class Civic(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
+        self.name: str = "civic"
         self.api_wait: float = 0.5
         self.cache: Path = self._cache_default("civic", cache)
         self.client: Client = Client(
@@ -310,6 +312,7 @@ class PanDrugs2(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         self.url: str = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
         self.api_wait: float = 1
+        self.name: str = "pandrugs2"
         self.session: Session = Session()
         self.cache: Path = self._cache_default("pandrugs2", cache)
 
@@ -434,23 +437,21 @@ def add_therapy_info(
     ).with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
     )
-    therapy_dbs: list[tuple[str, TherapyDB]] = [
-        ("civic", Civic(civic_cache)),
-        ("pandrugs2", PanDrugs2(pandrugs2_cache)),
+    therapy_dbs: list[TherapyDB] = [
+        Civic(civic_cache),
+        PanDrugs2(pandrugs2_cache),
     ]
     gene_list = list(df["SYMBOL"].unique())
 
     temp: list[pl.DataFrame] = []
-    for db_name, db in therapy_dbs:
+    for db in therapy_dbs:
         # <2024-12-20 Fri>
         # BUG: setting the confidence filters off is temporary, for testing
         find_info: pl.DataFrame = db.get_genes(gene_list, False)
         if not find_info.is_empty():
             found = find_info["gene"]
             gene_list = list(filter(lambda x: x not in found, gene_list))
-            temp.append(
-                find_info.select(TherapyDB.shared_cols).with_columns(db=pl.lit(db_name))
-            )
+            temp.append(find_info.select(TherapyDB.shared_cols))
         if not gene_list:
             break
     if temp:
