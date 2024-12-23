@@ -492,21 +492,21 @@ def add_therapy_info(
             "VAR_ID"
         )
     )
-    therapy_dbs: list[TherapyDB] = [
-        Civic(civic_cache),
-        PanDrugs2(pandrugs2_cache),
+    therapy_dbs: list[tuple[str, TherapyDB]] = [
+        ("civic", Civic(civic_cache)),
+        ("pandrugs2", PanDrugs2(pandrugs2_cache)),
     ]
     gene_list = list(df["SYMBOL"].unique())
 
     temp: list[pl.DataFrame] = []
-    for db in therapy_dbs:
+    for db_name, db in therapy_dbs:
         # <2024-12-20 Fri>
         # BUG: setting the confidence filters off is temporary, for testing
         find_info: pl.DataFrame = db.get_genes(gene_list, False)
         if not find_info.is_empty():
             found = find_info["gene"]
             gene_list = list(filter(lambda x: x not in found, gene_list))
-            temp.append(find_info.select(TherapyDB.shared_cols))
+            temp.append(find_info.select(TherapyDB.shared_cols).with_columns(db = pl.lit(db_name)))
         if not gene_list:
             break
     if temp:
