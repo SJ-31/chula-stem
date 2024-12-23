@@ -340,11 +340,17 @@ class PanDrugs2(TherapyDB):
             # All diseases from pandrugs are cancers
             cols["dScore"].append(entry["dScore"])
             cols["status"].append(entry["status"])
+            therapy = entry["showDrugName"]
+            if entry.get("pubchemId"):
+                pc = entry["pubchemId"][0]  # These are synonyms, so just take the first
+                cols["therapies"].append(f"{therapy}:{pc}")
+            else:
+                cols["therapies"].append(f"{therapy}:NA")
             cols["gScore"].append(entry["gScore"])
-            cols["therapies"].append(entry["showDrugName"])
             cols["therapyType"].append(entry["therapy"])
         return pl.DataFrame(cols, schema=schema).with_columns(
-            source=pl.lit("[PanDrugs2](https://pandrugs.org/#!/)")
+            db_link=pl.lit("https://pandrugs.org/#!/"),
+            source=pl.lit("NA"),
         )
 
     @override
