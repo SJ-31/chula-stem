@@ -1,0 +1,33 @@
+nextflow_process {
+
+    name "Test Process CROSS_REFERENCE"
+    script "modules/cross_reference.nf"
+    process "CROSS_REFERENCE"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/wes_params.yaml")
+            }
+            process {
+                """
+                input[0] = [["out": "$params.out/cross_ref_cnv",
+                    "log": "$params.log/cross_ref_cnv",
+                    "filename": "classify_cnv"],
+                    "$params.out/classify_cnv/8-null-ClassifyCNV.tsv"]
+                input[1] = "CNV"
+                input[2] = params.clingen_dosage
+                input[3] = params.cnv_reference
+                input[4] = 4
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}
