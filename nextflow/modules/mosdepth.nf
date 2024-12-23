@@ -26,7 +26,7 @@ process MOSDEPTH {
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """
-        ln -sr "${meta.out}/${prefix}*" .
+        ln -sr ${meta.out}/${prefix}* .
         ln -sr "${meta.log}/mosdepth.log" .
         """
     } else if (target_regions) {
