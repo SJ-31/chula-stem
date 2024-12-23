@@ -19,7 +19,7 @@ def empty_string2null(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def r2pd(robject):
+def r2pd(robject) -> pd.DataFrame:
     import rpy2.robjects as ro
     from rpy2.robjects import pandas2ri
 
@@ -38,9 +38,18 @@ def classify_cnv_format(caller: str, input: str, output: str):
     _classify_cnv(caller, input, output)
 
 
+def read_facets_rds(rds_path: str) -> pl.DataFrame:
+    base = importr("base")
+    df: pd.DataFrame = r2pd(base.readRDS(rds_path).rx2("segs"))
+    try:
+        df = df.astype({"chrom": "int32"})
+    except:
+        pass
+    return pl.from_pandas(df, schema_overrides={"chrom": pl.String})
+
+
 def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
     import polars as pl
-    from rpy2.robjects.packages import importr
 
     def dup_or_del(x):
         return "DEL" if x < 2 else "DUP"
