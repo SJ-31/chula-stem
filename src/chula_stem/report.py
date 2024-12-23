@@ -1,5 +1,5 @@
 import os
-from typing import Callable, override
+from typing import Callable
 
 import polars as pl
 import polars.selectors as cs
@@ -15,11 +15,42 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
 )
-from requests import Session
 
 STYLES = getSampleStyleSheet()
 
 from chula_stem.callset_qc import IMPACT_MAP
+from chula_stem.databases import add_therapy_info
+from chula_stem.utils import add_loc, read_facets_rds
+
+
+def get_copy_number(
+    df: pl.DataFrame, facets_path: str = "", cnvkit_path: str = "", cn_col_name="cn"
+) -> pl.DataFrame:
+    """
+    Add a copy number column `cn_col_name` to df
+    by merging with the raw CNV data. df must have the
+    column "Locus", containing the location of the cnv in the form of
+        chromosome:start-end
+    :param format: one of CNVKit|Facets
+    """
+    wanted_cols = df.columns + [cn_col_name]
+    if facets_path:
+        facets: pl.DataFrame = read_facets_rds(facets_path).rename(
+            {"tcn.em": cn_col_name}
+        )
+        facets = add_loc(facets, "chrom")
+        df = df.join(facets, how="left", on="Locus")
+    if cnvkit_path:
+        cnvkit: pl.DataFrame = pl.read_csv(
+            cnvkit_path, separator="\t", null_values="NA"
+        )
+        cnvkit = add_loc(cnvkit)
+        df = df.join(cnvkit, how="left", on="Locus")
+    if facets_path and cnvkit_path:
+        df = df.with_columns(
+            pl.coalesce([cn_col_name, f"{cn_col_name}_right"]).alias(cn_col_name)
+        )
+    return df.select(wanted_cols)
 
 
 def filter_format_vep(input: str, sep="\t"):
@@ -145,7 +176,7 @@ def add_pstyles(
         return [style_fn(row, i) for i, row in enumerate(data)]
 
 
-## Report configuration
+## ** Report configuration
 VTABLE_RENAME: dict = {
     "SYMBOL": "Gene",
     "VAF": "Variant Allele Frequency",
@@ -156,14 +187,27 @@ VTABLE_RENAME: dict = {
     "Consequence": "Variant Type",
     "CLIN_SIG": "ClinVar",
 }
+
 VTABLE_COL_WIDTHS: dict = {
     "Gene": 60,
     "Variant Allele Frequency": 55,
     "Variant Read Support": 45,
     "Locus": 80,
     "HGVS": 90,
+    "Database Name": 90,
     "Variant Type": 90,
     "ClinVar": 100,
+}
+
+CTABLE_RENAME: dict = {
+    "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
+    "All protein coding genes": "All genes",
+    "Type": "CNV type",
+}
+CNVTABLE_WIDTHS: dict = {
+    "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
+    "All protein coding genes": "All genes",
+    "Type": "CNV type",
 }
 
 ## ** Report class
@@ -177,6 +221,9 @@ class ResultsReport:
         civic_cache: str,
         vep_small: str,
         vep_sv: str,
+        classify_cnv: str,
+        facets: str = "",
+        cnvkit: str = "",
         tmpdir: str = "temp",
     ) -> None:
         self.civic_cache = civic_cache
@@ -191,19 +238,51 @@ class ResultsReport:
         os.chdir(self.tmpdir)
         self._format_vep(vep_small, "small")
         self._format_vep(vep_sv, "sv")
+        self._format_classifycnv(classify_cnv, facets, cnvkit)
 
-    def _format_vep(self, df_path: str, variant_class: str) -> None:
+    def _format_classifycnv(
+        self,
+        classifycnv_path: str,
+        facets_path: str = "",
+        cnvkit_path: str = "",
+        # TODO: use the output of cross_reference.r instead when that becomes available
+        #   provide links
+        #   or make it into a separate table
+    ) -> None:
+        cnv = pl.read_csv(
+            classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
+        )
+        wanted_cols = ["Locus"] + list(CTABLE_RENAME.values())
+        cnv = (
+            cnv.with_columns(
+                pl.concat_str(["Start", "End"], separator="-").alias("range"),
+            )
+            .with_columns(
+                pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
+            )
+            .rename(CTABLE_RENAME)
+        ).select(wanted_cols)
+        with_cn = get_copy_number(
+            cnv, facets_path, cnvkit_path, cn_col_name="cn"
+        ).rename({"cn": "Estimated Copy Number"})
+        relevant = with_cn.filter(
+            pl.col("Known/predicted dosage-sensitive genes").is_not_null()
+        )
+        nonrelevant = with_cn.filter(
+            pl.col("Known/predicted dosage-sensitive genes").is_null()
+        )
+        self.data["relevant"]["cnv"] = relevant
+        self.data["nonrelevant"]["cnv"] = nonrelevant
+        self.data["all"]["cnv"] = with_cn
+
+    def _format_vep(self, vep_path: str, variant_class: str) -> None:
         """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table
         """
         r_out = f"{self.tmpdir}/{variant_class}_relevant.parquet"
         nr_out = f"{self.tmpdir}/{variant_class}_non-relevant.parquet"
         all_out = f"{self.tmpdir}/{variant_class}_all.parquet"
-        if (
-            os.path.exists(r_out)
-            and os.path.exists(nr_out)
-            and os.path.exists(all_out)
-        ):
+        if os.path.exists(r_out) and os.path.exists(nr_out) and os.path.exists(all_out):
             # self._read_vep_saved(r_out, nr_out, all_out, variant_class)
             for c, p in zip(
                 ["relevant", "nonrelevant", "all"], [r_out, nr_out, all_out]
@@ -212,7 +291,7 @@ class ResultsReport:
             return
         var_col: str = "Database Name"  # New column for 'Existing_variation'
         with_therapeutics: pl.DataFrame = add_therapy_info(
-            df_path, self.civic_cache, self.pandrugs2_cache
+            vep_path, self.civic_cache, self.pandrugs2_cache
         )
         wanted_cols: list = list(VTABLE_RENAME.values())
         with_therapeutics = (
@@ -236,14 +315,10 @@ class ResultsReport:
             with_therapeutics.filter(
                 (pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1")
             )
-            .with_columns(
-                impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP)
-            )
+            .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
             .sort(pl.col("impact_score"), descending=True)
         )
-        others = with_therapeutics.filter(
-            ~pl.col("VAR_ID").is_in(confident["VAR_ID"])
-        )
+        others = with_therapeutics.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
         self.data["relevant"][variant_class] = confident.select(wanted_cols)
         self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
         self.data["all"][variant_class] = with_therapeutics
