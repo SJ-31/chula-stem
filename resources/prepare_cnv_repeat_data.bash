@@ -14,7 +14,7 @@ get_from_somatic_sv () {
 }
 
 get_header () {
-  echo -e "chr\tstart\tstop\tgenes\tsource\ttype\taccession" > "${1}"
+  echo -e "chr\tstart\tend\tgenes\tsource\ttype\taccession" > "${1}"
 }
 
 svdir="$(yq ".dir.ref" meta.yaml)/variants/structural"
@@ -36,9 +36,12 @@ if [[ ! -e "${dbvar_msi}" ]]; then
       { print } }' "${somatic_sv}" > "${dbvar_msi}"
 fi
 bcftools query -f "%CHROM\t%POS\tNA\t%INFO/GENEINFO\tClinVar\t%CLNVCSO\t%DBVARID" "${clinvar_msi}" | \
-  awk 'BEGIN { FS="\t"; OFS="\t" } { $4 = gensub(/\|/, ",", "g", $4); print }' >> "$final_msi"
+  awk 'BEGIN { FS="\t"; OFS="\t" }
+{ $4 = gensub(/\|/, ",", "g", $4)
+  $3 = $2 + 10
+ print }' >> "$final_msi"
+# Adding 10 based on the Sequence ontology's definition of microsatellites
 get_from_somatic_sv "${dbvar_msi}" >> "$final_msi"
-
 
 # CNV data
 gnomad_cnv="${svdir}/gnomad.v4.1.cnv.non_neuro.vcf.gz"
@@ -54,6 +57,14 @@ if [[ ! -e "${dbvar_clinical_cnvs}" ]]; then
           { if ($4 ~ /copy number/)
             { print $0 } }' "${dbvar_clinical}" > "${dbvar_clinical_cnvs}"
 fi
-get_header "$final_cnv"
-bcftools query -f "%CHROM\t%POS\t%INFO/END\t%INFO/Genes\tgnomADv4.1\t%INFO/SVTYPE\tNA" "${gnomad_cnv}" >> "$final_cnv"
-get_from_somatic_sv "${dbvar_cnvs}" >> "$final_cnv"
+get_header "${svdir}/tmp.tsv"
+bcftools query -f "%CHROM\t%POS\t%INFO/END\t%INFO/Genes\tgnomADv4.1\t%INFO/SVTYPE\tNA" "${gnomad_cnv}" >> "${svdir}/tmp.tsv"
+get_from_somatic_sv "${dbvar_cnvs}" >> "${svdir}/tmp.tsv"
+awk 'BEGIN { FS="\t"; OFS="\t" }
+{
+    if ($6 ~ /loss/) $6 = "DEL"
+    else if ($6 ~ /gain/) $6 = "DUP"
+    print
+ }' "${svdir}/tmp.tsv" > "${final_cnv}"
+rm "${svdir}/tmp.tsv"
+
