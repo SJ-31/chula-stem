@@ -378,14 +378,23 @@ class PanDrugs2(TherapyDB):
             "gScore": [],
             "dScore": [],
         }
+        schema: dict = {
+            "status": pl.String,
+            "therapies": pl.String,
+            "therapyType": pl.String,
+            "disease": pl.List(pl.String),
+            "gScore": pl.Float64,
+            "dScore": pl.Float64,
+        }
         for entry in data:
             cols["disease"].append(entry["cancer"])
+            # All diseases from pandrugs are cancers
             cols["dScore"].append(entry["dScore"])
             cols["status"].append(entry["status"])
             cols["gScore"].append(entry["gScore"])
             cols["therapies"].append(entry["showDrugName"])
             cols["therapyType"].append(entry["therapy"])
-        return pl.DataFrame(cols).with_columns(
+        return pl.DataFrame(cols, schema=schema).with_columns(
             source=pl.lit("[PanDrugs2](https://pandrugs.org/#!/)")
         )
 
