@@ -11,6 +11,7 @@ import polars as pl
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, read_facets_rds
 import os
+import re
 from chula_stem.databases import add_therapy_info
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
@@ -66,6 +67,19 @@ def get_copy_number(
     return df.select(wanted_cols)
 
 
+def get_clingen_link(clingen_str) -> str:
+    def get_sym(clingen_link: str) -> str:
+        find = re.findall(r".*sym=(.*)\&.*", clingen_link)
+        if not find:
+            return ""
+        return find[0]
+
+    symbol = get_sym(clingen_str)
+    if not symbol:
+        return "NA"
+    return add_link(symbol, clingen_str, underline="yes")
+
+
 def classify_cnv_fmt(
     classifycnv_path,
     facets_path: str = "",
@@ -80,28 +94,38 @@ def classify_cnv_fmt(
     ).with_columns(
         pl.struct(s="source", acc="accession")
         .map_elements(
-            lambda x: (dbvar_link(x["acc"]) if x["acc"] != "NA" else x["s"]),
+            lambda x: (
+                dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
+            ),
             return_dtype=pl.String,
         )
-        .alias("source")
+        .alias("source"),
+        pl.col("ClinGen_report").map_elements(get_clingen_link, return_dtype=pl.String),
     )
+    # "group_by" operation required because data was exploded to become longer on
+    #   dosage-sensitive genes in the R script
     wanted_cols = ["Locus"] + list(Rename.cnv.values())
     cnv = (
-        cnv.with_columns(
-            pl.concat_str(["Start", "End"], separator="-").alias("range"),
+        (
+            cnv.with_columns(
+                pl.concat_str(["Start", "End"], separator="-").alias("range"),
+            )
+            .with_columns(
+                pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
+            )
+            .rename(Rename.cnv)
         )
-        .with_columns(
-            pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
-        )
-        .rename(Rename.cnv)
-    ).select(wanted_cols)
+        .group_by("Locus")
+        .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
+        .with_columns(pl.col("ClinGen").list.join(", "))
+    )
     cn_col = "Estimated Copy Number"
     wanted_cols.insert(1, cn_col)
     with_cn = (
         get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name="cn")
         .rename({"cn": cn_col})
         .select(wanted_cols)
-    )
+    ).fill_null("-")
     relevant = with_cn.filter(
         pl.col("Known/predicted dosage-sensitive genes").is_not_null()
     )
