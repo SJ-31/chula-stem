@@ -200,7 +200,7 @@ class ResultsReport:
                 f"Non-relevant {name}",
                 f"Non-relevant {name} (Continued)",
                 table_decorator,
-                f"rel_{name}.pdf",
+                f"non-rel_{name}.pdf",
             )
 
 

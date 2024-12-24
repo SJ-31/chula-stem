@@ -126,11 +126,9 @@ def classify_cnv_fmt(
         .rename({"cn": cn_col})
         .select(wanted_cols)
     ).fill_null("-")
-    relevant = with_cn.filter(
-        pl.col("Known/predicted dosage-sensitive genes").is_not_null()
-    )
+    relevant = with_cn.filter(pl.col("Known/predicted dosage-sensitive genes") != "-")
     nonrelevant = with_cn.filter(
-        pl.col("Known/predicted dosage-sensitive genes").is_null()
+        pl.col("Known/predicted dosage-sensitive genes") == "-"
     )
     return with_cn, relevant, nonrelevant
 
