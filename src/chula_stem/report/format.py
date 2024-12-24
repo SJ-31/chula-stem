@@ -8,12 +8,14 @@
 #       these fns will add relevant links
 
 import polars as pl
-from chula_stem.report.spec import Rename, URL
+from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, read_facets_rds
 import os
 from chula_stem.databases import add_therapy_info
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
+
+TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
 
 def add_link(text: str, link: str, **kwargs) -> str:

@@ -1,4 +1,9 @@
 from dataclasses import dataclass
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from chula_stem.report.utils import style_cells
+from reportlab.lib import colors
+
+STYLES = getSampleStyleSheet()
 
 
 @dataclass
