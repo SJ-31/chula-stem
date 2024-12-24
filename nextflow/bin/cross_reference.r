@@ -1,5 +1,8 @@
 #!/usr/bin/env Rscript
 
+library(tidyverse)
+library(GenomicRanges)
+
 ##' Identify overlapping genomic ranges stored in tibbles x and y,
 ##'   for a specific chromosome and that are above a specific cutoff
 ##' @param x_id unique identifier column for ranges in x
@@ -40,7 +43,7 @@ overlapping_join <- function(
   )) |> rename(any_of(rename_back))
 }
 
-cross_reference_cnv <- function(input, reference, clingen) {
+cross_reference_cnv <- function(input, reference, clingen, wc) {
   data <- read_tsv(input) |>
     filter(!is.na(Start) & !is.na(End)) |>
     dplyr::rename(dosage_sensitive = `Known or predicted dosage-sensitive genes`)
