@@ -1,8 +1,7 @@
-while getopts "i:o:g:v:" f; do
+while getopts "i:o:g:" f; do
     case "$f" in
-        i) input=${OPTARG} ;; # Output microsatellite information ("*_unstable")
+        i) input=${OPTARG} ;; # Output microsatellite information ("*_unstable") from msisensorpro
         o) output=${OPTARG} ;; # Output file
-        v) vcf=${OPTARG} ;;
         g) gff=${OPTARG} ;;
         *) echo "Flag not recognized"
            exit 1 ;;

@@ -14,11 +14,14 @@ nextflow_process {
                 """
                 input[0] = [["out": "$params.out/msisensorpro",
                     "log": "$params.log/msisensorpro", "id": "sample2"],
-                    "$params.out/bqsr/b_recal.bam",
-                    "$params.out/bqsr/c_recal.bam",
-                ["$params.out/bqsr/c_recal.bai", "$params.out/bqsr/b_recal.bai"]]
+                    "$params.out2/patient_10/normal/4-patient_10_normal-recal.bam",
+                    "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam",
+                    ["$params.out2/patient_10/normal/4-patient_10_normal-recal.bam.bai",
+                        "$params.out2/patient_10/cancer/4-patient_10_cancer-recal.bam.bai"]]
                 input[1] = "$params.homopoly"
-                input[2] = 4
+                input[2] = "exome"
+                input[3] = "${params.genome_gff}"
+                input[4] = 4
                 """
             }
         }

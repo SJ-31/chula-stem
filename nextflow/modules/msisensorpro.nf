@@ -9,6 +9,7 @@ process MSISENSORPRO {
     val(reference) // A homopolymers and microsatellites tsv file, generated
     // with msisensor-pro scan -d <reference genome> -o <tsv>
     val(omics_type) // Either exome or wgs
+    val(gff) // Path to genome gff file to identify genes in repetitive regions
     val(module_number)
     //
 
@@ -51,8 +52,11 @@ process MSISENSORPRO {
 
         mv "${prefix}" "${prefix}"_summary.tsv
         mv "${all}" "${all}".tsv
-        mv "${unstable}" "${unstable}".tsv
         mv "${distribution_file}" "${distribution_file}".txt
+
+        get_msisensor.bash -i ${unstable} \\
+            -o "${unstable}".tsv \\
+            g ${gff}
 
         get_nextflow_log.bash msisensor.log
         """

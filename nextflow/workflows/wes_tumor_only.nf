@@ -64,7 +64,8 @@ workflow whole_exome_tumor_only {
     // Structural variants
 
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
-    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome", 5)
+    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
+                 params.ref.genome_gff, 5)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
