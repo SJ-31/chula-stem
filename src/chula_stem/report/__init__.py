@@ -15,12 +15,33 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
 )
+from chula_stem.report.spec import (
+    VTABLE_COL_WIDTHS,
+    CTABLE_WIDTHS,
+    VTABLE_COL_WIDTHS,
+    CTABLE_RENAME,
+    VTABLE_RENAME,
+    URLS,
+)
 
 STYLES = getSampleStyleSheet()
 
 from chula_stem.callset_qc import IMPACT_MAP
 from chula_stem.databases import add_therapy_info
 from chula_stem.utils import add_loc, read_facets_rds
+
+
+def add_link(text: str, link: str, **kwargs) -> str:
+    """
+    Wrap text in RML link tag. Can use any tag defined in
+        https://docs.reportlab.com/tagref/tag_link/
+    """
+    begin = f'<link href="{link}"'
+    if kwargs:
+        for k, v in kwargs.items():
+            begin = f'{begin} {k}="{v}"'
+    begin = f"{begin}>"
+    return f"{begin}{text}</link>"
 
 
 def get_copy_number(
@@ -85,7 +106,6 @@ def filter_format_vep(input: str, sep="\t"):
         .rename(to_rename)
     )
     return df
-
 
 
 ## * Report formatter
@@ -176,40 +196,6 @@ def add_pstyles(
         return [style_fn(row, i) for i, row in enumerate(data)]
 
 
-## ** Report configuration
-VTABLE_RENAME: dict = {
-    "SYMBOL": "Gene",
-    "VAF": "Variant Allele Frequency",
-    "Alt_depth": "Variant Read Support",
-    "Loc": "Locus",
-    "HGVSc": "HGVS",
-    "Existing_variation": "Database Name",
-    "Consequence": "Variant Type",
-    "CLIN_SIG": "ClinVar",
-}
-
-VTABLE_COL_WIDTHS: dict = {
-    "Gene": 60,
-    "Variant Allele Frequency": 55,
-    "Variant Read Support": 45,
-    "Locus": 80,
-    "HGVS": 90,
-    "Database Name": 90,
-    "Variant Type": 90,
-    "ClinVar": 100,
-}
-
-CTABLE_RENAME: dict = {
-    "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
-    "All protein coding genes": "All genes",
-    "Type": "CNV type",
-}
-CNVTABLE_WIDTHS: dict = {
-    "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
-    "All protein coding genes": "All genes",
-    "Type": "CNV type",
-}
-
 ## ** Report class
 
 
@@ -217,40 +203,48 @@ class ResultsReport:
     def __init__(
         self,
         filename: str,
-        pandrugs2_cache: str,
-        civic_cache: str,
-        vep_small: str,
-        vep_sv: str,
-        classify_cnv: str,
+        pandrugs2_cache: str = "",
+        civic_cache: str = "",
+        vep_small: str = "",
+        vep_sv: str = "",
+        classify_cnv: str = "",
         facets: str = "",
         cnvkit: str = "",
         tmpdir: str = "temp",
+        call_all: bool = True,
     ) -> None:
         self.civic_cache = civic_cache
         self.pandrugs2_cache = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.tmpdir = tmpdir
 
-        try:
-            os.makedirs(self.tmpdir)
-        except FileExistsError:
-            print("WARNING: directory exists")
-        os.chdir(self.tmpdir)
-        self._format_vep(vep_small, "small")
-        self._format_vep(vep_sv, "sv")
-        self._format_classifycnv(classify_cnv, facets, cnvkit)
+        if call_all:
+            try:
+                os.makedirs(self.tmpdir)
+            except FileExistsError:
+                print("WARNING: directory exists")
+            os.chdir(self.tmpdir)
+            self._format_vep(vep_small, "small")
+            self._format_vep(vep_sv, "sv")
+            self._format_classifycnv(classify_cnv, facets, cnvkit)
 
     def _format_classifycnv(
         self,
         classifycnv_path: str,
         facets_path: str = "",
         cnvkit_path: str = "",
-        # TODO: use the output of cross_reference.r instead when that becomes available
-        #   provide links
-        #   or make it into a separate table
     ) -> None:
         cnv = pl.read_csv(
             classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
+        ).with_columns(
+            pl.struct(s="source", acc="accession")
+            .map_elements(
+                lambda x: (
+                    self._format_dbvar_link(x["acc"]) if x["acc"] != "NA" else x["s"]
+                ),
+                return_dtype=pl.String,
+            )
+            .alias("source")
         )
         wanted_cols = ["Locus"] + list(CTABLE_RENAME.values())
         cnv = (
@@ -262,9 +256,11 @@ class ResultsReport:
             )
             .rename(CTABLE_RENAME)
         ).select(wanted_cols)
+        cn_col = "Estimated Copy Number"
+        wanted_cols.insert(1, cn_col)
         with_cn = get_copy_number(
             cnv, facets_path, cnvkit_path, cn_col_name="cn"
-        ).rename({"cn": "Estimated Copy Number"})
+        ).rename({"cn": cn_col}).selekt(wanted_cols)
         relevant = with_cn.filter(
             pl.col("Known/predicted dosage-sensitive genes").is_not_null()
         )
@@ -274,6 +270,11 @@ class ResultsReport:
         self.data["relevant"]["cnv"] = relevant
         self.data["nonrelevant"]["cnv"] = nonrelevant
         self.data["all"]["cnv"] = with_cn
+
+    @staticmethod
+    def _format_dbvar_link(x) -> str:
+        link = add_link(x, f"{URLS['dbvar']}/{x}", underline="yes")
+        return f"dbVar:{link}"
 
     def _format_vep(self, vep_path: str, variant_class: str) -> None:
         """Format and filter vep output into a dataframe with values ready to write
@@ -338,7 +339,7 @@ class ResultsReport:
         data: pl.DataFrame,
         first: str,
         later: str,
-        decorator: None,
+        decorator: Callable | None,
         filename: str,
     ) -> None:
         spec = {**spec, "header_first": first, "header_later": later}
@@ -351,8 +352,7 @@ class ResultsReport:
         """Create pdf files for all report elements individually, concatenate them
         and add header (time + page number)
         """
-        table_spec = {"header_pos": (inch * 7, A4[1] - 1.5 * inch)}
-        column_style: ParagraphStyle = ParagraphStyle("cols", fontSize=9)
+        table_spec = {"header_pos": (A4[0] - 5 * inch, A4[1] - inch)}
         numeric_style: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
         text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
 
@@ -361,9 +361,7 @@ class ResultsReport:
             2: numeric_style,
             None: text_style,
         }
-        cell_styles = style_cells(
-            (0, 1), background=colors.lightcyan, valign="TOP"
-        )
+        cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
         header_styles = style_cells(
             (0, 0),
             8,
@@ -465,9 +463,7 @@ class ReportElement:
         self.w_page_break = w_page_break
         self.elements = []
 
-    def add_decorator(
-        self, fn: Callable[[Canvas, BaseDocTemplate], None]
-    ) -> None:
+    def add_decorator(self, fn: Callable[[Canvas, BaseDocTemplate], None]) -> None:
         self.decorator = fn
 
     def draw_pages(self, h, f) -> Callable:
@@ -497,9 +493,7 @@ class ReportElement:
             if ftext := self.spec.get("footer", f):
                 draw_paragraph(
                     ftext,
-                    self.spec.get(
-                        "footer_pos", (self.width - 5 * inch, 0 + inch)
-                    ),
+                    self.spec.get("footer_pos", (self.width - 5 * inch, 0 + inch)),
                     self.spec.get("footer_style", STYLES["Normal"]),
                     c,
                     d,
