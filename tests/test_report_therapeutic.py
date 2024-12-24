@@ -5,8 +5,9 @@ from os import replace
 
 import polars as pl
 import polars.selectors as cs
+from chula_stem.report.format import dbvar_link, get_clingen_link
 from chula_stem.utils import read_facets_rds
-from chula_stem.report import ReportElement, ResultsReport, style_cells, add_link
+from chula_stem.report import ReportElement, ResultsReport
 from chula_stem.report.spec import URL, Rename, Widths
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -50,73 +51,12 @@ TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
 # Will have
 # May have to have tables in tables to show the therapy info properly
-all = "/home/shannc/Bio_SDD/chula-stem/tests/report_tmp/small_all.parquet"
 
 # For small and structural variants
 # TODO: will also need to do this for mutational signatures.
 # CNV data is a bonus, but probably not possible
 #
 
-
-db_link_fn = lambda x, y: add_link(x, y, underline="yes", underlinecolor="#5e81ac")
-df = (
-    (
-        (
-            pl.read_parquet(all)
-            .select(pl.col(["Gene", "disease", "source", "therapies", "db", "db_link"]))
-            .explode("disease")
-        )
-        .with_columns(
-            pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
-            pl.struct(["db", "db_link"])
-            .map_elements(
-                lambda x: db_link_fn(x["db"], x["db_link"]),
-                return_dtype=pl.String,
-            )
-            .alias("db_link"),
-        )
-        .filter(  # Make sure that the therapies reported are relevant to cancer
-            (pl.col("db") == "pandrugs2")
-            | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
-        )
-        .with_columns(
-            pl.col("disease")
-            .str.replace_many({"cancer": "", "clinical": ""})
-            .str.replace("", "unspecified")
-            .map_elements(str.capitalize, return_dtype=pl.String)
-        )
-    )
-    .explode("therapies")
-    .with_columns(
-        pl.col("therapies")
-        .str.split(":")
-        .list.to_struct(fields=["therapies", "PubChemId"])
-    )
-    .unnest("therapies")
-    .with_columns(
-        pl.col("PubChemId").map_elements(
-            lambda x: (
-                add_link(x, f"{URL.pubchem}/{x}", underline="yes") if x != "NA" else x
-            ),
-            return_dtype=pl.String,
-        ),
-        pl.lit("Gene variation").alias("type"),
-    )
-    .filter(pl.col("therapies").str.contains("[A-Z-a-z]*"))
-    .rename(Rename.therapy)
-).select(list((Rename.therapy).values()))
-
-ResultsReport.build_table(
-    table_spec,
-    ttable_styles,
-    df,
-    "Relevant therapies",
-    "Relevant therapies",
-    None,
-    "/home/shannc/Bio_SDD/chula-stem/tests/therapy_table.pdf",
-)
-
-# "therapy" will be the unique column
 #
 # others = df.filter(pl.col("db") != "pandrugs2")
 # * Treatment
@@ -128,3 +68,37 @@ ResultsReport.build_table(
 # *  Study
 # # Db link
 #
+
+## Repetitive elements
+from chula_stem.utils import add_loc
+from chula_stem.report.spec import Rename
+
+file = "/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv"
+df = pl.read_csv(file, separator="\t", null_values="NA", infer_schema_length=None)
+df = (
+    add_loc(df, start_col="Start", end_col="End")
+    .with_columns(
+        pl.col("ClinGen_report").map_elements(get_clingen_link, return_dtype=pl.String)
+    )
+    .with_columns(
+        pl.struct(s="source", acc="accession")
+        .map_elements(
+            lambda x: (
+                dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
+            ),
+            return_dtype=pl.String,
+        )
+        .alias("source")
+    )
+).rename(Rename.repeat)
+
+
+small = pl.read_parquet(
+        "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/small_all.parquet"
+)
+rel = pl.read_parquet(
+    "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/small_relevant.parquet"
+)
+sv = pl.read_parquet(
+    "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/sv_all.parquet"
+)
