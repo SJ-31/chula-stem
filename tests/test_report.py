@@ -8,11 +8,10 @@ import h5py
 import polars as pl
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
-from chula_stem.report import VTABLE_COL_WIDTHS, Civic, PanDrugs2, TherapyDB
+import chula_stem.report.format as fr
+from chula_stem.databases import Civic, PanDrugs2, TherapyDB
 
-small_path = (
-    "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
-)
+small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
 sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_SV_1.tsv"
 
 # Documents https://docs.reportlab.com/reportlab/userguide/ch5_platypus/#documents-and-templates
@@ -72,43 +71,6 @@ def default_shapes(canvas, doc: BaseDocTemplate):
     canvas.restoreState()
 
 
-# Using Paragraphs to format text for word wrap
-column_style: ParagraphStyle = ParagraphStyle("cols", fontSize=9)
-numeric_style: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
-text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
-data_styles: dict = {1: numeric_style, 2: numeric_style, None: text_style}
-ncols: int = len(res.columns)
-
-# # Dummy styles for now
-col_styles = rp.style_cells(
-    (0, 0),
-    ncols,
-    1,
-    textcolor=colors.red,
-    underline=(3, colors.black),
-    background=colors.lightgrey,
-)
-style_all = rp.style_cells((0, 1), background=colors.lightcyan, valign="TOP")
-test_table = rp.ReportElement(
-    "/home/shannc/Bio_SDD/chula-stem/test2.pdf",
-    {
-        "header_pos": (inch * 5, A4[1] - cm),
-        "header_first": "Relevant Variants",
-        "header_later": "Relevant Variants (continued)",
-    },
-)
-test_table.add_table(
-    res,
-    data_styles,
-    column_style,
-    style_all,
-    col_styles,
-    col_widths=list(VTABLE_COL_WIDTHS.values()),
-)
-# test_table.add_decorator(default_shapes)
-# test_table.build()
-
-
 def test_full():
     R = rp.ResultsReport(
         "/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
@@ -116,6 +78,17 @@ def test_full():
         pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
         vep_small=small_path,
         vep_sv=sv_pat,
+        classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/8-null-ClassifyCNV.tsv",
+        facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
+        cnvkit="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
     )
     R.build()
+
+def test_format_classify():
+    classify_cnv = (
+        "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv"
+    )
+    facets = "/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds"
+    cnvkit = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
+    fr.classify_cnv(classify_cnv, facets, cnvkit)

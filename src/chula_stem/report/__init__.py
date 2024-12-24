@@ -16,57 +16,13 @@ from reportlab.platypus import (
     SimpleDocTemplate,
 )
 from chula_stem.report.spec import (
-    Rename, Widths, URL,
+    Rename,
+    Widths,
 )
 
 STYLES = getSampleStyleSheet()
 
-from chula_stem.callset_qc import IMPACT_MAP
-from chula_stem.databases import add_therapy_info
-from chula_stem.utils import add_loc, read_facets_rds
-
-
-def add_link(text: str, link: str, **kwargs) -> str:
-    """
-    Wrap text in RML link tag. Can use any tag defined in
-        https://docs.reportlab.com/tagref/tag_link/
-    """
-    begin = f'<link href="{link}"'
-    if kwargs:
-        for k, v in kwargs.items():
-            begin = f'{begin} {k}="{v}"'
-    begin = f"{begin}>"
-    return f"{begin}{text}</link>"
-
-
-def get_copy_number(
-    df: pl.DataFrame, facets_path: str = "", cnvkit_path: str = "", cn_col_name="cn"
-) -> pl.DataFrame:
-    """
-    Add a copy number column `cn_col_name` to df
-    by merging with the raw CNV data. df must have the
-    column "Locus", containing the location of the cnv in the form of
-        chromosome:start-end
-    :param format: one of CNVKit|Facets
-    """
-    wanted_cols = df.columns + [cn_col_name]
-    if facets_path:
-        facets: pl.DataFrame = read_facets_rds(facets_path).rename(
-            {"tcn.em": cn_col_name}
-        )
-        facets = add_loc(facets, "chrom")
-        df = df.join(facets, how="left", on="Locus")
-    if cnvkit_path:
-        cnvkit: pl.DataFrame = pl.read_csv(
-            cnvkit_path, separator="\t", null_values="NA"
-        )
-        cnvkit = add_loc(cnvkit)
-        df = df.join(cnvkit, how="left", on="Locus")
-    if facets_path and cnvkit_path:
-        df = df.with_columns(
-            pl.coalesce([cn_col_name, f"{cn_col_name}_right"]).alias(cn_col_name)
-        )
-    return df.select(wanted_cols)
+import chula_stem.report.format as fr
 
 
 def filter_format_vep(input: str, sep="\t"):
@@ -206,126 +162,30 @@ class ResultsReport:
         facets: str = "",
         cnvkit: str = "",
         tmpdir: str = "temp",
-        call_all: bool = True,
     ) -> None:
         self.civic_cache = civic_cache
         self.pandrugs2_cache = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.tmpdir = tmpdir
 
-        if call_all:
-            try:
-                os.makedirs(self.tmpdir)
-            except FileExistsError:
-                print("WARNING: directory exists")
-            os.chdir(self.tmpdir)
-            self._format_vep(vep_small, "small")
-            self._format_vep(vep_sv, "sv")
-            self._format_classifycnv(classify_cnv, facets, cnvkit)
-
-    def _format_classifycnv(
-        self,
-        classifycnv_path: str,
-        facets_path: str = "",
-        cnvkit_path: str = "",
-    ) -> None:
-        cnv = pl.read_csv(
-            classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
-        ).with_columns(
-            pl.struct(s="source", acc="accession")
-            .map_elements(
-                lambda x: (
-                    self._format_dbvar_link(x["acc"]) if x["acc"] != "NA" else x["s"]
-                ),
-                return_dtype=pl.String,
-            )
-            .alias("source")
-        )
-        wanted_cols = ["Locus"] + list(Rename.cnv.values())
-        cnv = (
-            cnv.with_columns(
-                pl.concat_str(["Start", "End"], separator="-").alias("range"),
-            )
-            .with_columns(
-                pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
-            )
-            .rename(Rename.cnv)
-        ).select(wanted_cols)
-        cn_col = "Estimated Copy Number"
-        wanted_cols.insert(1, cn_col)
-        with_cn = get_copy_number(
-            cnv, facets_path, cnvkit_path, cn_col_name="cn"
-        ).rename({"cn": cn_col}).selekt(wanted_cols)
-        relevant = with_cn.filter(
-            pl.col("Known/predicted dosage-sensitive genes").is_not_null()
-        )
-        nonrelevant = with_cn.filter(
-            pl.col("Known/predicted dosage-sensitive genes").is_null()
-        )
-        self.data["relevant"]["cnv"] = relevant
-        self.data["nonrelevant"]["cnv"] = nonrelevant
-        self.data["all"]["cnv"] = with_cn
-
-    @staticmethod
-    def _format_dbvar_link(x) -> str:
-        link = add_link(x, f"{URL.dbvar}/{x}", underline="yes")
-        return f"dbVar:{link}"
-
-    def _format_vep(self, vep_path: str, variant_class: str) -> None:
-        """Format and filter vep output into a dataframe with values ready to write
-        into a reportlab table
-        """
-        r_out = f"{self.tmpdir}/{variant_class}_relevant.parquet"
-        nr_out = f"{self.tmpdir}/{variant_class}_non-relevant.parquet"
-        all_out = f"{self.tmpdir}/{variant_class}_all.parquet"
-        if os.path.exists(r_out) and os.path.exists(nr_out) and os.path.exists(all_out):
-            # self._read_vep_saved(r_out, nr_out, all_out, variant_class)
-            for c, p in zip(
-                ["relevant", "nonrelevant", "all"], [r_out, nr_out, all_out]
-            ):
-                self.data[c][variant_class] = pl.read_parquet(p)
-            return
-        var_col: str = "Database Name"  # New column for 'Existing_variation'
-        with_therapeutics: pl.DataFrame = add_therapy_info(
-            vep_path, self.civic_cache, self.pandrugs2_cache
-        )
-        wanted_cols: list = list(Rename.sv_snp.values())
-        with_therapeutics = (
-            with_therapeutics.drop("Gene")
-            .rename(Rename.sv_snp)
-            .with_columns(
-                pl.col("HGVS").str.extract(r".*:(.*)$", 1),
-                pl.col("Variant Type").str.replace("_variant$", ""),
-                (pl.col("Variant Allele Frequency").cast(pl.Float64) * 100)
-                .round(3)
-                .map_elements(lambda x: f"{x}%", return_dtype=pl.String),
-            )
-            .with_columns(
-                cs.by_dtype(pl.String)
-                .fill_null("-")
-                .str.replace_all("&", ", ", literal=True)
-                .str.replace_all("_", " ", literal=True),
-            )
-        )
-        confident = (
-            with_therapeutics.filter(
-                (pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1")
-            )
-            .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
-            .sort(pl.col("impact_score"), descending=True)
-        )
-        others = with_therapeutics.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
-        self.data["relevant"][variant_class] = confident.select(wanted_cols)
-        self.data["nonrelevant"][variant_class] = others.select(wanted_cols)
-        self.data["all"][variant_class] = with_therapeutics
-        for category, path in zip(
-            ["relevant", "nonrelevant", "all"], [r_out, nr_out, all_out]
+        try:
+            os.makedirs(self.tmpdir)
+        except FileExistsError:
+            print("WARNING: directory exists")
+        os.chdir(self.tmpdir)
+        calls = [
+            lambda: fr.vep_fmt(vep_small, tmpdir, "small", civic_cache, pandrugs2_cache),
+            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
+            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
+        ]
+        for type, fn_call in zip(
+            ["small", "sv", "cnv"],
+            calls,
         ):
-            self.data[category][variant_class].write_parquet(path)
-
-            # self.data[category][variant_class].with_columns(
-            #     cs.by_dtype(pl.List(pl.String)).list.join(";")
-            # ).write_csv(path, separator="\t", null_value="NA")
+            all, relevant, nonrelevant = fn_call()
+            self.data["relevant"][type] = relevant
+            self.data["nonrelevant"][type] = nonrelevant
+            self.data["all"][type] = all
 
     @staticmethod
     def build_table(
