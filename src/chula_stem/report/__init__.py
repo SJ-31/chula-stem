@@ -16,12 +16,7 @@ from reportlab.platypus import (
     SimpleDocTemplate,
 )
 from chula_stem.report.spec import (
-    VTABLE_COL_WIDTHS,
-    CTABLE_WIDTHS,
-    VTABLE_COL_WIDTHS,
-    CTABLE_RENAME,
-    VTABLE_RENAME,
-    URLS,
+    Rename, Widths, URL,
 )
 
 STYLES = getSampleStyleSheet()
@@ -246,7 +241,7 @@ class ResultsReport:
             )
             .alias("source")
         )
-        wanted_cols = ["Locus"] + list(CTABLE_RENAME.values())
+        wanted_cols = ["Locus"] + list(Rename.cnv.values())
         cnv = (
             cnv.with_columns(
                 pl.concat_str(["Start", "End"], separator="-").alias("range"),
@@ -254,7 +249,7 @@ class ResultsReport:
             .with_columns(
                 pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
             )
-            .rename(CTABLE_RENAME)
+            .rename(Rename.cnv)
         ).select(wanted_cols)
         cn_col = "Estimated Copy Number"
         wanted_cols.insert(1, cn_col)
@@ -273,7 +268,7 @@ class ResultsReport:
 
     @staticmethod
     def _format_dbvar_link(x) -> str:
-        link = add_link(x, f"{URLS['dbvar']}/{x}", underline="yes")
+        link = add_link(x, f"{URL.dbvar}/{x}", underline="yes")
         return f"dbVar:{link}"
 
     def _format_vep(self, vep_path: str, variant_class: str) -> None:
@@ -294,10 +289,10 @@ class ResultsReport:
         with_therapeutics: pl.DataFrame = add_therapy_info(
             vep_path, self.civic_cache, self.pandrugs2_cache
         )
-        wanted_cols: list = list(VTABLE_RENAME.values())
+        wanted_cols: list = list(Rename.sv_snp.values())
         with_therapeutics = (
             with_therapeutics.drop("Gene")
-            .rename(VTABLE_RENAME)
+            .rename(Rename.sv_snp)
             .with_columns(
                 pl.col("HGVS").str.extract(r".*:(.*)$", 1),
                 pl.col("Variant Type").str.replace("_variant$", ""),
@@ -377,7 +372,7 @@ class ResultsReport:
             "header_pstyles": ParagraphStyle("cols", fontSize=9),
             "cell_styles": cell_styles,
             "header_styles": header_styles,
-            "col_widths": list(VTABLE_COL_WIDTHS.values()),
+            "col_widths": list(Widths.sv_snp.values()),
         }
         # Report is in the following order
         # TODO: create universal footer/header spec for tables
