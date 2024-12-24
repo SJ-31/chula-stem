@@ -310,19 +310,21 @@ def _format_vep_vcf(
     if not ad:
         df = df.with_columns(Alt_depth=pl.lit(None))
     else:
-        replace_dots = cs.starts_with("VAF").str.replace(",.", "", literal=True)
         alt_cols = list(filter(lambda x: "Alt_depth" in x, vaf_ad_cols))
         ad_split = [
             pl.col(x).str.split(",").list.get(1, null_on_oob=True) for x in alt_cols
         ]
-        df = (
-            df.with_columns(ad_split)
-            .cast({a: pl.Int32 for a in alt_cols})
-            .with_columns(replace_dots)
-        )
-    df = df.select(
+        df = df.with_columns(ad_split).cast({a: pl.Int32 for a in alt_cols})
+        if pl.String in df.select(cs.starts_with("VAF")).dtypes:
+            replace_dots = cs.starts_with("VAF").str.replace(",.", "", literal=True)
+            df = df.with_columns(replace_dots)
+
+    wanted_cols = (
         ["Loc", "Ref", "Alt", tool_source_tag, "FILTER"] + vaf_ad_cols + vep_columns
     )
+    if variant_class == "sv":
+        wanted_cols.append("Svtype")
+    df = df.select(wanted_cols)
     df.write_csv(output, separator="\t", null_value="NA")
 
 
