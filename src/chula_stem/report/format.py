@@ -66,11 +66,15 @@ def get_copy_number(
     return df.select(wanted_cols)
 
 
-def classify_cnv(
+def classify_cnv_fmt(
     classifycnv_path,
     facets_path: str = "",
     cnvkit_path: str = "",
 ):
+    """
+    Format cnv data from ClassifyCNV for the report. Includes merging with cnvkit
+    and facets to determine show estimated copy number
+    """
     cnv = pl.read_csv(
         classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
     ).with_columns(

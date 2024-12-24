@@ -121,6 +121,12 @@ class ResultsReport:
         self.civic_cache = civic_cache
         self.pandrugs2_cache = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
+        self.table_styles: dict = {
+            "small": sv_snp_style(),
+            "cnv": cnv_style(),
+        }
+        self.table_styles["sv"] = self.table_styles["small"]
+        # TODO: add in the style for therapies
         self.tmpdir = tmpdir
 
         try:
@@ -129,7 +135,9 @@ class ResultsReport:
             print("WARNING: directory exists")
         os.chdir(self.tmpdir)
         calls = [
-            lambda: fr.vep_fmt(vep_small, tmpdir, "small", civic_cache, pandrugs2_cache),
+            lambda: fr.vep_fmt(
+                vep_small, tmpdir, "small", civic_cache, pandrugs2_cache
+            ),
             lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
             lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
         ]
@@ -163,32 +171,6 @@ class ResultsReport:
         and add header (time + page number)
         """
         table_spec = {"header_pos": (A4[0] - 5 * inch, A4[1] - inch)}
-        numeric_style: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
-        text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
-
-        cell_pstyles: dict = {
-            1: numeric_style,
-            2: numeric_style,
-            None: text_style,
-        }
-        cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
-        header_styles = style_cells(
-            (0, 0),
-            8,
-            1,
-            textcolor=colors.red,
-            underline=(3, colors.black),
-            background=colors.lightgrey,
-        )
-        # Variant table styles
-
-        vtable_styles: dict = {
-            "cell_pstyles": cell_pstyles,
-            "header_pstyles": ParagraphStyle("cols", fontSize=9),
-            "cell_styles": cell_styles,
-            "header_styles": header_styles,
-            "col_widths": list(Widths.sv_snp.values()),
-        }
         # Report is in the following order
         # TODO: create universal footer/header spec for tables
         # TODO: build the pdf for Therapeutic information
@@ -197,42 +179,29 @@ class ResultsReport:
         # TODO: create universal styles for variant tables
         # front_page: ReportElement =
         table_decorator = None
-        self.build_table(
-            table_spec,
-            vtable_styles,
-            self.data["relevant"]["small"],
-            "Relevant Small Variants",
-            "Relevant Small Variants (Continued)",
-            table_decorator,
-            "rs.pdf",
-        )
-        self.build_table(
-            table_spec,
-            vtable_styles,
-            self.data["nonrelevant"]["small"],
-            "Non-relevant Small Variants",
-            "Non-relevant Small Variants (Continued)",
-            table_decorator,
-            "nrs.pdf",
-        )
-        self.build_table(
-            table_spec,
-            vtable_styles,
-            self.data["nonrelevant"]["sv"],
-            "Non-relevant Structural Variants",
-            "Non-relevant Structural Variants (Continued)",
-            table_decorator,
-            "rv.pdf",
-        )
-        self.build_table(
-            table_spec,
-            vtable_styles,
-            self.data["nonrelevant"]["sv"],
-            "Non-relevant Structural Variants",
-            "Non-relevant Structural Variants (Continued)",
-            table_decorator,
-            "nrv.pdf",
-        )
+        for table, name in zip(
+            ["small", "sv", "cnv"],
+            ["Small Variants", "Structural Variants", "Copy Number Variants"],
+        ):
+            style = self.table_styles[table]
+            self.build_table(
+                table_spec,
+                style,
+                self.data["relevant"][table],
+                f"Relevant {name}",
+                f"Relevant {name} (Continued)",
+                table_decorator,
+                f"rel_{name}.pdf",
+            )
+            self.build_table(
+                table_spec,
+                style,
+                self.data["nonrelevant"][table],
+                f"Non-relevant {name}",
+                f"Non-relevant {name} (Continued)",
+                table_decorator,
+                f"rel_{name}.pdf",
+            )
 
 
 class ReportElement:

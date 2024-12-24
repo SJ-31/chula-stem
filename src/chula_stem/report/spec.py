@@ -25,18 +25,22 @@ class Widths:
         "ClinVar": 100,
     }
     cnv = {
-        "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
-        "All protein coding genes": "All genes",
-        "Type": "CNV type",
+        "Locus": 100,
+        "CNV type": 50,
+        "Estimated Copy Number": 40,
+        "Known/predicted dosage-sensitive genes": 90,
+        "All genes": 100,
+        "ClinGen": 50,
+        "Database/Study records": 50,
     }
     therapy = {
-        "Therapy": 50,
-        "PubChemId": 30,
+        "Therapy": 90,
+        "PubChemId": 90,
         "Evidence category": 70,
-        "Relevant evidence": 90,
+        "Evidence in sample": 90,
         "Relevant cancers": 100,
-        "Study": 50,
-        "Database source": 40,
+        "Study": 100,
+        "Database source": 90,
     }
 
 
@@ -60,8 +64,82 @@ class Rename:
         "source": "Database/Study records",
     }
     therapy = {
-        "Gene": "Relevant evidence",
+        "therapies": "Therapy",
+        "PubChemId": "PubChemId",
+        "type": "Evidence category",
+        "Gene": "Evidence in sample",
         "disease": "Relevant cancers",
         "source": "Study source",
         "db_link": "Database source",
+    }
+
+
+NUMERIC_STYLE: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
+TEXT_STYLE: ParagraphStyle = ParagraphStyle("data", fontSize=10)
+
+
+def sv_snp_style():
+    cell_pstyles: dict = {
+        1: NUMERIC_STYLE,
+        2: NUMERIC_STYLE,
+        None: TEXT_STYLE,
+    }
+    cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
+    header_styles = style_cells(
+        (0, 0),
+        8,
+        1,
+        textcolor=colors.red,
+        underline=(3, colors.black),
+        background=colors.lightgrey,
+    )
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": ParagraphStyle("cols", fontSize=9),
+        "cell_styles": cell_styles,
+        "header_styles": header_styles,
+        "col_widths": list(Widths.sv_snp.values()),
+    }
+
+
+def therapy_style():
+    cell_pstyles: dict = {
+        2: NUMERIC_STYLE,
+        None: TEXT_STYLE,
+    }
+    cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
+    header_styles = style_cells(
+        (0, 0),
+        8,
+        1,
+        textcolor=colors.red,
+        underline=(3, colors.black),
+        background=colors.lightgrey,
+    )
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": ParagraphStyle("cols", fontSize=9),
+        "cell_styles": cell_styles,
+        "header_styles": header_styles,
+        "col_widths": list(Widths.therapy.values()),
+    }
+
+
+def cnv_style():
+    cell_pstyles: dict = {0: NUMERIC_STYLE, 2: NUMERIC_STYLE, None: TEXT_STYLE}
+    cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
+    header_styles = style_cells(
+        (0, 0),
+        8,
+        1,
+        textcolor=colors.red,
+        underline=(3, colors.black),
+        background=colors.lightgrey,
+    )
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": ParagraphStyle("cols", fontSize=9),
+        "cell_styles": cell_styles,
+        "header_styles": header_styles,
+        "col_widths": list(Widths.cnv.values()),
     }
