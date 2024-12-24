@@ -26,12 +26,20 @@ class Widths:
     }
     cnv = {
         "Locus": 100,
-        "CNV type": 50,
+        "CNV Type": 50,
         "Estimated Copy Number": 40,
-        "Known/predicted dosage-sensitive genes": 90,
-        "All genes": 100,
+        "Known/predicted Dosage-sensitive Genes": 90,
+        "All Genes": 100,
         "ClinGen": 50,
-        "Database/Study records": 50,
+        "Database/Study Records": 50,
+    }
+    repeat = {
+        "Locus": 50,
+        "Repeat Unit": 50,
+        "Repeat Number": 50,
+        "Affected Gene": 50,
+        "ClinGen": 50,
+        "Database/Study Records": 50,
     }
     therapy = {
         "Therapy": 90,
@@ -57,11 +65,11 @@ class Rename:
         "CLIN_SIG": "ClinVar",
     }
     cnv = {
-        "Type": "CNV type",
-        "Known or predicted dosage-sensitive genes": "Known/predicted dosage-sensitive genes",
-        "All protein coding genes": "All genes",
+        "Type": "CNV Type",
+        "Known or predicted dosage-sensitive genes": "Known/predicted Dosage-sensitive Genes",
+        "All protein coding genes": "All Genes",
         "ClinGen_report": "ClinGen",
-        "source": "Database/Study records",
+        "source": "Database/Study Records",
     }
     therapy = {
         "therapies": "Therapy",
@@ -71,6 +79,13 @@ class Rename:
         "disease": "Relevant cancers",
         "source": "Study source",
         "db_link": "Database source",
+    }
+    repeat = {
+        "repeat_unit_bases": "Repeat Unit",
+        "repeat_times": "Repeat Number",
+        "gene_name": "Affected Gene",
+        "ClinGen_report": "ClinGen",
+        "source": "Database/Study Records",
     }
 
 
@@ -110,7 +125,7 @@ def therapy_style():
     cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
     header_styles = style_cells(
         (0, 0),
-        8,
+        7,
         1,
         textcolor=colors.red,
         underline=(3, colors.black),
@@ -130,7 +145,7 @@ def cnv_style():
     cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
     header_styles = style_cells(
         (0, 0),
-        8,
+        7,
         1,
         textcolor=colors.red,
         underline=(3, colors.black),
@@ -142,4 +157,24 @@ def cnv_style():
         "cell_styles": cell_styles,
         "header_styles": header_styles,
         "col_widths": list(Widths.cnv.values()),
+    }
+
+
+def repeat_style():
+    cell_pstyles: dict = {2: NUMERIC_STYLE, None: TEXT_STYLE}
+    cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
+    header_styles = style_cells(
+        (0, 0),
+        6,
+        1,
+        textcolor=colors.red,
+        underline=(3, colors.black),
+        background=colors.lightgrey,
+    )
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": ParagraphStyle("cols", fontSize=9),
+        "cell_styles": cell_styles,
+        "header_styles": header_styles,
+        "col_widths": list(Widths.repeat.values()),
     }

@@ -80,11 +80,45 @@ def get_clingen_link(clingen_str) -> str:
     return add_link(symbol, clingen_str, underline="yes")
 
 
+def msisensor_pro_fmt(msisensor_path: str) -> tuple:
+    wanted_cols = ["Locus"] + list(Rename.repeat.values())
+    df = pl.read_csv(
+        msisensor_path, separator="\t", null_values="NA", infer_schema_length=None
+    )
+    df = (
+        (
+            add_loc(df, start_col="Start", end_col="End")
+            .with_columns(
+                pl.col("ClinGen_report").map_elements(
+                    get_clingen_link, return_dtype=pl.String
+                )
+            )
+            .with_columns(
+                pl.struct(s="source", acc="accession")
+                .map_elements(
+                    lambda x: (
+                        dbvar_link(x["acc"])
+                        if x["acc"] != "NA" and x["acc"]
+                        else x["s"]
+                    ),
+                    return_dtype=pl.String,
+                )
+                .alias("source")
+            )
+        )
+        .rename(Rename.repeat)
+        .fill_null("-")
+    )
+    relevant = df.filter(pl.col("ClinGen") != "-").select(wanted_cols)
+    nonrelevant = df.filter(pl.col("ClinGen") != "-").select(wanted_cols)
+    return df, relevant, nonrelevant
+
+
 def classify_cnv_fmt(
     classifycnv_path,
     facets_path: str = "",
     cnvkit_path: str = "",
-):
+) -> tuple:
     """
     Format cnv data from ClassifyCNV for the report. Includes merging with cnvkit
     and facets to determine show estimated copy number
@@ -106,15 +140,8 @@ def classify_cnv_fmt(
     #   dosage-sensitive genes in the R script
     wanted_cols = ["Locus"] + list(Rename.cnv.values())
     cnv = (
-        (
-            cnv.with_columns(
-                pl.concat_str(["Start", "End"], separator="-").alias("range"),
-            )
-            .with_columns(
-                pl.concat_str(["Chromosome", "range"], separator=":").alias("Locus"),
-            )
-            .rename(Rename.cnv)
-        )
+        add_loc(cnv, start_col="Start", end_col="End", chr_col="Chromosome")
+        .rename(Rename.cnv)
         .group_by("Locus")
         .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
         .with_columns(pl.col("ClinGen").list.join(", "))
@@ -126,9 +153,11 @@ def classify_cnv_fmt(
         .rename({"cn": cn_col})
         .select(wanted_cols)
     ).fill_null("-")
-    relevant = with_cn.filter(pl.col("Known/predicted dosage-sensitive genes") != "-")
+    relevant = with_cn.filter(
+        pl.col("Known/predicted Dosage-sensitive Genes") != "-"
+    )
     nonrelevant = with_cn.filter(
-        pl.col("Known/predicted dosage-sensitive genes") == "-"
+        pl.col("Known/predicted Dosage-sensitive Genes") == "-"
     )
     return with_cn, relevant, nonrelevant
 
@@ -181,6 +210,66 @@ def vep_fmt(
     all = with_therapeutics
     relevant = confident.select(wanted_cols)
     nonrelevant = others.select(wanted_cols)
-    for df, path in zip([all, relevant, nonrelevant], [r_out, nr_out, all_out]):
+    for df, path in zip([relevant, nonrelevant, all], [r_out, nr_out, all_out]):
         df.write_parquet(path)
     return all, relevant, nonrelevant
+
+
+def therapy_fmt(parquet_path):
+    # TODO: must include signatures
+    db_link_fn = lambda x, y: add_link(x, y, underline="yes", underlinecolor="#5e81ac")
+    df = (
+        (
+            (
+                pl.read_parquet(parquet_path)
+                .select(
+                    pl.col(["Gene", "disease", "source", "therapies", "db", "db_link"])
+                )
+                .explode("disease")
+            )
+            .with_columns(
+                pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
+                pl.struct(["db", "db_link"])
+                .map_elements(
+                    lambda x: db_link_fn(x["db"], x["db_link"]),
+                    return_dtype=pl.String,
+                )
+                .alias("db_link"),
+            )
+            .filter(  # Make sure that the therapies reported are relevant to cancer
+                (pl.col("db") == "pandrugs2")
+                | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
+            )
+            .with_columns(
+                pl.col("disease")
+                .str.replace_many({"cancer": "", "clinical": ""})
+                .str.replace("", "unspecified")
+                .map_elements(str.capitalize, return_dtype=pl.String)
+            )
+        )
+        .explode("therapies")
+        .with_columns(
+            pl.col("therapies")
+            .str.split(":")
+            .list.to_struct(fields=["therapies", "PubChemId"])
+        )
+        .unnest("therapies")
+        .with_columns(
+            pl.col("PubChemId").map_elements(
+                lambda x: (
+                    add_link(x, f"{URL.pubchem}/{x}", underline="yes")
+                    if x != "NA"
+                    else x
+                ),
+                return_dtype=pl.String,
+            ),
+            pl.lit("Gene variation").alias("type"),
+        )
+        .filter(pl.col("therapies").str.contains("[A-Z-a-z]*"))
+        .rename(Rename.therapy)
+    ).select(list((Rename.therapy).values()))
+    relevant = df.filter(
+        (pl.col("Relevant cancers") != "Unspecified") & (pl.col("Study source") != "NA")
+    )
+    nonrelevant = df.filter(~pl.col("Therapy").is_in(relevant["Therapy"]))
+    return df, relevant, nonrelevant

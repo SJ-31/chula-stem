@@ -3,12 +3,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
+import pytest
 import polars as pl
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
 
 small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
-sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_SV_1.tsv"
+sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/sv2.tsv"
 
 # Documents https://docs.reportlab.com/reportlab/userguide/ch5_platypus/#documents-and-templates
 # Create a list of flowables and pass it to Doc.build()
@@ -37,22 +38,6 @@ PHEIGHT = A4[1]
 
 # You can work in cm by converting doc.width (or height) with the `units` module like so:
 # doc.width/units.cm
-
-sample = "/home/shannc/Bio_SDD/chula-stem/tests/report_sample.tsv"
-if not Path(sample).exists():
-    R = rp.ResultsReport(
-        "dummy",
-        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
-        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
-        vep_small=small_path,
-        vep_sv=sv_pat,
-    )
-    res = R.data["all"]["small"]
-    res.write_csv(sample, separator="\t", null_value="NA")
-else:
-    res = pl.read_csv(sample, separator="\t", null_values="NA")
-
-
 # Use a doc template to enable the table to be split across multiple pages
 out = "/home/shannc/Bio_SDD/chula-stem/test.pdf"
 # For doc coordinates, (0, 0) is the bottom left corner
@@ -67,6 +52,7 @@ def default_shapes(canvas, doc: BaseDocTemplate):
     canvas.restoreState()
 
 
+# @pytest.mark.skip(reason="Done")
 def test_full():
     from chula_stem.report import ResultsReport
 
@@ -79,11 +65,13 @@ def test_full():
         classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
         facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
         cnvkit="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
+        msisensor_pro="/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
     )
     R.build()
 
 
+@pytest.mark.skip(reason="Done")
 def test_format_classify():
     from chula_stem.report.format import classify_cnv_fmt
 
@@ -93,3 +81,27 @@ def test_format_classify():
     facets = "/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds"
     cnvkit = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
     classify_cnv_fmt(classify_cnv, facets, cnvkit)
+
+
+@pytest.mark.skip(reason="Done")
+def test_format_vep_sv():
+    from chula_stem.report.format import vep_fmt
+
+    try:
+        os.mkdir("/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv")
+    except:
+        pass
+    vep_fmt(
+        sv_pat,
+        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
+        variant_class="sv",
+        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
+        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
+    )
+    vep_fmt(
+        small_path,
+        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
+        variant_class="small",
+        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
+        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
+    )

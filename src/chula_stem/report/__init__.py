@@ -15,7 +15,7 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
 )
-from chula_stem.report.spec import cnv_style, sv_snp_style
+from chula_stem.report.spec import cnv_style, sv_snp_style, repeat_style
 
 STYLES = getSampleStyleSheet()
 
@@ -116,6 +116,7 @@ class ResultsReport:
         classify_cnv: str = "",
         facets: str = "",
         cnvkit: str = "",
+        msisensor_pro: str = "",
         tmpdir: str = "temp",
     ) -> None:
         self.civic_cache = civic_cache
@@ -124,6 +125,7 @@ class ResultsReport:
         self.table_styles: dict = {
             "small": sv_snp_style(),
             "cnv": cnv_style(),
+            "repeat": repeat_style(),
         }
         self.table_styles["sv"] = self.table_styles["small"]
         # TODO: add in the style for therapies
@@ -140,9 +142,10 @@ class ResultsReport:
             ),
             lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
             lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
+            lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]
         for type, fn_call in zip(
-            ["small", "sv", "cnv"],
+            ["small", "sv", "cnv", "repeat"],
             calls,
         ):
             all, relevant, nonrelevant = fn_call()
@@ -180,8 +183,13 @@ class ResultsReport:
         # front_page: ReportElement =
         table_decorator = None
         for table, name in zip(
-            ["small", "sv", "cnv"],
-            ["Small Variants", "Structural Variants", "Copy Number Variants"],
+            ["small", "sv", "cnv", "repeat"],
+            [
+                "Small Variants",
+                "Structural Variants",
+                "Copy Number Variants",
+                "Tandem Repeats",
+            ],
         ):
             style = self.table_styles[table]
             self.build_table(
