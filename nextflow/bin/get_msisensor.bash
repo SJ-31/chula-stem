@@ -17,7 +17,7 @@ awk 'BEGIN { OFS = "\t"}; FNR != 1 {print $1,$2,(length($5) * $4) + $2}' "${inpu
 # - This results in finding the repetitive sequences contained within transcript ranges
 echo -e "chromosome\tlocation\tstop\tgene_start\tgene_stop\tgene_name" > overlapping.tsv
 awk '{ if ($3 == "transcript") { print }}' "${gff}" | gff2bed | sort - | \
-    bedtools intersect -a sites.bed -b stdin -loj | \
+    bedtools intersect -a msi_sites.bed -b stdin -loj | \
     awk 'BEGIN { OFS = "\t" }
     {
         split($13, splits, ";")
@@ -34,9 +34,11 @@ awk '{ if ($3 == "transcript") { print }}' "${gff}" | gff2bed | sort - | \
 
 Rscript -e "
 library('tidyverse')
-u <- read_tsv(\"${unstable}\")
+u <- read_tsv(\"${input}\")
+u\$chromosome <- as.character(u\$chromosome)
 o <- read_tsv('overlapping.tsv')
-result <- inner_join(u, o) |> rename(start = location) |>
+o\$location <- as.numeric(o\$location)
+result <- left_join(u, o) |> rename(start = location) |>
        relocate(all_of(c('stop', 'gene_start', 'gene_stop', 'gene_name')), .after = start)
 write_tsv(result, \"${output}\")
 "

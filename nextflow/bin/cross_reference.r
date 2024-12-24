@@ -45,8 +45,7 @@ overlapping_join <- function(
 
 cross_reference_cnv <- function(input, reference, clingen, wc) {
   data <- read_tsv(input) |>
-    filter(!is.na(Start) & !is.na(End)) |>
-    dplyr::rename(dosage_sensitive = `Known or predicted dosage-sensitive genes`)
+    filter(!is.na(Start) & !is.na(End))
   ref <- read_tsv(reference) |>
     filter(!is.na(start) & !is.na(end)) |>
     mutate(id = row_number())
@@ -63,10 +62,10 @@ cross_reference_cnv <- function(input, reference, clingen, wc) {
     # valid dosage-sensitive genes
 
     result <- result |>
-      separate_longer_delim(dosage_sensitive, ",") |>
+      separate_longer_delim(`Known or predicted dosage-sensitive genes`, ",") |>
       left_join(
         dosage_data,
-        by = join_by(x$dosage_sensitive == y$`GENE/REGION`), na_matches = "never"
+        by = join_by(x$`Known or predicted dosage-sensitive genes` == y$`GENE/REGION`), na_matches = "never"
       ) |>
       select(all_of(c(colnames(result), "ONLINE REPORT")))
   }
