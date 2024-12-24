@@ -1,10 +1,11 @@
 #!/usr/bin/env ipython
 
-
+from rpy2.robjects.packages import importr
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
+import h5py
 import pandas as pd
 import polars as pl
 
@@ -61,7 +62,7 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
     elif caller.lower() == "facets":
         base = importr("base")
         df: pl.DataFrame = (
-            pl.from_pandas(r2pd(base.readRDS(input).rx2("segs")))
+            read_facets_rds(input)
             .select(["chrom", "start", "end", "tcn.em"])
             .rename({"tcn.em": "cn"})
         )
@@ -76,10 +77,7 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
             shell=True,
         )
         df = pl.read_csv(
-            "tmp.bed",
-            separator="\t",
-            new_columns=["chromosome", "start", "end", "cn"],
-            dtypes=[pl.String, pl.Int64, pl.Int64, pl.Int64],
+            "tmp.bed", separator="\t", new_columns=["chromosome", "start", "end", "cn"]
         )
         run("rm tmp.bed", shell=True)
     else:
@@ -236,9 +234,7 @@ def format_vep_vcf(
 def in_vcf_header(vcf: str, string: str) -> bool:
     from subprocess import run
 
-    return (
-        run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
-    )
+    return run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
 
 
 def _format_vep_vcf(
@@ -263,12 +259,10 @@ def _format_vep_vcf(
         capture_output=True,
         check=True,
     )
-    vep_columns: list = re.findall('.*Format: (.*)">', proc.stdout.decode())[
-        0
-    ].split("|")
-    vaf: str = (
-        "[%AF\t]" if in_vcf_header(input, f"##FORMAT=<ID={vaf_tag}") else ""
+    vep_columns: list = re.findall('.*Format: (.*)">', proc.stdout.decode())[0].split(
+        "|"
     )
+    vaf: str = "[%AF\t]" if in_vcf_header(input, f"##FORMAT=<ID={vaf_tag}") else ""
     ad: str = "[%AD\t]" if in_vcf_header(input, f"##FORMAT=<ID={ad_tag}") else ""
     vcf_cols: list = [
         "%CHROM:%POS",
@@ -295,12 +289,8 @@ def _format_vep_vcf(
     )
     qstring = "\t".join(list(filter(lambda x: x, vcf_cols))).replace("]\t", "]")
     runstr = rf"bcftools query -f '{qstring}' -s '{sample_flag}' {input}"
-    proc2: CompletedProcess = run(
-        runstr, shell=True, capture_output=True, check=True
-    )
-    columns = (
-        ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
-    )
+    proc2: CompletedProcess = run(runstr, shell=True, capture_output=True, check=True)
+    columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
     df = (
         pl.read_csv(
             io.StringIO(proc2.stdout.decode()),
@@ -311,9 +301,7 @@ def _format_vep_vcf(
         )
         .with_columns(pl.col("ANN").str.split(","))
         .explode("ANN")
-        .with_columns(
-            pl.col("ANN").str.split("|").list.to_struct(fields=vep_columns)
-        )
+        .with_columns(pl.col("ANN").str.split("|").list.to_struct(fields=vep_columns))
         .unnest("ANN")
         .pipe(empty_string2null)
     )
@@ -325,8 +313,7 @@ def _format_vep_vcf(
         replace_dots = cs.starts_with("VAF").str.replace(",.", "", literal=True)
         alt_cols = list(filter(lambda x: "Alt_depth" in x, vaf_ad_cols))
         ad_split = [
-            pl.col(x).str.split(",").list.get(1, null_on_oob=True)
-            for x in alt_cols
+            pl.col(x).str.split(",").list.get(1, null_on_oob=True) for x in alt_cols
         ]
         df = (
             df.with_columns(ad_split)
@@ -334,8 +321,26 @@ def _format_vep_vcf(
             .with_columns(replace_dots)
         )
     df = df.select(
-        ["Loc", "Ref", "Alt", tool_source_tag, "FILTER"]
-        + vaf_ad_cols
-        + vep_columns
+        ["Loc", "Ref", "Alt", tool_source_tag, "FILTER"] + vaf_ad_cols + vep_columns
     )
     df.write_csv(output, separator="\t", null_value="NA")
+
+
+def add_loc(
+    df: pl.DataFrame,
+    chr_col: str = "chromosome",
+    start_col: str = "start",
+    end_col: str = "end",
+    loc_name: str = "Locus",
+    prepend_chr: bool = True,
+) -> pl.DataFrame:
+    return (
+        df.with_columns(__range=pl.concat_str([start_col, end_col], separator="-"))
+        .with_columns(
+            pl.concat_str([chr_col, "__range"], separator=":").alias(loc_name)
+        )
+        .with_columns(
+            pl.when(prepend_chr).then(pl.col(loc_name).str.replace("^", "chr"))
+        )
+        .drop("__range")
+    )
