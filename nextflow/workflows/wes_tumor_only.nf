@@ -64,8 +64,9 @@ workflow whole_exome_tumor_only {
     // Structural variants
 
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
-    MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
-                 params.ref.genome_gff, 5)
+    // BUG: enable when this is fixed
+    // MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
+    //              params.ref.genome_gff, 5)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
@@ -164,9 +165,11 @@ workflow whole_exome_tumor_only {
      * Variant annotation
      */
     // QC for VEP will be carried out separately
-    VEP(STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("VEP_small", it) })
-        .mix(CONCAT_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })),
-        params.ref.genome, 7)
+    to_vep_small = STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("VEP_small", it) })
+                                          .map({ params.addVclass("small", it) })
+    to_vep_sv = CONCAT_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })
+                                 .map({ params.addVclass("sv", it) })
+    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
     SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 

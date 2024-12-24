@@ -177,9 +177,11 @@ workflow whole_exome {
     /*
      * Variant annotation
      */
-    VEP(small_all.map({ params.addSuffix("VEP_small", it) })
-        .mix(sv_all.map({ params.addSuffix("VEP_SV", it) })),
-        params.ref.genome, 7)
+    to_vep_small = small_all.map({ params.addSuffix("VEP_small", it) })
+                            .map({ params.addVclass("small", it) })
+    to_vep_sv = sv_all.map({ params.addSuffix("VEP_SV", it) })
+                      .map({ params.addVclass("sv", it) })
+    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
 
     SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true, "", 7)
     CLASSIFY_CNV(cnv_bed, 7)

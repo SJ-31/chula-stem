@@ -213,13 +213,27 @@ def make_freec_config(
     help="Name of the tumor sample in the vcf file",
 )
 @click.option(
+    "-c",
+    "--variant_class",
+    required=False,
+    help="Type of variants in file",
+    default="small",
+    type=click.Choice(["small", "sv"]),
+)
+@click.option(
     "-v",
     "--vep_info_field",
     required=True,
     help="Info field in vcf containing VEP annotations",
 )
 def format_vep_vcf(
-    input, output, tumor_sample, normal_sample, vep_info_field, tool_source_tag
+    input,
+    output,
+    tumor_sample,
+    normal_sample,
+    vep_info_field,
+    tool_source_tag,
+    variant_class,
 ):
     _format_vep_vcf(
         input,
@@ -228,6 +242,7 @@ def format_vep_vcf(
         normal_sample,
         vep_info_field,
         tool_source_tag,
+        variant_class=variant_class,
     )
 
 
@@ -246,6 +261,7 @@ def _format_vep_vcf(
     tool_source_tag: str = "TOOL_SOURCE",
     vaf_tag: str = "AF",
     ad_tag: str = "AD",
+    variant_class: str = "small",
 ):
     import io
     import re
@@ -287,10 +303,13 @@ def _format_vep_vcf(
     sample_flag: str = (
         f"{tumor_sample},{normal_sample}" if normal_sample else tumor_sample
     )
+    columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
+    if variant_class == "sv":
+        columns.insert(3, "SVTYPE")
+        vcf_cols.insert(3, "%INFO/SVTYPE")
     qstring = "\t".join(list(filter(lambda x: x, vcf_cols))).replace("]\t", "]")
     runstr = rf"bcftools query -f '{qstring}' -s '{sample_flag}' {input}"
     proc2: CompletedProcess = run(runstr, shell=True, capture_output=True, check=True)
-    columns = ["Loc", "Ref", "Alt"] + vaf_ad_cols + [tool_source_tag, "FILTER", "ANN"]
     df = (
         pl.read_csv(
             io.StringIO(proc2.stdout.decode()),
@@ -323,7 +342,7 @@ def _format_vep_vcf(
         ["Loc", "Ref", "Alt", tool_source_tag, "FILTER"] + vaf_ad_cols + vep_columns
     )
     if variant_class == "sv":
-        wanted_cols.append("Svtype")
+        wanted_cols.append("SVTYPE")
     df = df.select(wanted_cols)
     df.write_csv(output, separator="\t", null_value="NA")
 

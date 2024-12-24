@@ -23,6 +23,8 @@ process VEP {
     html = Utils.getName(module_number, meta, "VEP_summary", "html")
     check = file("$meta.out/$output")
     check2 = file("$meta.out/$tsv")
+    variant_class = meta.variant_class ? meta.variant_class : "small"
+    // One of "sv" or "small"
     args = task.ext.args.join(" ")
     if (check.exists() && check2.exists()) {
         """
@@ -48,7 +50,7 @@ process VEP {
             --output_file $output
 
         format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} \\
-            -v ANN -r ${meta.RGSM_tumor} -n ${meta.RGSM_normal}
+            -c ${variant_class} -v ANN -r ${meta.RGSM_tumor} -n ${meta.RGSM_normal}
 
         get_nextflow_log.bash vep.log
         """
