@@ -3,13 +3,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
-import chula_stem.report as rp
-import h5py
 import polars as pl
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
-import chula_stem.report.format as fr
-from chula_stem.databases import Civic, PanDrugs2, TherapyDB
 
 small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
 sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_SV_1.tsv"
@@ -72,23 +68,28 @@ def default_shapes(canvas, doc: BaseDocTemplate):
 
 
 def test_full():
-    R = rp.ResultsReport(
+    from chula_stem.report import ResultsReport
+
+    R = ResultsReport(
         "/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
         civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
         pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
         vep_small=small_path,
         vep_sv=sv_pat,
-        classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/8-null-ClassifyCNV.tsv",
+        classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
         facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
         cnvkit="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
     )
     R.build()
 
+
 def test_format_classify():
+    from chula_stem.report.format import classify_cnv_fmt
+
     classify_cnv = (
         "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv"
     )
     facets = "/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds"
     cnvkit = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
-    fr.classify_cnv(classify_cnv, facets, cnvkit)
+    classify_cnv_fmt(classify_cnv, facets, cnvkit)
