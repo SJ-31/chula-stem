@@ -53,13 +53,14 @@ workflow whole_exome {
                                         "log": "${params.logdir}/${it[0].id}/paired"],
                                         it[1]] }
     tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
-    indices = PREPROCESS_FASTQ.out.bam_index.map({ [it[0].id, it[1]] }).groupTuple()
+    indices = PREPROCESS_FASTQ.out.bam_index.map(params.getId).groupTuple()
     paired = normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
     // Order is important for the first two
     paired_no_id = paired.map { it[1..-1] }
-        // paired_no_id is [meta, normal, tumor, indices]
+    // paired_no_id is [meta, normal, tumor, [normal_index, tumor_index]]
+    // the order of indices doesn't matter, they just need to be present
 
 
     /*

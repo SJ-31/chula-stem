@@ -47,13 +47,14 @@ workflow whole_exome_tumor_only {
                         "log": "${params.logdir}/${it[0].id}/variant_calling"],
                                         it[1]] }
 
-    indices = PREPROCESS_FASTQ.out.bam_index.map({ [it[0].id, it[1]] })
+    indices = PREPROCESS_FASTQ.out.bam_index
     empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
+    all_indices = indices.map(params.getId).mix(empty_indices.map(params.getId))
+        .groupTuple()
 
-    paired = empty_normals.join(tumors)
-        .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
-        .join(indices)
-        .join(empty_indices)
+    paired = empty_normals.map(params.getId).join(tumors)
+        .map({ [it[0]] + [it[2]] + [it[1]] + [it[3]] })
+        .join(all_indices)
 
     paired_no_id = paired.map { it[1..-1] }
 
