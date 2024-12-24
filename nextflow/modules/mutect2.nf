@@ -26,6 +26,7 @@ process MUTECT2 {
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !params.tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
+    args = task.ext.args.join(" ")
     germline_flag = germline_resource != "" ? " --germline-resource ${germline_resource} " : ""
     if (check.exists()) {
         """
