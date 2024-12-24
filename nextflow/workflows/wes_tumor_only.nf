@@ -125,18 +125,19 @@ workflow whole_exome_tumor_only {
     // // in the real run use dbSNP or the combined snps file instead
     // FACETS(FACETS_PILEUP.out.pileup, 5)
 
-    def nullIfNotNum = { it.text.isNumber() ? it.text : null }
+    // TODO: only need this with facets
+    // def nullIfNotNum = { it.text.isNumber() ? it.text : null }
 
     purity_ploidy = paired.map({ [it[0], null, null] })
     // purity_ploidy = FACETS.out.purity_ploidy
     //     .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
-    collected_normals = empty_normals.map({ it[2] }).toList()
     CNVKIT_PREP(Channel.of(["filename": "flat_reference",
                             "out": "${params.outdir}/cnvkit_cnn",
                             "log": "${params.outdir}/cnvkit_cnn"])
-                            .merge(collected_normals),
-                params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
+                    .merge(Channel.fromPath("${params.configdir}/EMPTY.txt")),
+                params.ref.genome, params.ref.baits_unzipped,
+                params.ref.genome_blacklist, 4)
 
     to_cnvkit = paired.map({ it[0..1] + [it[2]] })
             .join(QC_SMALL.out.vcf.map(params.getId))
