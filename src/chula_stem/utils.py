@@ -5,7 +5,6 @@ from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
-import h5py
 import pandas as pd
 import polars as pl
 

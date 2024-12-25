@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-rename=$(yq ".grch38_rename_file" meta.yaml)
+rename=$(yq ".rename.grch38_nums" meta.yaml)
 testdir=$(yq ".dir.pytest" meta.yaml)
 a="${testdir}/vcf_test.vcf"
 snpsift=$(yq ".tools.snpsift" meta.yaml)
