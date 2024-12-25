@@ -183,7 +183,8 @@ workflow whole_exome {
                       .map({ params.addVclass("sv", it) })
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
 
-    SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true, "", 7)
+    SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true,
+                          "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
     CALLSET_QC_TSV(VEP.out.tsv, params.qc, 8)

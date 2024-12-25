@@ -169,7 +169,8 @@ workflow whole_exome_tumor_only {
     to_vep_sv = CONCAT_SV.out.vcf.map({ params.addSuffix("VEP_SV", it) })
                                  .map({ params.addVclass("sv", it) })
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
-    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true, "", 7)
+    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true,
+                          "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
     CALLSET_QC_TSV(VEP.out.tsv, params.qc, 8)
