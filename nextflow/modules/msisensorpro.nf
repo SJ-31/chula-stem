@@ -14,7 +14,8 @@ process MSISENSORPRO {
     //
 
     output:
-    tuple val(meta), path("*"), emit: tsvs
+    tuple val(meta), path("${prefix}/${unstable}.tsv"), emit: tsv
+    path(prefix)
     path("*.log")
     //
 
@@ -28,17 +29,10 @@ process MSISENSORPRO {
     n_flag = !params.tumor_only ? " -n ${normal} " : ""
     cov_threshold = omics_type == "exome" ? 20 : 15
 
-    check_summary = file("${meta.out}/${prefix}_summary.tsv")
-    check_all = file("${meta.out}/${all}.tsv")
-    check_unstable = file("${meta.out}/${unstable}.tsv")
-    check_dis = file("${meta.out}/${distribution_file}.txt")
-
-    if (check_all.exists() && check_summary.exists() && check_dis.exists() && check_unstable.exists()) {
+    check = file("${meta.out}/${prefix}")
+    if (check.exists()) {
         """
-        ln -sr $check_all .
-        ln -sr $check_unstable .
-        ln -sr $check_dis .
-        ln -sr $check_summary .
+        cp -r ${check} .
         ln -sr ${meta.log}/msisensor.log .
         """
     } else {
@@ -58,6 +52,8 @@ process MSISENSORPRO {
             -o "${unstable}".tsv \\
             g ${gff}
 
+        mkdir ${prefix}
+        mv *tsv ${prefix}
         get_nextflow_log.bash msisensor.log
         """
     }
