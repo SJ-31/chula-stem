@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 
 from collections import Counter
+import re
 from os import replace
 
 import polars as pl
@@ -19,35 +20,6 @@ from reportlab.pdfgen.canvas import Canvas
 table_spec = {"header_pos": (A4[0] - 5 * inch, A4[1] - inch)}
 numeric_style: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
 text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
-
-# TODO: add a style for underlining links and highlighting them
-cell_pstyles: dict = {
-    1: numeric_style,
-    2: numeric_style,
-    None: text_style,
-}
-PUBCHEM_URL: str = "https://pubchem.ncbi.nlm.nih.gov/compound"
-
-cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
-header_styles = style_cells(
-    (0, 0),
-    8,
-    1,
-    textcolor=colors.red,
-    underline=(3, colors.black),
-    background=colors.lightgrey,
-)
-
-ttable_styles: dict = {
-    "cell_pstyles": cell_pstyles,
-    "header_pstyles": ParagraphStyle("cols", fontSize=9),
-    "cell_styles": cell_styles,
-    "header_styles": header_styles,
-    "col_widths": list(Widths.therapy.values()),
-}
-
-
-TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
 # Will have
 # May have to have tables in tables to show the therapy info properly
@@ -69,36 +41,125 @@ TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 # # Db link
 #
 
-## Repetitive elements
-from chula_stem.utils import add_loc
-from chula_stem.report.spec import Rename
+# Is present if sig
+# contributes to more than 100 mutations or exceeds 25% of the mutational activity
 
-file = "/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv"
-df = pl.read_csv(file, separator="\t", null_values="NA", infer_schema_length=None)
-df = (
-    add_loc(df, start_col="Start", end_col="End")
-    .with_columns(
-        pl.col("ClinGen_report").map_elements(get_clingen_link, return_dtype=pl.String)
-    )
-    .with_columns(
-        pl.struct(s="source", acc="accession")
-        .map_elements(
-            lambda x: (
-                dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
-            ),
-            return_dtype=pl.String,
-        )
-        .alias("source")
-    )
-).rename(Rename.repeat)
+total_input_mutations = 55
+solution_activities = "/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/Assignment_Solution_Activities.txt"
+solution_activities = "/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/sol_dummy.txt"
 
-
-small = pl.read_parquet(
-        "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/small_all.parquet"
+abs_threshold: int = (
+    100  # Minimum absolute number of mutations required to be considered
 )
-rel = pl.read_parquet(
-    "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/small_relevant.parquet"
+rel_threshold: float = (
+    0.25  # Minimum percentage of mutational activity to be considered
 )
-sv = pl.read_parquet(
-    "/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv/sv_all.parquet"
+excluded_signatures: list = []
+
+## Signature tabl
+df = pl.read_csv(solution_activities, separator="\t").select(
+    ~cs.by_name(*excluded_signatures)
+)
+signatures: list = df.columns[1:]
+sig_cols = pl.col(signatures)
+samples: pl.Series = df["Samples"]
+replace_expr = [pl.col(s).replace_strict({True: s, False: None}) for s in signatures]
+
+m: pl.Series = df.select(sig_cols).sum_horizontal()
+# Total number of signature mutations per sample
+frequencies = df.with_columns(sig_cols / m).unpivot(
+    on=signatures, index="Samples", variable_name="Signatures", value_name="Frequency"
+)
+
+sums: pl.DataFrame = pl.DataFrame({"Samples": df["Samples"], "m": m})
+filtered = (
+    (
+        df.with_columns((sig_cols > abs_threshold) | ((sig_cols / m) > rel_threshold))
+        .with_columns(replace_expr)
+        .with_columns(Signatures=pl.concat_list(signatures).list.drop_nulls())
+        .select(["Samples", "Signatures"])
+        .join(sums, on="Samples")
+        .explode("Signatures")
+    )
+    .join(frequencies, on=["Samples", "Signatures"])
+    .group_by("Samples")
+    .agg(pl.col(["Signatures", "Frequency"]), pl.col("m").first())
+)
+
+# TODO: Want to display at the top of this table the total number of sig mutations (m),
+# and the fraction m/ (total number of mutations)
+# Should also show the number of sigs before and after filtering
+# Or maybe put those to be a separate
+
+
+def make_sample_table(df) -> pl.DataFrame:
+    """Format a row of the signature df (a single sample) into a df to present with
+    reportlab
+
+    The signature df has four columns: Samples, Signatures, Frequency and m
+    Signatures and Frequency are list columns of the same length, containing the
+    names and frequencies of signatures kept in the sample in their respective orders
+
+    :returns:
+    """
+    data: dict = {"Signature": [], "Frequency": [], "Type": [], "COSMIC": []}
+    return df
+
+
+##
+from bs4 import BeautifulSoup
+from bs4.element import Tag
+from urllib.request import urlopen
+
+COSMIC_URL: str = "https://cancer.sanger.ac.uk/signatures"
+
+
+def parse_cosmic_signature_page(source: str, url: bool = False, collection: str = ""):
+    """
+    Parse COSMIC signature collection page into a polars dataframe
+    Last updated for page when <2024-12-25 Wed>
+    """
+    if source and url:
+        with urlopen(source) as f:
+            bytes = f.read()
+            html = bytes.decode()
+    else:
+        with open(source, "r") as f:
+            html = f.read()
+    soup = BeautifulSoup(html, "html.parser")
+    signatures: list[Tag] = soup.find_all("div", {"class": "signature-card"})
+    aet: str = "Proposed_aetiology"
+    data: dict = {"Signature": [], aet: [], "Link": []}
+    find_collection: str = re.findall(
+        r".*\| (.*) - Mutational Signatures.*", soup.title.text
+    )
+    if find_collection:
+        collection = find_collection[0]
+    for sig in signatures:
+        name: Tag = sig.find("h4", {"class": "signature-card-title"})
+        pa: Tag = sig.find("div", {"class": "signature-card-body"})
+        if name and pa:
+            data["Signature"].append(name.text)
+            pa_desription = pa.text.strip().replace("Proposed Aetiology", "")
+            data[aet].append(pa_desription)
+            if collection:
+                link = f"{COSMIC_URL}/{collection.lower().replace(' ', '-')}/{name.text.lower()}"
+                data["Link"].append(link)
+            else:
+                data["Link"].append(pl.lit(None))
+    df = pl.DataFrame(data).with_columns(Collection=pl.lit(collection))
+    return df
+
+
+urls: list = [
+    "https://cancer.sanger.ac.uk/signatures/sbs/",
+    "https://cancer.sanger.ac.uk/signatures/dbs/",
+    "https://cancer.sanger.ac.uk/signatures/id/",
+    "https://cancer.sanger.ac.uk/signatures/cn/",
+    "https://cancer.sanger.ac.uk/signatures/rna-sbs/",
+]
+
+all_sigs = pl.concat([parse_cosmic_signature_page(u, True) for u in urls])
+all_sigs.write_csv(
+    "/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmicv3.4_signatures.csv"
 )
