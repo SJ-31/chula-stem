@@ -8,6 +8,37 @@ from bs4.element import Tag
 from urllib.request import urlopen
 
 COSMIC_URL: str = "https://cancer.sanger.ac.uk/signatures"
+AET: str = "Proposed_aetiology"
+
+
+def read_page(url: str) -> str:
+    with urlopen(url) as f:
+        bytes = f.read()
+        html = bytes.decode()
+        return html
+
+
+def get_artefacts(soup: BeautifulSoup, collection: str) -> pl.DataFrame:
+    artefact_div: Tag = soup.find(
+        lambda x: any(div.text == "Possible sequencing artefacts" for div in x.children)
+    )
+    artefacts = artefact_div.findChildren("a")
+    if not artefacts:
+        return pl.DataFrame()
+    data: dict = {"Signature": [], "Link": []}
+    for item in artefacts:
+        data["Signature"].append(item.text)
+        href = item.attrs.get("href")
+        if href:
+            link = f"{COSMIC_URL}/{href}"
+        else:
+            link = None
+        data["Link"].append(link)
+    df = pl.DataFrame(data).with_columns(
+        pl.lit("Possible sequencing artefact").alias(AET),
+        pl.lit(collection).alias("Collection"),
+    )
+    return df
 
 
 def parse_cosmic_signature_page(source: str, url: bool = False, collection: str = ""):
@@ -16,16 +47,13 @@ def parse_cosmic_signature_page(source: str, url: bool = False, collection: str 
     Last updated for page when <2024-12-25 Wed>
     """
     if source and url:
-        with urlopen(source) as f:
-            bytes = f.read()
-            html = bytes.decode()
+        html = read_page(source)
     else:
         with open(source, "r") as f:
             html = f.read()
-    soup = BeautifulSoup(html, "html.parser")
+    soup: BeautifulSoup = BeautifulSoup(html, "html.parser")
     signatures: list[Tag] = soup.find_all("div", {"class": "signature-card"})
-    aet: str = "Proposed_aetiology"
-    data: dict = {"Signature": [], aet: [], "Link": []}
+    data: dict = {"Signature": [], AET: [], "Link": []}
     find_collection: str = re.findall(
         r".*\| (.*) - Mutational Signatures.*", soup.title.text
     )
@@ -37,13 +65,16 @@ def parse_cosmic_signature_page(source: str, url: bool = False, collection: str 
         if name and pa:
             data["Signature"].append(name.text)
             pa_desription = pa.text.strip().replace("Proposed Aetiology", "")
-            data[aet].append(pa_desription)
+            data[AET].append(pa_desription)
             if collection:
                 link = f"{COSMIC_URL}/{collection.lower().replace(' ', '-')}/{name.text.lower()}"
                 data["Link"].append(link)
             else:
                 data["Link"].append(pl.lit(None))
     df = pl.DataFrame(data).with_columns(Collection=pl.lit(collection))
+    artefacts: pl.DataFrame = get_artefacts(soup, collection)
+    if not artefacts.is_empty():
+        df = pl.concat([df, artefacts.select(df.columns)])
     return df
 
 
