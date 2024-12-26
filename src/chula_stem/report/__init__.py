@@ -3,6 +3,8 @@ from typing import Callable
 
 import polars as pl
 import polars.selectors as cs
+from pymupdf import Document, Page
+import pymupdf
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -61,16 +63,13 @@ def filter_format_vep(input: str, sep="\t"):
     return df
 
 
-## * Report formatter
-
-
 def draw_paragraph(
     text: str,
     pos: tuple,
     style: ParagraphStyle,
     canvas: Canvas,
     doc: BaseDocTemplate,
-):
+) -> None:
     canvas.saveState()
     para = Paragraph(text, style)
     para.wrap(doc.width, doc.topMargin)
@@ -84,7 +83,7 @@ def add_pstyles(
     """Helper for adding paragraph styles to lists or data in dfs
 
     :param style: A single style which is then applied to all data.
-    Alternatively, a map of column_index -> style specifying styles to
+    Alternatively, a map of column_index > style specifying styles to
     apply to specific columns. A key for 'None' is the default and applied to columns
     not explicitly given
 
@@ -107,59 +106,19 @@ def add_pstyles(
         return [style_fn(row, i) for i, row in enumerate(data)]
 
 
-## ** Report class
-
-
 class ResultsReport:
     def __init__(
-        self,
-        filename: str,
-        pandrugs2_cache: str = "",
-        civic_cache: str = "",
-        vep_small: str = "",
-        vep_sv: str = "",
-        classify_cnv: str = "",
-        facets: str = "",
-        cnvkit: str = "",
-        msisensor_pro: str = "",
-        sigprofiler: str = "",
-        cosmic_reference: str = "",
-        tmpdir: str = "temp",
+        self, filename: str, font: str, bold_font: str, tmpdir: str = "temp"
     ) -> None:
-        self.civic_cache = civic_cache
-        self.pandrugs2_cache = pandrugs2_cache
-        self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
-        self.table_styles: dict = {
-            "small": sv_snp_style(),
-            "cnv": cnv_style(),
-            "repeat": repeat_style(),
-        }
-        self.table_styles["sv"] = self.table_styles["small"]
-        # TODO: add in the style for therapies
-        self.tmpdir = tmpdir
-
+        self.filename: str = filename
+        self.tmpdir: str = tmpdir
+        self.font: str = font
+        self.bold_font: str = bold_font
         try:
             os.makedirs(self.tmpdir)
         except FileExistsError:
             print("WARNING: directory exists")
         os.chdir(self.tmpdir)
-        calls = [
-            lambda: fr.vep_fmt(
-                vep_small, tmpdir, "small", civic_cache, pandrugs2_cache
-            ),
-            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
-            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
-            lambda: fr.msisensor_pro_fmt(msisensor_pro),
-        ]
-        for type, fn_call in zip(
-            ["small", "sv", "cnv", "repeat"],
-            calls,
-        ):
-            all, relevant, nonrelevant = fn_call()
-            self.data["relevant"][type] = relevant
-            self.data["nonrelevant"][type] = nonrelevant
-            self.data["all"][type] = all
-        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
 
     @staticmethod
     def build_table(
@@ -177,6 +136,69 @@ class ResultsReport:
         R.add_decorator(decorator)
         R.build()
 
+
+class VariantCallingReport(ResultsReport):
+    def __init__(
+        self,
+        filename: str,
+        pandrugs2_cache: str = "",
+        civic_cache: str = "",
+        vep_small: str = "",
+        vep_sv: str = "",
+        classify_cnv: str = "",
+        facets: str = "",
+        cnvkit: str = "",
+        msisensor_pro: str = "",
+        sigprofiler: str = "",
+        cosmic_reference: str = "",
+        tmpdir: str = "temp",
+        font="Helvetica",
+        bold_font="Helvetica-Bold",
+    ) -> None:
+        super().__init__(
+            filename=filename,
+            tmpdir=tmpdir,
+            font=font,
+            bold_font=bold_font,
+        )
+        self.civic_cache: str = civic_cache
+        self.header_y: int = cm
+        self.pandrugs2_cache: str = pandrugs2_cache
+        self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
+        self.files: dict = {"signatures": []}
+        self.table_styles: dict = {
+            "small": sv_snp_style(),
+            "cnv": cnv_style(),
+            "repeat": repeat_style(),
+        }
+        self.table_styles["sv"] = self.table_styles["small"]
+        # TODO: add in the style for therapies
+
+        calls = [
+            lambda: fr.vep_fmt(
+                vep_small, tmpdir, "small", civic_cache, pandrugs2_cache
+            ),
+            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
+            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
+            lambda: fr.msisensor_pro_fmt(msisensor_pro),
+        ]
+        for type, fn_call in zip(
+            ["small", "sv", "cnv", "repeat"],
+            calls,
+        ):
+            all, relevant, nonrelevant = fn_call()
+            self.data["relevant"][type] = relevant
+            self.data["nonrelevant"][type] = nonrelevant
+            self.data["all"][type] = all
+        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
+        self.variant_short_names = ["small", "sv", "cnv", "repeat"]
+        self.variant_long_names = [
+            "Small Variants",
+            "Structural Variants",
+            "Copy Number Variants",
+            "Tandem Repeats",
+        ]
+
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
         and add header (time + page number)
@@ -190,13 +212,8 @@ class ResultsReport:
         # front_page: ReportElement =
         table_decorator = None
         for table, name in zip(
-            ["small", "sv", "cnv", "repeat"],
-            [
-                "Small Variants",
-                "Structural Variants",
-                "Copy Number Variants",
-                "Tandem Repeats",
-            ],
+            self.variant_short_names,
+            self.variant_long_names,
         ):
             style = self.table_styles[table]
             self.build_table(
@@ -206,7 +223,7 @@ class ResultsReport:
                 f"Relevant {name}",
                 f"Relevant {name} (Continued)",
                 table_decorator,
-                f"rel_{name}.pdf",
+                f"rel_{table}.pdf",
             )
             self.build_table(
                 table_spec,
@@ -215,7 +232,7 @@ class ResultsReport:
                 f"Non-relevant {name}",
                 f"Non-relevant {name} (Continued)",
                 table_decorator,
-                f"non-rel_{name}.pdf",
+                f"non-rel_{table}.pdf",
             )
         for n, sample in enumerate(self.data["sigprofiler"]):
             if len(self.data["sigprofiler"]) == 1:
@@ -224,15 +241,53 @@ class ResultsReport:
             else:
                 first = f"Mutational signatures, Sample {n}"
                 last = f"Mutational signatures, Sample {n} (continued)"
-            ResultsReport.build_table(
+            name = f"signatures_{n}.pdf"
+            self.build_table(
                 table_spec,
                 signature_style(),
                 sample,
                 first,
                 last,
                 table_decorator,
-                f"signatures_{n}.pdf",
+                name,
             )
+            self.files["signatures"].append(name)
+
+    def _add_page_numbers(self, page: Page, total_pages: int, offset: int = 1) -> None:
+        n: int = page.number
+        text = f"Page {n + offset} of {total_pages}"
+        page.insert_text(
+            (A4[0] - inch, A4[1] - inch),
+            text,
+            fontsize=20,
+            fontname="Courier-Bold",
+        )
+
+    # TODO: add in the front, back pages
+    # TODO: add in the therapeutic data
+    def merge(self) -> None:
+        toc: list = []
+        doc: Document = pymupdf.open()
+        for t, n in zip(self.variant_short_names, self.variant_long_names):
+            toc.append([1, n, len(doc) + 1])
+            toc.append([2, "Relevant", len(doc) + 1])
+            doc.insert_file(f"rel_{t}.pdf")
+            toc.append([2, "Non-relevant", len(doc) + 1])
+            doc.insert_file(f"non-rel_{t}.pdf")
+
+        toc.append([1, "Mutational signatures", len(doc) + 1])
+        if len(self.files["signatures"]) == 1:
+            doc.insert_file(self.files["signatures"][0])
+        else:
+            for index, s in enumerate(self.files["signatures"]):
+                toc.append([2, f"Sample {index}", len(doc) + 1])
+                doc.insert_file(s)
+
+        total_pages: int = len(doc)
+        for p in doc.pages():
+            self._add_page_numbers(p, total_pages)
+        doc.set_toc(toc)
+        doc.save(self.filename)
 
 
 class ReportElement:
