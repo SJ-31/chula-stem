@@ -23,6 +23,7 @@ process FILTER_MUTECT_CALLS {
     output = Utils.getName(module_number, meta, "Mutect2_filtered", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
+    args_flag = task.ext.args ? "-a ${args}" : ""
     if (check.exists()) {
         """
         ln -sr ${check} .
@@ -30,14 +31,14 @@ process FILTER_MUTECT_CALLS {
         """
     } else {
         """
-        gatk IndexFeatureFile -I ${vcf}
-
-        gatk FilterMutectCalls -V ${vcf} \\
-            --ob-priors ${ro_model} \\
-            --tumor-segmentation ${segmentation} \\
-            --contamination-table ${contamination} \\
-            --reference ${reference} \\
-            -O ${output}
+        filter_mutect_calls.bash -v ${vcf} \\
+            ${args_flag} \\
+            -r ${reference} \\
+            -t ${segmentation} \\
+            -o ${output} \\
+            -m ${ro_model} \\
+            -s ${stats} \\
+            -c ${contamination}
 
         get_nextflow_log.bash filter_mutect_calls.log
         """

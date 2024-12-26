@@ -117,3 +117,5 @@ docs
 /tests/sample.hdf5
 /tests/sample.parquet
 /test2.pdf
+/tests/6-null-SigProfilerAssignment/
+/tests/therapy_table.pdf
