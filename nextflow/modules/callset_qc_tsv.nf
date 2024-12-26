@@ -65,7 +65,7 @@ process CALLSET_QC_TSV {
     } else {
         """
         callset_qc -i ${tsv} \\
-            --tool_source_tag ${params.source_description} \\
+            --tool_source_tag "${params.source_name}" \\
             -o ${output} \\
             ${args} \\
             ${filter_flag} \\
