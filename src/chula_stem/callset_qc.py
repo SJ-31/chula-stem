@@ -143,16 +143,18 @@ def standard_filters(
 ) -> pl.DataFrame:
     filters = accepted_filters.split(",")
     if "Alt_depth_normal" in df.columns:
-        df = df.filter(
+        df = df.cast({"Alt_depth_normal": pl.Float64}).filter(
             (pl.col("Alt_depth_normal") <= max_normal_depth)
             | (pl.col("Alt_depth_normal").is_null())
         )
     if "Alt_depth" in df.columns:
-        df = df.filter(
+        df = df.cast({"Alt_depth": pl.Float64}).filter(
             (pl.col("Alt_depth") >= min_tumor_depth) | (pl.col("Alt_depth").is_null())
         )
     if "VAF" in df.columns:
-        df = df.filter((pl.col("VAF") >= min_vaf) | (pl.col("VAF").is_null()))
+        df = df.cast({"VAF": pl.Float64}).filter(
+            (pl.col("VAF") >= min_vaf) | (pl.col("VAF").is_null())
+        )
     if filters:
         df = df.filter(
             pl.col("FILTER").str.split(";").list.set_intersection(filters).list.len()
