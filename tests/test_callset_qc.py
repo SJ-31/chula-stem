@@ -37,7 +37,7 @@ def test_main():
         "/home/shannc/Bio_SDD/chula-stem/tests/vep/format/vep_qc2.tsv",
         min_tumor_depth=10,
         max_normal_depth=5,
-        min_VAF=0.05,
+        min_vaf=0.05,
         accepted_filters="PASS",
         impact=False,
         canonical=True,

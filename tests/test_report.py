@@ -54,10 +54,10 @@ def default_shapes(canvas, doc: BaseDocTemplate):
 
 # @pytest.mark.skip(reason="Done")
 def test_full():
-    from chula_stem.report import ResultsReport
+    from chula_stem.report import VariantCallingReport
 
-    R = ResultsReport(
-        "/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
+    R = VariantCallingReport(
+        "/home/shannc/Bio_SDD/chula-stem/tests/report_full.pdf",
         civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
         pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
         vep_small=small_path,
@@ -66,9 +66,12 @@ def test_full():
         facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
         cnvkit="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
         msisensor_pro="/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv",
+        sigprofiler="/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/Assignment_Solution_Activities.txt",
+        cosmic_reference="/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmic_signatures_v3.4-2024-12-26.csv",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
     )
     R.build()
+    R.merge()
 
 
 @pytest.mark.skip(reason="Done")
