@@ -9,12 +9,13 @@ process CALLSET_QC_TSV {
 
     input:
     tuple val(meta), path(tsv)
-    val(qc) // A map specifying filters to apply
+    val(qc)
+    // Meta must have a key "qc" whose value is a map specifying filters to apply
     // Currently supported are..
     // -- General
     //  - min_tumor_depth: the minimum number of ALT reads found in the tumor (FORMAT/DP)
     //  - max_normal_depth: the maximum number of ALT reads found in the normal (FORMAT/DP)
-    //  - min_VAF: minimum variant allele frequency in the tumor (FORMAT/VAF)
+    //  - min_vaf: minimum variant allele frequency in the tumor (FORMAT/VAF)
     //  - accepted_filters: A string of FILTER flags that calls must have to be accepted,
     //      separated by ","
     //
@@ -40,7 +41,15 @@ process CALLSET_QC_TSV {
     args = task.ext.args.join(" ")
 
     flags = ["informative", "canonical", "impact", "vaf_adaptive"]
-    all = qc.collect({ k, v ->
+    qc_copy = qc ? qc.clone() : meta.qc.clone()
+    accepted_filters = qc_copy.remove("accepted_filters")
+    if (accepted_filters) {
+        joined = accepted_filters.join(",")
+        filter_flag = "--accepted_filters ${joined}"
+    } else {
+        filter_flag = ""
+    }
+    all = qc_copy.collect({ k, v ->
         if (k in flags) {
             v ? "--${k}" : ""
         } else {
@@ -56,8 +65,10 @@ process CALLSET_QC_TSV {
     } else {
         """
         callset_qc -i ${tsv} \\
+            --tool_source_tag ${params.source_description} \\
             -o ${output} \\
             ${args} \\
+            ${filter_flag} \\
             ${all}
 
         get_nextflow_log.bash qc_tsv.log

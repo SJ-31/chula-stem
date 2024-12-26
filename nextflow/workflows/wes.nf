@@ -177,17 +177,20 @@ workflow whole_exome {
     /*
      * Variant annotation
      */
-    to_vep_small = small_all.map({ params.addSuffix("VEP_small", it) })
-                            .map({ params.addVclass("small", it) })
-    to_vep_sv = sv_all.map({ params.addSuffix("VEP_SV", it) })
-                      .map({ params.addVclass("sv", it) })
+    vep_small_add = ["suffix": "VEP_small", "variant_class": "small", "qc": params.small_qc]
+    to_vep_small = small_all.map({ params.addMeta(vep_small_add, it) })
+
+    vep_sv_add = ["suffix": "VEP_SV", "variant_class": "sv", "qc": params.sv_qc]
+    to_vep_sv = sv_all.map({ params.addMeta(vep_sv_add, it) })
+
+
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
 
     SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
-    CALLSET_QC_TSV(VEP.out.tsv, params.qc, 8)
+    CALLSET_QC_TSV(VEP.out.tsv, "", 8)
     /*
      * Metric collection
      */
