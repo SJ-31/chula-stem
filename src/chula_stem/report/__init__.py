@@ -15,7 +15,12 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
 )
-from chula_stem.report.spec import cnv_style, sv_snp_style, repeat_style
+from chula_stem.report.spec import (
+    cnv_style,
+    signature_style,
+    sv_snp_style,
+    repeat_style,
+)
 
 STYLES = getSampleStyleSheet()
 
@@ -117,6 +122,8 @@ class ResultsReport:
         facets: str = "",
         cnvkit: str = "",
         msisensor_pro: str = "",
+        sigprofiler: str = "",
+        cosmic_reference: str = "",
         tmpdir: str = "temp",
     ) -> None:
         self.civic_cache = civic_cache
@@ -152,6 +159,7 @@ class ResultsReport:
             self.data["relevant"][type] = relevant
             self.data["nonrelevant"][type] = nonrelevant
             self.data["all"][type] = all
+        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
 
     @staticmethod
     def build_table(
@@ -177,7 +185,6 @@ class ResultsReport:
         # Report is in the following order
         # TODO: create universal footer/header spec for tables
         # TODO: build the pdf for Therapeutic information
-        # TODO: build the pdf for Copy number
         # TODO: build the pdf for signature analysis
         # TODO: create universal styles for variant tables
         # front_page: ReportElement =
@@ -209,6 +216,22 @@ class ResultsReport:
                 f"Non-relevant {name} (Continued)",
                 table_decorator,
                 f"non-rel_{name}.pdf",
+            )
+        for n, sample in enumerate(self.data["sigprofiler"]):
+            if len(self.data["sigprofiler"]) == 1:
+                first = "Mutational signatures"
+                last = "Mutational signatures (continued)"
+            else:
+                first = f"Mutational signatures, Sample {n}"
+                last = f"Mutational signatures, Sample {n} (continued)"
+            ResultsReport.build_table(
+                table_spec,
+                signature_style(),
+                sample,
+                first,
+                last,
+                table_decorator,
+                f"signatures_{n}.pdf",
             )
 
 

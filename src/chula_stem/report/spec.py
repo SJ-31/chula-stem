@@ -152,7 +152,7 @@ def cnv_style():
     cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
     header_styles = style_cells(
         (0, 0),
-        5,
+        7,
         1,
         textcolor=colors.red,
         underline=(3, colors.black),
