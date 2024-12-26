@@ -153,9 +153,7 @@ def classify_cnv_fmt(
         .rename({"cn": cn_col})
         .select(wanted_cols)
     ).fill_null("-")
-    relevant = with_cn.filter(
-        pl.col("Known/predicted Dosage-sensitive Genes") != "-"
-    )
+    relevant = with_cn.filter(pl.col("Known/predicted Dosage-sensitive Genes") != "-")
     nonrelevant = with_cn.filter(
         pl.col("Known/predicted Dosage-sensitive Genes") == "-"
     )
@@ -273,3 +271,115 @@ def therapy_fmt(parquet_path):
     )
     nonrelevant = df.filter(~pl.col("Therapy").is_in(relevant["Therapy"]))
     return df, relevant, nonrelevant
+
+
+def format_signature_link(sig: str, link: str) -> str:
+    return add_link(sig, link, underline="yes")
+
+
+def make_signature_table(slice: pl.DataFrame, ref: pl.DataFrame) -> pl.DataFrame:
+    """Format a row of the signature df (a single sample) into a df to present with
+    reportlab
+
+    The signature df has four columns: Samples, Signatures, Frequency and m
+    Signatures and Frequency are list columns of the same length, containing the
+    names and frequencies of signatures kept in the sample in their respective orders
+
+    :returns: a df of formatted data
+    """
+    wanted_cols = [
+        "Signature",
+        "Count",
+        "Frequency",
+        "Collection",
+        "Proposed Aetiology",
+    ]
+    total: int = slice["m"][0]
+    df = (
+        (
+            slice.explode(["Signatures", "Count", "Frequency"])
+            .join(ref, left_on="Signatures", right_on="Signature", how="left")
+            .rename(lambda x: x.replace("_", " "))
+            .with_columns(
+                pl.struct(s="Signatures", l="Link")
+                .map_elements(
+                    lambda x: format_signature_link(x["s"], x["l"]),
+                    return_dtype=pl.String,
+                )
+                .alias("Signature")
+            )
+        )
+        .select(wanted_cols)
+        .rename({"Count": f"Count (Total: {total})"})
+    )
+    return df
+
+
+def sigprofiler_fmt(
+    soln_activities_path: str,
+    cosmic_reference: str,
+    abs_threshold: int = 100,
+    rel_threshold: float = 0.25,
+    excluded_signatures: str = "",
+) -> list[pl.DataFrame]:
+    """Format SigProfilerAssignment results for reportlab
+
+    :param soln_activities_path: Path to SigProfiler "Assignment_Solution_Activities.txt" file
+    :param cosmic_reference: Path to csv file with COSMIC signature metadata
+
+        This function performs some basic filtering on signatures
+    :param abs_threshold: Minimum absolute number of mutations required to be considered
+    :param rel_threshold: Minimum percentage of mutational activity to be considered
+    :param excluded_signatures: Path to file containing signatures to ignore
+        Signatures in this file are spearated by newlines
+
+    :returns: a list of (n mutations in sample, sample dataframe)
+        In case only one sample was provided to SigProfiler, just take the first element
+    """
+    if excluded_signatures:
+        with open(excluded_signatures, "r") as f:
+            excluded: list = f.readlines()
+    else:
+        excluded: list = []
+    df = pl.read_csv(soln_activities_path, separator="\t").select(
+        ~cs.by_name(*excluded)
+    )
+    signatures: list = df.columns[1:]
+    sig_cols = pl.col(signatures)
+    samples: pl.Series = df["Samples"]
+    replace_expr = [
+        pl.col(s).replace_strict({True: s, False: None}) for s in signatures
+    ]
+
+    m: pl.Series = df.select(sig_cols).sum_horizontal()
+    # Total number of signature mutations per sample
+    frequencies = df.with_columns(sig_cols / m).unpivot(
+        on=signatures,
+        index="Samples",
+        variable_name="Signatures",
+        value_name="Frequency",
+    ).with_columns(pl.col("Frequency").round(2))
+    counts = df.with_columns(sig_cols).unpivot(
+        on=signatures, index="Samples", variable_name="Signatures", value_name="Count"
+    )
+
+    sums: pl.DataFrame = pl.DataFrame({"Samples": samples, "m": m})
+    filtered = (
+        (
+            df.with_columns(
+                (sig_cols > abs_threshold) | ((sig_cols / m) > rel_threshold)
+            )
+            .with_columns(replace_expr)
+            .with_columns(Signatures=pl.concat_list(signatures).list.drop_nulls())
+            .select(["Samples", "Signatures"])
+            .join(sums, on="Samples")
+            .explode("Signatures")
+        )
+        .join(frequencies, on=["Samples", "Signatures"])
+        .join(counts, on=["Samples", "Signatures"])
+        .group_by("Samples")
+        .agg(pl.col(["Signatures", "Frequency", "Count"]), pl.col("m").first())
+    )
+    cosmic_data: pl.DataFrame = pl.read_csv(cosmic_reference)
+    formatted = [make_signature_table(s, cosmic_data) for s in filtered.iter_slices(1)]
+    return formatted

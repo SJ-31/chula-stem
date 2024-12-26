@@ -8,7 +8,7 @@ from bs4.element import Tag
 from urllib.request import urlopen
 
 COSMIC_URL: str = "https://cancer.sanger.ac.uk/signatures"
-AET: str = "Proposed_aetiology"
+AET: str = "Proposed_Aetiology"
 
 
 def read_page(url: str) -> str:

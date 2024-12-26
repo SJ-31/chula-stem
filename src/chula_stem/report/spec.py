@@ -41,6 +41,13 @@ class Widths:
         "ClinGen": 50,
         "Database/Study Records": 50,
     }
+    signature = {
+        "Signature": 60,
+        "Count": 60,
+        "Frequency": 60,
+        "Collection": 60,
+        "Proposed Aetiology": 150,
+    }
     therapy = {
         "Therapy": 90,
         "PubChemId": 90,
@@ -145,7 +152,7 @@ def cnv_style():
     cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
     header_styles = style_cells(
         (0, 0),
-        7,
+        5,
         1,
         textcolor=colors.red,
         underline=(3, colors.black),
@@ -157,6 +164,26 @@ def cnv_style():
         "cell_styles": cell_styles,
         "header_styles": header_styles,
         "col_widths": list(Widths.cnv.values()),
+    }
+
+
+def signature_style():
+    cell_pstyles: dict = {1: NUMERIC_STYLE, None: TEXT_STYLE}
+    cell_styles = style_cells((0, 1), background=colors.lightcyan, valign="TOP")
+    header_styles = style_cells(
+        (0, 0),
+        6,
+        1,
+        textcolor=colors.red,
+        underline=(3, colors.black),
+        background=colors.lightgrey,
+    )
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": ParagraphStyle("cols", fontSize=9),
+        "cell_styles": cell_styles,
+        "header_styles": header_styles,
+        "col_widths": list(Widths.signature.values()),
     }
 
 
