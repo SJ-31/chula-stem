@@ -16,7 +16,14 @@ class TherapyDB(ABC):
     api_wait: float
     name: str
     cache: Path
-    shared_cols: tuple = ("gene", "source", "disease", "therapies")
+    shared_cols: tuple = (
+        "gene",
+        "source",
+        "disease",
+        "therapies",
+        "db",
+        "db_link",
+    )
     all_cached: pl.DataFrame
 
     @abstractmethod
@@ -45,7 +52,7 @@ class TherapyDB(ABC):
         for g in gene_list:
             current: pl.DataFrame = self.get_gene(g, confident)
             if not current.is_empty():
-                results.append(current.with_columns(db = pl.lit(self.name)))
+                results.append(current.with_columns(db=pl.lit(self.name)))
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
             df = pl.concat(results, how="vertical_relaxed")
@@ -99,11 +106,13 @@ class TherapyDB(ABC):
 
 ## * Civic database
 
+CIVIC_URL: str = "https://civicdb.org"
+
 
 class Civic(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
-        self.name: str = "civic"
+        self.name: str = "Civic"
         self.api_wait: float = 0.5
         self.cache: Path = self._cache_default("civic", cache)
         self.client: Client = Client(
@@ -137,6 +146,9 @@ class Civic(TherapyDB):
                         link
                         therapies {
                         name
+                        myChemInfo {
+                                pubchemCid
+                            }
                         }
                         evidenceRating
                         variantOrigin
@@ -207,7 +219,6 @@ class Civic(TherapyDB):
             loc: str = Civic.get_loc(entry["coordinates"])
             for mp in entry["molecularProfiles"]["nodes"]:
                 for ev in mp["evidenceItems"]["nodes"]:
-                    ther: list = [t["name"] for t in ev["therapies"]]
                     if d := ev.get("disease"):
                         disease = [d["name"]]
                     else:
@@ -222,7 +233,23 @@ class Civic(TherapyDB):
                     cols["evidenceLevel"].append(ev["evidenceLevel"])
                     cols["source"].append(Civic.format_source(ev["source"]))
                     cols["loc"].append(loc)
-                    cols["therapies"].append(ther)
+                    if ev["therapies"]:
+                        ther: list = [t["name"] for t in ev["therapies"]]
+                        pubchem = []
+                        for t in ev["therapies"]:
+                            if (
+                                t
+                                and (tmp := t.get("myChemInfo", {}))
+                                and (id := tmp.get("pubchemCid"))
+                            ):
+                                pubchem.append(id)
+                            else:
+                                pubchem.append("NA")
+                        pubchem = list(filter(lambda x: x, pubchem))
+                        with_pc = [f"{x}:{y}" for x, y in zip(ther, pubchem)]
+                        cols["therapies"].append(with_pc)
+                    else:
+                        cols["therapies"].append([])
 
         level_mapping: dict = {
             "": 0,
@@ -236,7 +263,8 @@ class Civic(TherapyDB):
         entry_df: pl.DataFrame = pl.DataFrame(cols).cast(schema)
         if entry_df.shape[0] > 0:
             entry_df = entry_df.with_columns(
-                pl.col("evidenceLevel").replace_strict(level_mapping)
+                pl.col("evidenceLevel").replace_strict(level_mapping),
+                pl.col("civicLink").str.replace("^", CIVIC_URL).alias("db_link"),
             )
         else:
             entry_df = entry_df.cast({"evidenceLevel": pl.Int64})
@@ -312,7 +340,7 @@ class PanDrugs2(TherapyDB):
     def __init__(self, cache: str = "") -> None:
         self.url: str = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
         self.api_wait: float = 1
-        self.name: str = "pandrugs2"
+        self.name: str = "PanDrugs2"
         self.session: Session = Session()
         self.cache: Path = self._cache_default("pandrugs2", cache)
 
