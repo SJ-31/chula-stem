@@ -16,7 +16,7 @@ def merge_variant_calls(
     df: pl.DataFrame,
     grouping_cols: list,
     tool_source_tag: str = "TOOL_SOURCE",
-    minimum_callers: int = 3,
+    minimum_callers: int = 2,
     vaf_adaptive: bool = False,
     separator: str = ";",
 ) -> pl.DataFrame:
@@ -39,13 +39,14 @@ def merge_variant_calls(
 
     :returns: filtered tsv file
     """
-    original_shape: tuple = df.shape
     original_cols: list = df.columns
-    to_average: list = ["VAF", "Alt_depth"]
+    to_average: list = []
+    if "VAF" in original_cols:
+        to_average.append("VAF")
+    if "Alt_depth" in original_cols:
+        to_average.append("Alt_depth")
     vep_cols = list(
-        filter(
-            lambda x: not (x in grouping_cols or x in to_average), original_cols
-        )
+        filter(lambda x: not (x in grouping_cols or x in to_average), original_cols)
     )
     split_unique: list = vep_cols
     keep_all: list = to_average + split_unique
@@ -76,8 +77,6 @@ def merge_variant_calls(
     grouped = grouped.with_columns(
         pl.col(split_unique).cast(pl.List(pl.String)).list.join(separator)
     ).select(original_cols)
-    new_shape = grouped.shape
-    print(f"Shape before merging: {original_shape}\nShape after: {new_shape}")
     return grouped
 
 
@@ -129,30 +128,34 @@ def resolve_transcripts(
         if informative:
             group = by_informative(group)
         dfs.append(group)
-    resolved = pl.concat(dfs)
-    return resolved
+    if dfs:
+        resolved = pl.concat(dfs)
+        return resolved
+    return pl.DataFrame(schema=df.schema)
 
 
 def standard_filters(
     df: pl.DataFrame,
     min_tumor_depth: int,
     max_normal_depth: int,
-    min_VAF: float,
+    min_vaf: float,
     accepted_filters: str,
 ) -> pl.DataFrame:
     filters = accepted_filters.split(",")
     if "Alt_depth_normal" in df.columns:
-        df = df.filter(pl.col("Alt_depth_normal") <= max_normal_depth)
+        df = df.filter(
+            (pl.col("Alt_depth_normal") <= max_normal_depth)
+            | (pl.col("Alt_depth_normal").is_null())
+        )
     if "Alt_depth" in df.columns:
-        df = df.filter(pl.col("Alt_depth") >= min_tumor_depth)
+        df = df.filter(
+            (pl.col("Alt_depth") >= min_tumor_depth) | (pl.col("Alt_depth").is_null())
+        )
     if "VAF" in df.columns:
-        df = df.filter(pl.col("VAF") >= min_VAF)
+        df = df.filter((pl.col("VAF") >= min_vaf) | (pl.col("VAF").is_null()))
     if filters:
         df = df.filter(
-            pl.col("FILTER")
-            .str.split(";")
-            .list.set_intersection(filters)
-            .list.len()
+            pl.col("FILTER").str.split(";").list.set_intersection(filters).list.len()
             >= 1
         )
     return df
@@ -160,13 +163,13 @@ def standard_filters(
 
 @click.command()
 @click.option("-o", "--output", required=True, help="Output tsv path")
-@click.option("-i", "--input", required=True, help="Input tsv path")
+@click.option("-i", "--input_tsv", required=True, help="Input tsv path")
 @click.option("--min_tumor_depth", required=True)
 @click.option("--max_normal_depth", required=True)
-@click.option("--min_VAF", required=True)
+@click.option("--min_vaf", required=True)
 @click.option("--impact", required=False, default=False, is_flag=True)
 @click.option("--canonical", required=False, default=False, is_flag=True)
-@click.option("--accepted_filters", required=True)
+@click.option("--accepted_filters", required=False, default="PASS")
 @click.option("--informative", required=False, default=False, is_flag=True)
 @click.option("--min_callers", required=False, default=2)
 @click.option("--vaf_adaptive", required=False, default=False, is_flag=True)
@@ -176,8 +179,8 @@ def qc_main(
     output: str,
     min_tumor_depth: int,
     max_normal_depth: int,
-    min_VAF: float,
-    accepted_filters: list,
+    min_vaf: float,
+    accepted_filters: str,
     impact: bool,
     canonical: bool,
     informative: bool,
@@ -190,7 +193,7 @@ def qc_main(
         output,
         min_tumor_depth,
         max_normal_depth,
-        min_VAF,
+        min_vaf,
         accepted_filters,
         impact,
         canonical,
@@ -206,7 +209,7 @@ def _qc_main(
     output: str,
     min_tumor_depth: int,
     max_normal_depth: int,
-    min_VAF: float,
+    min_vaf: float,
     accepted_filters: str,
     impact: bool,
     canonical: bool,
@@ -221,14 +224,16 @@ def _qc_main(
         infer_schema_length=None,
         null_values=["NA", "."],
     )
+    print(f"Original shape: {df.shape}")
     grouping_cols: list = ["Loc", "Ref", "Alt"]
     df = standard_filters(
         df,
         min_tumor_depth=min_tumor_depth,
         max_normal_depth=max_normal_depth,
-        min_VAF=min_VAF,
+        min_vaf=min_vaf,
         accepted_filters=accepted_filters,
     )
+    print(f"After standard_filters: {df.shape}")
     df = resolve_transcripts(
         df,
         grouping_cols,
@@ -236,6 +241,7 @@ def _qc_main(
         canonical=canonical,
         informative=informative,
     )
+    print(f"After resolve_transcripts: {df.shape}")
     df = merge_variant_calls(
         df,
         grouping_cols,
@@ -243,6 +249,7 @@ def _qc_main(
         minimum_callers=min_callers,
         vaf_adaptive=vaf_adaptive,
     )
+    print(f"After merge_variant_calls: {df.shape}")
     df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
         empty_string2null
     ).write_csv(output, separator="\t", null_value="NA")
