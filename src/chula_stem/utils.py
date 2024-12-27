@@ -19,6 +19,25 @@ def empty_string2null(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def contain_join(
+    x, y, x_start, y_start, y_end, on=None, x_end=None, suffix="_right"
+) -> pl.DataFrame:
+    """
+    Join x and y on rows where columns `x_start` and `x_end` (optional) are contained
+        by the range of `y_start` and `y_end`
+    Does not accept true overlapping joins
+    """
+    predicates = []
+    if on:
+        predicates.extend([pl.col(o) == pl.col(f"{o}{suffix}") for o in on])
+    predicates.extend(
+        [pl.col(y_start) <= pl.col(x_start), pl.col(x_start) <= pl.col(y_end)]
+    )
+    if x_end:
+        predicates.extend([pl.col(x_end) <= pl.col(y_end)])
+    return x.join_where(y, *predicates)
+
+
 def r2pd(robject) -> pd.DataFrame:
     import rpy2.robjects as ro
     from rpy2.robjects import pandas2ri
