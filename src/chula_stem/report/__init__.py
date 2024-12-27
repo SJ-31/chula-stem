@@ -17,6 +17,7 @@ from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
 )
+from chula_stem.databases import get_therapy_df
 from chula_stem.report.spec import (
     cnv_style,
     signature_style,
@@ -173,6 +174,27 @@ class VariantCallingReport(ResultsReport):
         }
         self.table_styles["sv"] = self.table_styles["small"]
         # TODO: add in the style for therapies
+
+        gene_spec = [
+            {"file": vep_small, "column": "SYMBOL"},
+            {"file": vep_sv, "column": "SYMBOL"},
+            {
+                "file": classify_cnv,
+                "is_list": True,
+                "is_list_separator": ",",
+                "column": "All protein coding genes",
+            },
+            {"file": msisensor_pro, "column": "gene_name"},
+        ]
+        therapy_data_cache: str = "therapy_data.parquet"
+        if os.path.exists(therapy_data_cache):
+            therapy_df = pl.read_parquet(therapy_data_cache)
+        else:
+            gene_list = fr.get_genes(gene_spec)
+            therapy_df: pl.DataFrame = get_therapy_df(
+                gene_list, civic_cache=civic_cache, pandrugs2_cache=pandrugs2_cache
+            )
+            therapy_df.write_parquet(therapy_data_cache)
 
         calls = [
             lambda: fr.vep_fmt(

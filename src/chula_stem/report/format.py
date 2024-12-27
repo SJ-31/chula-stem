@@ -18,6 +18,28 @@ from chula_stem.callset_qc import IMPACT_MAP
 
 TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
+def get_genes(file_spec: list[dict]) -> list:
+    unique_genes: set = set()
+    for spec in file_spec:
+        df = pl.read_csv(
+            spec["file"],
+            separator=spec.get("separator", "\t"),
+            null_values=["NA", "."],
+            infer_schema_length=None,
+        )
+        gene_col: pl.Series = df[spec["column"]].drop_nulls()
+        if spec.get("is_list"):
+            cur_genes: list = [
+                g.strip()
+                for genes in gene_col.str.split(spec.get("is_list_separator", ";"))
+                for g in genes
+            ]
+        else:
+            cur_genes = list(gene_col)
+        unique_genes |= set(cur_genes)
+    return list(unique_genes)
+
+
 
 def add_link(text: str, link: str, **kwargs) -> str:
     """

@@ -495,3 +495,47 @@ def add_therapy_info(
         )
         return with_therapeutics
     return df.with_columns([pl.lit(None).alias(c) for c in TherapyDB.shared_cols])
+
+
+def get_therapy_df(
+    gene_list: list,
+    civic_cache: str = "",
+    pandrugs2_cache: str = "",
+    filter_confident=False,
+) -> pl.DataFrame:
+    """Get therapeutic information
+
+    :param gene_list: list of genes to look up
+
+    :returns: the input dataframe with additional information about therapeutic
+    options for each gene.
+    The result is a dataframe with columns
+    - "gene"
+    - "source" database or paper source
+    - "disease": disease(s) the gene is implicated in
+    - "therapies": validated therapies for the gene
+    """
+    therapy_dbs: list[TherapyDB] = [
+        Civic(civic_cache),
+        PanDrugs2(pandrugs2_cache),
+    ]
+    temp: list[pl.DataFrame] = []
+    for db in therapy_dbs:
+        find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
+        if not find_info.is_empty():
+            found = find_info["gene"]
+            gene_list = list(filter(lambda x: x not in found, gene_list))
+            temp.append(find_info.select(TherapyDB.shared_cols))
+        if not gene_list:
+            break
+    if temp:
+        all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
+        return all_drug_info
+    return pl.DataFrame(
+        schema={
+            "gene": pl.String,
+            "source": pl.String,
+            "disease": pl.String,
+            "therapies": pl.String,
+        }
+    )
