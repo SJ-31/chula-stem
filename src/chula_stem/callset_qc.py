@@ -330,9 +330,9 @@ def _qc_main(
     )
     print(f"After merge_variant_calls: {df.shape}")
     if ignore_regions:
-        print(f"Before filtering by regions in {ignore_file}: {df.shape}")
-        df = region_filter(df, ignore_file, chr_col, start_col, end_col)
-        print(f"After filtering by regions in {ignore_file}: {df.shape}")
+        print(f"Before filtering by regions in {ignore_regions}: {df.shape}")
+        df = region_filter(df, ignore_regions, chr_col, start_col, end_col)
+        print(f"After filtering by regions in {ignore_regions}: {df.shape}")
     df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
         empty_string2null
     ).write_csv(output, separator="\t", null_value="NA")
