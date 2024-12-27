@@ -20,6 +20,8 @@ include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 // include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
 include { CALLSET_QC_TSV } from "../modules/callset_qc_tsv.nf"
+include { CROSS_REFERENCE as CROSS_REFERENCE_MSI } from "../modules/cross_reference.nf"
+include { CROSS_REFERENCE as CROSS_REFERENCE_CNV } from "../modules/cross_reference.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
@@ -201,6 +203,11 @@ workflow whole_exome {
     SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
+
+    CROSS_REFERENCE_CNV(CLASSIFY_CNV.out.tsv, "CNV", params.ref.clingen_dosage,
+                        params.ref.cnv_reference, 8)
+    CROSS_REFERENCE_MSI(MSISENSORPRO.out.tsv, "MSI", params.ref.clingen_gene,
+                        params.ref.msi_reference, 8)
 
     /*
      * Metric collection

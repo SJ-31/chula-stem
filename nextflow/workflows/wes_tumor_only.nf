@@ -23,6 +23,8 @@ include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
 include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { GRIDSS } from "../modules/gridss.nf"
+include { CROSS_REFERENCE as CROSS_REFERENCE_MSI } from "../modules/cross_reference.nf"
+include { CROSS_REFERENCE as CROSS_REFERENCE_CNV } from "../modules/cross_reference.nf"
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
@@ -89,14 +91,16 @@ workflow whole_exome_tumor_only {
         .join(CLAIRS_TO.out.variants.map(params.getId))
         .map(params.delId)
         .map({ toConcat("Small_all", "annotations", it) })
-        .join(PREPROCESS_FASTQ.out.bam.map(params.getId))
 
     CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
 
-    to_octopus = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
+    to_octopus = paired.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
+            .map(params.delSuffix)
+
+    to_octopus.view()
     OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
 
-     CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
+    CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
                     .join(OCTOPUS.out.variants.map(params.getId)),
                     params.ref.genome, 6)
     small_variants = CONCAT_SMALL_2.out.vcf
@@ -186,6 +190,11 @@ workflow whole_exome_tumor_only {
     SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
+
+    CROSS_REFERENCE_CNV(CLASSIFY_CNV.out.tsv, "CNV", params.ref.clingen_dosage,
+                        params.ref.cnv_reference, 8)
+    CROSS_REFERENCE_MSI(MSISENSORPRO.out.tsv, "MSI", params.ref.clingen_gene,
+                        params.ref.msi_reference, 8)
 
     /*
      * Metric collection
