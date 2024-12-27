@@ -1,7 +1,7 @@
 import click
 import polars as pl
 
-from chula_stem.utils import empty_string2null
+from chula_stem.utils import empty_string2null, contain_join
 
 IMPACT_MAP: dict = {
     "HIGH": 3,
@@ -163,6 +163,52 @@ def standard_filters(
     return df
 
 
+def region_filter(
+    df: pl.DataFrame,
+    ignore_file: str,
+    chr_col: int = 0,
+    start_col: int = 1,
+    end_col: int = 2,
+) -> pl.DataFrame:
+    """Remove variants within the specified regions
+
+    Any variants on the same chromosome of `ignore_file` and within the range specified
+        by `start_col` and `end_col` are filtered out
+
+    :param ignore_file: a TSV file (e.g. assumed to be a BED file by default)
+            containing regions to ignore
+    """
+    wanted_cols: list = ["chr", "start", "end"]
+    original_cols = df.columns
+    df = (
+        df.with_columns(
+            pl.col("Loc")
+            .str.split(":")
+            .list.to_struct(fields=["chr", "start"])
+            .alias("chr_start")
+        )
+        .unnest("chr_start")
+        .cast({"chr": pl.String, "start": pl.Int64})
+    )
+    ignore = (
+        pl.read_csv(
+            ignore_file, separator="\t", null_values="NA", infer_schema_length=None
+        )
+        .with_columns(
+            pl.nth(chr_col).alias(wanted_cols[0]),
+            pl.nth(start_col).alias(wanted_cols[1]),
+            pl.nth(end_col).alias(wanted_cols[2]),
+        )
+        .select(wanted_cols)
+        .cast({"chr": pl.String, "start": pl.Int64, "end": pl.Int64})
+    )
+    joined = contain_join(
+        df, ignore, x_start="start", y_start="start_right", y_end="end", on=["chr"]
+    )
+    df = df.filter(~pl.col("Loc").is_in(joined["Loc"]))
+    return df.select(original_cols)
+
+
 @click.command()
 @click.option("-o", "--output", required=True, help="Output tsv path")
 @click.option("-i", "--input_tsv", required=True, help="Input tsv path")
@@ -176,6 +222,25 @@ def standard_filters(
 @click.option("--min_callers", required=False, default=2)
 @click.option("--vaf_adaptive", required=False, default=False, is_flag=True)
 @click.option("--tool_source_tag", required=False, default="TOOL_SOURCE")
+@click.option("-g", "--ignore_regions", required=False, default="")
+@click.option(
+    "--chr_col",
+    required=False,
+    default=0,
+    help="Chromosome column index for `ignore_regions` file",
+)
+@click.option(
+    "--start_col",
+    required=False,
+    default=1,
+    help="Starting column index for `ignore_regions` file",
+)
+@click.option(
+    "--end_col",
+    required=False,
+    default=2,
+    help="Ending column index for `ignore_regions` file",
+)
 def qc_main(
     input_tsv: str,
     output: str,
@@ -189,20 +254,28 @@ def qc_main(
     min_callers: bool,
     vaf_adaptive: bool,
     tool_source_tag: str = "TOOL_SOURCE",
+    ignore_regions: str = "",
+    chr_col: int = 0,
+    start_col: int = 1,
+    end_col: int = 2,
 ):
     _qc_main(
-        input_tsv,
-        output,
-        min_tumor_depth,
-        max_normal_depth,
-        min_vaf,
-        accepted_filters,
-        impact,
-        canonical,
-        informative,
-        min_callers,
-        vaf_adaptive,
-        tool_source_tag,
+        input_tsv=input_tsv,
+        output=output,
+        min_tumor_depth=min_tumor_depth,
+        max_normal_depth=max_normal_depth,
+        min_vaf=min_vaf,
+        accepted_filters=accepted_filters,
+        impact=impact,
+        canonical=canonical,
+        informative=informative,
+        min_callers=min_callers,
+        vaf_adaptive=vaf_adaptive,
+        tool_source_tag=tool_source_tag,
+        ignore_regions=ignore_regions,
+        chr_col=chr_col,
+        start_col=start_col,
+        end_col=end_col,
     )
 
 
@@ -219,6 +292,10 @@ def _qc_main(
     min_callers: bool,
     vaf_adaptive: bool,
     tool_source_tag: str = "TOOL_SOURCE",
+    ignore_regions: str = "",
+    chr_col: int = 0,
+    start_col: int = 1,
+    end_col: int = 2,
 ) -> None:
     df: pl.DataFrame = pl.read_csv(
         input_tsv,
@@ -252,6 +329,10 @@ def _qc_main(
         vaf_adaptive=vaf_adaptive,
     )
     print(f"After merge_variant_calls: {df.shape}")
+    if ignore_regions:
+        print(f"Before filtering by regions in {ignore_file}: {df.shape}")
+        df = region_filter(df, ignore_file, chr_col, start_col, end_col)
+        print(f"After filtering by regions in {ignore_file}: {df.shape}")
     df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
         empty_string2null
     ).write_csv(output, separator="\t", null_value="NA")

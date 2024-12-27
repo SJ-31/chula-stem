@@ -8,7 +8,10 @@ process CALLSET_QC_TSV {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(tsv)
+    tuple val(meta), path(tsv), path(ignore_regions)
+    // Will remove variants in locations that were called by the repetitive
+    //      element tools, as those are likely to be more accurate in such cases
+    //      Can be disabled by just sending an empty file
     val(qc)
     // Meta must have a key "qc" whose value is a map specifying filters to apply
     // Currently supported are..
@@ -40,6 +43,8 @@ process CALLSET_QC_TSV {
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 
+    ignore_flag = ignore_regions.length() > 0 ? " --ignore_regions ${ignore_regions} " : ""
+
     flags = ["informative", "canonical", "impact", "vaf_adaptive"]
     qc_copy = qc ? qc.clone() : meta.qc.clone()
     accepted_filters = qc_copy.remove("accepted_filters")
@@ -65,6 +70,7 @@ process CALLSET_QC_TSV {
     } else {
         """
         callset_qc -i ${tsv} \\
+            ${ignore_flag} \\
             --tool_source_tag "${params.source_name}" \\
             -o ${output} \\
             ${args} \\
