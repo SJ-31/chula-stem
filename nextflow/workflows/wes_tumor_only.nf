@@ -175,7 +175,7 @@ workflow whole_exome_tumor_only {
         x.map(params.prependId).join(y.map(params.getId)).map(params.delId)
     }
 
-    vep_out = VEP.out.branch { meta, files ->
+    vep_out = VEP.out.tsv.branch { meta, files ->
         sv: meta.variant_class == "sv"
         small: meta.variant_class == "small"
     }
