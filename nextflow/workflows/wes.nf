@@ -185,15 +185,23 @@ workflow whole_exome {
 
 
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
+    def joinTwo = { x, y ->
+        x.map(params.prependId).join(y.map(params.getId)).map(params.delId)
+    }
+
+    vep_out = VEP.out.branch { meta, files ->
+        sv: meta.variant_class == "sv"
+        small: meta.variant_class == "small"
+    }
+    to_qc_tsv_sv = joinTwo(vep_out.sv, MSISENSORPRO.out.tsv)
+    to_qc_tsv_small = joinTwo(vep_out.small, MSISENSORPRO.out.tsv)
+    CALLSET_QC_TSV(to_qc_tsv_sv.mix(to_qc_tsv_small), "", 8)
+    // Filter out conflicts between repetitive region and sv/small variant callers
 
     SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
-    to_qc_tsv = VEP.out.tsv.map(params.prependId)
-        .join(MSISENSORPRO.out.tsv.map(params.getId))
-        .map(params.delId)
-    CALLSET_QC_TSV(to_qc_tsv, "", 8)
     /*
      * Metric collection
      */
