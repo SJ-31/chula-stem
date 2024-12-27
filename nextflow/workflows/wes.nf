@@ -58,7 +58,7 @@ workflow whole_exome {
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
     // Order is important for the first two
-    paired_no_id = paired.map { it[1..-1] }
+    paired_no_id = paired.map(params.delId)
     // paired_no_id is [meta, normal, tumor, [normal_index, tumor_index]]
     // the order of indices doesn't matter, they just need to be present
 
@@ -80,7 +80,7 @@ workflow whole_exome {
     MUTECT2_COMPLETE(to_mutect, 5)
 
     to_strelka = paired.join(MANTA.out.indels)
-        .map { it[1..-1] }
+        .map(params.delId)
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
@@ -96,7 +96,7 @@ workflow whole_exome {
     small_variants_to_geno = MUTECT2_COMPLETE.out.map(params.prependId)
         .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
         .join(MUSE2.out.variants.map(params.getId))
-        .map({ it[1..-1] })
+        .map(params.delId)
         .map({ toConcat("Concat_to_oct", "paired", it) })
 
     CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
@@ -114,7 +114,7 @@ workflow whole_exome {
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(DELLY_SV.out.variants.map(params.getId))
         .join(GRIDSS.out.variants.map(params.getId))
-        .map({ it[1..-1] })
+        .map(params.delId)
         .map({ toConcat("SV_all", "annotations", it) })
 
     CONCAT_SV(structural_variants, params.ref.genome, 6)
@@ -122,7 +122,7 @@ workflow whole_exome {
     def withBams = { n, t, it -> it.map(params.prependId)
                     .join(n.map(params.getId))
                     .join(t.map(params.getId))
-                    .map( { it[1..-1] } ) }
+                    .map( params.delId ) }
 
     to_std_small = withBams(branched.normal, branched.tumor, CONCAT_SMALL_2.out.vcf)
 
@@ -160,7 +160,7 @@ workflow whole_exome {
     to_cnvkit = paired.map({ it[0..1] + [it[2]] })
             .join(small_high_conf.map(params.getId))
             .join(purity_ploidy)
-            .map({ it[1..-1] })
+            .map(params.delId)
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
 
@@ -190,7 +190,10 @@ workflow whole_exome {
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
-    CALLSET_QC_TSV(VEP.out.tsv, "", 8)
+    to_qc_tsv = VEP.out.tsv.map(params.prependId)
+        .join(MSISENSORPRO.out.tsv.map(params.getId))
+        .map(params.delId)
+    CALLSET_QC_TSV(to_qc_tsv, "", 8)
     /*
      * Metric collection
      */

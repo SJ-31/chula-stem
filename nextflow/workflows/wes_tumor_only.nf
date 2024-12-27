@@ -56,7 +56,7 @@ workflow whole_exome_tumor_only {
         .map({ [it[0]] + [it[2]] + [it[1]] + [it[3]] })
         .join(all_indices)
 
-    paired_no_id = paired.map { it[1..-1] }
+    paired_no_id = paired.map(params.delId)
 
     /*
      * Variant calling
@@ -75,6 +75,7 @@ workflow whole_exome_tumor_only {
 
     to_clairs = tumors.join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
             .join(MUTECT2_COMPLETE.out.map(params.getId))
+            .map(params.delId)
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
@@ -86,7 +87,7 @@ workflow whole_exome_tumor_only {
     // Combine variants by type
     small_variants_to_oct = MUTECT2_COMPLETE.out.map(params.prependId)
         .join(CLAIRS_TO.out.variants.map(params.getId))
-        .map({ it[1..-1] })
+        .map(params.delId)
         .map({ toConcat("Small_all", "annotations", it) })
         .join(PREPROCESS_FASTQ.out.bam.map(params.getId))
 
@@ -102,7 +103,7 @@ workflow whole_exome_tumor_only {
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
         .join(GRIDSS.out.variants.map(params.getId))
-        .map({ it[1..-1] })
+        .map(params.delId)
         .map({ toConcat("SV_all", "annotations", it) })
 
     CONCAT_SV(structural_variants, params.ref.genome, 6)
@@ -143,7 +144,7 @@ workflow whole_exome_tumor_only {
     to_cnvkit = paired.map({ it[0..1] + [it[2]] })
             .join(QC_SMALL.out.vcf.map(params.getId))
             .join(purity_ploidy)
-            .map({ it[1..-1] })
+            .map(params.delId)
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
 
@@ -174,7 +175,10 @@ workflow whole_exome_tumor_only {
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
-    CALLSET_QC_TSV(VEP.out.tsv, "", 8)
+    to_qc_tsv = VEP.out.tsv.map(params.prependId)
+        .join(MSISENSORPRO.out.tsv.map(params.getId))
+        .map(params.delId)
+    CALLSET_QC_TSV(to_qc_tsv, "", 8)
     /*
      * Metric collection
      */
