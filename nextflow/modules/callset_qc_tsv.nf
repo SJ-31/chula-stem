@@ -43,7 +43,7 @@ process CALLSET_QC_TSV {
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 
-    ignore_flag = ignore_regions.length() > 0 ? " --ignore_regions ${ignore_regions} " : ""
+    ignore_flag = !ignore_regions.empty() ? " --ignore_regions ${ignore_regions} " : ""
 
     flags = ["informative", "canonical", "impact", "vaf_adaptive"]
     qc_copy = qc ? qc.clone() : meta.qc.clone()
