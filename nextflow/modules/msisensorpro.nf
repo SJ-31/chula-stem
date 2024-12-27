@@ -50,7 +50,7 @@ process MSISENSORPRO {
 
         get_msisensor.bash -i ${unstable} \\
             -o "${unstable}".tsv \\
-            g ${gff}
+            -g ${gff}
 
         mkdir ${prefix}
         mv *tsv ${prefix}
