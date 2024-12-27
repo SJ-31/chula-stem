@@ -19,7 +19,7 @@ done
 
 
 bcftools view "${vcf}" | \
-    awk 'BEGIN { FS="\t"; OFS="\t" } $8 !~ /.*POPAF=[\.,a-zA-Z0-9]*inf;/ { print }' > tmp.vcf
+    awk 'BEGIN { FS="\t"; OFS="\t" } $8 !~ /.*POPAF=[\.,a-zA-Z0-9]*inf[\.,a-zA-Z0-9]*;/ { print }' > tmp.vcf
 
 cp "${stats}" tmp.vcf.stats
 
