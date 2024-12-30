@@ -2,7 +2,8 @@ refdir = "/data/project/stemcell/shannc/reference"
 kitdir = "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38"
 
 genome = "$refdir/genomes/GRCh38.p14_filtered.fasta"
-genome_gff= "$refdir/genomes/GRCh38.p14_filtered.gff"
+genome_gff = "$refdir/genomes/GRCh38.p14_filtered.gff"
+genome_sdf = "$refdir/genomes/GRCh38.p14_filtered.sdf"
 
 homopolymers_microsatellites= "$refdir/tool_specific/mishomopoly_GRCh38_filtered.tsv"
 

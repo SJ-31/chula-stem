@@ -1,3 +1,20 @@
+* GCF_000001405.40_GRCh38.p14_genomic.sdf
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/genomes/GCF_000001405.40_GRCh38.p14_genomic.sdf=
+*Date added*: <2024-12-30 Mon>
+*Source:* Custom
+
+RTG Sequence Data File of the GRCh38 reference genome, see [[https://realtimegenomics.github.io/rtg-tools/rtg_command_reference.html#data-formatting-commands][the docs]]
+<2024-12-30 Mon> Generated for use with vcfeval
+* cosmicv3.4_signatures.csv
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmicv3.4_signatures.csv=
+*Date added*: <2024-12-25 Wed>
+*Source:* Custom
+Contains metadata about cosmic signatures (v3.4) to aid in reporting the results of SigProfiler
+#+begin_src text
+Signature,Class,Proposed_aetiology,Studies,COSMIC_link
+#+end_src
++ Proposed aetiologies are taken directly from the COSMIC page
+
 * Clingen-Dosage-Sensitivity-2024-12-16.csv
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
 *Date added*: <2024-12-19 Thu>
