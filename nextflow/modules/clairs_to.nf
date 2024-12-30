@@ -32,6 +32,7 @@ process CLAIRS_TO {
         run_clairs_to ${args} \\
             --tumor_bam_fn ${tumor} \\
             --ref_fn ${reference} \\
+            --sample_name ${meta.RGSM_tumor} \\
             --threads ${task.cpus} \\
             --platform ${task.ext.platform} \\
             ${target_flag} \\
@@ -45,7 +46,7 @@ process CLAIRS_TO {
                     -b '.' \\
                     -t String \\
                     -a clairs-to \\
-                    -o ${output}
+                    -o tmp.vcf.gz
         else
             if [[ -e snv.vcf.gz ]]; then
                 result=snv.vcf.gz
@@ -58,8 +59,10 @@ process CLAIRS_TO {
                 -i \$result \\
                 -t String \\
                 -a clairs-to \\
-                -o ${output}
+                -o tmp.vcf.gz
         fi
+
+        clairs_to_fixes.bash tmp.vcf.gz ${output}
 
         get_nextflow_log.bash clairs-to.log
         """
