@@ -82,10 +82,10 @@ class Rename:
         "therapies": "Therapy",
         "PubChemId": "PubChemId",
         "type": "Evidence category",
-        "Gene": "Evidence in sample",
+        "gene": "Evidence in sample",
         "disease": "Relevant cancers",
-        "source": "Study source",
-        "db_link": "Database source",
+        "source": "Study source(s)",
+        "db_link": "Database source(s)",
     }
     repeat = {
         "repeat_unit_bases": "Repeat Unit",

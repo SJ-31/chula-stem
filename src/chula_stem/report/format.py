@@ -9,7 +9,7 @@
 
 import polars as pl
 from chula_stem.report.spec import URL, Rename
-from chula_stem.utils import add_loc, read_facets_rds
+from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
 import os
 import re
 from chula_stem.databases import add_therapy_info
@@ -17,6 +17,7 @@ import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
 
 TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
+
 
 def get_genes(file_spec: list[dict]) -> list:
     unique_genes: set = set()
@@ -38,7 +39,6 @@ def get_genes(file_spec: list[dict]) -> list:
             cur_genes = list(gene_col)
         unique_genes |= set(cur_genes)
     return list(unique_genes)
-
 
 
 def add_link(text: str, link: str, **kwargs) -> str:
@@ -186,8 +186,7 @@ def vep_fmt(
     vep_path: str,
     tmpdir: str,
     variant_class: str,
-    civic_cache: str,
-    pandrugs2_cache: str,
+    therapy_df: pl.DataFrame,
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
     into a reportlab table
@@ -198,8 +197,13 @@ def vep_fmt(
     if os.path.exists(r_out) and os.path.exists(nr_out) and os.path.exists(all_out):
         return tuple([pl.read_parquet(p) for p in [all_out, r_out, nr_out]])
     var_col: str = "Database Name"  # New column for 'Existing_variation'
-    with_therapeutics: pl.DataFrame = add_therapy_info(
-        vep_path, civic_cache, pandrugs2_cache
+    df: pl.DataFrame = pl.read_csv(
+        vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
+    ).with_columns(
+        pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
+    )
+    with_therapeutics: pl.DataFrame = df.join(
+        therapy_df, how="left", left_on="SYMBOL", right_on="gene"
     )
     wanted_cols: list = list(Rename.sv_snp.values())
     with_therapeutics = (
@@ -235,64 +239,129 @@ def vep_fmt(
     return all, relevant, nonrelevant
 
 
-def therapy_fmt(parquet_path):
-    # TODO: must include signatures
-    db_link_fn = lambda x, y: add_link(x, y, underline="yes", underlinecolor="#5e81ac")
-    df = (
-        (
-            (
-                pl.read_parquet(parquet_path)
-                .select(
-                    pl.col(["Gene", "disease", "source", "therapies", "db", "db_link"])
-                )
-                .explode("disease")
+def format_therapy_sources(sources: str, source_lookup: dict) -> list[str]:
+    def helper(source):
+        if find := re.findall(r"\[(.*)\]\((.*)\)", source):
+            match = find[0]
+            with_link = add_link(match[0], match[1], underline="yes")
+        else:
+            return source
+
+        num = source_lookup.get(with_link, f"[{len(source_lookup) + 1}]")
+        source_lookup[with_link] = num
+        return num
+
+    return [helper(s) for s in sources if s and s != "NA"]
+
+
+def therapy_fmt(
+    therapy_df: pl.DataFrame,
+    variant_spec: list[dict],
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def db_link_fn(name, link) -> str:
+        params = {"underline": "yes", "underlinecolor": "#5e81ac"}
+        if name == "Civic":
+            id = link.replace("https://civicdb.org/evidence/", "")
+            return add_link(f"Civic:{id}", link, **params)
+        else:
+            return add_link(name, link, **params)
+
+    def limit_links(link_str) -> str:
+        splits = link_str.split(", ")
+        if len(splits) > 5:
+            return ", ".join(splits[:5])
+        return link_str
+
+    source_dict: dict = {}
+    dfs: list = []
+    for v in variant_spec:
+        gene_col: str = v["gene_col"]
+        current: pl.DataFrame = v["df"].select(gene_col)
+        if v.get("is_list"):
+            current = (
+                current.with_columns(pl.col(gene_col).str.split(v["separator"]))
+                .explode(gene_col)
+                .with_columns(pl.col(gene_col).str.strip_chars())
             )
-            .with_columns(
-                pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
-                pl.struct(["db", "db_link"])
-                .map_elements(
-                    lambda x: db_link_fn(x["db"], x["db_link"]),
-                    return_dtype=pl.String,
-                )
-                .alias("db_link"),
-            )
-            .filter(  # Make sure that the therapies reported are relevant to cancer
-                (pl.col("db") == "pandrugs2")
-                | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
-            )
-            .with_columns(
-                pl.col("disease")
-                .str.replace_many({"cancer": "", "clinical": ""})
-                .str.replace("", "unspecified")
-                .map_elements(str.capitalize, return_dtype=pl.String)
-            )
+        type: str = v["type"]
+        genes: set = set(current[gene_col])
+        df = therapy_df.filter(pl.col("gene").is_in(genes)).with_columns(
+            pl.lit(type).alias("type")
         )
+        dfs.append(df)
+    wanted_cols = [
+        "gene",
+        "disease",
+        "type",
+        "source",
+        "therapies",
+        "db",
+        "db_link",
+    ]
+
+    therapy_df = (
+        pl.concat(dfs)
+        .select(wanted_cols)
         .explode("therapies")
+        .explode("disease")
+        .unique()
         .with_columns(
+            pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
+        )
+        .filter(  # Make sure that the therapies reported are relevant to cancer
+            (pl.col("db") == "PanDrugs2")
+            | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
+        )
+        .pipe(empty_string2null)
+        .with_columns(
+            pl.col("disease")
+            .str.replace_many({"cancer": "", "clinical": ""})
+            .map_elements(str.capitalize, return_dtype=pl.String),
+            pl.struct(["db", "db_link"])
+            .map_elements(
+                lambda x: db_link_fn(x["db"], x["db_link"]),
+                return_dtype=pl.String,
+            )
+            .alias("db_link"),
+        )
+        .group_by("therapies")
+        .agg(pl.all().unique())
+        .with_columns(
+            pl.col("source").map_elements(
+                lambda x: format_therapy_sources(x, source_dict),
+                return_dtype=pl.List(pl.String),
+            ),
+        )
+        .with_columns(
+            pl.col("db_link").list.head(5).list.join(", "),
+            pl.col(["gene", "disease", "type", "source", "db"]).list.join(", "),
             pl.col("therapies")
             .str.split(":")
-            .list.to_struct(fields=["therapies", "PubChemId"])
+            .list.to_struct(fields=["therapies", "PubChemId"]),
         )
         .unnest("therapies")
+        .filter(pl.col("therapies").str.contains("[A-Z-a-z]*"))
         .with_columns(
-            pl.col("PubChemId").map_elements(
+            pl.col("PubChemId")
+            .map_elements(
                 lambda x: (
                     add_link(x, f"{URL.pubchem}/{x}", underline="yes")
                     if x != "NA"
                     else x
                 ),
                 return_dtype=pl.String,
-            ),
-            pl.lit("Gene variation").alias("type"),
+            )
+            .str.replace("NA", "-"),
         )
-        .filter(pl.col("therapies").str.contains("[A-Z-a-z]*"))
         .rename(Rename.therapy)
-    ).select(list((Rename.therapy).values()))
-    relevant = df.filter(
-        (pl.col("Relevant cancers") != "Unspecified") & (pl.col("Study source") != "NA")
+        .select(list((Rename.therapy).values()))
+        .pipe(empty_string2null)
+        .fill_null("-")
     )
-    nonrelevant = df.filter(~pl.col("Therapy").is_in(relevant["Therapy"]))
-    return df, relevant, nonrelevant
+    source_df = pl.DataFrame(
+        {"Number": source_dict.values(), "Source": source_dict.keys()}
+    )
+    return therapy_df, source_df
 
 
 def format_signature_link(sig: str, link: str) -> str:
@@ -375,12 +444,16 @@ def sigprofiler_fmt(
 
     m: pl.Series = df.select(sig_cols).sum_horizontal()
     # Total number of signature mutations per sample
-    frequencies = df.with_columns(sig_cols / m).unpivot(
-        on=signatures,
-        index="Samples",
-        variable_name="Signatures",
-        value_name="Frequency",
-    ).with_columns(pl.col("Frequency").round(2))
+    frequencies = (
+        df.with_columns(sig_cols / m)
+        .unpivot(
+            on=signatures,
+            index="Samples",
+            variable_name="Signatures",
+            value_name="Frequency",
+        )
+        .with_columns(pl.col("Frequency").round(2))
+    )
     counts = df.with_columns(sig_cols).unpivot(
         on=signatures, index="Samples", variable_name="Signatures", value_name="Count"
     )

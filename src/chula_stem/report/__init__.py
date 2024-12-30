@@ -23,6 +23,7 @@ from chula_stem.report.spec import (
     signature_style,
     sv_snp_style,
     repeat_style,
+    therapy_style,
 )
 
 STYLES = getSampleStyleSheet()
@@ -197,29 +198,47 @@ class VariantCallingReport(ResultsReport):
             therapy_df.write_parquet(therapy_data_cache)
 
         calls = [
-            lambda: fr.vep_fmt(
-                vep_small, tmpdir, "small", civic_cache, pandrugs2_cache
-            ),
-            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", civic_cache, pandrugs2_cache),
+            lambda: fr.vep_fmt(vep_small, tmpdir, "small", therapy_df),
+            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", therapy_df),
             lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
             lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]
-        for type, fn_call in zip(
-            ["small", "sv", "cnv", "repeat"],
-            calls,
-        ):
+        self.variant_names: dict[str, str] = dict(
+            zip(
+                ["small", "sv", "cnv", "repeat"],
+                [
+                    "Small Variants",
+                    "Structural Variants",
+                    "Copy Number Variants",
+                    "Tandem Repeats",
+                ],
+            )
+        )
+
+        variant_spec: list[dict] = []
+        for type, fn_call in zip(self.variant_names, calls):
             all, relevant, nonrelevant = fn_call()
             self.data["relevant"][type] = relevant
             self.data["nonrelevant"][type] = nonrelevant
             self.data["all"][type] = all
+            spec: dict = {
+                "type": self.variant_names[type],
+                "df": relevant,
+                "is_list": False,
+                "gene_col": "Gene",
+            }
+            if type == "cnv":
+                spec["is_list"] = True
+                spec["gene_col"] = "All Genes"
+                spec["separator"] = ","
+            elif type == "repeat":
+                spec["gene_col"] = "Affected Gene"
+            variant_spec.append(spec)
+
+        self.data["therapies"], self.data["study_references"] = fr.therapy_fmt(
+            therapy_df, variant_spec
+        )
         self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
-        self.variant_short_names = ["small", "sv", "cnv", "repeat"]
-        self.variant_long_names = [
-            "Small Variants",
-            "Structural Variants",
-            "Copy Number Variants",
-            "Tandem Repeats",
-        ]
 
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
@@ -228,15 +247,10 @@ class VariantCallingReport(ResultsReport):
         table_spec = {"header_pos": (A4[0] - 5 * inch, A4[1] - inch)}
         # Report is in the following order
         # TODO: create universal footer/header spec for tables
-        # TODO: build the pdf for Therapeutic information
-        # TODO: build the pdf for signature analysis
         # TODO: create universal styles for variant tables
         # front_page: ReportElement =
         table_decorator = None
-        for table, name in zip(
-            self.variant_short_names,
-            self.variant_long_names,
-        ):
+        for table, name in self.variant_names.items():
             style = self.table_styles[table]
             self.build_table(
                 table_spec,
@@ -256,6 +270,15 @@ class VariantCallingReport(ResultsReport):
                 table_decorator,
                 f"non-rel_{table}.pdf",
             )
+        self.build_table(
+            table_spec,
+            therapy_style(),
+            self.data["therapies"],
+            "Relevant therapies",
+            "Relevant therapies (Continued)",
+            table_decorator,
+            "therapies.pdf",
+        )
         for n, sample in enumerate(self.data["sigprofiler"]):
             if len(self.data["sigprofiler"]) == 1:
                 first = "Mutational signatures"
@@ -286,11 +309,13 @@ class VariantCallingReport(ResultsReport):
         )
 
     # TODO: add in the front, back pages
-    # TODO: add in the therapeutic data
     def merge(self) -> None:
         toc: list = []
         doc: Document = pymupdf.open()
-        for t, n in zip(self.variant_short_names, self.variant_long_names):
+        toc.append([1, "Relevant therapies", len(doc) + 1])
+        doc.insert_file("therapies.pdf")
+
+        for t, n in self.variant_names.items():
             toc.append([1, n, len(doc) + 1])
             toc.append([2, "Relevant", len(doc) + 1])
             doc.insert_file(f"rel_{t}.pdf")
