@@ -451,7 +451,11 @@ class PanDrugs2(TherapyDB):
 
 
 def add_therapy_info(
-    vep_out: str, civic_cache: str = "", pandrugs2_cache: str = ""
+    vep_out: str = "",
+    civic_cache: str = "",
+    pandrugs2_cache: str = "",
+    filter_confident=False,
+    gene_list: list | None = None,
 ) -> pl.DataFrame:
     """Add therapeutic information
 
@@ -481,7 +485,7 @@ def add_therapy_info(
     for db in therapy_dbs:
         # <2024-12-20 Fri>
         # BUG: setting the confidence filters off is temporary, for testing
-        find_info: pl.DataFrame = db.get_genes(gene_list, False)
+        find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
         if not find_info.is_empty():
             found = find_info["gene"]
             gene_list = list(filter(lambda x: x not in found, gene_list))
