@@ -38,13 +38,13 @@ text_style: ParagraphStyle = ParagraphStyle("data", fontSize=10)
 
 #
 # others = df.filter(pl.col("db") != "pandrugs2")
-# * Treatment
+# - Treatment
 # # pubchemId
-# * Evidence type
+# - Evidence type
 #   * Can be mutational signature or variant
-# * Relevant evidence in sample (gene names or mutational signature ids)
-# * Use in other cancers
-# *  Study
+# - Relevant evidence in sample (gene names or mutational signature ids)
+# - Use in other cancers
+# -  Study
 # # Db link
 #
 from pypdf import PdfWriter
@@ -79,34 +79,7 @@ names = [
     "Copy Number Variants",
     "Tandem Repeats",
 ]
-doc: Document = pymupdf.open()
+# * Therapy formatter with signatures
+from chula_stem.report.format import therapy_fmt, sigprofiler_fmt
 
-
-toc = []
-for t, n in zip(tables, names):
-    toc.append([1, n, len(doc)])
-    toc.append([2, "Relevant", len(doc)])
-    doc.insert_file(f"{reportdir}/rel_{t}.pdf")
-    toc.append([2, "Non-relevant", len(doc)])
-    doc.insert_file(f"{reportdir}/non-rel_{t}.pdf")
-
-
-y = cm
-def add_page_numbers2(page: Page, total: int) -> None:
-    n = page.number
-    text = f"Page {n} of {total}"
-    page.insert_text(
-        (A4[0] - 2 * inch, y),
-        text,
-        fontsize=10,
-        fontname="Helvetica-Bold",
-    )
-
-
-total_pages: int = len(doc)
-for p in doc.pages():
-    add_page_numbers2(p, total_pages)
-
-doc.set_toc(toc)
-
-doc.save(f"{reportdir}/merged2.pdf")
+data = pl.read_parquet(f"{reportdir}/therapy_data.parquet")

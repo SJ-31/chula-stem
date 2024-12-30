@@ -7,6 +7,7 @@ import pytest
 import polars as pl
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
+from chula_stem.report.format import msisensor_pro_fmt
 
 small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
 sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/sv2.tsv"
@@ -98,13 +99,29 @@ def test_format_vep_sv():
         sv_pat,
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
         variant_class="sv",
-        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
-        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
     )
     vep_fmt(
         small_path,
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
         variant_class="small",
-        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
-        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
     )
+
+
+spec: list = [
+    {
+        "file": "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
+        "is_list": True,
+        "is_list_separator": ",",
+        "column": "All protein coding genes",
+    },
+    {
+        "file": "/home/shannc/Bio_SDD/chula-stem/tests/msisensor/5-P1-Msisensor_unstable.tsv",
+        "column": "gene_name",
+    },
+    {
+        "file": "/home/shannc/Bio_SDD/chula-stem/tests/vep/sv.tsv",
+        "column": "SYMBOL",
+    },
+]
+
+
