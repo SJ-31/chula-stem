@@ -20,6 +20,7 @@ from reportlab.platypus import (
 from chula_stem.databases import get_therapy_df
 from chula_stem.report.spec import (
     cnv_style,
+    reference_list_style,
     signature_style,
     sv_snp_style,
     repeat_style,
@@ -279,6 +280,15 @@ class VariantCallingReport(ResultsReport):
             table_decorator,
             "therapies.pdf",
         )
+        self.build_table(
+            table_spec,
+            reference_list_style(),
+            self.data["study_references"],
+            "References",
+            "",
+            table_decorator,
+            "reference_list.pdf",
+        )
         for n, sample in enumerate(self.data["sigprofiler"]):
             if len(self.data["sigprofiler"]) == 1:
                 first = "Mutational signatures"
@@ -312,6 +322,7 @@ class VariantCallingReport(ResultsReport):
     def merge(self) -> None:
         toc: list = []
         doc: Document = pymupdf.open()
+
         toc.append([1, "Relevant therapies", len(doc) + 1])
         doc.insert_file("therapies.pdf")
 
@@ -329,6 +340,9 @@ class VariantCallingReport(ResultsReport):
             for index, s in enumerate(self.files["signatures"]):
                 toc.append([2, f"Sample {index}", len(doc) + 1])
                 doc.insert_file(s)
+
+        toc.append([1, "References", len(doc) + 1])
+        doc.insert_file("reference_list.pdf")
 
         total_pages: int = len(doc)
         for p in doc.pages():
@@ -432,14 +446,21 @@ class ReportElement:
 
         """
         cells = add_pstyles(data, cell_pstyles)
-        headers = add_pstyles(data.columns, header_pstyles)
-        cells.insert(0, headers)
+        if header_pstyles and header_styles:
+            headers = add_pstyles(data.columns, header_pstyles)
+            cells.insert(0, headers)
         table: LongTable = LongTable(
             cells,
             colWidths=col_widths,
             repeatRows=1 if repeat_header else 0,
         )
-        table.setStyle(cell_styles + header_styles)
+        style_list = []
+        if cell_styles:
+            style_list.extend(cell_styles)
+        if header_styles:
+            style_list.extend(header_styles)
+        if style_list:
+            table.setStyle(style_list)
         self.elements.append(table)
 
     def build(self) -> None:

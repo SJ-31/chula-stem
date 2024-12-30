@@ -266,12 +266,6 @@ def therapy_fmt(
         else:
             return add_link(name, link, **params)
 
-    def limit_links(link_str) -> str:
-        splits = link_str.split(", ")
-        if len(splits) > 5:
-            return ", ".join(splits[:5])
-        return link_str
-
     source_dict: dict = {}
     dfs: list = []
     for v in variant_spec:

@@ -33,6 +33,10 @@ class Widths:
         "ClinGen": 50,
         "Database/Study Records": 50,
     }
+    reference_table = {
+        "id": 30,
+        "text": 500
+    }
     repeat = {
         "Locus": 50,
         "Repeat Unit": 50,
@@ -121,6 +125,21 @@ def sv_snp_style():
         "cell_styles": cell_styles,
         "header_styles": header_styles,
         "col_widths": list(Widths.sv_snp.values()),
+    }
+
+
+def reference_list_style():
+    cell_pstyles: dict = {
+        None: TEXT_STYLE,
+    }
+    cell_styles = style_cells((0, 1), background=colors.white, valign="TOP")
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": None,
+        "cell_styles": cell_styles,
+        "header_styles": None,
+        "col_widths": list(Widths.reference_table.values()),
+        "repeat_header": False,
     }
 
 
