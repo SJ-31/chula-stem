@@ -38,6 +38,7 @@ library('tidyverse')
 u <- read_tsv(\"${input}\") |> mutate(stop = nchar(repeat_unit_bases) * repeat_times + location)
 u\$chromosome <- as.character(u\$chromosome)
 o <- read_tsv('overlapping.tsv') |> select(-stop)
+o\$chromosome <- as.character(o\$chromosome)
 o\$location <- as.numeric(o\$location)
 result <- left_join(u, o) |> rename(start = location) |>
        relocate(all_of(c('stop', 'gene_start', 'gene_stop', 'gene_name')), .after = start)
