@@ -12,7 +12,15 @@ class Utils {
         }
     }
 
-    // public static String saveFn(x, String patterns = /.*\.log/) {
-    //     x ==~ patterns ||
-    // }
+    public static joinById(first, to_join) {
+        def prepend_id = first.map({ [it[0].id] + it })
+        to_join.each {
+            prepend_id = prepend_id.join(it.map({ [it[0].id] + it[1..-1] }))
+        }
+        return prepend_id.map({ it[1..-1] })
+    }
+
+    public static getId(x) {
+        return [x[0].id] + [x[1]]
+    }
 }
