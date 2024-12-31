@@ -12,7 +12,7 @@ process MANTA {
     //
 
     output:
-    tuple val(meta), path("*.vcf.gz"), emit: variants
+    tuple val(meta), path("*_Manta.vcf.gz"), emit: variants
     tuple val(meta), path(callfile), emit: somatic
     tuple val(meta.id), path("${module_number}-${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     path(out)
