@@ -371,15 +371,11 @@ def add_loc(
     start_col: str = "start",
     end_col: str = "end",
     loc_name: str = "Locus",
-    prepend_chr: bool = True,
 ) -> pl.DataFrame:
     return (
         df.with_columns(__range=pl.concat_str([start_col, end_col], separator="-"))
         .with_columns(
             pl.concat_str([chr_col, "__range"], separator=":").alias(loc_name)
-        )
-        .with_columns(
-            pl.when(prepend_chr).then(pl.col(loc_name).str.replace("^", "chr"))
         )
         .drop("__range")
     )

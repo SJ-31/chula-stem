@@ -10,9 +10,7 @@
 import polars as pl
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
-import os
 import re
-from chula_stem.databases import add_therapy_info
 import polars.selectors as cs
 from chula_stem.callset_qc import IMPACT_MAP
 
@@ -142,24 +140,35 @@ def classify_cnv_fmt(
     Format cnv data from ClassifyCNV for the report. Includes merging with cnvkit
     and facets to determine show estimated copy number
     """
-    cnv = pl.read_csv(
-        classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
-    ).with_columns(
-        pl.struct(s="source", acc="accession")
-        .map_elements(
-            lambda x: (
-                dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
-            ),
-            return_dtype=pl.String,
+    cnv = (
+        pl.read_csv(
+            classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
         )
-        .alias("source"),
-        pl.col("ClinGen_report").map_elements(get_clingen_link, return_dtype=pl.String),
+        .filter(pl.col("Start").is_not_null() & pl.col("End").is_not_null())
+        .with_columns(
+            pl.struct(s="source", acc="accession")
+            .map_elements(
+                lambda x: (
+                    dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
+                ),
+                return_dtype=pl.String,
+            )
+            .alias("source"),
+            pl.col("ClinGen_report").map_elements(
+                get_clingen_link, return_dtype=pl.String
+            ),
+        )
     )
     # "group_by" operation required because data was exploded to become longer on
     #   dosage-sensitive genes in the R script
     wanted_cols = ["Locus"] + list(Rename.cnv.values())
     cnv = (
-        add_loc(cnv, start_col="Start", end_col="End", chr_col="Chromosome")
+        add_loc(
+            cnv,
+            start_col="Start",
+            end_col="End",
+            chr_col="Chromosome",
+        )
         .rename(Rename.cnv)
         .group_by("Locus")
         .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
