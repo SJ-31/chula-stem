@@ -16,10 +16,12 @@ from reportlab.platypus import (
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
+    Table,
 )
 from chula_stem.databases import get_therapy_df
 from chula_stem.report.spec import (
     BOLD_FONT,
+    FONT,
     cnv_style,
     reference_list_style,
     signature_style,
@@ -27,6 +29,7 @@ from chula_stem.report.spec import (
     repeat_style,
     therapy_style,
 )
+from chula_stem.report.utils import style_cells
 
 STYLES = getSampleStyleSheet()
 
@@ -67,6 +70,18 @@ def filter_format_vep(input: str, sep="\t"):
     return df
 
 
+# * Utility fns
+def no_data_decorator(c: Canvas, d: Document) -> None:
+    style = ParagraphStyle(
+        "nd", fontName=BOLD_FONT, fontSize=40, borderColor=colors.black
+    )
+    # TODO: try to contain the text in a rectangle
+    # c.saveState()
+    # c.rect(A4[0] / 2, A4[1] / 2, 5 * cm, 4 * cm)
+    # c.restoreState()
+    draw_paragraph("NO DATA", (A4[0] / 2 - 3 * cm, A4[1] / 2 + 2 * inch), style, c, d)
+
+
 def draw_paragraph(
     text: str,
     pos: tuple,
@@ -82,7 +97,9 @@ def draw_paragraph(
 
 
 def add_pstyles(
-    data: pl.DataFrame | list, style: ParagraphStyle | dict[int, ParagraphStyle]
+    data: pl.DataFrame | list,
+    style: ParagraphStyle | dict[int, ParagraphStyle],
+    nested=False,
 ) -> list:
     """Helper for adding paragraph styles to lists or data in dfs
 
@@ -102,10 +119,9 @@ def add_pstyles(
         style_fn = lambda x, index=None: Paragraph(str(x), style)
 
     if isinstance(data, pl.DataFrame):
-        return [
-            [Paragraph(str(s), style.get(i)) for i, s in enumerate(row)]
-            for row in data.iter_rows()
-        ]
+        return [[style_fn(s, i) for i, s in enumerate(row)] for row in data.iter_rows()]
+    elif nested:
+        return [[style_fn(s, i) for i, s in enumerate(row)] for row in data]
     else:
         return [style_fn(row, i) for i, row in enumerate(data)]
 
@@ -145,6 +161,7 @@ class VariantCallingReport(ResultsReport):
     def __init__(
         self,
         filename: str,
+        metadata: dict,
         pandrugs2_cache: str = "",
         civic_cache: str = "",
         vep_small: str = "",
@@ -165,6 +182,7 @@ class VariantCallingReport(ResultsReport):
             font=font,
             bold_font=bold_font,
         )
+        self.metadata: dict = metadata
         self.civic_cache: str = civic_cache
         self.header_y: int = cm
         self.pandrugs2_cache: str = pandrugs2_cache
@@ -242,6 +260,65 @@ class VariantCallingReport(ResultsReport):
         )
         self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
 
+    def build_front_page(self) -> None:
+        """Front page
+        Shows the following:
+        - Patient information: name, date of birth, gender, hospital, diagnosis
+        - Sample information: id, collection date, sample type, cancer type
+        - Summary
+        """
+        # TODO: front page will be a table of two columns, one for patient info, the other sample info
+        fontsize = 12
+        spec: dict = {}  # TODO: fill this
+        widths = [100, 150]
+        styles = {
+            0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),
+            None: ParagraphStyle("values", fontName=FONT, fontSize=fontsize),
+        }
+        patient_data = [
+            ["Name", self.metadata.get("patient_name", "-")],
+            ["Gender", self.metadata.get("gender", "-")],
+            ["Date of Birth", self.metadata.get("patient_birthdate", "-")],
+            ["Physician", self.metadata.get("physician", "-")],
+            ["Diagnosis", self.metadata.get("diagnosis", "-")],
+            ["Hospital", self.metadata.get("hospital", "-")],
+        ]
+        sample_data = [
+            ["ID", self.metadata.get("id", "-")],
+            ["Collection Date", self.metadata.get("collection_date", "-")],
+            ["Type", self.metadata.get("sample_type", "-")],
+        ]
+        patient_data = add_pstyles(patient_data, styles, nested=True)
+        sample_data = add_pstyles(sample_data, styles, nested=True)
+        patient_table = Table(patient_data, colWidths=widths)
+        sample_table = Table(sample_data, colWidths=widths)
+        header = ["Patient Information", "", "Sample Information"]
+        header = add_pstyles(
+            header,
+            ParagraphStyle("header", fontName=BOLD_FONT, fontSize=1.2 * fontsize),
+        )
+        header_styles = style_cells(
+            (0, 0), ncols=3, nrows=1, align="CENTER", background=colors.whitesmoke
+        )
+        cell_styles = style_cells((0, 1), background=colors.whitesmoke, valign="TOP")
+        padding = ["", "", ""]
+        full = Table(
+            [header, padding, [patient_table, "", sample_table]],
+            colWidths=[200, 100, 200],
+            style=cell_styles + header_styles,
+        )
+        doc = SimpleDocTemplate(
+            "front_page.pdf",
+            pagesize=A4,
+            rightMargin=spec.get("right_margin", inch),
+            leftMargin=spec.get("left_margin", inch),
+            topMargin=spec.get("top_margin", inch),
+            bmargin=spec.get("bottom_margin", inch),
+        )
+        doc.build([full])
+
+    # def build_toc(self) -> None:
+
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
         and add header (time + page number)
@@ -252,6 +329,7 @@ class VariantCallingReport(ResultsReport):
         # TODO: create universal styles for variant tables
         # front_page: ReportElement =
         table_decorator = None
+        self.build_front_page()
         for table, name in self.variant_names.items():
             style = self.table_styles[table]
             self.build_table(
@@ -352,20 +430,7 @@ class VariantCallingReport(ResultsReport):
         doc.save(self.filename)
 
 
-def no_data_decorator(c: Canvas, d: Document) -> None:
-    style = ParagraphStyle(
-        "nd",
-        fontName=BOLD_FONT,
-        fontSize=40,
-        borderColor=colors.black
-    )
-    # TODO: try to contain the text in a rectangle
-    # c.saveState()
-    # c.rect(A4[0] / 2, A4[1] / 2, 5 * cm, 4 * cm)
-    # c.restoreState()
-    draw_paragraph("NO DATA", (A4[0] / 2 - 3 * cm, A4[1] / 2 + 2 * inch), style, c, d)
-
-
+# * Report element
 class ReportElement:
     """Generic class to use to add report elements
     These are intended to be discrete units of the report e.g. a specific table or
