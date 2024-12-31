@@ -71,6 +71,9 @@ def filter_format_vep(input: str, sep="\t"):
 
 
 # * Utility fns
+#
+
+
 def no_data_decorator(c: Canvas, d: Document) -> None:
     style = ParagraphStyle(
         "nd", fontName=BOLD_FONT, fontSize=40, borderColor=colors.black
@@ -194,7 +197,6 @@ class VariantCallingReport(ResultsReport):
             "repeat": repeat_style(),
         }
         self.table_styles["sv"] = self.table_styles["small"]
-        # TODO: add in the style for therapies
 
         gene_spec = [
             {"file": vep_small, "column": "SYMBOL"},
@@ -236,9 +238,15 @@ class VariantCallingReport(ResultsReport):
         )
 
         variant_spec: list[dict] = []
+        self.stats: dict = {"counts": {}}
         for type, fn_call in zip(self.variant_names, calls):
             all, relevant, nonrelevant = fn_call()
             self.data["relevant"][type] = relevant
+            formatted_name = self.variant_names.get(type)
+            self.stats["counts"][f"Relevant {formatted_name}"] = relevant.shape[0]
+            self.stats["counts"][f"Non-relevant {formatted_name}"] = nonrelevant.shape[
+                0
+            ]
             self.data["nonrelevant"][type] = nonrelevant
             self.data["all"][type] = all
             spec: dict = {
@@ -258,7 +266,11 @@ class VariantCallingReport(ResultsReport):
         self.data["therapies"], self.data["study_references"] = fr.therapy_fmt(
             therapy_df, variant_spec
         )
+        self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[0]
         self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
+        self.stats["counts"]["Mutational Signatures"] = sum(
+            [d.shape[0] for d in self.data["sigprofiler"]]
+        )
 
     def build_front_page(self) -> None:
         """Front page
@@ -317,7 +329,55 @@ class VariantCallingReport(ResultsReport):
         )
         doc.build([full])
 
-    # def build_toc(self) -> None:
+    def build_toc(self, toc: list) -> None:
+        """Build a toc page
+
+        :param toc: toc list of the form used by pymupdf
+        """
+        spec: dict = {}  # TODO: fill this
+        toc_fontsize = 8
+        cells = []
+        header = add_pstyles(
+            ["Table of Contents", "Page"],
+            {
+                None: ParagraphStyle(
+                    "header", fontName=BOLD_FONT, fontSize=1.2 * toc_fontsize
+                ),
+                2: ParagraphStyle(
+                    "header",
+                    fontName=BOLD_FONT,
+                    fontSize=1.2 * toc_fontsize,
+                    alignment=2,
+                ),
+            },
+        )
+        for level, text, page in toc:
+            text_style = ParagraphStyle(
+                "text",
+                fontName=FONT,
+                fontSize=toc_fontsize,
+                firstLineIndent=(level - 1) * 20,
+            )
+            num_style = ParagraphStyle(
+                "num", fontName=BOLD_FONT, fontSize=toc_fontsize, alignment=2
+            )
+            t = Paragraph(text, text_style)
+            n = Paragraph(str(page), num_style)
+            cells.append([t, n])
+        cells = [header, ["", "", ""]] + cells
+        toc_table = Table(cells, colWidths=[150, 50], rowHeights=10)
+        doc = SimpleDocTemplate(
+            "toc.pdf",
+            pagesize=A4,
+            rightMargin=spec.get("right_margin", inch),
+            leftMargin=spec.get("left_margin", inch),
+            topMargin=spec.get("top_margin", inch),
+            bmargin=spec.get("bottom_margin", inch),
+        )
+        stats = [[v, "", k] for k, v in self.stats["counts"].items()]
+        stats_table = Table(stats)
+        full = Table([[toc_table, "", stats_table]], colWidths=[200, 50, 200])
+        doc.build([full])
 
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
@@ -402,26 +462,31 @@ class VariantCallingReport(ResultsReport):
         toc: list = []
         doc: Document = pymupdf.open()
 
-        toc.append([1, "Relevant therapies", len(doc) + 1])
+        offset = 2 # Account for front page and TOC page
+        doc.insert_file("front_page.pdf")
+        toc.append([1, "Relevant therapies", len(doc) + offset])
         doc.insert_file("therapies.pdf")
 
         for t, n in self.variant_names.items():
-            toc.append([1, n, len(doc) + 1])
-            toc.append([2, "Relevant", len(doc) + 1])
+            toc.append([1, n, len(doc) + offset])
+            toc.append([2, "Relevant", len(doc) + offset])
             doc.insert_file(f"rel_{t}.pdf")
-            toc.append([2, "Non-relevant", len(doc) + 1])
+            toc.append([2, "Non-relevant", len(doc) + offset])
             doc.insert_file(f"non-rel_{t}.pdf")
 
-        toc.append([1, "Mutational signatures", len(doc) + 1])
+        toc.append([1, "Mutational signatures", len(doc) + offset])
         if len(self.files["signatures"]) == 1:
             doc.insert_file(self.files["signatures"][0])
         else:
             for index, s in enumerate(self.files["signatures"]):
-                toc.append([2, f"Sample {index}", len(doc) + 1])
+                toc.append([2, f"Sample {index}", len(doc) + offset])
                 doc.insert_file(s)
 
-        toc.append([1, "References", len(doc) + 1])
+        toc.append([1, "References", len(doc) + offset])
         doc.insert_file("reference_list.pdf")
+
+        self.build_toc(toc)
+        doc.insert_file("toc.pdf", start_at=1)
 
         total_pages: int = len(doc)
         for p in doc.pages():
