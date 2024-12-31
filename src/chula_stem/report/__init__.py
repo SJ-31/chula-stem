@@ -114,9 +114,9 @@ def add_pstyles(
         if not style.get(None):
             raise ValueError("A default key `None` must be provided!")
 
-        style_fn = lambda x, index=None: Paragraph(str(x), style.get(index))
+        style_fn = lambda x, index: Paragraph(str(x), style.get(index, style[None]))
     else:
-        style_fn = lambda x, index=None: Paragraph(str(x), style)
+        style_fn = lambda x, _: Paragraph(str(x), style)
 
     if isinstance(data, pl.DataFrame):
         return [[style_fn(s, i) for i, s in enumerate(row)] for row in data.iter_rows()]
