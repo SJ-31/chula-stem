@@ -108,27 +108,24 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
         msisensor_path, separator="\t", null_values="NA", infer_schema_length=None
     )
     df = (
-        (
-            add_loc(df, start_col="Start", end_col="End")
-            .with_columns(
-                pl.col("ClinGen_report").map_elements(
-                    get_clingen_link, return_dtype=pl.String
-                )
-            )
-            .with_columns(
-                pl.struct(s="source", acc="accession")
-                .map_elements(
-                    lambda x: (
-                        dbvar_link(x["acc"])
-                        if x["acc"] != "NA" and x["acc"]
-                        else x["s"]
-                    ),
-                    return_dtype=pl.String,
-                )
-                .alias("source")
+        add_loc(df, start_col="Start", end_col="End")
+        .with_columns(
+            pl.col("ClinGen_report").map_elements(
+                get_clingen_link, return_dtype=pl.String
             )
         )
+        .with_columns(
+            pl.struct(s="source", acc="accession")
+            .map_elements(
+                lambda x: (
+                    dbvar_link(x["acc"]) if x["acc"] != "NA" and x["acc"] else x["s"]
+                ),
+                return_dtype=pl.String,
+            )
+            .alias("source")
+        )
         .rename(Rename.repeat)
+        .cast(pl.String)
         .fill_null("-")
     )
     relevant = df.filter(pl.col("ClinGen") != "-").select(wanted_cols)
@@ -174,7 +171,9 @@ def classify_cnv_fmt(
         get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name="cn")
         .rename({"cn": cn_col})
         .select(wanted_cols)
-    ).fill_null("-")
+        .cast(pl.String)
+        .fill_null("-")
+    )
     relevant = with_cn.filter(pl.col("Known/predicted Dosage-sensitive Genes") != "-")
     nonrelevant = with_cn.filter(
         pl.col("Known/predicted Dosage-sensitive Genes") == "-"
@@ -210,18 +209,18 @@ def vep_fmt(
         )
         .with_columns(
             cs.by_dtype(pl.String)
-            .fill_null("-")
             .str.replace_all("&", ", ", literal=True)
             .str.replace_all("_", " ", literal=True),
         )
-        .filter(pl.col("Gene") != "-")
-        .group_by(pl.col(["Gene", "Locus"]))
-        .agg(pl.all().first())
-    confident = (
-        df.filter((pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1"))
         .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
         .sort(pl.col("impact_score"), descending=True)
+        .group_by(pl.col(["Gene", "Locus"]))
+        .agg(pl.all().first())
+        .filter(pl.col("Gene").is_not_null())
+        .cast(pl.String)
+        .fill_null("-")
     )
+    confident = df.filter((pl.col(var_col) != "-") & (pl.col("SOMATIC") == "1"))
     others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
     relevant = confident.select(wanted_cols)
     nonrelevant = others.select(wanted_cols)
@@ -295,7 +294,6 @@ def therapy_fmt(
             (pl.col("db") == "PanDrugs2")
             | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
         )
-        .pipe(empty_string2null)
         .with_columns(
             pl.col("disease")
             .str.replace_many({"cancer": "", "clinical": ""})
@@ -307,6 +305,7 @@ def therapy_fmt(
             )
             .alias("db_link"),
         )
+        .pipe(empty_string2null)
         .group_by("therapies")
         .agg(pl.all().unique())
         .with_columns(
@@ -323,7 +322,7 @@ def therapy_fmt(
             .list.to_struct(fields=["therapies", "PubChemId"]),
         )
         .unnest("therapies")
-        .filter(pl.col("therapies").str.contains("[A-Z-a-z]*"))
+        .filter(pl.col("therapies").str.contains("[A-Za-z]*"))
         .with_columns(
             pl.col("PubChemId")
             .map_elements(
@@ -335,9 +334,13 @@ def therapy_fmt(
                 return_dtype=pl.String,
             )
             .str.replace("NA", "-"),
+            pl.col("therapies")
+            .str.to_lowercase()
+            .map_elements(str.capitalize, return_dtype=pl.String),
         )
         .rename(Rename.therapy)
         .select(list((Rename.therapy).values()))
+        .cast(pl.String)
         .pipe(empty_string2null)
         .fill_null("-")
     )
@@ -370,21 +373,21 @@ def make_signature_table(slice: pl.DataFrame, ref: pl.DataFrame) -> pl.DataFrame
     ]
     total: int = slice["m"][0]
     df = (
-        (
-            slice.explode(["Signatures", "Count", "Frequency"])
-            .join(ref, left_on="Signatures", right_on="Signature", how="left")
-            .rename(lambda x: x.replace("_", " "))
-            .with_columns(
-                pl.struct(s="Signatures", l="Link")
-                .map_elements(
-                    lambda x: format_signature_link(x["s"], x["l"]),
-                    return_dtype=pl.String,
-                )
-                .alias("Signature")
+        slice.explode(["Signatures", "Count", "Frequency"])
+        .join(ref, left_on="Signatures", right_on="Signature", how="left")
+        .rename(lambda x: x.replace("_", " "))
+        .with_columns(
+            pl.struct(s="Signatures", l="Link")
+            .map_elements(
+                lambda x: format_signature_link(x["s"], x["l"]),
+                return_dtype=pl.String,
             )
+            .alias("Signature")
         )
         .select(wanted_cols)
         .rename({"Count": f"Count (Total: {total})"})
+        .cast(pl.String)
+        .fill_null("-")
     )
     return df
 
@@ -443,16 +446,12 @@ def sigprofiler_fmt(
 
     sums: pl.DataFrame = pl.DataFrame({"Samples": samples, "m": m})
     filtered = (
-        (
-            df.with_columns(
-                (sig_cols > abs_threshold) | ((sig_cols / m) > rel_threshold)
-            )
-            .with_columns(replace_expr)
-            .with_columns(Signatures=pl.concat_list(signatures).list.drop_nulls())
-            .select(["Samples", "Signatures"])
-            .join(sums, on="Samples")
-            .explode("Signatures")
-        )
+        df.with_columns((sig_cols > abs_threshold) | ((sig_cols / m) > rel_threshold))
+        .with_columns(replace_expr)
+        .with_columns(Signatures=pl.concat_list(signatures).list.drop_nulls())
+        .select(["Samples", "Signatures"])
+        .join(sums, on="Samples")
+        .explode("Signatures")
         .join(frequencies, on=["Samples", "Signatures"])
         .join(counts, on=["Samples", "Signatures"])
         .group_by("Samples")
