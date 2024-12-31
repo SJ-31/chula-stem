@@ -123,11 +123,12 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
             .alias("source")
         )
         .rename(Rename.repeat)
+        .with_columns(cs.by_dtype(pl.String).replace("NA", None))
         .cast(pl.String)
         .fill_null("-")
     )
     relevant = df.filter(pl.col("ClinGen") != "-").select(wanted_cols)
-    nonrelevant = df.filter(pl.col("ClinGen") != "-").select(wanted_cols)
+    nonrelevant = df.filter(pl.col("ClinGen") == "-").select(wanted_cols)
     return df, relevant, nonrelevant
 
 
