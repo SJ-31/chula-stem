@@ -22,7 +22,7 @@ from chula_stem.report.spec import (
     cnv_style,
     reference_list_style,
     signature_style,
-    sv_snp_style,
+    snp_style,
     repeat_style,
     therapy_style,
 )
@@ -170,7 +170,7 @@ class VariantCallingReport(ResultsReport):
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.files: dict = {"signatures": []}
         self.table_styles: dict = {
-            "small": sv_snp_style(),
+            "small": snp_style(),
             "cnv": cnv_style(),
             "repeat": repeat_style(),
         }
@@ -199,8 +199,8 @@ class VariantCallingReport(ResultsReport):
             therapy_df.write_parquet(therapy_data_cache)
 
         calls = [
-            lambda: fr.vep_fmt(vep_small, tmpdir, "small", therapy_df),
-            lambda: fr.vep_fmt(vep_sv, tmpdir, "sv", therapy_df),
+            lambda: fr.vep_fmt(vep_small, "small"),
+            lambda: fr.vep_fmt(vep_sv, "sv"),
             lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
             lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]

@@ -184,37 +184,29 @@ def classify_cnv_fmt(
 
 def vep_fmt(
     vep_path: str,
-    tmpdir: str,
     variant_class: str,
-    therapy_df: pl.DataFrame,
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
     into a reportlab table
     """
-    r_out = f"{tmpdir}/{variant_class}_relevant.parquet"
-    nr_out = f"{tmpdir}/{variant_class}_non-relevant.parquet"
-    all_out = f"{tmpdir}/{variant_class}_all.parquet"
-    if os.path.exists(r_out) and os.path.exists(nr_out) and os.path.exists(all_out):
-        return tuple([pl.read_parquet(p) for p in [all_out, r_out, nr_out]])
     var_col: str = "Database Name"  # New column for 'Existing_variation'
     df: pl.DataFrame = pl.read_csv(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
     ).with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
     )
-    with_therapeutics: pl.DataFrame = df.join(
-        therapy_df, how="left", left_on="SYMBOL", right_on="gene"
-    )
-    wanted_cols: list = list(Rename.sv_snp.values())
-    with_therapeutics = (
-        with_therapeutics.drop("Gene")
-        .rename(Rename.sv_snp)
+    if variant_class == "sv":
+        rename: dict = Rename.sv
+    else:
+        rename: dict = Rename.snp
+    wanted_cols: list = list(rename.values())
+    df = (
+        df.drop("Gene")
+        .rename(rename)
         .with_columns(
             pl.col("HGVS").str.extract(r".*:(.*)$", 1),
             pl.col("Variant Type").str.replace("_variant$", ""),
-            (pl.col("Variant Allele Frequency").cast(pl.Float64) * 100)
-            .round(3)
-            .map_elements(lambda x: f"{x}%", return_dtype=pl.String),
+            (pl.col(rename["VAF"]).cast(pl.Float64) * 100).round(3),
         )
         .with_columns(
             cs.by_dtype(pl.String)
@@ -222,21 +214,18 @@ def vep_fmt(
             .str.replace_all("&", ", ", literal=True)
             .str.replace_all("_", " ", literal=True),
         )
-    )
+        .filter(pl.col("Gene") != "-")
+        .group_by(pl.col(["Gene", "Locus"]))
+        .agg(pl.all().first())
     confident = (
-        with_therapeutics.filter(
-            (pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1")
-        )
+        df.filter((pl.col(var_col).is_not_null()) & (pl.col("SOMATIC") == "1"))
         .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
         .sort(pl.col("impact_score"), descending=True)
     )
-    others = with_therapeutics.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
-    all = with_therapeutics
+    others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
     relevant = confident.select(wanted_cols)
     nonrelevant = others.select(wanted_cols)
-    for df, path in zip([relevant, nonrelevant, all], [r_out, nr_out, all_out]):
-        df.write_parquet(path)
-    return all, relevant, nonrelevant
+    return df, relevant, nonrelevant
 
 
 def format_therapy_sources(sources: str, source_lookup: dict) -> list[str]:
