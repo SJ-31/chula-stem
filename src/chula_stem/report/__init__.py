@@ -19,6 +19,7 @@ from reportlab.platypus import (
 )
 from chula_stem.databases import get_therapy_df
 from chula_stem.report.spec import (
+    BOLD_FONT,
     cnv_style,
     reference_list_style,
     signature_style,
@@ -351,6 +352,20 @@ class VariantCallingReport(ResultsReport):
         doc.save(self.filename)
 
 
+def no_data_decorator(c: Canvas, d: Document) -> None:
+    style = ParagraphStyle(
+        "nd",
+        fontName=BOLD_FONT,
+        fontSize=40,
+        borderColor=colors.black
+    )
+    # TODO: try to contain the text in a rectangle
+    # c.saveState()
+    # c.rect(A4[0] / 2, A4[1] / 2, 5 * cm, 4 * cm)
+    # c.restoreState()
+    draw_paragraph("NO DATA", (A4[0] / 2 - 3 * cm, A4[1] / 2 + 2 * inch), style, c, d)
+
+
 class ReportElement:
     """Generic class to use to add report elements
     These are intended to be discrete units of the report e.g. a specific table or
@@ -384,13 +399,13 @@ class ReportElement:
         )
         self.spec = spec
         self.width = pagesize[0]
-        self.decorator: Callable[[Canvas, BaseDocTemplate], None] = None
+        self.decorators: list[Callable[[Canvas, BaseDocTemplate], None]] = []
         self.height = pagesize[1]
         self.w_page_break = w_page_break
         self.elements = []
 
     def add_decorator(self, fn: Callable[[Canvas, BaseDocTemplate], None]) -> None:
-        self.decorator = fn
+        self.decorators.append(fn)
 
     def draw_pages(self, h, f) -> Callable:
         """Generic function for drawing pages with header, footer if they are provided,
@@ -403,8 +418,9 @@ class ReportElement:
         """
 
         def fn(c, d):
-            if self.decorator:
-                self.decorator(c, d)
+            for decorator in self.decorators:
+                if decorator:
+                    decorator(c, d)
             if htext := self.spec.get("header", h):
                 draw_paragraph(
                     htext,
@@ -461,6 +477,8 @@ class ReportElement:
             style_list.extend(header_styles)
         if style_list:
             table.setStyle(style_list)
+        if data.is_empty():
+            self.add_decorator(no_data_decorator)
         self.elements.append(table)
 
     def build(self) -> None:
