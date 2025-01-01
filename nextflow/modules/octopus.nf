@@ -33,7 +33,7 @@ process OCTOPUS {
     if (check.exists()) {
         """
         ln -sr ${check} .
-        ln -sr ${meta.log}/octopus2.log .
+        ln -sr ${meta.log}/octopus.log .
         """
     } else {
         """

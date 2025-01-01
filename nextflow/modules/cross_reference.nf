@@ -26,7 +26,7 @@ process CROSS_REFERENCE {
     if (check.exists()) {
         """
         ln -sr ${check} .
-        ln -sr ${meta.log}/${type}_cross_reference .
+        ln -sr ${meta.log}/${type}_cross_reference.log .
         """
     } else {
         """
@@ -36,7 +36,7 @@ process CROSS_REFERENCE {
             --clingen ${clingen} \\
             --output ${out}
 
-        cp .command.out ${type}_cross_reference.log
+        get_nextflow_log.bash ${type}_cross_reference.log
         """
     }
     //
