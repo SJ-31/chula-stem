@@ -42,7 +42,7 @@ workflow whole_exome {
     /*
      * Preprocessing
      */
-    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir)
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes")
     // After preprocessing, branch data into tumor and normal then pair up by id and join with
     //  index
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
@@ -146,6 +146,7 @@ workflow whole_exome {
 
     FACETS_PILEUP(paired_no_id, params.ref.pileup, 5) // TODO: this is only temporary,
     // in the real run use dbSNP or the combined snps file instead
+    // TODO: join this with an estimate of window_size from cnvkit's autobin
     FACETS(FACETS_PILEUP.out.pileup, 5)
 
     def nullIfNotNum = { it.text.isNumber() ? it.text : null }

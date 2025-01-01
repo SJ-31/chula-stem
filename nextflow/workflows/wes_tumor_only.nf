@@ -37,7 +37,7 @@ workflow whole_exome_tumor_only {
     /*
      * Preprocessing
      */
-    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir)
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes")
 
     empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
     tumors = PREPROCESS_FASTQ.out.bam.map { [it[0].id,
