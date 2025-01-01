@@ -21,7 +21,7 @@ process CROSS_REFERENCE {
     //
 
     script:
-    out = Utils.getName(module_number, meta, "CR", "tsv")
+    out = Utl.getName(module_number, meta, "CR", "tsv")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

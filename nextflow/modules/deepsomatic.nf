@@ -17,7 +17,7 @@ process DEEPSOMATIC {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "Deepsomatic", "vcf.gz")
+    output = Utl.getName(module_number, meta, "Deepsomatic", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --regions ${target_intervals} " : ""
     args = task.ext.args.join(" ")

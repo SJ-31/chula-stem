@@ -18,8 +18,8 @@ process STRELKA2 {
     //
 
     script:
-    out = Utils.getName(module_number, meta, "StrelkaOut")
-    prefix = Utils.getName(module_number, meta)
+    out = Utl.getName(module_number, meta, "StrelkaOut")
+    prefix = Utl.getName(module_number, meta)
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     args = task.ext.args.join(" ")

@@ -17,7 +17,7 @@ process CLAIRS {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "ClairS", "vcf.gz")
+    output = Utl.getName(module_number, meta, "ClairS", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
     prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
@@ -60,5 +60,9 @@ process CLAIRS {
         get_nextflow_log.bash clairs.log
         """
     }
-    //
 }
+// On the rename procedure:
+    // ClairS combines both somatic and germline calls under the same sample name in the vcf
+// The germline calls are extracted by checking for the 'Germline' filter, then placed into a separate file - germline.vcf.gz
+// In germline.vcf.gz, sample is correctly renamed to be the germline sample. Then
+// both germline and somatic files are merged together

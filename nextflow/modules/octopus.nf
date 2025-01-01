@@ -20,7 +20,7 @@ process OCTOPUS {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "Octopus", "vcf.gz")
+    output = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
     check = file("${meta.out}/${output}")
     prev_flag = previous_variants ? "--source-candidates ${previous_variants}" : ""
     if (!params.tumor_only) {

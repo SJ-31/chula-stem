@@ -16,7 +16,7 @@ process CREATE_PANEL_OF_NORMALS {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "PON", "vcf.gz")
+    output = Utl.getName(module_number, meta, "PON", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

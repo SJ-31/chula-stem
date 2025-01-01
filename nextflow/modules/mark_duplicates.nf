@@ -15,8 +15,8 @@ process MARK_DUPLICATES {
     tuple val(meta), path(txt), emit: qc
 
     script:
-    out = Utils.getName(module_number, meta, "dedup", "bam")
-    txt = Utils.getName(module_number, meta, "dedup_metrics", "txt")
+    out = Utl.getName(module_number, meta, "dedup", "bam")
+    txt = Utl.getName(module_number, meta, "dedup_metrics", "txt")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

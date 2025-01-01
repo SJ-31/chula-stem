@@ -23,7 +23,7 @@ process CALLSET_QC {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "QC", "vcf.gz")
+    output = Utl.getName(module_number, meta, "QC", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 

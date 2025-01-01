@@ -17,7 +17,7 @@ process DELLY_COV {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "Delly", "cov.gz")
+    output = Utl.getName(module_number, meta, "Delly", "cov.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

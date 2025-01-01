@@ -27,7 +27,8 @@ workflow  PREPROCESS_FASTQ {
     FASTP(input, 1)
     BWA(FASTP.out.passed, params.ref.genome, 2)
     MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
-    BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
+    BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants,
+         false, 4)
     SAMTOOLS_INDEX(BQSR.out.bam) // indices are required by certain callers
 
 

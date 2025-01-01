@@ -16,7 +16,7 @@ process CLASSIFY_CNV_FORMAT {
 
     script:
     caller = meta.caller
-    output = Utils.getName(module_number, meta, "ClassifyCNV_format_${caller}", "bed")
+    output = Utl.getName(module_number, meta, "ClassifyCNV_format_${caller}", "bed")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

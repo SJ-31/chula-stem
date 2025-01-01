@@ -19,8 +19,8 @@ process GRIDSS {
     //
 
     script:
-    all = Utils.getName(module_number, meta, "Gridss_all", "vcf.gz")
-    filtered = Utils.getName(module_number, meta, "Gridss_confident", "vcf.gz")
+    all = Utl.getName(module_number, meta, "Gridss_all", "vcf.gz")
+    filtered = Utl.getName(module_number, meta, "Gridss_confident", "vcf.gz")
     check1 = file("${meta.out}/${all}")
     check2 = file("${meta.out}/${filtered}")
     args = task.ext.args.join(" ")

@@ -18,7 +18,7 @@ process BWA {
     //
 
     script:
-    out = Utils.getName(module_number, meta, null, "bam")
+    out = Utl.getName(module_number, meta, null, "bam")
     check = file("${meta.out}/$out")
     if (check.exists()) {
         """

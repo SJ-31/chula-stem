@@ -5,7 +5,7 @@ process FACETS {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(counts_file) // Output from facets_pileup
+    tuple val(meta), path(counts_file), val(window_size) // Output from facets_pileup
     val(module_number)
     //
 
@@ -18,11 +18,12 @@ process FACETS {
     //
 
     script:
-    prefix = Utils.getName(module_number, meta, "Facets")
+    prefix = Utl.getName(module_number, meta, "Facets")
     check = file("${meta.out}/${prefix}")
     tsv = "${prefix}/${prefix}_hisens.tsv"
     check2 = file("${meta.out}/${tsv}")
     with_caller = meta + ["caller": "facets"]
+    window_size = window_size ? window_size : 250
     args = task.ext.args.join(" ")
     if (check.exists() && check2.exists()) {
         """
@@ -36,6 +37,7 @@ process FACETS {
             --counts-file ${counts_file} \\
             --sample-id ${prefix} \\
             --genome ${task.ext.genome} \\
+            --snp-window-size ${window_size} \\
             ${args}
 
         cut -f 2 ${prefix}/${prefix}.txt | tail -n 1 > ${prefix}/purity.txt

@@ -17,7 +17,7 @@ process MOSDEPTH {
     //
 
     script:
-    prefix = Utils.getName(module_number, meta, "Mosdepth")
+    prefix = Utl.getName(module_number, meta, "Mosdepth")
     if (target_regions) {
         out = "${prefix}.mosdepth.global.dist.txt"
     } else {

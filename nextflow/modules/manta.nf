@@ -24,12 +24,12 @@ process MANTA {
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
 
     script:
-    out = Utils.getName(module_number, meta, "MantaOut")
+    out = Utl.getName(module_number, meta, "MantaOut")
     call_suffix = !params.tumor_only ? "somaticSV_Manta" : "tumorSV_Manta"
-    callfile = Utils.getName(module_number, meta, call_suffix, "vcf.gz")
+    callfile = Utl.getName(module_number, meta, call_suffix, "vcf.gz")
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
-    prefix = Utils.getName(module_number, meta)
+    prefix = Utl.getName(module_number, meta)
     n = !params.tumor_only ? meta.normal : "none"
     normal_flag = !params.tumor_only ? " --normalBam ${normal} " : ""
     args = task.ext.args.join(" ")

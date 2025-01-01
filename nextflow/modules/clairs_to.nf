@@ -17,7 +17,7 @@ process CLAIRS_TO {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "ClairS-TO", "vcf.gz")
+    output = Utl.getName(module_number, meta, "ClairS-TO", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
     prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""

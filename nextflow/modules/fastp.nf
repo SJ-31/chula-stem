@@ -22,7 +22,7 @@ process FASTP {
     n1 = reads[1].baseName.replaceAll(".fastq", "")
     output1 = "${module_number}-${n0}.fastp.fastq.gz"
     output2 = "${module_number}-${n1}.fastp.fastq.gz"
-    prefix = Utils.getName(module_number, meta, "fastp")
+    prefix = Utl.getName(module_number, meta, "fastp")
     check1 = file("${meta.out}/$output1")
     check2 = file("${meta.out}/$output2")
     args = task.ext.args.join(" ")

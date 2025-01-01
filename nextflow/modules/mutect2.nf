@@ -20,9 +20,9 @@ process MUTECT2 {
     //
 
     script:
-    out = Utils.getName(module_number, meta, "Mutect2", "vcf.gz")
+    out = Utl.getName(module_number, meta, "Mutect2", "vcf.gz")
     stats = "${out}.stats"
-    raw = Utils.getName(module_number, meta, "Mutect2_raw", "tar.gz")
+    raw = Utl.getName(module_number, meta, "Mutect2_raw", "tar.gz")
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !params.tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""

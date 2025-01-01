@@ -17,7 +17,7 @@ process SIGPROFILERASSIGNMENT {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "SigProfilerAssignment")
+    output = Utl.getName(module_number, meta, "SigProfilerAssignment")
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args.join(" ")

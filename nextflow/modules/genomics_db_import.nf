@@ -17,7 +17,7 @@ process GENOMICS_DB_IMPORT {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "Genomics_DB")
+    output = Utl.getName(module_number, meta, "Genomics_DB")
     check = file("${meta.out}/${output}")
     normal_flag = normals.collect({" -V ${it} "}).join(" ")
     args = task.ext.args.join(" ")

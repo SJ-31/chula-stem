@@ -18,9 +18,9 @@ process VEP {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "VEP", "vcf.gz")
-    tsv = Utils.getName(module_number, meta, "VEP", "tsv")
-    html = Utils.getName(module_number, meta, "VEP_summary", "html")
+    output = Utl.getName(module_number, meta, "VEP", "vcf.gz")
+    tsv = Utl.getName(module_number, meta, "VEP", "tsv")
+    html = Utl.getName(module_number, meta, "VEP_summary", "html")
     check = file("$meta.out/$output")
     check2 = file("$meta.out/$tsv")
     variant_class = meta.variant_class ? meta.variant_class : "small"

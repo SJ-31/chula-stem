@@ -20,7 +20,7 @@ process FILTER_MUTECT_CALLS {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "Mutect2_filtered", "vcf.gz")
+    output = Utl.getName(module_number, meta, "Mutect2_filtered", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     args_flag = task.ext.args ? "-a ${args}" : ""

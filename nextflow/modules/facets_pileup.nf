@@ -17,7 +17,7 @@ process FACETS_PILEUP {
     //
 
     script:
-    prefix = Utils.getName(module_number, meta, "Facets")
+    prefix = Utl.getName(module_number, meta, "Facets")
     output = "${prefix}.snp_pileup.gz"
     check = file("${meta.out}/${output}")
     if (check.exists()) {

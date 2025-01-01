@@ -27,8 +27,8 @@ process MULTIQC {
     //
 
     script:
-    out = Utils.getName(module_number, meta, "MultiQC", "html")
-    data = Utils.getName(module_number, meta, "MultiQC_data")
+    out = Utl.getName(module_number, meta, "MultiQC", "html")
+    data = Utl.getName(module_number, meta, "MultiQC_data")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${data}")
     if (check.exists()) {

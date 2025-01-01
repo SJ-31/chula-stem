@@ -19,8 +19,8 @@ process PICARD {
     path("*.log")
 
     script:
-    out = Utils.getName(module_number, meta, "Picard_alignment_metrics", "txt")
-    out2 = Utils.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
+    out = Utl.getName(module_number, meta, "Picard_alignment_metrics", "txt")
+    out2 = Utl.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${out2}")
     if (check.exists() && check2.exists()) {

@@ -17,7 +17,7 @@ process CONCAT_VCF {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "All", "vcf.gz")
+    output = Utl.getName(module_number, meta, "All", "vcf.gz")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         """

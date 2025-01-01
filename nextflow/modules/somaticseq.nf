@@ -30,7 +30,7 @@ process SOMATICSEQ {
         found[0]
     }
 
-    output = Utils.getName(module_number, "Somaticseq")
+    output = Utl.getName(module_number, "Somaticseq")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --inclusion-region ${target_intervals} " : ""
     blacklist_flag = blacklist != "" ? " --exclusion-region ${blacklist} " : ""

@@ -39,7 +39,7 @@ process CALLSET_QC_TSV {
     //
 
     script:
-    output = Utils.getName(module_number, meta, "QC", "tsv")
+    output = Utl.getName(module_number, meta, "QC", "tsv")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
 
