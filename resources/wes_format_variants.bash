@@ -56,3 +56,9 @@ for g in "${dir}"/variants/gnomADv4.1.0_Exomes/*vcf.bgz; do
         echo "Biallelic from ${g} retrieved"
     fi
 done
+
+for dir in $("${biallelic}" "${random}"); do
+    cd "${dir}"
+    bcftools concat *.vcf.gz -O z > all.vcf.gz
+    gatk IndexFeatureFile -i all.vcf.gz
+done

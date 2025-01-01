@@ -44,7 +44,7 @@ Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.
   * Quality filtering
   * Length filtering
   * Base correction
-  * polyG tail trimming: is performed if reads are detected to NextSeq/NovaSeq
+  * polyG tail trimming: is performed if reads are detected to be NextSeq/NovaSeq
 + Read mapping to reference: =bwa-mem2=
   * This is done in an alt-aware manner, due to the benefits for variant calling when doing so [1].
     * You can get the =.alt= index file for =bwa-mem2= at
@@ -113,22 +113,17 @@ Callers with support for tumor-only data are marked with *T*. Note that this is 
     * This works by scoring the CNV, based on its overlap with protein-coding and noncoding genes, as well as with a set of dosage-sensitive genes (haploinsufficient and triplosensitive) curated by ClinGen.
       * If there is no such overlap, the algorithm checks for overlap with benign CNVs from gnomAD and DGV
   * Is cautious about assigning clinical significance, will place CNV as uncertain "if convincing data are not available"
-- [[https://pcingola.github.io/SnpEff/][snpEff]] (SNPs, indels, multiple-nucleotide-polymorphisms )
-  * Make sure the the chromosome names of the snpEff db and your reference genome are identical, otherwise you will get missing chromosome errors
-*** Output
-+ Variants with high consequence, as predicted by VEP and snpEff (both using the same terms)
-****  Report format
-+ Relevant variants table
-  * Must have existing variation,
-    Filter variants by those that have existing variation, ideally with clinical significance. Include read support and allele frequency in the
-  * Cols for variant type, genes, read support and allele frequency too
-  * Actionable drugs and mutation type if available
-+ Table of mutational signatures
-  * Relevant signatures - those mapped with specific processes and that have known treatments available
-  * Everything else
-*** Motivation
-+ Using multiple variant callers is common practice, notably used in the flagship analysis of the Pan-Cancer Analysis of Whole Genomes Consortium [4]
-** WES tumor-only
+** RNA-seq
+*** Input
+*** Steps
+**** Preprocessing
++ QC:
+  * =fastp= with quality, length filtering, base correction
++ Marking duplicates: GATK's =MarkDuplicatesSpark=
+**** Read quantification
++ =kallisto= - a pseudoalignment program that quantifies reads at the transcript level
+  * These will be collapsed into gene-level abundance estimates with [[https://bioconductor.org/packages/release/bioc/html/tximport.html][tximport]]
+**** Fusion detection
 * Dependencies
 https://bedops.readthedocs.io/en/latest/index.html
 samtools, bcftools

@@ -1,3 +1,8 @@
+* GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz=
+*Date added*: <2025-01-01 Wed>
+*Source:* [[https://data.broadinstitute.org/Trinity/CTAT_RESOURCE_LIB/]]
+Reference genome and protein-coding gene annotation set, for use in fusion detection with [[https://github.com/STAR-Fusion/STAR-Fusion/wiki/installing-star-fusion][STAR-Fusion]]
 * GCF_000001405.40_GRCh38.p14_genomic.sdf
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/genomes/GCF_000001405.40_GRCh38.p14_genomic.sdf=
 *Date added*: <2024-12-30 Mon>
@@ -16,7 +21,7 @@ Signature,Class,Proposed_aetiology,Studies,COSMIC_link
 + Proposed aetiologies are taken directly from the COSMIC page
 
 * Clingen-Dosage-Sensitivity-2024-12-16.csv
-*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
+*Absolute path:*         =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
 *Date added*: <2024-12-19 Thu>
 *Source:* [[https://search.clinicalgenome.org/kb/gene-validity/download][ClinGen]]
 A summary of Gene-Disease validity curations by ClinGen. Used primarily to identify potentially important genes that are affected by called repetitive regions

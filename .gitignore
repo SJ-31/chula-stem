@@ -2,6 +2,7 @@
 tests/patient*
 .github
 *.nf.test.snap
+tests/*.pdf
 *.nf-test.log*
 /nextflow/.nf-test*
 *slurm-*.out
