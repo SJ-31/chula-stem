@@ -1,12 +1,12 @@
 #!/usr/bin/env ipython
 
-from rpy2.robjects.packages import importr
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 
 import click
 import pandas as pd
 import polars as pl
+from rpy2.robjects.packages import importr
 
 
 # rx method is equivalent to [], rx2 is [[]]

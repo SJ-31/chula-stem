@@ -1,5 +1,6 @@
 #!/usr/bin/env ipython
 
+
 def style_cells(
     start: tuple,
     ncols: int = 0,
@@ -8,6 +9,7 @@ def style_cells(
     fontsize: str = "",
     align: str = "",
     background: str = "",
+    end: tuple = None,
     valign: str = "",
     textcolor=None,
     underline: tuple = (),
@@ -24,16 +26,18 @@ def style_cells(
         valign: "VALIGN",
         underline: "LINEBELOW",
     }
-    if ncols and nrows:
-        end: tuple = start[0] + ncols - 1, start[1] + nrows - 1
+    if ncols and nrows and (not end):
+        end_actual: tuple = start[0] + ncols - 1, start[1] + nrows - 1
+    elif not end:
+        end_actual = (-1, -1)
     else:
-        end = (-1, -1)
+        end_actual = end
 
     def style_helper(format: str, value) -> tuple:
         if isinstance(value, tuple):
-            return (format, start, end) + value
+            return (format, start, end_actual) + value
         else:
-            return (format, start, end, value)
+            return (format, start, end_actual, value)
 
     styles: list = []
     for param, name in parameter_map.items():
