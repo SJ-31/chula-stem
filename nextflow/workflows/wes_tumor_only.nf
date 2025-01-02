@@ -28,7 +28,7 @@ include { CROSS_REFERENCE as CROSS_REFERENCE_CNV } from "../modules/cross_refere
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
-
+include { CLAIRS } from '../modules/clairs.nf'
 
 workflow whole_exome_tumor_only {
 
@@ -75,6 +75,7 @@ workflow whole_exome_tumor_only {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
+    // TODO: <2024-12-30 Mon> Make sure that the first element of tumors is a meta map
     to_clairs = tumors.join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
             .join(MUTECT2_COMPLETE.out.map(params.getId))
             .map(params.delId)
@@ -87,22 +88,19 @@ workflow whole_exome_tumor_only {
     }
 
     // Combine variants by type
-    small_variants_to_oct = MUTECT2_COMPLETE.out.map(params.prependId)
-        .join(CLAIRS_TO.out.variants.map(params.getId))
-        .map(params.delId)
-        .map({ toConcat("Small_all", "annotations", it) })
+    small_variants_to_oct = Utl.joinFirst(
+        MUTECT2_COMPLETE.out, [CLAIRS_TO.out.variants]
+    ).map({ toConcat("Small_all", "annotations", it) })
 
     CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
 
-    to_octopus = paired.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
-            .map(params.delSuffix)
+    to_octopus = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
 
-    to_octopus.view()
     OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
 
-    CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
-                    .join(OCTOPUS.out.variants.map(params.getId)),
-                    params.ref.genome, 6)
+    CONCAT_SMALL_2(Utl.joinFirst(CONCAT_SMALL_1.out.vcf, [OCTOPUS.out.variants])
+                    .map({ toConcat("Small_all", "annotations", it) }),
+                   params.ref.genome, 6)
     small_variants = CONCAT_SMALL_2.out.vcf
 
     structural_variants = MANTA.out.somatic.map(params.prependId)
@@ -115,13 +113,18 @@ workflow whole_exome_tumor_only {
     /*
      * Metric collection and QC
      */
-    STANDARDIZE_VCF(small_variants.map({ params.addSuffix("Small_std", it) }),
-                    params.ref.genome, 6)
 
-    QC_SMALL(STANDARDIZE_VCF.out.vcf.map({ params.addSuffix("Small_high_conf", it) }),
-        params.small_qc, 7)
-    QC_SV(CONCAT_SV.out.vcf.map({ params.addSuffix("SV_high_conf", it) }),
-          params.sv_qc, 7)
+    to_standardize = Utl.addSuffix(Utl.joinFirst(small_variants,
+                                                 [empty_normals,
+                                                  PREPROCESS_FASTQ.out.bam]),
+                                   "Small_std")
+
+    STANDARDIZE_VCF(to_standardize, params.ref.genome, 6)
+
+    QC_SMALL(Utl.addSuffix(STANDARDIZE_VCF.out.vcf,
+                           "Small_high_conf"), params.small_qc, 7)
+
+    QC_SV(Utl.addSuffix(CONCAT_SV.out.vcf, "SV_high_conf"), params.sv_qc, 7)
 
     /*
     * Copy number abberation
@@ -224,3 +227,4 @@ workflow whole_exome_tumor_only {
     MULTIQC(to_multiqc, 8)
 
 }
+
