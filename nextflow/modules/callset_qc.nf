@@ -33,7 +33,11 @@ process CALLSET_QC {
     // Note: VAF is calculated with GATK, which calls it FORMAT/AF
     filter = qc.accepted_filters.collect({ "FILTER~\"${it}\"" }).join(" && ")
 
-    all = [ndepth, tdepth, filter, vaf].findAll({ it != "" && it != null })
+    filter_list = [tdepth, filter, vaf]
+    if (!params.tumor_only) {
+        filter_list << ndepth
+    }
+    all = filter_list.findAll({ it != "" && it != null })
         .collect({ "bcftools filter -i '${it}'" }).join(" | ")
     all = all != "" && all != null ? "${all} -O z > ${output}" : "bcftools view -O z > ${output}"
     if (check.exists()) {
