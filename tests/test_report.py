@@ -63,7 +63,7 @@ def test_cnvkit_pdf():
 
 
 # @pytest.mark.skip(reason="Done")
-def test_full():
+def test_full(front_page_only=False):
     from chula_stem.report.variant_calling_report import VariantCallingReport
 
     meta = {
@@ -94,8 +94,16 @@ def test_full():
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
         plot=False,
     )
-    R.build()
-    R.merge()
+    if front_page_only:
+        R.build_front_page()
+    else:
+        R.build()
+        R.merge()
+
+
+@pytest.mark.skip(reason="Done")
+def test_front_page():
+    test_full(True)
 
 
 @pytest.mark.skip(reason="Done")
