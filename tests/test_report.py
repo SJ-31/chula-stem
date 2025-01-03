@@ -3,9 +3,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
-import pytest
 import polars as pl
 import polars.selectors as cs
+import pytest
 from chula_stem.callset_qc import IMPACT_MAP
 from chula_stem.report.format import msisensor_pro_fmt
 
@@ -53,23 +53,46 @@ def default_shapes(canvas, doc: BaseDocTemplate):
     canvas.restoreState()
 
 
-# @pytest.mark.skip(reason="Done")
-def test_full():
+@pytest.mark.skip(reason="Done")
+def test_cnvkit_pdf():
     from chula_stem.report import VariantCallingReport
 
+    cnr = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr"
+    cns = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
+    VariantCallingReport.plot_cnvkit(cnr, cns)
+
+
+# @pytest.mark.skip(reason="Done")
+def test_full():
+    from chula_stem.report.variant_calling_report import VariantCallingReport
+
+    meta = {
+        "patient_name": "John Doe",
+        "gender": "Male",
+        "patient_birthdate": "1990-05-14",
+        "physician": "Dr. Alice Smith",
+        "diagnosis": "Hypertension",
+        "hospital": "Green Valley Medical Center",
+        "id": "SMP-123456",
+        "collection_date": "2024-12-01",
+        "sample_type": "Blood",
+    }
     R = VariantCallingReport(
         "/home/shannc/Bio_SDD/chula-stem/tests/report_full.pdf",
+        metadata=meta,
         civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
         pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
         vep_small=small_path,
         vep_sv=sv_pat,
         classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
         facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
-        cnvkit="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
+        cnvkit_cns="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
+        cnvkit_cnr="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr",
         msisensor_pro="/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv",
         sigprofiler="/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/Assignment_Solution_Activities.txt",
         cosmic_reference="/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmic_signatures_v3.4-2024-12-26.csv",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
+        plot=False,
     )
     R.build()
     R.merge()
@@ -95,16 +118,8 @@ def test_format_vep_sv():
         os.mkdir("/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv")
     except:
         pass
-    vep_fmt(
-        sv_pat,
-        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
-        variant_class="sv",
-    )
-    vep_fmt(
-        small_path,
-        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv",
-        variant_class="small",
-    )
+    vep_fmt(sv_pat, variant_class="sv")
+    vep_fmt(small_path, variant_class="small")
 
 
 spec: list = [
@@ -123,5 +138,3 @@ spec: list = [
         "column": "SYMBOL",
     },
 ]
-
-
