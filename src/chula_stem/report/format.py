@@ -7,12 +7,14 @@
 #    In addition to cleaning up the output with string operations and renaming cols,
 #       these fns will add relevant links
 
+import re
+
 import polars as pl
+import polars.selectors as cs
+
+from chula_stem.callset_qc import IMPACT_MAP
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
-import re
-import polars.selectors as cs
-from chula_stem.callset_qc import IMPACT_MAP
 
 TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
@@ -209,13 +211,22 @@ def vep_fmt(
     else:
         rename: dict = Rename.snp
     wanted_cols: list = list(rename.values())
+    df = df.drop("Gene").rename(rename)
+    try:
+        df = df.with_columns((pl.col(rename["VAF"]).cast(pl.Float64) * 100).round(3))
+    except pl.exceptions.InvalidOperationError:
+        df = df.with_columns(
+            pl.col(rename["VAF"]).map_elements(
+                lambda vaf: ",".join(
+                    list(map(lambda y: str(round(float(y), 3)), vaf.split(",")))
+                ),
+                return_dtype=pl.String,
+            )
+        )
     df = (
-        df.drop("Gene")
-        .rename(rename)
-        .with_columns(
+        df.with_columns(
             pl.col("HGVS").str.extract(r".*:(.*)$", 1),
             pl.col("Variant Type").str.replace("_variant$", ""),
-            (pl.col(rename["VAF"]).cast(pl.Float64) * 100).round(3),
         )
         .with_columns(
             cs.by_dtype(pl.String)

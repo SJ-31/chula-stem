@@ -1,7 +1,9 @@
+from collections.abc import Callable
+
 import click
 import polars as pl
 
-from chula_stem.utils import empty_string2null, contain_join
+from chula_stem.utils import contain_join, empty_string2null
 
 IMPACT_MAP: dict = {
     "HIGH": 3,
@@ -66,7 +68,7 @@ def merge_variant_calls(
         grouped = grouped.with_columns(mutect_strelka_cols).filter(
             (pl.col("has_mutect2") & (pl.col("VAF") < 0.03))
             | (
-                ((pl.col("has_mutect2") & pl.col("has_strelka2")))
+                (pl.col("has_mutect2") & pl.col("has_strelka2"))
                 & (pl.col("VAF") <= 0.1)
                 & (pl.col("VAF") >= 0.03)
             )
@@ -134,6 +136,19 @@ def resolve_transcripts(
     return pl.DataFrame(schema=df.schema)
 
 
+def filter_multiallelic(
+    df: pl.DataFrame,
+    col: str,
+    filter_fn: Callable[[list[str]], bool],
+    separator: str = ",",
+) -> pl.DataFrame:
+    return df.filter(
+        pl.col(col).map_elements(
+            lambda x: filter_fn(x.split(separator)), return_dtype=pl.Boolean
+        )
+    )
+
+
 def standard_filters(
     df: pl.DataFrame,
     min_tumor_depth: int,
@@ -152,9 +167,16 @@ def standard_filters(
             (pl.col("Alt_depth") >= min_tumor_depth) | (pl.col("Alt_depth").is_null())
         )
     if "VAF" in df.columns:
-        df = df.cast({"VAF": pl.Float64}).filter(
-            (pl.col("VAF") >= min_vaf) | (pl.col("VAF").is_null())
-        )
+        try:
+            df = df.cast({"VAF": pl.Float64}).filter(
+                (pl.col("VAF") >= min_vaf) | (pl.col("VAF").is_null())
+            )
+        except pl.exceptions.InvalidOperationError:
+            df = filter_multiallelic(
+                df,
+                "VAF",
+                lambda x: all(list(map(lambda vaf: float(vaf) >= min_vaf, x))),
+            )
     if filters:
         df = df.filter(
             pl.col("FILTER").str.split(";").list.set_intersection(filters).list.len()
@@ -214,7 +236,7 @@ def region_filter(
 @click.option("-i", "--input_tsv", required=True, help="Input tsv path")
 @click.option("--min_tumor_depth", required=False, default=0)
 @click.option("--max_normal_depth", required=False, default=50)
-@click.option("--min_vaf", required=False, default=0)
+@click.option("--min_vaf", required=False, default=0.0, type=float)
 @click.option("--impact", required=False, default=False, is_flag=True)
 @click.option("--canonical", required=False, default=False, is_flag=True)
 @click.option("--accepted_filters", required=False, default="PASS")
