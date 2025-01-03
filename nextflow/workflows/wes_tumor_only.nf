@@ -129,17 +129,7 @@ workflow whole_exome_tumor_only {
     /*
     * Copy number abberation
     */
-
-    // FACETS_PILEUP(paired_no_id, params.ref.pileup, 5) // TODO: this is only temporary,
-    // // in the real run use dbSNP or the combined snps file instead
-    // FACETS(FACETS_PILEUP.out.pileup, 5)
-
-    // TODO: only need this with facets
-    // def nullIfNotNum = { it.text.isNumber() ? it.text : null }
-
-    purity_ploidy = paired.map({ [it[0], null, null] })
-    // purity_ploidy = FACETS.out.purity_ploidy
-    //     .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+    purity_ploidy = tumors.map({ [it[0], null, null] })
 
     CNVKIT_PREP(Channel.of(["filename": "flat_reference",
                             "out": "${params.outdir}/cnvkit_cnn",
@@ -153,10 +143,9 @@ workflow whole_exome_tumor_only {
             .join(purity_ploidy)
             .map(params.delId)
 
-    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
+    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
     cnv_ch = CNVKIT.out.cnv
-    // TODO: maybe add in facets?
 
     CLASSIFY_CNV_FORMAT(cnv_ch, 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
