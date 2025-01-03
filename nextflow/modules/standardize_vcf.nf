@@ -13,6 +13,9 @@
 
 process STANDARDIZE_VCF {
     ext version: params.gatk_version
+    errorStrategy "ignore"
+    // BUG: <2025-01-03 Fri> gatk has an Invalid File pointer error
+    // when trying to read the recal bam file it produced...
 
     publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
@@ -29,7 +32,7 @@ process STANDARDIZE_VCF {
 
     script:
     suffix = meta.suffix ? meta.suffix : "Standardized"
-    output = Utils.getName(module_number, meta, "Standardize", "vcf.gz")
+    output = Utl.getName(module_number, meta, "Standardize", "vcf.gz")
     check = file("${meta.out}/${output}")
     to_clear = [
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],
@@ -40,6 +43,7 @@ process STANDARDIZE_VCF {
 
     annotation_flag = annotations.collect({" -A ${it} "}).join(" ")
     clear_flag = to_clear.collect({ k,v -> v.collect({ "${k}/${it}" }).join(",") }).join(",")
+    read_flag = !params.tumor_only ? " -I ${tumor_bam} -I ${normal_bam} " : " -I ${tumor_bam} "
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
@@ -48,11 +52,12 @@ process STANDARDIZE_VCF {
         """
     } else {
         """
-        bcftools annotate -x ${clear_flag} -O z ${vcf} > tmp.vcf.gz
+        standardize_vcf_clean.bash "${clear_flag}" ${vcf}
 
         gatk IndexFeatureFile -I tmp.vcf.gz
-        gatk VariantAnnotator -R ${reference} -V tmp.vcf.gz \\
-            -I ${tumor_bam} -I ${normal_bam} \\
+        gatk VariantAnnotator ${args} \\
+            -R ${reference} -V tmp.vcf.gz \\
+            ${read_flag} \\
             ${annotation_flag} \\
             -O ${output} \\
             --add-output-vcf-command-line
