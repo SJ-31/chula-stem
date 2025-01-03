@@ -33,7 +33,7 @@ from chula_stem.report.spec import (
     snp_style,
     therapy_style,
 )
-from chula_stem.report.utils import style_cells
+from chula_stem.report.utils import alternating_bg, style_cells
 
 # TODO: replace this with some info about pipeline or stem lab
 FRONT_PAGE_DETAILS: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"
@@ -287,37 +287,44 @@ class VariantCallingReport(ResultsReport):
 
         :param toc: toc list of the form used by pymupdf
         """
-        toc_fontsize = 8
-        cells = []
-        header = add_pstyles(
-            ["Table of Contents", "Page"],
-            {
-                None: ParagraphStyle(
-                    "header", fontName=BOLD_FONT, fontSize=1.2 * toc_fontsize
-                ),
-                2: ParagraphStyle(
-                    "header",
-                    fontName=BOLD_FONT,
-                    fontSize=1.2 * toc_fontsize,
-                    alignment=2,
-                ),
-            },
-        )
+        cell_sets = [[], []]
+        cell_styles = []
+        cur_set = cell_sets[0]
+        i, offset = 0, 0
         for level, text, page in toc:
-            text_style = ParagraphStyle(
-                "text",
-                fontName=FONT,
-                fontSize=toc_fontsize,
-                firstLineIndent=(level - 1) * 20,
+            t = Paragraph(text, STYLE["toc_text"](level))
+            n = Paragraph(str(page), STYLE["toc_num"])
+
+            tstyle = style_cells(
+                (offset, i), end=(offset + 2, i), background=STYLE["toc_cell_bg"]
             )
-            num_style = ParagraphStyle(
-                "num", fontName=BOLD_FONT, fontSize=toc_fontsize, alignment=2
-            )
-            t = Paragraph(text, text_style)
-            n = Paragraph(str(page), num_style)
-            cells.append([t, n])
-        cells = [header, ["", "", ""]] + cells
-        toc_table = Table(cells, colWidths=[150, 50], rowHeights=10)
+            if i % 2 == 0:
+                cell_styles.extend(tstyle)
+            i += 1
+            if text == "Tandem Repeats":
+                i = 0
+                offset = 2
+                cur_set = cell_sets[1]
+            cur_set.append([t, n])
+        cell_styles.extend(style_cells((2, 0), end=(2, -1), background=colors.white))
+        n = max(len(cell_sets[0]), len(cell_sets[1]))
+        cell_sets[0] += [""] * (n - len(cell_sets[0]))
+        cell_sets[1] += [""] * (n - len(cell_sets[1]))
+
+        all_cells = []
+        for left, right in zip(*cell_sets):
+            if isinstance(left, list) and isinstance(right, list):
+                all_cells.append([*left, " ", *right])
+            elif isinstance(left, list):
+                all_cells.append([*left, "", "", ""])
+            else:
+                all_cells.append(["", "", "", *right])
+
+        widths = [((AVAILABLE_WIDTH / 4) - 3)] * 4
+        widths.insert(2, 12)
+        toc_table = Table(all_cells, colWidths=widths)
+        toc_table.setStyle(style_cells((0, 0), valign="TOP") + cell_styles)
+
         doc = SimpleDocTemplate(
             "toc.pdf",
             pagesize=A4,
@@ -328,8 +335,19 @@ class VariantCallingReport(ResultsReport):
         )
         stats = [[v, "", k] for k, v in self.stats["counts"].items()]
         stats_table = Table(stats)
-        full = Table([[toc_table, "", stats_table]], colWidths=[200, 50, 200])
-        doc.build([full])
+        # full = Table([[toc_table, "", stats_table]], colWidths=[])
+
+        def decorator(c: Canvas, d: SimpleDocTemplate) -> None:
+            STYLE["table_decorator"](c, d)
+            draw_paragraph(
+                "Table of Contents",
+                self.spec.get("header_pos"),
+                STYLE["toc_title_style"],
+                c,
+                d,
+            )
+
+        doc.build([toc_table], onFirstPage=decorator)
 
     @staticmethod
     def plot_cnvkit(cnr: str, cns: str) -> None:

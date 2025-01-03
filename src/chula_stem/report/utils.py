@@ -16,6 +16,7 @@ def style_cells(
     valign: str = "",
     textcolor=None,
     underline: tuple = (),
+    lineafter: tuple = (),
     box: tuple = (),
     grid: tuple = (),
 ) -> list:
@@ -28,6 +29,7 @@ def style_cells(
         textcolor: "TEXTCOLOR",
         background: "BACKGROUND",
         align: "ALIGN",
+        lineafter: "LINEAFTER",
         valign: "VALIGN",
         box: "BOX",
         grid: "GRID",
