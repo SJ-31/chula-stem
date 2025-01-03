@@ -278,3 +278,26 @@ class ReportElement:
                 self.spec.get("footer_later", ""),
             ),
         )
+
+
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-o", "--output")
+    subparsers = parser.add_subparsers(help="Report version", dest="version")
+    vc = subparsers.add_parser(
+        "variant_calling", help="Report for variant calling pipeline"
+    )
+    parser.add_argument("-s", "--", default="", help="Ve", action="store")
+    parser.add_argument("-c", "--civic_cache", default="", help="Ve", action="store")
+    parser.add_argument(
+        "-d", "--pandrugs2_cache", default="", help="Ve", action="store"
+    )
+    parser.add_argument("-", "--facets", default="", help="Ve", action="store")
+    args = vars(parser.parse_args())  # convert to dict
+    return args
+
+
+def entry_point():
+    args = parse_args()
