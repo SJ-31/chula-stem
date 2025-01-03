@@ -2,6 +2,7 @@
 
 from SigProfilerAssignment import Analyzer as Analyze
 
+
 def parse_args():
     import argparse
 
@@ -52,5 +53,5 @@ if __name__ == "__main__":
         input_type=args["input_type"],
         exome=args["exome"],
         genome_build=args["genome_build"],
-        exclude_signature_groups=to_exclude,
+        exclude_signature_subgroups=to_exclude,
     )
