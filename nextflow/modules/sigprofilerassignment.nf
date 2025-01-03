@@ -34,7 +34,7 @@ process SIGPROFILERASSIGNMENT {
         mkdir vcfs
 
         for v in *vcf.gz; do
-            sigprofiler_assignment_cleanup.bash \$v vcfs/\$v
+            sigprofiler_assignment_cleanup.bash \$v vcfs
         done
 
         SigProfilerAssignmentWrapper.py -i vcfs \\
