@@ -148,7 +148,7 @@ workflow whole_exome_tumor_only {
                 params.ref.genome, params.ref.baits_unzipped,
                 params.ref.genome_blacklist, 4)
 
-    to_cnvkit = paired.map({ it[0..1] + [it[2]] })
+    to_cnvkit = paired.map({ it[0..1] + [it[3]] })
             .join(QC_SMALL.out.vcf.map(params.getId))
             .join(purity_ploidy)
             .map(params.delId)

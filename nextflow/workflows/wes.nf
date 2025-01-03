@@ -160,7 +160,7 @@ workflow whole_exome {
                             .merge(collected_normals),
                 params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
 
-    to_cnvkit = paired.map({ it[0..1] + [it[2]] })
+    to_cnvkit = paired.map({ it[0..1] + [it[3]] })
             .join(small_high_conf.map(params.getId))
             .join(purity_ploidy)
             .map(params.delId)
