@@ -41,7 +41,7 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
     ) |>
     ggplot(aes(x = mid, y = log2, alpha = weight), stat = "identity") +
     ylab("Copy Number Ratio (log2)") +
-    geom_point() +
+    geom_point(size = 0.5) +
     scale_y_continuous(
       breaks = scales::breaks_pretty(n = 15),
       minor_breaks = scales::minor_breaks_n(5)
@@ -63,10 +63,11 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
     )
     plot <- plot + facet_wrap(vars(chromosome),
       strip.position = "bottom", scales = "free_x",
-      nrow = 1
+      ncol = lget(sizing, "ncol", 3)
     ) +
       theme_bw() +
       theme(
+        text = element_text(size = 15),
         axis.line = element_line(colour = "grey"),
         strip.placement = "outside",
         panel.grid.minor.x = element_blank(),
@@ -82,8 +83,12 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
   } else {
     plot <- plot + xlab("Position (mb)") + labs(title = glue("Chromosome {chr}"))
   }
-  ggsave(output, plot,
-    dpi = lget(sizing, "dpi", 300), width = lget(sizing, "width", NA),
-    height = lget(sizing, "height", NA), units = lget(sizing, "units", "in")
-  )
+  if (!is.null(output)) {
+    ggsave(output, plot,
+      dpi = lget(sizing, "dpi", 300), width = lget(sizing, "width", NA),
+      height = lget(sizing, "height", NA), units = lget(sizing, "units", "in")
+    )
+  } else {
+    plot
+  }
 }

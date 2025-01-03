@@ -1,10 +1,11 @@
 #!/usr/bin/env python
-import rpy2
-import click
-from rpy2.robjects.packages import STAP
-from rpy2.robjects import NULL, ListVector
-from pathlib import Path
 import inspect
+from pathlib import Path
+
+import click
+import rpy2
+from rpy2.robjects import NULL, ListVector
+from rpy2.robjects.packages import STAP
 
 
 def parse_args():
@@ -51,29 +52,29 @@ def parse_args():
 
 
 def none2null(item):
-    if item == None:
+    if item is None:
         return NULL
     if isinstance(item, dict):
         changed = dict(
-            list(map(lambda x: (x[0], NULL) if x[1] == None else x, item.items()))
+            list(map(lambda x: (x[0], NULL) if x[1] is None else x, item.items()))
         )
         return changed
     if isinstance(item, tuple):
         change_fn = tuple
     else:
         change_fn = list
-    return change_fn(map(lambda x: NULL if x == None else x, item))
+    return change_fn(map(lambda x: NULL if x is None else x, item))
 
 
 def plot_cnvkit(cnr: str, cns: str, chr: str, sizing: dict, output: str = "cnvkit.png"):
     source: str = get_rscripts().joinpath("plotting.R").read_text()
-    chr = NULL if not chr else chr
+    chr = NULL if not chr else chr.split(",")
     conv = ListVector(none2null(sizing))
     plot_lib: STAP = STAP(source, "plotting")
-    plot_lib.plot_cnvkit(cns, cnr, chr.split(","), conv, output)
+    plot_lib.plot_cnvkit(cns, cnr, chr, conv, output)
 
 
-def main(args, sizing):
+def plot_main(args, sizing):
     if args["name"] == "cnvkit":
         plot_cnvkit(
             cnr=args["cnr"],
@@ -91,4 +92,4 @@ def get_rscripts() -> Path:
 
 if __name__ == "__main__":
     args, sizing = parse_args()
-    main(args, sizing)
+    plot_main(args, sizing)

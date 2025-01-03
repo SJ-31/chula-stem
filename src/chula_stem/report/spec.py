@@ -29,9 +29,14 @@ STYLE: dict = {
     "header_pstyle": ParagraphStyle(
         "header", fontSize=6.5, fontName=BOLD_FONT, textColor=colors.white, alignment=1
     ),
+    "toc_title_style": ParagraphStyle("toc", fontSize=14),
     "table_title_style": ParagraphStyle(
         "headline", fontSize=14, fontName=BOLD_FONT, textColor=HexColor("#549f9f")
     ),
+    "toc_text": lambda x: ParagraphStyle(
+        "text", fontName=FONT, fontSize=8, firstLineIndent=(x - 1) * 20
+    ),
+    "toc_num": ParagraphStyle("num", fontName=BOLD_FONT, fontSize=8, alignment=2),
 }
 STYLE["cell_pstyle"] = ParagraphStyle("text", fontSize=6.5)
 STYLE["cell_style"] = lambda x: alternating_bg(
@@ -50,7 +55,9 @@ STYLE["header_style"] = lambda x: style_cells(
     background=STYLE["header_bg"],
     valign="TOP",
     align="CENTER",
+    grid=(1, colors.white),
 )
+STYLE["toc_cell_bg"] = "#c3e7ea"
 STYLE["title_style"] = ParagraphStyle(
     "tstyle",
     textColor=colors.white,

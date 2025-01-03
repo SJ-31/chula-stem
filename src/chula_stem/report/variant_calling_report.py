@@ -4,7 +4,7 @@ import os
 
 import polars as pl
 import pymupdf
-from pymupdf import Document, Page, mupdf
+from pymupdf import Document, Page
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
@@ -33,7 +33,7 @@ from chula_stem.report.spec import (
     snp_style,
     therapy_style,
 )
-from chula_stem.report.utils import alternating_bg, style_cells
+from chula_stem.report.utils import style_cells
 
 # TODO: replace this with some info about pipeline or stem lab
 FRONT_PAGE_DETAILS: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"

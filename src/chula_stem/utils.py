@@ -74,7 +74,7 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
         return "DEL" if x < 2 else "DUP"
 
     if caller.lower() == "cnvkit":
-        df = pl.read_csv(input, separator="\t").select(
+        df = pl.read_csv(input, separator="\t", infer_schema_length=None).select(
             ["chromosome", "start", "end", "cn"]
         )
     elif caller.lower() == "facets":
