@@ -79,7 +79,7 @@ def get_copy_number(
     if cnvkit_path:
         cnvkit: pl.DataFrame = pl.read_csv(
             cnvkit_path, separator="\t", null_values="NA"
-        )
+        ).rename({"cn": cn_col_name})
         cnvkit = add_loc(cnvkit)
         df = df.join(cnvkit, how="left", on="Locus")
     if facets_path and cnvkit_path:
@@ -177,18 +177,19 @@ def classify_cnv_fmt(
         .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
         .with_columns(pl.col("ClinGen").list.join(", "))
     )
-    cn_col = "Estimated Copy Number"
+    cn_col = "CN"
     wanted_cols.insert(1, cn_col)
     with_cn = (
-        get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name="cn")
-        .rename({"cn": cn_col})
+        get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name=cn_col)
         .select(wanted_cols)
         .cast(pl.String)
         .fill_null("-")
     )
-    relevant = with_cn.filter(pl.col("Known/predicted Dosage-sensitive Genes") != "-")
+    relevant = with_cn.filter(
+        Rename.cnv["Known or predicted dosage-sensitive genes"] != "-"
+    )
     nonrelevant = with_cn.filter(
-        pl.col("Known/predicted Dosage-sensitive Genes") == "-"
+        pl.col(Rename.cnv["Known or predicted dosage-sensitive genes"]) == "-"
     )
     return with_cn, relevant, nonrelevant
 
@@ -343,7 +344,7 @@ def therapy_fmt(
             .list.to_struct(fields=["therapies", "PubChemId"]),
         )
         .unnest("therapies")
-        .filter(pl.col("therapies").str.contains("[A-Za-z]*"))
+        .filter(pl.col("therapies").str.contains("[A-Za-z]+"))
         .with_columns(
             pl.col("PubChemId")
             .map_elements(
