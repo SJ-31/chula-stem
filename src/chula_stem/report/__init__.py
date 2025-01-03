@@ -56,7 +56,6 @@ def filter_format_vep(input: str, sep="\t"):
 
 
 # * Utility fns
-#
 
 
 def no_data_decorator(c: Canvas, d: Document) -> None:
@@ -76,10 +75,14 @@ def draw_paragraph(
     style: ParagraphStyle,
     canvas: Canvas,
     doc: BaseDocTemplate,
+    width: float = None,
+    height: float = None,
 ) -> None:
     canvas.saveState()
     para = Paragraph(text, style)
-    para.wrap(doc.width, doc.topMargin)
+    w = width if width else doc.width
+    h = height if height else doc.topMargin
+    para.wrap(w, h)
     para.drawOn(canvas, pos[0], pos[1])
     canvas.restoreState()
 

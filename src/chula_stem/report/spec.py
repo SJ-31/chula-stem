@@ -51,6 +51,12 @@ STYLE["header_style"] = lambda x: style_cells(
     valign="TOP",
     align="CENTER",
 )
+STYLE["title_style"] = ParagraphStyle(
+    "tstyle", textColor=colors.white, fontSize=22, fontName=FONT, leading=25
+)
+STYLE["detail_style"] = ParagraphStyle(
+    "dstyle", fontSize=8, fontName=FONT, firstLineIndent=10
+)
 
 
 def decorator(c: Canvas, d: BaseDocTemplate) -> None:
@@ -65,6 +71,7 @@ def decorator(c: Canvas, d: BaseDocTemplate) -> None:
 
 
 STYLE["table_decorator"] = decorator
+AVAILABLE_WIDTH = A4[0] - 4 * cm
 
 
 @dataclass
@@ -75,50 +82,49 @@ class URL:
 
 @dataclass
 class Widths:
-    available_width = A4[0] - 4 * cm
     sv_snp = {
-        "Locus": available_width * 0.13,
-        "Variant Allele Frequency": available_width * 0.08,
-        "Variant Read Support": available_width * 0.07,
-        "Gene": available_width * 0.12,
-        "HGVS": available_width * 0.14,
-        "Database Name": available_width * 0.16,
-        "Variant Type": available_width * 0.2,
-        "ClinVar": available_width * 0.1,
+        "Locus": AVAILABLE_WIDTH * 0.13,
+        "Variant Allele Frequency": AVAILABLE_WIDTH * 0.08,
+        "Variant Read Support": AVAILABLE_WIDTH * 0.07,
+        "Gene": AVAILABLE_WIDTH * 0.12,
+        "HGVS": AVAILABLE_WIDTH * 0.14,
+        "Database Name": AVAILABLE_WIDTH * 0.16,
+        "Variant Type": AVAILABLE_WIDTH * 0.2,
+        "ClinVar": AVAILABLE_WIDTH * 0.1,
     }
     cnv = {
-        "Locus": available_width * 0.21,
-        "CNV Type": available_width * 0.05,
-        "Estimated Copy Number": available_width * 0.1,
-        "Known/predicted Dosage-sensitive Genes": available_width * 0.15,
-        "All Genes": available_width * 0.29,
-        "ClinGen": available_width * 0.08,
-        "Database/Study Records": available_width * 0.12,
+        "Locus": AVAILABLE_WIDTH * 0.21,
+        "CNV Type": AVAILABLE_WIDTH * 0.05,
+        "Estimated Copy Number": AVAILABLE_WIDTH * 0.1,
+        "Known/predicted Dosage-sensitive Genes": AVAILABLE_WIDTH * 0.15,
+        "All Genes": AVAILABLE_WIDTH * 0.29,
+        "ClinGen": AVAILABLE_WIDTH * 0.08,
+        "Database/Study Records": AVAILABLE_WIDTH * 0.12,
     }
     reference_table = {"id": 30, "text": 500}
     repeat = {
-        "Locus": available_width * 0.21,
-        "Repeat Unit": available_width * 0.12,
-        "Repeat Number": available_width * 0.08,
-        "Affected Gene": available_width * 0.12,
-        "ClinGen": available_width * 0.08,
-        "Database/Study Records": available_width * 0.39,
+        "Locus": AVAILABLE_WIDTH * 0.21,
+        "Repeat Unit": AVAILABLE_WIDTH * 0.12,
+        "Repeat Number": AVAILABLE_WIDTH * 0.08,
+        "Affected Gene": AVAILABLE_WIDTH * 0.12,
+        "ClinGen": AVAILABLE_WIDTH * 0.08,
+        "Database/Study Records": AVAILABLE_WIDTH * 0.39,
     }
     signature = {
-        "Signature": available_width * 0.12,
-        "Count": available_width * 0.15,
-        "Frequency": available_width * 0.1,
-        "Collection": available_width * 0.1,
-        "Proposed Aetiology": available_width * 0.53,
+        "Signature": AVAILABLE_WIDTH * 0.12,
+        "Count": AVAILABLE_WIDTH * 0.15,
+        "Frequency": AVAILABLE_WIDTH * 0.1,
+        "Collection": AVAILABLE_WIDTH * 0.1,
+        "Proposed Aetiology": AVAILABLE_WIDTH * 0.53,
     }
     therapy = {
-        "Therapy": available_width * 0.19,
-        "PubChemId": available_width * 0.1,
-        "Evidence category": available_width * 0.16,
-        "Evidence in sample": available_width * 0.15,
-        "Relevant cancers": available_width * 0.2,
-        "Study": available_width * 0.1,
-        "Database source": available_width * 0.1,
+        "Therapy": AVAILABLE_WIDTH * 0.19,
+        "PubChemId": AVAILABLE_WIDTH * 0.1,
+        "Evidence category": AVAILABLE_WIDTH * 0.16,
+        "Evidence in sample": AVAILABLE_WIDTH * 0.15,
+        "Relevant cancers": AVAILABLE_WIDTH * 0.2,
+        "Study": AVAILABLE_WIDTH * 0.1,
+        "Database source": AVAILABLE_WIDTH * 0.1,
     }
 
 

@@ -9,17 +9,20 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, inch
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
+    Spacer,
     Table,
 )
 
 import chula_stem.report.format as fr
 from chula_stem.databases import get_therapy_df
 from chula_stem.plotting import plot_cnvkit
-from chula_stem.report import ResultsReport, add_pstyles
+from chula_stem.report import ResultsReport, add_pstyles, draw_paragraph
 from chula_stem.report.spec import (
+    AVAILABLE_WIDTH,
     BOLD_FONT,
     FONT,
     STYLE,
@@ -31,6 +34,11 @@ from chula_stem.report.spec import (
     therapy_style,
 )
 from chula_stem.report.utils import style_cells
+
+# TODO: replace this with some info about pipeline or stem lab
+FRONT_PAGE_DETAILS: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"
+FRONT_PAGE_NOTE: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"
+TITLE: str = "Variant calling report"
 
 
 class VariantCallingReport(ResultsReport):
@@ -71,7 +79,6 @@ class VariantCallingReport(ResultsReport):
         }
         self.metadata: dict = metadata
         self.civic_cache: str = civic_cache
-        self.header_y: int = cm
         self.pandrugs2_cache: str = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.files: dict = {"signatures": []}
@@ -165,45 +172,98 @@ class VariantCallingReport(ResultsReport):
         - Sample information: id, collection date, sample type, cancer type
         - Summary
         """
-        # TODO: front page will be a table of two columns, one for patient info, the other sample info
-        fontsize = 12
-        widths = [100, 150]
+
+        def decorator(c: Canvas, d: SimpleDocTemplate) -> None:
+            c.saveState()
+            # Add decorations
+            c.setFillColor("#86cfd5")
+            c.rect(0, A4[1] - cm * 4, A4[0], cm * 4, stroke=0, fill=1)
+            c.setLineWidth(0.9)
+            c.setStrokeColor("#86cfd5")
+            y1 = cm * 5
+            y2 = A4[1] - cm * 10
+            x, xend = cm * 2, A4[0] - cm * 2
+            c.line(x, y1, xend, y1)
+            c.line(x, y2, xend, y2)
+            c.restoreState()
+            note_style_top = ParagraphStyle("note", fontSize=8, fontName=BOLD_FONT)
+            note_style = ParagraphStyle("note", fontSize=8, fontName=FONT)
+            note_pos = (x, y1 - cm)
+            draw_paragraph("Note:", note_pos, note_style_top, c, d)
+            draw_paragraph(FRONT_PAGE_NOTE, (x, y1 - 1.9 * cm), note_style, c, d)
+
+            title_y = A4[1] - 3 * cm
+
+            draw_paragraph(
+                TITLE,
+                (x, title_y),
+                STYLE["title_style"],
+                c,
+                d,
+                width=AVAILABLE_WIDTH * 0.4,
+            )
+            draw_paragraph(
+                FRONT_PAGE_DETAILS,
+                (3 * cm + AVAILABLE_WIDTH * 0.4, title_y),
+                STYLE["detail_style"],
+                c,
+                d,
+                width=AVAILABLE_WIDTH * 0.6,
+            )
+
+        # Patient, sample info tables
+        fontsize = 9
+        header_fontsize = 13
+        info_table_widths = [100, 150]
+        cell_row_height = 15
         styles = {
-            0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),
+            # 0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),
             None: ParagraphStyle("values", fontName=FONT, fontSize=fontsize),
         }
         patient_data = [
-            ["Name", self.metadata.get("patient_name", "-")],
-            ["Gender", self.metadata.get("gender", "-")],
-            ["Date of Birth", self.metadata.get("patient_birthdate", "-")],
-            ["Physician", self.metadata.get("physician", "-")],
-            ["Diagnosis", self.metadata.get("diagnosis", "-")],
-            ["Hospital", self.metadata.get("hospital", "-")],
+            ["Name:", self.metadata.get("patient_name", "-")],
+            ["Gender:", self.metadata.get("gender", "-")],
+            ["Date of Birth:", self.metadata.get("patient_birthdate", "-")],
+            ["Physician:", self.metadata.get("physician", "-")],
+            ["Diagnosis:", self.metadata.get("diagnosis", "-")],
+            ["Hospital:", self.metadata.get("hospital", "-")],
         ]
         sample_data = [
-            ["ID", self.metadata.get("id", "-")],
-            ["Collection Date", self.metadata.get("collection_date", "-")],
-            ["Type", self.metadata.get("sample_type", "-")],
+            ["ID:", self.metadata.get("id", "-")],
+            ["Collection Date:", self.metadata.get("collection_date", "-")],
+            ["Type:", self.metadata.get("sample_type", "-")],
         ]
         patient_data = add_pstyles(patient_data, styles, nested=True)
         sample_data = add_pstyles(sample_data, styles, nested=True)
-        patient_table = Table(patient_data, colWidths=widths)
-        sample_table = Table(sample_data, colWidths=widths)
-        header = ["Patient Information", "", "Sample Information"]
-        header = add_pstyles(
-            header,
-            ParagraphStyle("header", fontName=BOLD_FONT, fontSize=1.2 * fontsize),
+        cell_styles = style_cells((0, 0), ncols=2, valign="TOP")
+        header_pstyle = ParagraphStyle(
+            "header",
+            fontName=BOLD_FONT,
+            fontSize=header_fontsize,
+            textColor="#86cfd5",
+            firstLineIndent=7,
         )
-        header_styles = style_cells(
-            (0, 0), ncols=3, nrows=1, align="CENTER", background=colors.whitesmoke
+        p_header, s_header = (
+            add_pstyles(["Patient Information"], header_pstyle),
+            add_pstyles(["Sample Information"], header_pstyle),
         )
-        cell_styles = style_cells((0, 1), background=colors.whitesmoke, valign="TOP")
-        padding = ["", "", ""]
+
+        patient_table = Table(
+            patient_data, colWidths=info_table_widths, rowHeights=cell_row_height
+        )
+        patient_table.setStyle(cell_styles)
+        sample_table = Table(
+            sample_data, colWidths=info_table_widths, rowHeights=cell_row_height
+        )
+        sample_table.setStyle(cell_styles)
+        spacing = Spacer(AVAILABLE_WIDTH, cm)
+        stacked = Table(
+            [p_header, [patient_table], [spacing], s_header, [sample_table]],
+        )
         full = Table(
-            [header, padding, [patient_table, "", sample_table]],
-            colWidths=[200, 100, 200],
-            style=cell_styles + header_styles,
+            [["", stacked]], colWidths=[AVAILABLE_WIDTH * 0.4, AVAILABLE_WIDTH * 0.6]
         )
+
         doc = SimpleDocTemplate(
             "front_page.pdf",
             pagesize=A4,
@@ -212,7 +272,10 @@ class VariantCallingReport(ResultsReport):
             topMargin=self.spec.get("top_margin", inch),
             bmargin=self.spec.get("bottom_margin", inch),
         )
-        doc.build([full])
+        doc.build(
+            [Spacer(AVAILABLE_WIDTH, 3 * cm), full],
+            onFirstPage=decorator,
+        )
 
     def build_toc(self, toc: list) -> None:
         """Build a toc page
@@ -399,7 +462,8 @@ class VariantCallingReport(ResultsReport):
         doc.insert_file("toc.pdf", start_at=1)
 
         total_pages: int = len(doc)
-        for p in doc.pages():
-            self._add_page_numbers(p, total_pages)
+        for i, p in enumerate(doc.pages()):
+            if i > 0:
+                self._add_page_numbers(p, total_pages)
         doc.set_toc(toc)
         doc.save(self.filename)
