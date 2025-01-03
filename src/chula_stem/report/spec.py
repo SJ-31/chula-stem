@@ -52,7 +52,12 @@ STYLE["header_style"] = lambda x: style_cells(
     align="CENTER",
 )
 STYLE["title_style"] = ParagraphStyle(
-    "tstyle", textColor=colors.white, fontSize=22, fontName=FONT, leading=25
+    "tstyle",
+    textColor=colors.white,
+    fontSize=25,
+    fontName=FONT,
+    leading=25,
+    alignment=1,
 )
 STYLE["detail_style"] = ParagraphStyle(
     "dstyle", fontSize=8, fontName=FONT, firstLineIndent=10

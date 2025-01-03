@@ -177,7 +177,8 @@ class VariantCallingReport(ResultsReport):
             c.saveState()
             # Add decorations
             c.setFillColor("#86cfd5")
-            c.rect(0, A4[1] - cm * 4, A4[0], cm * 4, stroke=0, fill=1)
+            rect_y = A4[1] - cm * 4.5
+            c.rect(0, rect_y, A4[0], cm * 4.5, stroke=0, fill=1)
             c.setLineWidth(0.9)
             c.setStrokeColor("#86cfd5")
             y1 = cm * 5
@@ -204,7 +205,7 @@ class VariantCallingReport(ResultsReport):
             )
             draw_paragraph(
                 FRONT_PAGE_DETAILS,
-                (3 * cm + AVAILABLE_WIDTH * 0.4, title_y),
+                (2.8 * cm + AVAILABLE_WIDTH * 0.4, title_y),
                 STYLE["detail_style"],
                 c,
                 d,
@@ -261,7 +262,11 @@ class VariantCallingReport(ResultsReport):
             [p_header, [patient_table], [spacing], s_header, [sample_table]],
         )
         full = Table(
-            [["", stacked]], colWidths=[AVAILABLE_WIDTH * 0.4, AVAILABLE_WIDTH * 0.6]
+            [
+                [Spacer(AVAILABLE_WIDTH, 3 * cm)],
+                ["", stacked],
+            ],
+            colWidths=[AVAILABLE_WIDTH * 0.4, AVAILABLE_WIDTH * 0.6],
         )
 
         doc = SimpleDocTemplate(
@@ -273,7 +278,7 @@ class VariantCallingReport(ResultsReport):
             bmargin=self.spec.get("bottom_margin", inch),
         )
         doc.build(
-            [Spacer(AVAILABLE_WIDTH, 3 * cm), full],
+            [full],
             onFirstPage=decorator,
         )
 
