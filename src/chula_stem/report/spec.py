@@ -1,7 +1,12 @@
 from dataclasses import dataclass
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from chula_stem.report.utils import style_cells
+
 from reportlab.lib import colors
+from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm, inch
+
+from chula_stem.report.utils import alternating_bg, style_cells
 
 STYLES = getSampleStyleSheet()
 
@@ -11,6 +16,36 @@ NUMERIC_STYLE: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
 TEXT_STYLE: ParagraphStyle = ParagraphStyle("text", fontSize=10)
 TEXT_STYLE_SMALL: ParagraphStyle = ParagraphStyle("text_small", fontSize=8)
 
+
+# <2025-01-02 Thu> Style designed by Manoon Chongwattananukul
+STYLE1: dict = {
+    "header_bg": "#559f9f",
+    "cell1": "#c3e7eb",
+    "cell2": "#87cfd6",
+    "cell_font_size": 8,
+    "cell_font_size_small": 6,
+    "header_pstyle": ParagraphStyle(
+        "header", fontSize=6.5, fontName=BOLD_FONT, textColor=colors.white, alignment=1
+    ),
+}
+STYLE1["cell_pstyle"] = ParagraphStyle("text", fontSize=6.5)
+STYLE1["cell_style"] = lambda x: alternating_bg(
+    len(x),
+    STYLE1["cell1"],
+    STYLE1["cell2"],
+    offset=1,
+    valign="TOP",
+    grid=(1, colors.white),
+)
+STYLE1["header_style"] = lambda x: style_cells(
+    (0, 0),
+    len(x),
+    1,
+    underline=(1, colors.white),
+    background=STYLE1["header_bg"],
+    valign="TOP",
+    align="CENTER",
+)
 # Use paragraph styles to specify font parameters (e.g. color, size, font face)
 # and not the cell styles
 
@@ -23,59 +58,60 @@ class URL:
 
 @dataclass
 class Widths:
+    available_width = A4[0] - 4 * cm
     sv_snp = {
-        "Gene": 80,
-        "Variant Allele Frequency": 30,
-        "Variant Read Support": 40,
-        "Locus": 80,
-        "HGVS": 80,
-        "Database Name": 90,
-        "Variant Type": 90,
-        "ClinVar": 90,
+        "Locus": available_width * 0.13,
+        "Variant Allele Frequency": available_width * 0.08,
+        "Variant Read Support": available_width * 0.07,
+        "Gene": available_width * 0.12,
+        "HGVS": available_width * 0.14,
+        "Database Name": available_width * 0.16,
+        "Variant Type": available_width * 0.2,
+        "ClinVar": available_width * 0.1,
     }
     cnv = {
-        "Locus": 160,
-        "CNV Type": 50,
-        "Estimated Copy Number": 70,
-        "Known/predicted Dosage-sensitive Genes": 90,
-        "All Genes": 90,
-        "ClinGen": 50,
-        "Database/Study Records": 70,
+        "Locus": available_width * 0.21,
+        "CNV Type": available_width * 0.05,
+        "Estimated Copy Number": available_width * 0.1,
+        "Known/predicted Dosage-sensitive Genes": available_width * 0.15,
+        "All Genes": available_width * 0.29,
+        "ClinGen": available_width * 0.08,
+        "Database/Study Records": available_width * 0.12,
     }
     reference_table = {"id": 30, "text": 500}
     repeat = {
-        "Locus": 130,
-        "Repeat Unit": 80,
-        "Repeat Number": 50,
-        "Affected Gene": 90,
-        "ClinGen": 50,
-        "Database/Study Records": 100,
+        "Locus": available_width * 0.21,
+        "Repeat Unit": available_width * 0.12,
+        "Repeat Number": available_width * 0.08,
+        "Affected Gene": available_width * 0.12,
+        "ClinGen": available_width * 0.08,
+        "Database/Study Records": available_width * 0.39,
     }
     signature = {
-        "Signature": 60,
-        "Count": 60,
-        "Frequency": 60,
-        "Collection": 60,
-        "Proposed Aetiology": 150,
+        "Signature": available_width * 0.12,
+        "Count": available_width * 0.15,
+        "Frequency": available_width * 0.1,
+        "Collection": available_width * 0.1,
+        "Proposed Aetiology": available_width * 0.53,
     }
     therapy = {
-        "Therapy": 100,
-        "PubChemId": 70,
-        "Evidence category": 90,
-        "Evidence in sample": 90,
-        "Relevant cancers": 100,
-        "Study": 60,
-        "Database source": 70,
+        "Therapy": available_width * 0.19,
+        "PubChemId": available_width * 0.1,
+        "Evidence category": available_width * 0.16,
+        "Evidence in sample": available_width * 0.15,
+        "Relevant cancers": available_width * 0.2,
+        "Study": available_width * 0.1,
+        "Database source": available_width * 0.1,
     }
 
 
 @dataclass
 class Rename:
     snp = {
-        "SYMBOL": "Gene",
-        "VAF": "VAF (%)",
-        "Alt_depth": "Variant Read Support",
         "Loc": "Locus",
+        "VAF": "VAF (%)",
+        "Alt_depth": "VRS",
+        "SYMBOL": "Gene",
         "HGVSc": "HGVS",
         "Existing_variation": "Database Name",
         "Consequence": "Variant Type",
@@ -93,10 +129,10 @@ class Rename:
     }
     cnv = {
         "Type": "CNV Type",
-        "Known or predicted dosage-sensitive genes": "Known/predicted Dosage-sensitive Genes",
+        "Known or predicted dosage-sensitive genes": "Dosage-sensitive Genes",
         "All protein coding genes": "All Genes",
         "ClinGen_report": "ClinGen",
-        "source": "Database/Study Records",
+        "source": "Source",
     }
     therapy = {
         "therapies": "Therapy",
@@ -104,40 +140,29 @@ class Rename:
         "type": "Evidence category",
         "gene": "Evidence in sample",
         "disease": "Relevant cancers",
-        "source": "Study source(s)",
-        "db_link": "Database source(s)",
+        "source": "Study source",
+        "db_link": "Database source",
     }
     repeat = {
         "repeat_unit_bases": "Repeat Unit",
         "repeat_times": "Repeat Number",
         "gene_name": "Affected Gene",
         "ClinGen_report": "ClinGen",
-        "source": "Database/Study Records",
+        "source": "Source",
     }
 
 
 def snp_style():
-    cell_pstyles: dict = {
-        None: TEXT_STYLE_SMALL,
+    cell_pstyles = {
+        None: STYLE1["cell_pstyle"],
+        1: ParagraphStyle("text", fontSize=6.5, alignment=1),
+        2: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
-    header_pstyles: dict = {
-        None: ParagraphStyle("header", fontSize=9, fontName=BOLD_FONT),
-        2: ParagraphStyle("header_small", fontSize=8, fontName=BOLD_FONT),
-        1: ParagraphStyle("header_small", fontSize=8, fontName=BOLD_FONT),
-    }
-    cell_styles = style_cells((0, 1), background=colors.whitesmoke, valign="TOP")
-    header_styles = style_cells(
-        (0, 0),
-        8,
-        1,
-        underline=(3, colors.black),
-        background=colors.lightgrey,
-    )
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": header_pstyles,
-        "cell_styles": cell_styles,
-        "header_styles": header_styles,
+        "header_pstyles": STYLE1["header_pstyle"],
+        "cell_styles": STYLE1["cell_style"](Widths.sv_snp),
+        "header_styles": STYLE1["header_style"](Widths.sv_snp),
         "col_widths": list(Widths.sv_snp.values()),
     }
 
@@ -158,84 +183,59 @@ def reference_list_style():
 
 
 def therapy_style():
-    cell_pstyles: dict = {None: TEXT_STYLE_SMALL}
-    cell_styles = style_cells((0, 1), background=colors.whitesmoke, valign="TOP")
-    header_styles = style_cells(
-        (0, 0),
-        7,
-        1,
-        underline=(3, colors.black),
-        background=colors.lightgrey,
-    )
+    cell_pstyles = {
+        None: STYLE1["cell_pstyle"],
+        1: ParagraphStyle("text", fontSize=6.5, alignment=1),
+    }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": ParagraphStyle("cols", fontSize=9, fontName=BOLD_FONT),
-        "cell_styles": cell_styles,
-        "header_styles": header_styles,
+        "header_pstyles": STYLE1["header_pstyle"],
+        "cell_styles": STYLE1["cell_style"](Widths.therapy),
+        "header_styles": STYLE1["header_style"](Widths.therapy),
         "col_widths": list(Widths.therapy.values()),
     }
 
 
 def cnv_style():
-    cell_pstyles: dict = {0: NUMERIC_STYLE, 2: NUMERIC_STYLE, None: TEXT_STYLE_SMALL}
-    cell_styles = style_cells(
-        (0, 1), fontname=FONT, background=colors.whitesmoke, valign="TOP"
-    )
-    header_styles = style_cells(
-        (0, 0),
-        7,
-        1,
-        textcolor=colors.red,
-        underline=(3, colors.black),
-        background=colors.lightgrey,
-    )
+    cell_pstyles = {
+        None: STYLE1["cell_pstyle"],
+        1: ParagraphStyle("text", fontSize=6.5, alignment=1),
+        2: ParagraphStyle("text", fontSize=6.5, alignment=1),
+    }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": ParagraphStyle("cols", fontSize=9, fontName=BOLD_FONT),
-        "cell_styles": cell_styles,
-        "header_styles": header_styles,
+        "header_pstyles": STYLE1["header_pstyle"],
+        "cell_styles": STYLE1["cell_style"](Widths.cnv),
+        "header_styles": STYLE1["header_style"](Widths.cnv),
         "col_widths": list(Widths.cnv.values()),
     }
 
 
 def signature_style():
-    cell_pstyles: dict = {1: NUMERIC_STYLE, None: TEXT_STYLE}
-    cell_styles = style_cells(
-        (0, 1), fontname=FONT, background=colors.whitesmoke, valign="TOP"
-    )
-    header_styles = style_cells(
-        (0, 0),
-        6,
-        1,
-        textcolor=colors.red,
-        fontname=BOLD_FONT,
-        underline=(3, colors.black),
-        background=colors.lightgrey,
-    )
+    cell_pstyles = {
+        None: STYLE1["cell_pstyle"],
+        1: ParagraphStyle("text", fontSize=6.5, alignment=1),
+        2: ParagraphStyle("text", fontSize=6.5, alignment=1),
+        3: ParagraphStyle("text", fontSize=6.5, alignment=1),
+    }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": ParagraphStyle("cols", fontSize=9),
-        "cell_styles": cell_styles,
-        "header_styles": header_styles,
+        "header_pstyles": STYLE1["header_pstyle"],
+        "cell_styles": STYLE1["cell_style"](Widths.signature),
+        "header_styles": STYLE1["header_style"](Widths.signature),
         "col_widths": list(Widths.signature.values()),
     }
 
 
 def repeat_style():
-    cell_pstyles: dict = {2: NUMERIC_STYLE, None: TEXT_STYLE}
-    cell_styles = style_cells((0, 1), background=colors.whitesmoke, valign="TOP")
-    header_styles = style_cells(
-        (0, 0),
-        6,
-        1,
-        textcolor=colors.red,
-        underline=(3, colors.black),
-        background=colors.lightgrey,
-    )
+    cell_pstyles = {
+        None: STYLE1["cell_pstyle"],
+        2: ParagraphStyle("text", fontSize=6.5, alignment=1),
+    }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": ParagraphStyle("cols", fontSize=9, fontName=BOLD_FONT),
-        "cell_styles": cell_styles,
-        "header_styles": header_styles,
+        "header_pstyles": STYLE1["header_pstyle"],
+        "cell_styles": STYLE1["cell_style"](Widths.repeat),
+        "header_styles": STYLE1["header_style"](Widths.repeat),
         "col_widths": list(Widths.repeat.values()),
     }
