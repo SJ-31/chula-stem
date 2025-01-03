@@ -1,6 +1,9 @@
 #!/usr/bin/env ipython
 
 
+from reportlab.lib.colors import HexColor
+
+
 def style_cells(
     start: tuple,
     ncols: int = 0,
@@ -13,6 +16,8 @@ def style_cells(
     valign: str = "",
     textcolor=None,
     underline: tuple = (),
+    box: tuple = (),
+    grid: tuple = (),
 ) -> list:
     """
     Coordinates for table style are given as (column, row)
@@ -24,6 +29,8 @@ def style_cells(
         background: "BACKGROUND",
         align: "ALIGN",
         valign: "VALIGN",
+        box: "BOX",
+        grid: "GRID",
         underline: "LINEBELOW",
     }
     if ncols and nrows and (not end):
@@ -44,3 +51,20 @@ def style_cells(
         if param:
             styles.append(style_helper(name, param))
     return styles
+
+
+def alternating_bg(ncols: int, c1: str, c2: str, offset=1, **kwargs) -> list:
+    """Produce a series of alternating background colors for table cells
+
+    All cells in the 1st column will have bg "c1", cells in the 2nd column bg "c2",
+    which repeats
+    """
+    style_list = []
+    for i in range(ncols):
+        color = c1 if i % 2 == 0 else c2
+        style_list.extend(
+            style_cells(
+                start=(i, offset), end=(i, -1), background=HexColor(color), **kwargs
+            )
+        )
+    return style_list
