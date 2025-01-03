@@ -3,8 +3,8 @@ from typing import Callable
 
 import polars as pl
 import polars.selectors as cs
-from pymupdf import Document, Page
 import pymupdf
+from pymupdf import Document, Page, mupdf
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -18,15 +18,18 @@ from reportlab.platypus import (
     SimpleDocTemplate,
     Table,
 )
+
 from chula_stem.databases import get_therapy_df
+from chula_stem.plotting import plot_cnvkit, plot_main
 from chula_stem.report.spec import (
     BOLD_FONT,
     FONT,
+    STYLE,
     cnv_style,
     reference_list_style,
+    repeat_style,
     signature_style,
     snp_style,
-    repeat_style,
     therapy_style,
 )
 from chula_stem.report.utils import style_cells
@@ -171,13 +174,15 @@ class VariantCallingReport(ResultsReport):
         vep_sv: str = "",
         classify_cnv: str = "",
         facets: str = "",
-        cnvkit: str = "",
+        cnvkit_cns: str = "",
+        cnvkit_cnr: str = "",
         msisensor_pro: str = "",
         sigprofiler: str = "",
         cosmic_reference: str = "",
         tmpdir: str = "temp",
         font="Helvetica",
         bold_font="Helvetica-Bold",
+        plot=True,
     ) -> None:
         super().__init__(
             filename=filename,
@@ -185,6 +190,14 @@ class VariantCallingReport(ResultsReport):
             font=font,
             bold_font=bold_font,
         )
+        self.spec: dict = {
+            "right_margin": 2 * cm,
+            "left_margin": 2 * cm,
+            "top_margin": 2 * cm,
+            "bottom_margin": 2 * cm,
+            "header_pos": (2 * cm, A4[1] - 1.5 * cm),
+            "header_style": STYLE["table_title_style"],
+        }
         self.metadata: dict = metadata
         self.civic_cache: str = civic_cache
         self.header_y: int = cm
@@ -197,6 +210,8 @@ class VariantCallingReport(ResultsReport):
             "repeat": repeat_style(),
         }
         self.table_styles["sv"] = self.table_styles["small"]
+        if plot:
+            self.plot_cnvkit(cnvkit_cnr, cnvkit_cns)
 
         gene_spec = [
             {"file": vep_small, "column": "SYMBOL"},
@@ -222,7 +237,7 @@ class VariantCallingReport(ResultsReport):
         calls = [
             lambda: fr.vep_fmt(vep_small, "small"),
             lambda: fr.vep_fmt(vep_sv, "sv"),
-            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit),
+            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit_cns),
             lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]
         self.variant_names: dict[str, str] = dict(
@@ -231,8 +246,8 @@ class VariantCallingReport(ResultsReport):
                 [
                     "Small Variants",
                     "Structural Variants",
-                    "Copy Number Variants",
                     "Tandem Repeats",
+                    "Copy Number Variants",
                 ],
             )
         )
@@ -281,7 +296,6 @@ class VariantCallingReport(ResultsReport):
         """
         # TODO: front page will be a table of two columns, one for patient info, the other sample info
         fontsize = 12
-        spec: dict = {}  # TODO: fill this
         widths = [100, 150]
         styles = {
             0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),
@@ -322,10 +336,10 @@ class VariantCallingReport(ResultsReport):
         doc = SimpleDocTemplate(
             "front_page.pdf",
             pagesize=A4,
-            rightMargin=spec.get("right_margin", inch),
-            leftMargin=spec.get("left_margin", inch),
-            topMargin=spec.get("top_margin", inch),
-            bmargin=spec.get("bottom_margin", inch),
+            rightMargin=self.spec.get("right_margin", inch),
+            leftMargin=self.spec.get("left_margin", inch),
+            topMargin=self.spec.get("top_margin", inch),
+            bmargin=self.spec.get("bottom_margin", inch),
         )
         doc.build([full])
 
@@ -334,7 +348,6 @@ class VariantCallingReport(ResultsReport):
 
         :param toc: toc list of the form used by pymupdf
         """
-        spec: dict = {}  # TODO: fill this
         toc_fontsize = 8
         cells = []
         header = add_pstyles(
@@ -369,31 +382,41 @@ class VariantCallingReport(ResultsReport):
         doc = SimpleDocTemplate(
             "toc.pdf",
             pagesize=A4,
-            rightMargin=spec.get("right_margin", inch),
-            leftMargin=spec.get("left_margin", inch),
-            topMargin=spec.get("top_margin", inch),
-            bmargin=spec.get("bottom_margin", inch),
+            rightMargin=self.spec.get("right_margin", inch),
+            leftMargin=self.spec.get("left_margin", inch),
+            topMargin=self.spec.get("top_margin", inch),
+            bmargin=self.spec.get("bottom_margin", inch),
         )
         stats = [[v, "", k] for k, v in self.stats["counts"].items()]
         stats_table = Table(stats)
         full = Table([[toc_table, "", stats_table]], colWidths=[200, 50, 200])
         doc.build([full])
 
+    @staticmethod
+    def plot_cnvkit(cnr: str, cns: str) -> None:
+        sizes = {"ncol": 3, "height": 30, "dpi": 200, "width": 20}
+        file = "cnvkit.png"
+        plot_cnvkit(cnr, cns, None, sizes, file)
+        doc: Document = pymupdf.open()
+        page = doc.new_page()
+        with open(file, "rb") as pic:
+            img = pic.read()
+            page.insert_image(page.rect, stream=img)
+        doc.save("cnvkit.pdf")
+
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
         and add header (time + page number)
         """
-        table_spec = {"header_pos": (A4[0] - 5 * inch, A4[1] - inch)}
-        # Report is in the following order
         # TODO: create universal footer/header spec for tables
         # TODO: create universal styles for variant tables
-        # front_page: ReportElement =
-        table_decorator = None
+        table_decorator = STYLE["table_decorator"]
         self.build_front_page()
+
         for table, name in self.variant_names.items():
             style = self.table_styles[table]
             self.build_table(
-                table_spec,
+                self.spec,
                 style,
                 self.data["relevant"][table],
                 f"Relevant {name}",
@@ -402,7 +425,7 @@ class VariantCallingReport(ResultsReport):
                 f"rel_{table}.pdf",
             )
             self.build_table(
-                table_spec,
+                self.spec,
                 style,
                 self.data["nonrelevant"][table],
                 f"Non-relevant {name}",
@@ -411,7 +434,7 @@ class VariantCallingReport(ResultsReport):
                 f"non-rel_{table}.pdf",
             )
         self.build_table(
-            table_spec,
+            self.spec,
             therapy_style(),
             self.data["therapies"],
             "Relevant therapies",
@@ -420,7 +443,7 @@ class VariantCallingReport(ResultsReport):
             "therapies.pdf",
         )
         self.build_table(
-            table_spec,
+            self.spec,
             reference_list_style(),
             self.data["study_references"],
             "References",
@@ -437,7 +460,7 @@ class VariantCallingReport(ResultsReport):
                 last = f"Mutational signatures, Sample {n} (continued)"
             name = f"signatures_{n}.pdf"
             self.build_table(
-                table_spec,
+                self.spec,
                 signature_style(),
                 sample,
                 first,
@@ -462,7 +485,7 @@ class VariantCallingReport(ResultsReport):
         toc: list = []
         doc: Document = pymupdf.open()
 
-        offset = 2 # Account for front page and TOC page
+        offset = 2  # Account for front page and TOC page
         doc.insert_file("front_page.pdf")
         toc.append([1, "Relevant therapies", len(doc) + offset])
         doc.insert_file("therapies.pdf")
@@ -473,6 +496,10 @@ class VariantCallingReport(ResultsReport):
             doc.insert_file(f"rel_{t}.pdf")
             toc.append([2, "Non-relevant", len(doc) + offset])
             doc.insert_file(f"non-rel_{t}.pdf")
+
+        if os.path.exists("cnvkit.pdf"):
+            toc.append([1, "Copy Number Plots", len(doc) + offset])
+            doc.insert_file("cnvkit.pdf")
 
         toc.append([1, "Mutational signatures", len(doc) + offset])
         if len(self.files["signatures"]) == 1:

@@ -4,11 +4,11 @@ from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import cm, inch
+from reportlab.lib.units import cm, mm
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.platypus import BaseDocTemplate
 
 from chula_stem.report.utils import alternating_bg, style_cells
-
-STYLES = getSampleStyleSheet()
 
 FONT = "Helvetica"
 BOLD_FONT = "Helvetica-Bold"
@@ -16,9 +16,11 @@ NUMERIC_STYLE: ParagraphStyle = ParagraphStyle("nums", fontSize=11)
 TEXT_STYLE: ParagraphStyle = ParagraphStyle("text", fontSize=10)
 TEXT_STYLE_SMALL: ParagraphStyle = ParagraphStyle("text_small", fontSize=8)
 
-
-# <2025-01-02 Thu> Style designed by Manoon Chongwattananukul
-STYLE1: dict = {
+# * Variant calling report style 1
+# <2025-01-02 Thu>
+# Author: Manoon Chongwattananukul
+# Usd first for whole-exome sequencing pipeline
+STYLE: dict = {
     "header_bg": "#559f9f",
     "cell1": "#c3e7eb",
     "cell2": "#87cfd6",
@@ -27,25 +29,43 @@ STYLE1: dict = {
     "header_pstyle": ParagraphStyle(
         "header", fontSize=6.5, fontName=BOLD_FONT, textColor=colors.white, alignment=1
     ),
+    "table_title_style": ParagraphStyle(
+        "headline", fontSize=14, fontName=BOLD_FONT, textColor=HexColor("#549f9f")
+    ),
 }
-STYLE1["cell_pstyle"] = ParagraphStyle("text", fontSize=6.5)
-STYLE1["cell_style"] = lambda x: alternating_bg(
+STYLE["cell_pstyle"] = ParagraphStyle("text", fontSize=6.5)
+STYLE["cell_style"] = lambda x: alternating_bg(
     len(x),
-    STYLE1["cell1"],
-    STYLE1["cell2"],
+    STYLE["cell1"],
+    STYLE["cell2"],
     offset=1,
     valign="TOP",
     grid=(1, colors.white),
 )
-STYLE1["header_style"] = lambda x: style_cells(
+STYLE["header_style"] = lambda x: style_cells(
     (0, 0),
     len(x),
     1,
     underline=(1, colors.white),
-    background=STYLE1["header_bg"],
+    background=STYLE["header_bg"],
     valign="TOP",
     align="CENTER",
 )
+
+
+def decorator(c: Canvas, d: BaseDocTemplate) -> None:
+    c.saveState()
+    x = 2 * cm
+    xend = A4[0] - 2 * cm
+    y = A4[1] - 1.9 * cm
+    c.setLineWidth(0.8)
+    c.setStrokeColor(HexColor("#86cfd5"))
+    c.line(x, y, xend, y)
+    c.restoreState()
+
+
+STYLE["table_decorator"] = decorator
+
 # Use paragraph styles to specify font parameters (e.g. color, size, font face)
 # and not the cell styles
 
@@ -154,15 +174,15 @@ class Rename:
 
 def snp_style():
     cell_pstyles = {
-        None: STYLE1["cell_pstyle"],
+        None: STYLE["cell_pstyle"],
         1: ParagraphStyle("text", fontSize=6.5, alignment=1),
         2: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": STYLE1["header_pstyle"],
-        "cell_styles": STYLE1["cell_style"](Widths.sv_snp),
-        "header_styles": STYLE1["header_style"](Widths.sv_snp),
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.sv_snp),
+        "header_styles": STYLE["header_style"](Widths.sv_snp),
         "col_widths": list(Widths.sv_snp.values()),
     }
 
@@ -184,58 +204,58 @@ def reference_list_style():
 
 def therapy_style():
     cell_pstyles = {
-        None: STYLE1["cell_pstyle"],
+        None: STYLE["cell_pstyle"],
         1: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": STYLE1["header_pstyle"],
-        "cell_styles": STYLE1["cell_style"](Widths.therapy),
-        "header_styles": STYLE1["header_style"](Widths.therapy),
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.therapy),
+        "header_styles": STYLE["header_style"](Widths.therapy),
         "col_widths": list(Widths.therapy.values()),
     }
 
 
 def cnv_style():
     cell_pstyles = {
-        None: STYLE1["cell_pstyle"],
+        None: STYLE["cell_pstyle"],
         1: ParagraphStyle("text", fontSize=6.5, alignment=1),
         2: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": STYLE1["header_pstyle"],
-        "cell_styles": STYLE1["cell_style"](Widths.cnv),
-        "header_styles": STYLE1["header_style"](Widths.cnv),
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.cnv),
+        "header_styles": STYLE["header_style"](Widths.cnv),
         "col_widths": list(Widths.cnv.values()),
     }
 
 
 def signature_style():
     cell_pstyles = {
-        None: STYLE1["cell_pstyle"],
+        None: STYLE["cell_pstyle"],
         1: ParagraphStyle("text", fontSize=6.5, alignment=1),
         2: ParagraphStyle("text", fontSize=6.5, alignment=1),
         3: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": STYLE1["header_pstyle"],
-        "cell_styles": STYLE1["cell_style"](Widths.signature),
-        "header_styles": STYLE1["header_style"](Widths.signature),
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.signature),
+        "header_styles": STYLE["header_style"](Widths.signature),
         "col_widths": list(Widths.signature.values()),
     }
 
 
 def repeat_style():
     cell_pstyles = {
-        None: STYLE1["cell_pstyle"],
+        None: STYLE["cell_pstyle"],
         2: ParagraphStyle("text", fontSize=6.5, alignment=1),
     }
     return {
         "cell_pstyles": cell_pstyles,
-        "header_pstyles": STYLE1["header_pstyle"],
-        "cell_styles": STYLE1["cell_style"](Widths.repeat),
-        "header_styles": STYLE1["header_style"](Widths.repeat),
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.repeat),
+        "header_styles": STYLE["header_style"](Widths.repeat),
         "col_widths": list(Widths.repeat.values()),
     }
