@@ -1,4 +1,5 @@
 #!/usr/bin/env ipython
+import datetime
 import os
 
 import polars as pl
@@ -49,8 +50,8 @@ class VariantCallingReport(ResultsReport):
         sigprofiler: str = "",
         cosmic_reference: str = "",
         tmpdir: str = "temp",
-        font="Helvetica",
-        bold_font="Helvetica-Bold",
+        font=FONT,
+        bold_font=BOLD_FONT,
         plot=True,
     ) -> None:
         super().__init__(
@@ -65,7 +66,7 @@ class VariantCallingReport(ResultsReport):
             "top_margin": 2 * cm,
             "bottom_margin": 2 * cm,
             "header_pos": (2 * cm, A4[1] - 1.5 * cm),
-            "footer_pos": (A4[0] - cm, 1 * cm),
+            "footer_pos": (A4[0] - 2 * cm, A4[1] - cm),
             "header_style": STYLE["table_title_style"],
         }
         self.metadata: dict = metadata
@@ -342,12 +343,24 @@ class VariantCallingReport(ResultsReport):
 
     def _add_page_numbers(self, page: Page, total_pages: int, offset: int = 1) -> None:
         n: int = page.number
-        text = f"Page {n + offset} of {total_pages}"
+        number = f"| {n + offset} of {total_pages}"
+        date = datetime.datetime.now().strftime(
+            "%Y-%m-%d",
+        )
+        x, y = self.spec["footer_pos"]
+        size = 8
         page.insert_text(
-            self.spec["footer_pos"],
-            text,
-            fontsize=20,
+            (x, y),
+            number,
+            fontsize=size,
             fontname=FONT,
+        )
+        page.insert_text(
+            (x - 1.6 * cm, y),
+            date,
+            fontsize=size,
+            fontname=FONT,
+            color=(0.34902, 0.63529, 0.63529),
         )
 
     # TODO: add in the front, back pages

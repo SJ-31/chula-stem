@@ -58,16 +58,13 @@ def decorator(c: Canvas, d: BaseDocTemplate) -> None:
     x = 2 * cm
     xend = A4[0] - 2 * cm
     y = A4[1] - 1.9 * cm
-    c.setLineWidth(0.8)
+    c.setLineWidth(0.9)
     c.setStrokeColor(HexColor("#86cfd5"))
     c.line(x, y, xend, y)
     c.restoreState()
 
 
 STYLE["table_decorator"] = decorator
-
-# Use paragraph styles to specify font parameters (e.g. color, size, font face)
-# and not the cell styles
 
 
 @dataclass
