@@ -29,6 +29,7 @@ include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { VEP } from "../modules/vep.nf"
+include { DELLY_CNV } from '../modules/delly_cnv.nf'
 
 
 workflow whole_exome {
@@ -55,15 +56,14 @@ workflow whole_exome {
                                         "log": "${params.logdir}/${it[0].id}/paired"],
                                         it[1]] }
     tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
-    indices = PREPROCESS_FASTQ.out.bam_index.map(params.getId).groupTuple()
+    indices = PREPROCESS_FASTQ.out.bam_index.map(Utl.getId).groupTuple()
     paired = normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
     // Order is important for the first two
-    paired_no_id = paired.map(params.delId)
+    paired_no_id = paired.map(Utl.delId)
     // paired_no_id is [meta, normal, tumor, [normal_index, tumor_index]]
     // the order of indices doesn't matter, they just need to be present
-
 
     /*
      * Variant calling
@@ -81,8 +81,8 @@ workflow whole_exome {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
-    to_strelka = paired.join(MANTA.out.indels)
-        .map(params.delId)
+    to_strelka = paired.join(MANTA.out.indels).map(Utl.delId)
+
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
@@ -95,50 +95,42 @@ workflow whole_exome {
 
 
     // Combine variants by type
-    small_variants_to_geno = MUTECT2_COMPLETE.out.map(params.prependId)
-        .join(STRELKA2.out.variants.map(params.getId).map( { it.flatten() } ))
-        .join(MUSE2.out.variants.map(params.getId))
-        .map(params.delId)
+    //
+    small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out,
+                                           [STRELKA2.out.variants.map({ it.flatten }),
+                                            MUSE2.out.variants])
         .map({ toConcat("Concat_to_oct", "paired", it) })
 
     CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
 
     // Octopus and Clairs uses previous variants to aid calling
-    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(params.getId))
+    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(Utl.getId))
     OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
 
-    CONCAT_SMALL_2(CONCAT_SMALL_1.out.vcf.map(params.prependId)
-                    .join(OCTOPUS.out.variants.map(params.getId))
-                    .join(CLAIRS.out.variants.map(params.getId)),
-                    params.ref.genome, 6)
+    to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,
+                                      [OCTOPUS.out.variants,
+                                       CLAIRS.out.variants])
+    CONCAT_SMALL_2(to_concat_small_2, params.ref.genome, 6)
 
-    structural_variants = MANTA.out.somatic.map(params.prependId)
-        .join(DELLY_SV.out.variants.map(params.getId))
-        .join(GRIDSS.out.variants.map(params.getId))
-        .map(params.delId)
+    structural_variants = Utl.joinFirst(MANTA.out.somatic,
+                                        [DELLY_SV.out.variants, GRIDSS.out.variants])
         .map({ toConcat("SV_all", "annotations", it) })
 
     CONCAT_SV(structural_variants, params.ref.genome, 6)
 
-    def withBams = { n, t, it -> it.map(params.prependId)
-                    .join(n.map(params.getId))
-                    .join(t.map(params.getId))
-                    .map( params.delId ) }
-
-    to_std_small = withBams(branched.normal, branched.tumor, CONCAT_SMALL_2.out.vcf)
-
+    to_std_small = Utl.joinFirst(CONCAT_SMALL_2.out.vcf,
+                                 [branched.normal, branched.tumor])
     /*
      * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
      */
 
-    STANDARDIZE_VCF(to_std_small.map({ params.addSuffix("Small_std", it) }),
-                    params.ref.genome, 6)
+    STANDARDIZE_VCF(Utl.addSuffix(to_std_small, "Small_std"), params.ref.genome, 6)
 
-    small_all = STANDARDIZE_VCF.out.vcf.map(params.delSuffix)
-    sv_all = CONCAT_SV.out.vcf.map(params.delSuffix)
-    small_high_conf = QC_SMALL(small_all.map({ params.addSuffix("Small_high_conf", it) }),
-                               params.small_qc, 7)
+    small_all = Utl.delSuffix(STANDARDIZE_VCF.out.vcf)
+    sv_all = Utl.delSuffix(CONCAT_SV.out.vcf)
+
+    QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"), params.small_qc, 7)
 
     /*
     * Copy number abberation
@@ -161,11 +153,11 @@ workflow whole_exome {
                 params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
 
     to_cnvkit = paired.map({ it[0..1] + [it[3]] })
-            .join(small_high_conf.map(params.getId))
+            .join(QC_SMALL.out.vcf.map(Utl.getId))
             .join(purity_ploidy)
-            .map(params.delId)
+            .map(Utl.delId)
 
-    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference, "hybrid", 5)
+    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
     CLASSIFY_CNV_FORMAT(CNVKIT.out.cnv.mix(FACETS.out.rds), 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
@@ -180,28 +172,26 @@ workflow whole_exome {
     /*
      * Variant annotation
      */
-    vep_small_add = ["suffix": "VEP_small", "variant_class": "small", "qc": params.small_qc]
-    to_vep_small = small_all.map({ params.addMeta(vep_small_add, it) })
-
-    vep_sv_add = ["suffix": "VEP_SV", "variant_class": "sv", "qc": params.sv_qc]
-    to_vep_sv = sv_all.map({ params.addMeta(vep_sv_add, it) })
-
+    to_vep_small = Utl.modifyMeta(small_all,
+                                  ["suffix": "VEP_small", "variant_class": "small",
+                                   "qc": params.small_qc])
+    to_vep_sv = Utl.modifyMeta(sv_all,
+                               ["suffix": "VEP_SV", "variant_class": "sv",
+                                "qc": params.sv_qc])
 
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
-    def joinTwo = { x, y ->
-        x.map(params.prependId).join(y.map(params.getId)).map(params.delId)
-    }
 
     vep_out = VEP.out.tsv.branch { meta, files ->
         sv: meta.variant_class == "sv"
         small: meta.variant_class == "small"
     }
-    to_qc_tsv_sv = joinTwo(vep_out.sv, MSISENSORPRO.out.tsv)
-    to_qc_tsv_small = joinTwo(vep_out.small, MSISENSORPRO.out.tsv)
+    to_qc_tsv_sv = Utl.joinFirst(vep_out.sv, [MSISENSORPRO.out.tsv])
+    to_qc_tsv_small = Utl.joinFirst(vep_out.small, [MSISENSORPRO.out.tsv])
+
     CALLSET_QC_TSV(to_qc_tsv_sv.mix(to_qc_tsv_small), "", 8)
     // Filter out conflicts between repetitive region and sv/small variant callers
 
-    SIGPROFILERASSIGNMENT(small_high_conf.map(params.delSuffix), true,
+    SIGPROFILERASSIGNMENT(Utl.delSuffix(QC_SMALL.out.vcf), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
@@ -217,19 +207,25 @@ workflow whole_exome {
                                  "log": "${params.logdir}/${it[0].id}/metrics"],
                         it[1], it[2]] }
 
-    def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-    to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
-        .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
-              by: [0, 1]) // [id, type, meta, bam, meta, bai]
-        .map({ [it[2], it[3], it[5]] })
-        .map(replaceOut)
+    // def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
 
-    PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets_il, params.ref.baits_il,
+    // to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
+    //     .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
+    //           by: [0, 1]) // [id, type, meta, bam, meta, bai]
+    //     .map({ [it[2], it[3], it[5]] })
+    //     .map(replaceOut)
+    to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
+                               [PREPROCESS_FASTQ.out.bam_index],
+                               on: ["id", "type"]).map(replaceOut)
+
+    PICARD(to_metrics, "hs", params.ref.genome,
+           params.ref.targets_il, params.ref.baits_il,
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
     to_bcftools_stats = small_all.mix(sv_all)
         .map({ [it[0], it[1..-1]] })
+
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,

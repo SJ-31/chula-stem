@@ -29,6 +29,7 @@ include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
 include { CLAIRS } from '../modules/clairs.nf'
+include { MUTECT2 } from '../modules/mutect2.nf'
 
 workflow whole_exome_tumor_only {
 
@@ -40,7 +41,7 @@ workflow whole_exome_tumor_only {
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes")
 
     empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
-    tumors = PREPROCESS_FASTQ.out.bam.map { [it[0].id,
+    tumors = PREPROCESS_FASTQ.out.bam.map { [
                         ["type": "paired",
                         "id": it[0].id,
                         "out": "${params.outdir}/${it[0].id}/variant_calling",
@@ -51,14 +52,14 @@ workflow whole_exome_tumor_only {
 
     indices = PREPROCESS_FASTQ.out.bam_index
     empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
-    all_indices = indices.map(params.getId).mix(empty_indices.map(params.getId))
+    all_indices = indices.map(Utl.getId).mix(empty_indices.map(Utl.getId))
         .groupTuple()
 
-    paired = empty_normals.map(params.getId).join(tumors)
+    paired = Utl.joinFirst(empty_normals, [tumors])
         .map({ [it[0]] + [it[2]] + [it[1]] + [it[3]] })
         .join(all_indices)
 
-    paired_no_id = paired.map(params.delId)
+    paired_no_id = paired.map(Utl.delId)
 
     /*
      * Variant calling
@@ -75,10 +76,9 @@ workflow whole_exome_tumor_only {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
-    // TODO: <2024-12-30 Mon> Make sure that the first element of tumors is a meta map
-    to_clairs = tumors.join(PREPROCESS_FASTQ.out.bam_index.map(params.getId))
-            .join(MUTECT2_COMPLETE.out.map(params.getId))
-            .map(params.delId)
+    to_clairs = Utl.joinFirst(tumors, [PREPROCESS_FASTQ.out.bam_index,
+                                       MUTECT2_COMPLETE.out])
+
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
     def toConcat = { suffix, outdir_name, it ->
@@ -101,11 +101,10 @@ workflow whole_exome_tumor_only {
     CONCAT_SMALL_2(Utl.joinFirst(CONCAT_SMALL_1.out.vcf, [OCTOPUS.out.variants])
                     .map({ toConcat("Small_all", "annotations", it) }),
                    params.ref.genome, 6)
+
     small_variants = CONCAT_SMALL_2.out.vcf
 
-    structural_variants = MANTA.out.somatic.map(params.prependId)
-        .join(GRIDSS.out.variants.map(params.getId))
-        .map(params.delId)
+    structural_variants = Utl.joinFirst(MANTA.out.somatic, [GRIDSS.out.variants])
         .map({ toConcat("SV_all", "annotations", it) })
 
     CONCAT_SV(structural_variants, params.ref.genome, 6)
@@ -129,7 +128,7 @@ workflow whole_exome_tumor_only {
     /*
     * Copy number abberation
     */
-    purity_ploidy = tumors.map({ [it[0], null, null] })
+    purity_ploidy = tumors.map({ [it[0].id, null, null] })
 
     CNVKIT_PREP(Channel.of(["filename": "flat_reference",
                             "out": "${params.outdir}/cnvkit_cnn",
@@ -139,9 +138,9 @@ workflow whole_exome_tumor_only {
                 params.ref.genome_blacklist, 4)
 
     to_cnvkit = paired.map({ it[0..1] + [it[3]] })
-            .join(QC_SMALL.out.vcf.map(params.getId))
+            .join(QC_SMALL.out.vcf.map(Utl.getId))
             .join(purity_ploidy)
-            .map(params.delId)
+            .map(Utl.delId)
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
@@ -160,26 +159,29 @@ workflow whole_exome_tumor_only {
      * Variant annotation
      */
     // QC for VEP will be carried out separately
-    vep_small_add = ["suffix": "VEP_small", "variant_class": "small", "qc": params.small_qc]
-    to_vep_small = STANDARDIZE_VCF.out.vcf.map({ params.addMeta(vep_small_add, it) })
+    to_vep_small = Utl.modifyMeta(STANDARDIZE_VCF.out.vcf,
+                              ["suffix": "VEP_small", "variant_class": "small",
+                               "qc": params.small_qc])
 
-    vep_sv_add = ["suffix": "VEP_SV", "variant_class": "sv", "qc": params.sv_qc]
-    to_vep_sv = CONCAT_SV.out.vcf.map({ params.addMeta(vep_sv_add, it) })
+
+    to_vep_sv = Utl.modifyMeta(CONCAT_SV.out.vcf,
+                           ["suffix": "VEP_SV", "variant_class": "sv",
+                            "qc": params.sv_qc])
+
 
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
-    def joinTwo = { x, y ->
-        x.map(params.prependId).join(y.map(params.getId)).map(params.delId)
-    }
 
     vep_out = VEP.out.tsv.branch { meta, files ->
         sv: meta.variant_class == "sv"
         small: meta.variant_class == "small"
     }
-    to_qc_tsv_sv = joinTwo(vep_out.sv, MSISENSORPRO.out.tsv)
-    to_qc_tsv_small = joinTwo(vep_out.small, MSISENSORPRO.out.tsv)
+
+    to_qc_tsv_sv = Utl.joinFirst(vep_out.sv, [MSISENSORPRO.out.tsv])
+    to_qc_tsv_small = Utl.joinFirst(vep_out.small, [MSISENSORPRO.out.tsv])
+
     CALLSET_QC_TSV(to_qc_tsv_sv.mix(to_qc_tsv_small), "", 8)
 
-    SIGPROFILERASSIGNMENT(QC_SMALL.out.vcf.map({ params.addSuffix(null, it) }), true,
+    SIGPROFILERASSIGNMENT(Utl.delSuffix(QC_SMALL.out.vcf), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
@@ -195,17 +197,29 @@ workflow whole_exome_tumor_only {
                                  "log": "${params.logdir}/${it[0].id}/metrics"],
                         it[1], it[2]] }
 
-    def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-    to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
-        .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
-              by: [0, 1]) // [id, type, meta, bam, meta, bai]
-        .map({ [it[2], it[3], it[5]] })
-        .map(replaceOut)
+    // def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
 
-    PICARD(to_metrics, "hs", params.ref.genome, params.ref.targets_il, params.ref.baits_il,
+    // to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
+    //     .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
+    //           by: [0, 1]) // [id, type, meta, bam, meta, bai]
+    //     .map({ [it[2], it[3], it[5]] })
+    //     .map(replaceOut)
+    //     TODO: <2025-01-04 Sat> Check if this works
+    to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
+                               [PREPROCESS_FASTQ.out.bam_index],
+                               on: ["id", "type"]).map(replaceOut)
+    // <2025-01-04 Sat> If joinFirst is set up correctly, then "id" "type" that
+    // was prepended should be removed automatically
+
+    PICARD(to_metrics, "hs", params.ref.genome,
+           params.ref.targets_il, params.ref.baits_il,
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
-    BCFTOOLS_STATS(STANDARDIZE_VCF.out.vcf.mix(CONCAT_SV.out.vcf), params.ref.targets, 8)
+
+    to_bcftools_stats = Utl.delSuffix(STANDARDIZE_VCF.out.vcf)
+        .mix(Utl.delSuffix(CONCAT_SV.out.vcf))
+
+    BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,
                                                     MOSDEPTH.out.dist,
