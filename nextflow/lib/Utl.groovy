@@ -24,7 +24,8 @@ class Utl {
         // If on == ["id"], by = [0]; if on == ["id", "bar"], by = [0, 1]
 
         def getVals = { meta -> on.collect { meta[it] } }
-        // closure to extract keys from meta map, collecting them into a list
+        // closure to extract all keys specified by `on`
+        //  from the meta map, collecting them into a list
 
         def key_prepended = first.map({ getVals(it[0]) + it })
 
@@ -34,6 +35,22 @@ class Utl {
                                            by: by)
         }
         return key_prepended.map({ it[n_keys..-1] })
+    }
+
+    public static getId(item) {
+        return [it[0].id + [it[1]]]
+    }
+
+    public static delId(item) {
+        return it[1..-1]
+    }
+
+    public static prependId(item) {
+        return [item[0].id] + it
+    }
+
+    public static delSuffix(ch) {
+        return ch.map({ [it[0] + ["suffix": null]] + it[1..-1] })
     }
 
     public static addSuffix(ch, suffix) {
