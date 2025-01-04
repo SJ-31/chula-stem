@@ -1,3 +1,106 @@
++ *General conventions*
+  * Outputs are prefixed with a number (referred to as =module_number=) which represents their order in the pipeline (roughly)
+  * Essential parameters for each pipeline are specified in a separate nextflow file (the =run_conf=  parameter)
+    * All input data e.g. reference genomes, bait files, population variation data are specified with =params.ref=, a groovy map
+      * The required entries for each pipeline are detailed below under "Input"
+    * See ./config/run_conf_template.config.nf and the =nextflow.config= file for more information
+  * Place tool-specific configuration in the =<pipeline_name>_tool_config.nf= file, see the =config= directory for examples
+    * TODO: is this name right?
+* Whole-exome sequencing (=wes.nf= )
+A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re/sarek/3.4.4/][nf-core's sarek]] and GATK best practices. The final output
+** Input
++ A csv file with four fields
+  * =patient= Patient id (will be present twice on paired data)
+  * =fastq_1= path to raw reads
+  * =fastq_2=
+  * =source=  either tumor or normal to specify the origin of the reads on the row
+*** =params.ref= fields
++ *WARNING:* every single resource below MUST have the same contig names
++ =genome=: reference genome
++ =vep_species=: species of annotation sources
+  * Can be cached and downloaded with the =INSTALL.pl= script
+  * See [[https://grch37.ensembl.org/info/docs/tools/vep/script/vep_custom.html][here]] for how to supply custom annotation data
++ =baits=: bgzipped and indexed BED file of baited regions in exome capture kit
+  * =baits_il=: the same file as =baits= converted into GATK interval list format using the [[https://gatk.broadinstitute.org/hc/en-us/articles/360036883931-BedToIntervalList-Picard][BedToIntervalList]] tool
++ =targets=: bgzipped and indexed BED file of target regions in exome capture kit
+  * =targets_il=: the targets equivalent of =baits_il=
++ =baits_unzipped=: unzipped version of =baits=, defaults to =baits= without the =.gz= extension
++ =genome_blacklist=: genomic regions to ignore, such as the ENCODE blacklist
++ =known_variants=: list of file paths to known germline variants, such as dbSNP or gnomAD
++ =delly_exclude=: BED file containing genomic regions to ignore for the tool delly. Recommended to be centromeric and telomeric regions
++ =dbsnp=: bgzipped and indexed dbSNP VCF file. Filtered for somatic variants
++ =homopolymers_microsatellites=:  a homopolymers and microsatellites file prepared from the target genome with the =msisensor-pro scan= command
++ =germline=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, such as those from gnomAD
++ =pileup=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, filtered for only biallelic SNPs
++ =clingen_gene=:  file containing ClinGen gene-disease curations (see [[https://search.clinicalgenome.org/kb/downloads][Gene-Disease Validity Curations]])
++ =clingen_dosage=: file containing ClinGen dosage-sensitive gene and region data (see [[https://search.clinicalgenome.org/kb/downloads][Dosage Sensitivity Curations]])
++ =cnv_reference=: a BED file containing dbVar and gnomAD copy number variant data, generated with a custom script (=resources/prepare_cnv_repeat_data.bash=)
+  * Has 7 headers: chr, start, stop, genes, source, type, accession
+    TODO: describe what each of these headers are
+   generated with a custom script (=resources/prepare_cnv_repeat_data.bash=)
++ =msi_reference=:  the equivalent of =cnv_reference= for repetitive elements, generated with the same script; a BED file containing dbVar and clinVar repetitive element data
+** Steps
+*** Preprocessing
++ Quality control ([[https://github.com/OpenGene/fastp][fastp]])
+  + =fastp= is an all-in-one FASTQ preprocessing tool; base-quality filtering, length filtering, and base correction are enabled
+    * If the reads are detected to be generated with the NextSeq or NovaSeq platforms, polyG tail trimming is also performed
++ Read mapping to reference [[https://github.com/bwa-mem2/bwa-mem2][(bwa-mem2)]]
++ Marking PCR duplicates ([[https://gatk.broadinstitute.org/hc/en-us/articles/360037052812-MarkDuplicates-Picard][GATK MarkDuplicates]])
++ Base Quality Score Recalibration ([[https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR][GATK BaseRecalibrator, ApplyBQSR]])
+  * Both tumor and normal samples undergo BQSR with the same parameter for =known_variants=
+    * See [[https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets][here]] for the details about this parameter
+*** Variant calling
+Find variants with multiple, intended to be used as an additional form of callset quality control (see below). Specific callers can be disabled if needed, but enable at least one from each category
++ Small variants ( [[https://gatk.broadinstitute.org/hc/en-us/articles/360037593851-Mutect2][Mutect2]], [[https://github.com/Illumina/strelka][Strelka2]], [[https://github.com/wwylab/MuSE][MuSE2]], [[https://luntergroup.github.io/octopus/][Octopus]], [[https://github.com/HKU-BAL/ClairS][ClairS]])
++ Microsatellite instability ([[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]])
++ Structural variants ([[https://github.com/Illumina/manta][Manta]], [[https://github.com/dellytools/delly][delly]], [[https://github.com/PapenfussLab/gridss][gridss]])
++ Copy number variants ([[https://github.com/etal/cnvkit][CNVkit]] [[https://github.com/mskcc/facets-suite][facets-suite]])
+*** Callset quality control
++ Filters for small and structural variants include requiring specified filter fields (PASS by default) and identification by a minimum number of variants
++ You can also filter small variants* with minimum read depth in tumor, maximum read depth in normal and minimum VAF
+  * *Not possible for structural variants as the required INFO/FORMAT fields are not provided from SV callers
++ Configured with =params.qc= , =params.small_qc=  and =params.sv_qc=
+#+begin_src nextflow
+params.qc = ["accepted_filters": ["PASS"],
+                "min_tumor_depth": 10,
+                "min_callers": 2,
+                "max_normal_depth": 10,
+                "min_VAF": 0.10]
+#+end_src
+*** Variant annotation
+- [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]] (SNPs, indels and SVs)
+- [[https://github.com/Genotek/ClassifyCNV][ClassifyCNV]] (CNVs)
+- Genes overlapping unstable regions detected by msisensor-pro are also reported
+*** Misc. output
++ The pipeline collects various metrics, including..
+  * Estimation of tumor purity and ploidy (facets)
+  * Sequencing metrics ([[https://github.com/brentp/mosdepth][mosdepth]], [[https://gatk.broadinstitute.org/hc/en-us/articles/360036856051-CollectHsMetrics-Picard][Picard CollectHsMetrics]], [[https://gatk.broadinstitute.org/hc/en-us/articles/360042476752-CollectAlignmentSummaryMetrics-Picard][CollectAlignmentSummaryMetrics]])
+  * QC metrics (=fastp=,  [[https://gatk.broadinstitute.org/hc/en-us/articles/360037066912-AnalyzeCovariates][GATK AnalyzeCovariates]])
+  * [[https://github.com/MultiQC/MultiQC][MultiQC]] summarizes the latter two metrics + COSMIC mutational signature fitting ([[https://github.com/AlexandrovLab/SigProfilerAssignment?tab=readme-ov-file][SigProfilerAssignment]])
+** Tumor-only mode (=wes_tumor_only.nf=)
++ The pipeline has support for tumor-only WES datasets with the following variant callers
+  * Small variants: Mutect2, Octopus, [[https://github.com/HKU-BAL/ClairS-TO][ClairS-TO]]
+  * Structural variants: gridss, Manta
+  * Copy number variants: cnvkit
+    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [6]
++ With the exception of purity and ploidy estimation, all other metrics are still provided
+* RNA-seq
+TODO
+** Input
+** Steps
+*** Preprocessing
++ QC:
+  * =fastp= with quality, length filtering, base correction
++ Marking duplicates: GATK's =MarkDuplicatesSpark=
+*** Read quantification
++ =kallisto= - a pseudoalignment program that quantifies reads at the transcript level
+  * These will be collapsed into gene-level abundance estimates with [[https://bioconductor.org/packages/release/bioc/html/tximport.html][tximport]]
+*** Fusion detection
+
+* VAR
+# Local Variables:
+# citar-prev-references: ("aroraFACETSFractionAlleleSpecific2022")
+# End:
 :REFERENCES:
 + [1] https://support.illumina.com/content/dam/illumina-support/help/Illumina_DRAGEN_Bio_IT_Platform_v3_7_1000000141465/Content/SW/Informatics/Dragen/GPipelineAltMap_fDG.htm
 + [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
@@ -6,128 +109,3 @@
 + [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and identifies SAV1 as a potential driver]]
 + [6] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
 :END:
-* Workflows
-# All workflows expect an input csv file with
-Outputs are prefixed with "<module_number>-" representing their order in the pipeline (roughly)
-
-Must be submitted to the job queue
-** WES
-Workflow for variant detection on WES data inspired by https://nf-co.re/sarek/3.4.4/ and GATK best practices
-*** Input
-+ A csv file with four fields
-  * =patient= Patient id, which should be present twice, one for the tumor and another for the normal sample
-  * =fastq_1= path to raw reads
-  * =fastq_2=
-  * =source=  [tumor|normal]
-**** =params.ref= fields
-+ *WARNING:* every single resource below MUST have the same contig names
-+ =genome=: reference genome
-+ =vep_species=: species of annotation sources
-  * Can be cached and downloaded with the =INSTALL.pl= script
-  * See [[https://grch37.ensembl.org/info/docs/tools/vep/script/vep_custom.html][here]] for how to supply custom annotation data
-+ =baits=: bgzipped and indexed BED file of baited regions in exome capture kit
-  * =baits_il=: the same file as =baits= converted into GATK =interval_list= format the [[https://gatk.broadinstitute.org/hc/en-us/articles/360036883931-BedToIntervalList-Picard][BedToIntervalList]] tool
-+ =targets=: bgzipped and indexed BED file of target regions in exome capture kit
-  * =targets_il=: same processing as =baits_il=
-+ =baits_unzipped=: unzipped version of =baits=, defaults to =baits= without the =.gz= extension
-+ =genome_blacklist=: genomic regions to ignore, such as the ENCODE blacklist
-  * Though shouldn't make much of a difference on exome data
-+ =known_variants=: list of file paths to known germline variants
-+ =delly_exclude=: BED file containing genomic regions to ignore for the tool delly. Recommended to be centromeric and telomeric regions
-+ =dbsnp=: bgzipped and indexed dbSNP VCF file. Filtered for somatic variants
-+ =homopolymers_microsatellites=:  a homopolymers and microsatellites file prepared from the target genome with the =msisensor-pro scan= command
-+ =germline=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, such as those from gnomAD
-+ =pileup=: bgzipped and indexed population-level vcf file of germline variants including the allele fraction, filtered for only biallelic SNPs
-*** Steps
-**** Preprocessing
-+ QC: =fastp= with the following routines
-  * Quality filtering
-  * Length filtering
-  * Base correction
-  * polyG tail trimming: is performed if reads are detected to be NextSeq/NovaSeq
-+ Read mapping to reference: =bwa-mem2=
-  * This is done in an alt-aware manner, due to the benefits for variant calling when doing so [1].
-    * You can get the =.alt= index file for =bwa-mem2= at
-+ Marking duplicates: GATK's =MarkDuplicatesSpark=
-+ Base Quality Score Recalibration: GATK =BaseRecalibrator=  and =ApplyBQSR=
-  * Reports changes to base scores with =AnalyzeCovariates=
-  * Both cancer and normal samples undergo BQSR with the same =known_variants= sources, which will be sources of germline variants (listed fully above)
-    * See [[https://gatk.broadinstitute.org/hc/en-us/articles/360035890831-Known-variants-Training-resources-Truth-sets][here]] for the details of known variants
-**** Variant calling
-Callers with support for tumor-only data are marked with *T*. Note that this is not ideal and typically inflates false positives
-+ Small variants
-  * GATK Mutect2: somatic SNVs and indels *T*
-    * Output from Mutect2 is filtered according to best practices [3]
-    * *Note:* Mutect2 raw vcf files do not use the QUAL field
-  * [[https://github.com/Illumina/strelka][Strelka2]]: SNVs and indels, up to a predefined maximum size of (49 bases default)
-  * Notes
-    * [1] observes that Mutect2 and Strelka2 are good at detecting SNVs in low VAF sites
-  * [[https://github.com/wwylab/MuSE][MuSE2]]
-    * Takes into account dbSNP information "by requiring a cutoff that is two times more stringent for a dbSNP position than for a non-dbSNP position"
-  * [[https://luntergroup.github.io/octopus/][Octopus]] *T*
-  * [[https://github.com/HKU-BAL/ClairS][ClairS]]/[[https://github.com/HKU-BAL/ClairS-TO][ClairS-TO]]: deep-learning based variant caller *T*
-    * Although designed for long-read data, has models that allow it to be used with short read data
-+ Structural variants
-  * [[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]]: microsatellite instability *T*
-  * [[https://github.com/Illumina/manta][Manta]] : Strutural variants (paired with strelka2) *T*
-  * [[https://github.com/dellytools/delly][delly]], uses split-read analysis
-    * *Note:* is specialized for WGS, might need to replace
-  * [[https://github.com/PapenfussLab/gridss][gridss]]: uses split-read analysis *T*
-    * Can also report single breakends, "breakpoints in which only one side can be unambigiously determined"
-  * *Note:* do not expect this to have high number of calls due to low off-target coverage and SVs mostly occurring in noncoding regions
-+ Copy number variation
-  * [[https://github.com/etal/cnvkit][CNVkit]]: copy number variation (designed for hybrid capture platforms, RD-based method) *T*
-    * When given hybrid-selection data, utilizes off-target reads as well as on-target to detect CNVs
-    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [6]
-  * [[https://github.com/mskcc/facets-suite][facets-suite]] (CNV detection for several omics platforms, including WES)
-    * RD-based method
-****  Merging results
-+ Concatenate results with =bcftools concat= and report source in =SOURCE= header
-**** Callset quality control
-+ Possible options based on [4]
-  * Tumor in normal estimation
-  * Filtering out somatic mutations that are known germline sites
-  * Oxidative artifact filter
-+ General options (Validate this)
-  * Minimum read depth in tumor, TODO: but do you need this?
-    * If you impose a minimum read depth, then you may get rid of variants with low VAF
-      * [4] uses a read depth of 4 and VAF of 10% for one of their tools
-      * [5] requires that variants are supported by at least 4% of total reads in the tumor, and at least three reads, and less than 1% of total reads in normal
-  * Maximum read depth in normal
-  * Checking for PASS filter
-    * *Note:* Since the INFO/FORMAT fields for the above can't be calculated with SVs, and because SV callers use different fields, SVs will only be filtered with PASS
-**** Metrics
-+ Tumor purity and ploidy
-  * With [[https://github.com/mskcc/facets-suite][facets-suite]]
-    * See [cite:@aroraFACETSFractionAlleleSpecific2022] for how to interpret
-+ QC metrics from =fastp=
-+ Various metrics from =Picard=
-  * =CountReads=
-  * =CollectAlignmentSummaryMetrics=
-  * TODO: fill this up
-**** Variant annotation
-  (both snpEff and VEP use the sequence ontology for consequence terms (see   [[http://asia.ensembl.org/info/genome/variation/prediction/predicted_data.html#consequences][here]] ))
-- [[https://github.com/Ensembl/ensembl-vep?tab=readme-ov-file#vepusage][VEP]] (SNPs, indels and SVs)
-- [[https://github.com/Genotek/ClassifyCNV][ClassifyCNV]] (CNVs)
-  * Attempts to estimate CNV pathogenicity using the American College of Medical Genetics and Genomics (ACMG) guidelines
-    * This works by scoring the CNV, based on its overlap with protein-coding and noncoding genes, as well as with a set of dosage-sensitive genes (haploinsufficient and triplosensitive) curated by ClinGen.
-      * If there is no such overlap, the algorithm checks for overlap with benign CNVs from gnomAD and DGV
-  * Is cautious about assigning clinical significance, will place CNV as uncertain "if convincing data are not available"
-** RNA-seq
-*** Input
-*** Steps
-**** Preprocessing
-+ QC:
-  * =fastp= with quality, length filtering, base correction
-+ Marking duplicates: GATK's =MarkDuplicatesSpark=
-**** Read quantification
-+ =kallisto= - a pseudoalignment program that quantifies reads at the transcript level
-  * These will be collapsed into gene-level abundance estimates with [[https://bioconductor.org/packages/release/bioc/html/tximport.html][tximport]]
-**** Fusion detection
-* Dependencies
-https://bedops.readthedocs.io/en/latest/index.html
-samtools, bcftools
-
-# Local Variables:
-# citar-prev-references: ("aroraFACETSFractionAlleleSpecific2022")
-# End:
