@@ -223,9 +223,8 @@ workflow whole_exome {
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
-    to_bcftools_stats = small_all.mix(sv_all)
-        .map({ [it[0], it[1..-1]] })
-
+    to_bcftools_stats = Utl.addSuffix(small_all, "Bcftools_stats_small")
+        .mix(Utl.addSuffix(sv_all, "Bcftools_stats_SV"))
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,

@@ -207,8 +207,9 @@ workflow whole_exome_tumor_only {
            "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
-    to_bcftools_stats = Utl.delSuffix(STANDARDIZE_VCF.out.vcf)
-        .mix(Utl.delSuffix(CONCAT_SV.out.vcf))
+
+    to_bcftools_stats = Utl.addSuffix(STANDARDIZE_VCF.out.vcf, "Bcftools_stats_small")
+        .mix(Utl.addSuffix(CONCAT_SV.out.vcf, "Bcftools_stats_SV"))
 
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
