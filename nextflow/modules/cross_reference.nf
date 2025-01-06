@@ -16,7 +16,7 @@ process CROSS_REFERENCE {
     //
 
     output:
-    tuple val(meta), path(out)
+    tuple val(meta), path(out), emit: tsv
     path("*.log")
     //
 

@@ -13,6 +13,7 @@ process SIGPROFILERASSIGNMENT {
 
     output:
     tuple val(meta), path(output), emit: data
+    tuple val(meta), path("${output}/Activities/Assignment_Solution_Activities.txt"), emit: activities
     path("*.log")
     //
 
