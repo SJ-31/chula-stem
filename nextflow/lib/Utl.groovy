@@ -37,29 +37,20 @@ class Utl {
         return key_prepended.map({ it[n_keys..-1] })
     }
 
-    public static getId(item) {
-        return [it[0].id + [it[1]]]
-    }
-
-    public static delId(item) {
-        return it[1..-1]
-    }
-
-    public static prependId(item) {
-        return [item[0].id] + it
-    }
-
     public static delSuffix(ch) {
         return ch.map({ [it[0] + ["suffix": null]] + it[1..-1] })
     }
 
-    public static addSuffix(ch, suffix) {
-        return ch.map({ [it[0] + ["suffix": suffix]] + it[1..-1] })
+    public static getId(ch) {
+        return ch.map({ [it[0].id] + [it[1]] })
     }
 
-    public static getId(ch) {
-        // Gets id while removing meta map
-        ch.map({ [it[0].id] + it[1..-1] })
+    public static delId(ch) {
+        return ch.map({ it[1..-1] })
+    }
+
+    public static addSuffix(ch, suffix) {
+        return ch.map({ [it[0] + ["suffix": suffix]] + it[1..-1] })
     }
 
     public static modifyMeta(ch, Map meta) {
