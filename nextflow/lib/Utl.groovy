@@ -43,8 +43,12 @@ class Utl {
         return ch.map({ [it[0] + ["suffix": null]] + it[1..-1] })
     }
 
-    public static getId(ch) {
-        return ch.map({ [it[0].id] + [it[1]] })
+    public static getId(ch, prepend = false) {
+        if (prepend) {
+            return ch.map({ [it[0].id] + it })
+        } else {
+            return ch.map({ [it[0].id] + [it[1]] })
+        }
     }
 
     public static delId(ch) {
@@ -52,7 +56,10 @@ class Utl {
     }
 
     public static addSuffix(ch, suffix) {
-        return ch.map({ [it[0] + ["suffix": suffix]] + it[1..-1] })
+        return ch.map({
+            def val = suffix instanceof Closure ? suffix(it[0]) : suffix
+            [it[0] + ["suffix": val]] + it[1..-1]
+        })
     }
 
     /**  Change the meta map (first element) of a given channel
