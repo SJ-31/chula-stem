@@ -12,7 +12,7 @@ import re
 import polars as pl
 import polars.selectors as cs
 
-from chula_stem.callset_qc import IMPACT_MAP
+from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
 
@@ -201,7 +201,6 @@ def vep_fmt(
     """Format and filter vep output into a dataframe with values ready to write
     into a reportlab table
     """
-    var_col: str = "Database Name"  # New column for 'Existing_variation'
     df: pl.DataFrame = pl.read_csv(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
     ).with_columns(
@@ -211,6 +210,7 @@ def vep_fmt(
         rename: dict = Rename.sv
     else:
         rename: dict = Rename.snp
+    clinsig: str = Rename.snp["CLIN_SIG"]
     wanted_cols: list = list(rename.values())
     df = df.drop("Gene").rename(rename)
     try:
@@ -236,17 +236,40 @@ def vep_fmt(
         )
         .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
         .sort(pl.col("impact_score"), descending=True)
+        .pipe(lambda x: sort_clinsig(x, clinsig_col=clinsig, separator=";"))
         .group_by(pl.col(["Gene", "Locus"]))
         .agg(pl.all().first())
         .filter(pl.col("Gene").is_not_null())
         .cast(pl.String)
         .fill_null("-")
     )
-    confident = df.filter((pl.col(var_col) != "-") & (pl.col("SOMATIC") == "1"))
+    confident = df.filter((pl.col("SOMATIC") == "1") & (pl.col(clinsig) != "-"))
     others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
     relevant = confident.select(wanted_cols)
     nonrelevant = others.select(wanted_cols)
     return df, relevant, nonrelevant
+
+
+def sort_clinsig(
+    df: pl.DataFrame, clinsig_col: str = "CLIN_SIG", separator: str = ""
+) -> pl.DataFrame:
+    if not separator:
+        df = df.with_columns(
+            clinsig_score=pl.col(clinsig_col).replace_strict(CLINSIG_MAP, default=0)
+        )
+    else:
+
+        def find_max(terms: list[str]) -> int:
+            if not terms:
+                return 0
+            return max((map(lambda x: CLINSIG_MAP.get(x, 0), terms)))
+
+        df = df.with_columns(
+            clinsig_score=pl.col(clinsig_col)
+            .str.split(separator)
+            .map_elements(find_max, return_dtype=pl.Int64)
+        )
+    return df.sort(pl.col(clinsig_col), descending=True).drop("clinsig_score")
 
 
 def format_therapy_sources(sources: str, source_lookup: dict) -> list[str]:

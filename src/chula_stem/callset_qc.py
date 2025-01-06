@@ -14,6 +14,21 @@ IMPACT_MAP: dict = {
     None: 0,
 }
 
+CLINSIG_MAP = {
+    "pathogenic": 4,
+    "likely_pathogenic": 3,
+    "uncertain_significance": 0,
+    "likely_benign": 1,
+    "benign": 1,
+    "conflicting_interpretations_of_pathogenicity": 2,
+    "risk_factor": 2,
+    "drug_response": 2,
+    "association": 2,
+    "other": 1,
+    "not_provided": 0,
+    "-": 0,
+}
+
 
 def str_is_float(x) -> bool:
     try:
