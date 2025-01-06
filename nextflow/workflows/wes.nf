@@ -56,12 +56,12 @@ workflow whole_exome {
                                         "log": "${params.logdir}/${it[0].id}/paired"],
                                         it[1]] }
     tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
-    indices = PREPROCESS_FASTQ.out.bam_index.map(Utl.getId).groupTuple()
+    indices = Utl.getId(PREPROCESS_FASTQ.out.bam_index).groupTuple()
     paired = normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
         .join(indices)
     // Order is important for the first two
-    paired_no_id = paired.map(Utl.delId)
+    paired_no_id = Utl.delId(paired)
     // paired_no_id is [meta, normal, tumor, [normal_index, tumor_index]]
     // the order of indices doesn't matter, they just need to be present
 
@@ -81,7 +81,7 @@ workflow whole_exome {
     to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
-    to_strelka = paired.join(MANTA.out.indels).map(Utl.delId)
+    to_strelka = Utl.delId(paired.join(MANTA.out.indels))
 
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
@@ -104,7 +104,7 @@ workflow whole_exome {
     CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
 
     // Octopus and Clairs uses previous variants to aid calling
-    to_geno = paired_no_id.join(CONCAT_SMALL_1.out.vcf.map(Utl.getId))
+    to_geno = Utl.joinFirst(paired, [CONCAT_SMALL_1.out.vcf])
     OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
 
@@ -152,10 +152,9 @@ workflow whole_exome {
                             .merge(collected_normals),
                 params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
 
-    to_cnvkit = paired.map({ it[0..1] + [it[3]] })
-            .join(QC_SMALL.out.vcf.map(Utl.getId))
-            .join(purity_ploidy)
-            .map(Utl.delId)
+    to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
+            .join(Utl.getId(QC_SMALL.out.vcf))
+            .join(purity_ploidy))
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 

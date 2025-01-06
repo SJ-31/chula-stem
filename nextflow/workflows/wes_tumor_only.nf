@@ -49,17 +49,19 @@ workflow whole_exome_tumor_only {
                          "RGSM_tumor": it[0].RGSM,
                         "log": "${params.logdir}/${it[0].id}/variant_calling"],
                                         it[1]] }
+    // tumors: [meta, bam]
 
     indices = PREPROCESS_FASTQ.out.bam_index
     empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
-    all_indices = indices.map(Utl.getId).mix(empty_indices.map(Utl.getId))
+    all_indices = Utl.getId(indices).mix(Utl.getId(empty_indices))
         .groupTuple()
 
-    paired = Utl.joinFirst(empty_normals, [tumors])
-        .map({ [it[0]] + [it[2]] + [it[1]] + [it[3]] })
-        .join(all_indices)
+    paired = Utl.joinFirst(empty_normals, [tumors],
+                           ["id"], true) // -> [n_meta, n, t_meta, t]
+        .map({ [it[2].id] + [it[2]] + [it[1]] + [it[3]] }) // -> [id, t_meta, n, t]
+        .join(all_indices) // -> [id, t_meta, n, t, [n_index, t_index]]
 
-    paired_no_id = paired.map(Utl.delId)
+    paired_no_id = Utl.delId(paired)
 
     /*
      * Variant calling
@@ -137,10 +139,9 @@ workflow whole_exome_tumor_only {
                 params.ref.genome, params.ref.baits_unzipped,
                 params.ref.genome_blacklist, 4)
 
-    to_cnvkit = paired.map({ it[0..1] + [it[3]] })
-            .join(QC_SMALL.out.vcf.map(Utl.getId))
-            .join(purity_ploidy)
-            .map(Utl.delId)
+    to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
+                          .join(Utl.getId(QC_SMALL.out.vcf))
+                          .join(purity_ploidy))
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
@@ -197,19 +198,9 @@ workflow whole_exome_tumor_only {
                                  "log": "${params.logdir}/${it[0].id}/metrics"],
                         it[1], it[2]] }
 
-    // def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-
-    // to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
-    //     .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
-    //           by: [0, 1]) // [id, type, meta, bam, meta, bai]
-    //     .map({ [it[2], it[3], it[5]] })
-    //     .map(replaceOut)
-    //     TODO: <2025-01-04 Sat> Check if this works
     to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
                                [PREPROCESS_FASTQ.out.bam_index],
-                               on: ["id", "type"]).map(replaceOut)
-    // <2025-01-04 Sat> If joinFirst is set up correctly, then "id" "type" that
-    // was prepended should be removed automatically
+                               ["id", "type"]).map(replaceOut)
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,
