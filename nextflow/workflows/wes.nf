@@ -158,7 +158,7 @@ workflow whole_exome {
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
-    CLASSIFY_CNV_FORMAT(CNVKIT.out.cnv.mix(FACETS.out.rds), 5)
+    CLASSIFY_CNV_FORMAT(CNVKIT.out.cns.mix(FACETS.out.rds), 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)

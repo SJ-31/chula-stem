@@ -145,14 +145,13 @@ workflow whole_exome_tumor_only {
 
     CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
 
-    cnv_ch = CNVKIT.out.cnv
+    CLASSIFY_CNV_FORMAT(CNVKIT.out.cns, 5)
 
-    CLASSIFY_CNV_FORMAT(cnv_ch, 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)
         .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
-        [["filename": id,
+              [["id": id, "filename": id,
           "out": "${params.outdir}/${id}/annotations",
           "log": "${params.logdir}/${id}/annotations"], it]
         })
