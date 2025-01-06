@@ -123,3 +123,10 @@ docs
 /tests/mosdepth/
 /tests/8-cohort-MultiQC.html
 /tests/8-cohort-MultiQC_data/
+/report_full.pdf
+/tests/data/
+/tests/plots/
+/tests/report_params.json
+/tests/report_params.yaml
+/.command_history.el
+/8-cohort-MultiQC.html

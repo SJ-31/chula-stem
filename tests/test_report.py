@@ -3,10 +3,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable
 
+import click
 import polars as pl
 import polars.selectors as cs
 import pytest
 from chula_stem.callset_qc import IMPACT_MAP
+from chula_stem.report.cli import entry_point
 from chula_stem.report.format import msisensor_pro_fmt
 
 small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
@@ -62,7 +64,7 @@ def test_cnvkit_pdf():
     VariantCallingReport.plot_cnvkit(cnr, cns)
 
 
-# @pytest.mark.skip(reason="Done")
+@pytest.mark.skip(reason="Done")
 def test_full(front_page_only=False):
     from chula_stem.report.variant_calling_report import VariantCallingReport
 
@@ -146,3 +148,13 @@ spec: list = [
         "column": "SYMBOL",
     },
 ]
+
+
+def test_read_json():
+    path = "/home/shannc/Bio_SDD/chula-stem/tests/report_params.json"
+    entry_point.callback(
+        report_type="variant_calling",
+        specification=path,
+        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
+        output="/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
+    )
