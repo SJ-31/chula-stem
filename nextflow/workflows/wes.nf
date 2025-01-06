@@ -189,9 +189,15 @@ workflow whole_exome {
                           "${params.configdir}/excluded_signatures.txt", 7)
     CLASSIFY_CNV(cnv_bed, 7)
 
-    CROSS_REFERENCE_CNV(CLASSIFY_CNV.out.tsv, "CNV", params.ref.clingen_dosage,
+    // Cross reference regions
+    CROSS_REFERENCE_CNV(Utl.addSuffix(CLASSIFY_CNV.out.tsv, "CR_CNV"),
+                        "CNV", params.ref.clingen_dosage,
                         params.ref.cnv_reference, 8)
-    CROSS_REFERENCE_MSI(MSISENSORPRO.out.tsv, "MSI", params.ref.clingen_gene,
+    to_cr_msi = Utl.modifyMeta(MSISENSORPRO.out.tsv,
+                               [suffix: "CR_MSI",
+                                out: { "${params.outdir}/${it.id}/annotations" },
+                                log: { "${params.logdir}/${it.id}/annotations" } ])
+    CROSS_REFERENCE_MSI(to_cr_msi, "MSI", params.ref.clingen_gene,
                         params.ref.msi_reference, 8)
 
     /*
