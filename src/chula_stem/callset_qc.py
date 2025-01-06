@@ -3,6 +3,7 @@ from collections.abc import Callable
 import click
 import numpy as np
 import polars as pl
+import polars.selectors as cs
 
 from chula_stem.utils import contain_join, empty_string2null
 
@@ -65,6 +66,7 @@ def merge_variant_calls(
 
     :returns: filtered tsv file
     """
+    df = df.with_columns(cs.by_dtype(pl.String).str.replace_all("&", ";", literal=True))
     original_cols: list = df.columns
     to_average: list = []
     if "VAF" in original_cols:
@@ -325,9 +327,9 @@ def qc_main(
         separator="\t",
         infer_schema_length=None,
         null_values=["NA", "."],
-    )
+    ).with_columns()
     print(f"Original shape: {df.shape}")
-    grouping_cols: list = ["Loc", "Ref", "Alt"]
+    grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
     df = standard_filters(
         df,
         min_tumor_depth=min_tumor_depth,
