@@ -172,15 +172,10 @@ workflow whole_exome_tumor_only {
 
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
 
-    vep_out = VEP.out.tsv.branch { meta, files ->
-        sv: meta.variant_class == "sv"
-        small: meta.variant_class == "small"
-    }
+    to_qc_tsv = Utl.joinFirst(VEP.out.tsv,
+                              [MSISENSORPRO.out.tsv.mix(MSISENSORPRO.out.tsv)])
 
-    to_qc_tsv_sv = Utl.joinFirst(vep_out.sv, [MSISENSORPRO.out.tsv])
-    to_qc_tsv_small = Utl.joinFirst(vep_out.small, [MSISENSORPRO.out.tsv])
-
-    CALLSET_QC_TSV(to_qc_tsv_sv.mix(to_qc_tsv_small), "", 8)
+    CALLSET_QC_TSV(to_qc_tsv, "", 8)
 
     SIGPROFILERASSIGNMENT(Utl.delSuffix(QC_SMALL.out.vcf), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
