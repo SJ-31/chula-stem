@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 import click
+import numpy as np
 import polars as pl
 
 from chula_stem.utils import contain_join, empty_string2null
@@ -12,6 +13,14 @@ IMPACT_MAP: dict = {
     "MODIFIER": 1,
     None: 0,
 }
+
+
+def str_is_float(x) -> bool:
+    try:
+        float(x)
+        return True
+    except ValueError:
+        return False
 
 
 def merge_variant_calls(
@@ -53,13 +62,25 @@ def merge_variant_calls(
     split_unique: list = vep_cols
     keep_all: list = to_average + split_unique
     unique_expr: list = [pl.col(u).list.unique() for u in split_unique]
-    avg_expr: list = [pl.col(x).list.mean() for x in to_average]
+    schema: dict = df.schema
+    avg_fns: dict = {
+        pl.String: lambda x: pl.col(x)
+        .list.join(",")
+        .str.split(",")
+        .map_elements(
+            lambda nums: np.mean([float(v) for v in nums if str_is_float(v)]),
+            return_dtype=pl.Float64,
+        ),
+        pl.Float64: lambda x: pl.col(x).list.mean(),
+    }
+    avg_expr: list = [avg_fns[schema[x]](x) for x in to_average]
     grouped = (
         df.group_by(grouping_cols)
         .agg(keep_all)
         .with_columns(avg_expr + unique_expr)
         .with_columns(n_callers=pl.col(tool_source_tag).list.len())
     )
+    print(grouped)
     if vaf_adaptive:
         mutect_strelka_cols = [
             (pl.col(tool_source_tag).list.contains(c)).alias(f"has_{c}")
@@ -264,44 +285,6 @@ def region_filter(
     help="Ending column index for `ignore_regions` file",
 )
 def qc_main(
-    input_tsv: str,
-    output: str,
-    min_tumor_depth: int,
-    max_normal_depth: int,
-    min_vaf: float,
-    accepted_filters: str,
-    impact: bool,
-    canonical: bool,
-    informative: bool,
-    min_callers: bool,
-    vaf_adaptive: bool,
-    tool_source_tag: str = "TOOL_SOURCE",
-    ignore_regions: str = "",
-    chr_col: int = 0,
-    start_col: int = 1,
-    end_col: int = 2,
-):
-    _qc_main(
-        input_tsv=input_tsv,
-        output=output,
-        min_tumor_depth=min_tumor_depth,
-        max_normal_depth=max_normal_depth,
-        min_vaf=min_vaf,
-        accepted_filters=accepted_filters,
-        impact=impact,
-        canonical=canonical,
-        informative=informative,
-        min_callers=min_callers,
-        vaf_adaptive=vaf_adaptive,
-        tool_source_tag=tool_source_tag,
-        ignore_regions=ignore_regions,
-        chr_col=chr_col,
-        start_col=start_col,
-        end_col=end_col,
-    )
-
-
-def _qc_main(
     input_tsv: str,
     output: str,
     min_tumor_depth: int,
