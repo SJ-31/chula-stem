@@ -134,6 +134,9 @@ def resolve_transcripts(
     def by_informative(df: pl.DataFrame) -> pl.DataFrame:
         original_cols: list = df.columns
         sum_col: str = "na_count"
+        df = df.filter(pl.col("CLIN_SIG").is_not_null())
+        if not df.is_empty():
+            return df
         df = (
             df.with_columns(pl.sum_horizontal(pl.all().is_null()).alias(sum_col))
             .filter(pl.col(sum_col) == pl.col(sum_col).min())
