@@ -22,12 +22,11 @@ workflow MUTECT2_COMPLETE {
 
     CALCULATE_CONTAMINATION(GET_PILEUP_SUMMARIES.out.pileup, module_number)
 
-    to_filter = MUTECT2.out.variants.map({ [it[0].id] + it })
-        .join(LEARN_READ_ORIENTATION.out.ro.map(params.getId))
-        .join(CALCULATE_CONTAMINATION.out.c.map(params.getId))
-        .join(CALCULATE_CONTAMINATION.out.s.map(params.getId))
-        .join(MUTECT2.out.stats.map(params.getId))
-        .map { it[1..-1] }
+    to_filter = Utl.joinFirst(MUTECT2.out.variants,
+                              [LEARN_READ_ORIENTATION.out.ro,
+                               CALCULATE_CONTAMINATION.out.c,
+                               CALCULATE_CONTAMINATION.out.s,
+                               MUTECT2.out.stats])
 
     FILTER_MUTECT_CALLS(to_filter, params.ref.genome, module_number)
 
