@@ -1,3 +1,5 @@
+import groovy.json.JsonOutput
+
 class Utl {
     public static String getName(Integer module_number, Map meta, String suffix = null, String ext = null) {
         def suf = meta.suffix ? meta.suffix : suffix
@@ -53,8 +55,27 @@ class Utl {
         return ch.map({ [it[0] + ["suffix": suffix]] + it[1..-1] })
     }
 
-    public static modifyMeta(ch, Map meta) {
-        return ch.map({[it[0] + meta] + it[1..-1] })
+    /**  Change the meta map (first element) of a given channel
+    /** The values of `override` can be literals or closures.    **/
+    /**  In the latter case, they must be a closure that takes the old meta as input    **/
+    /**     and returns a literal value
+    **/
+    public static modifyMeta(ch, Map override) {
+        def changeVals = {
+            def processed = [:]
+            override.each({ k, v ->
+                if (v instanceof Closure) {
+                    processed.put(k, v(it[0]))
+                } else {
+                    processed.put(k, v)
+                }
+            })
+           [it[0] + processed] + it[1..-1]
+        }
+        return ch.map(changeVals)
     }
 
+    public static mapToJson(Map m) {
+        return JsonOutput.prettyPrint(JsonOutput.toJson(m))
+    }
 }
