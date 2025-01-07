@@ -21,7 +21,7 @@ from chula_stem.report.variant_calling_report import VariantCallingReport
     "-s", "--specification", required=True, help="Path specification file (YAML)"
 )
 @click.option(
-    "-t",
+    "-d",
     "--tmpdir",
     required=False,
     default="./report_tmp",

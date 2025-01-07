@@ -1,18 +1,164 @@
-import polars as pl
+import copy
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import sleep
+from typing import override
+
+import click
+import polars as pl
 import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-from typing import override
 from requests import Session
 
-## * Therapy db parent class
+# * Utilities
+
+
+@click.command()
+@click.option(
+    "-i",
+    "--input-files",
+    required=True,
+    help="Path to directory containing input files",
+)
+@click.option(
+    "-c",
+    "--gene-col",
+    default="Gene",
+    show_default=True,
+    help="For dataframe input, the column containing gene names",
+)
+@click.option(
+    "-f",
+    "--filter-confident",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Whether or not to filter confident therapy entries",
+)
+@click.option(
+    "-n",
+    "--not-in-db",
+    default="not_in_databases.txt",
+    show_default=True,
+    help="File to write genes that weren't found",
+)
+@click.option(
+    "-v",
+    "--civic-cache",
+    default="civic.json",
+    show_default=True,
+    help="Path to write Civic cache",
+)
+@click.option(
+    "-p",
+    "--pandrugs2-cache",
+    default="pandrugs2.json",
+    show_default=True,
+    help="Path to write Pandrugs2 cache",
+)
+def therapy_cache_from_files(
+    input_files: str,
+    civic_cache: str,
+    pandrugs2_cache: str,
+    not_in_db: str,
+    filter_confident: bool,
+    gene_col: str = "Genes",
+):
+    genes: set = set()
+    for path in Path(input_files).rglob("*"):
+        path: Path
+        if path.is_dir():
+            continue
+        if path.suffix == ".tsv":
+            df = pl.read_csv(path, separator="\t", infer_schema_length=None)
+            genes |= set(df[gene_col])
+        elif path.suffix == ".csv":
+            df = pl.read_csv(path, infer_schema_length=None)
+            genes |= set(df[gene_col])
+        else:
+            with open(path, "r") as f:
+                genes |= set(f.read().splitlines())
+    _ = get_therapy_df(
+        genes,
+        civic_cache=civic_cache,
+        pandrugs2_cache=pandrugs2_cache,
+        not_in_db_file=not_in_db,
+        filter_confident=filter_confident,
+    )
+
+
+def get_therapy_df(
+    gene_list: list,
+    civic_cache: str = "",
+    pandrugs2_cache: str = "",
+    not_in_db_file: str = "",
+    filter_confident=False,
+    attempt_failed=True,
+) -> pl.DataFrame:
+    """Get therapeutic information
+
+    :param gene_list: list of genes to look up
+
+    :returns: the input dataframe with additional information about therapeutic
+    options for each gene.
+    The result is a dataframe with columns
+    - "gene"
+    - "source" database or paper source
+    - "disease": disease(s) the gene is implicated in
+    - "therapies": validated therapies for the gene
+    """
+    therapy_dbs: list[TherapyDB] = [
+        Civic(civic_cache),
+        PanDrugs2(pandrugs2_cache),
+    ]
+    temp: list[pl.DataFrame] = []
+    gene_list_copy: list = copy.copy(gene_list)
+    if not attempt_failed and not_in_db_file and os.path.exists(not_in_db_file):
+        # Do not look up genes that weren't found in the databases on previous tries
+        with open(not_in_db_file, "r") as f:
+            failed_previously: list = f.read().splitlines()
+            gene_list = list(set(gene_list) - set(failed_previously))
+    for db in therapy_dbs:
+        find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
+        if not find_info.is_empty():
+            found = find_info["gene"]
+            gene_list = list(filter(lambda x: x not in found, gene_list))
+            temp.append(find_info.select(TherapyDB.shared_cols))
+        if not gene_list:
+            break
+    if temp:
+        all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
+        not_in_db: list = list(set(gene_list_copy) - set(all_drug_info["gene"]))
+        write_not_found = not_in_db_file if not_in_db_file else "genes_not_found.txt"
+        with open(write_not_found, "a") as f:
+            f.write("\n".join(not_in_db))
+        return all_drug_info
+    return pl.DataFrame(
+        schema={
+            "gene": pl.String,
+            "source": pl.String,
+            "disease": pl.String,
+            "therapies": pl.String,
+        }
+    )
+
+
+def no_gene_df(gene: str) -> pl.DataFrame:
+    """Dataframe to return when `gene` isn't found"""
+    return pl.DataFrame(
+        {
+            "gene": [gene],
+            "found": [False],
+        }
+    )
+
+
+# * Therapy db parent class
 
 
 class TherapyDB(ABC):
-
     api_wait: float
     name: str
     cache: Path
@@ -104,7 +250,7 @@ class TherapyDB(ABC):
         df.write_json(self.cache)
 
 
-## * Civic database
+# * Civic database
 
 CIVIC_URL: str = "https://civicdb.org"
 
@@ -483,8 +629,6 @@ def add_therapy_info(
 
     temp: list[pl.DataFrame] = []
     for db in therapy_dbs:
-        # <2024-12-20 Fri>
-        # BUG: setting the confidence filters off is temporary, for testing
         find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
         if not find_info.is_empty():
             found = find_info["gene"]
@@ -499,47 +643,3 @@ def add_therapy_info(
         )
         return with_therapeutics
     return df.with_columns([pl.lit(None).alias(c) for c in TherapyDB.shared_cols])
-
-
-def get_therapy_df(
-    gene_list: list,
-    civic_cache: str = "",
-    pandrugs2_cache: str = "",
-    filter_confident=False,
-) -> pl.DataFrame:
-    """Get therapeutic information
-
-    :param gene_list: list of genes to look up
-
-    :returns: the input dataframe with additional information about therapeutic
-    options for each gene.
-    The result is a dataframe with columns
-    - "gene"
-    - "source" database or paper source
-    - "disease": disease(s) the gene is implicated in
-    - "therapies": validated therapies for the gene
-    """
-    therapy_dbs: list[TherapyDB] = [
-        Civic(civic_cache),
-        PanDrugs2(pandrugs2_cache),
-    ]
-    temp: list[pl.DataFrame] = []
-    for db in therapy_dbs:
-        find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
-        if not find_info.is_empty():
-            found = find_info["gene"]
-            gene_list = list(filter(lambda x: x not in found, gene_list))
-            temp.append(find_info.select(TherapyDB.shared_cols))
-        if not gene_list:
-            break
-    if temp:
-        all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
-        return all_drug_info
-    return pl.DataFrame(
-        schema={
-            "gene": pl.String,
-            "source": pl.String,
-            "disease": pl.String,
-            "therapies": pl.String,
-        }
-    )
