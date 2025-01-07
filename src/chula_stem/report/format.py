@@ -236,12 +236,18 @@ def vep_fmt(
         )
         .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
         .sort(pl.col("impact_score"), descending=True)
-        .pipe(lambda x: sort_clinsig(x, clinsig_col=clinsig, separator=";"))
         .group_by(pl.col(["Gene", "Locus"]))
         .agg(pl.all().first())
         .filter(pl.col("Gene").is_not_null())
         .cast(pl.String)
         .fill_null("-")
+    )
+    df = pl.concat(
+        [
+            sort_clinsig(d, clinsig_col=clinsig, separator=";")
+            for d in df.partition_by("impact_score", maintain_order=True)
+        ],
+        how="vertical_relaxed",
     )
     confident = df.filter((pl.col("SOMATIC") == "1") & (pl.col(clinsig) != "-"))
     others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
