@@ -1,6 +1,2 @@
-Artifact_signatures
 AA_signatures
 Tobacco_signatures
- Chemotherapy_signatures
-Immunosuppressants_signatures
-Treatment_signatures

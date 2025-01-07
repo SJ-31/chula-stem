@@ -6,6 +6,7 @@
     * See ./config/run_conf_template.config.nf and the =nextflow.config= file for more information
   * Place tool-specific configuration in the =<pipeline_name>_tool_config.nf= file, see the =config= directory for examples
     * TODO: is this name right?
+  * Cohort information to be displayed in the report (e.g. address, notes, sample collection dates) is stored in the groovy map =params.report_data=
 * Whole-exome sequencing (=wes.nf= )
 A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re/sarek/3.4.4/][nf-core's sarek]] and GATK best practices. The final output
 ** Input
@@ -39,6 +40,8 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
     TODO: describe what each of these headers are
    generated with a custom script (=resources/prepare_cnv_repeat_data.bash=)
 + =msi_reference=:  the equivalent of =cnv_reference= for repetitive elements, generated with the same script; a BED file containing dbVar and clinVar repetitive element data
++ =civic_cache=: path to json file containing cached calls to Civic API (is automatically generated and updated if it doesn't exist)
++ =pandrugs2_cache=: path to json file containing cached calls to Pandrugs2 API (is automatically generated and updated if it doesn't exist)
 ** Steps
 *** Preprocessing
 + Quality control ([[https://github.com/OpenGene/fastp][fastp]])
@@ -106,6 +109,7 @@ TODO
 + [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
 + [3] [[https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2][GATK Mutect2 Ho2]]
 + [4] [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
-+ [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and identifies SAV1 as a potential driver]]
++ [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and ide
+  ntifies SAV1 as a potential driver]]
 + [6] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
 :END:

@@ -4,6 +4,8 @@ kitdir = "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38"
 genome = "$refdir/genomes/GRCh38.p14_filtered.fasta"
 genome_gff = "$refdir/genomes/GRCh38.p14_filtered.gff"
 genome_sdf = "$refdir/genomes/GRCh38.p14_filtered.sdf"
+civic_cache = "/data/home/shannc/.cache/civic.json"
+pandrugs2_cache = "/data/home/shannc/.cache/pandrugs2.json"
 
 homopolymers_microsatellites= "$refdir/tool_specific/mishomopoly_GRCh38_filtered.tsv"
 

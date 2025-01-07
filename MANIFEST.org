@@ -1,3 +1,10 @@
+* SureSelectHumanAllExonV6Hg38
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38=
+*Date added*: <2024-11-22 Thu>
+*Source:* [[https://earray.chem.agilent.com/suredesign][Agilent SureDesign]]
+Download package for the SureSelectHumanAllExon V6 Hg38 capture kit.
+The *_Covered.bed file are taken to be baits, *_Regions.bed to be targets
+
 * GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz=
 *Date added*: <2025-01-01 Wed>
