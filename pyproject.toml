@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "chula_stem"
 requires-python = ">=3.8"
 dependencies = ["rpy2", "pandas", "click", "polars==1.17", "pymupdf",
-"reportlab", "gql[aiohttp]"]
+"reportlab", "gql[aiohttp]", "requests"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -21,4 +21,4 @@ module-name = "chula_stem._rust"
 format_vep_vcf = "chula_stem.utils:format_vep_vcf"
 classify_cnv_format = "chula_stem.utils:classify_cnv_format"
 callset_qc = "chula_stem.callset_qc:qc_main"
-pipeline_report = "chula_stem.report.cli.entry_point"
+pipeline_report = "chula_stem.report.cli:entry_point"
