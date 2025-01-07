@@ -4,6 +4,7 @@ tests/patient*
 *.nf.test.snap
 tests/*.pdf
 *.nf-test.log*
+analyses/data
 /nextflow/.nf-test*
 *slurm-*.out
 *.vcf.gz*
