@@ -4,7 +4,7 @@ read_with_filename <- function(x, col = "filename") {
 
 #' Flatten the character vector `char_vec` by `separator`, then
 #'  get unique values
-flatten_by <- function(char_vec, separator = ";", collapse = TRUE) {
+flatten_by <- function(char_vec, separator = ";", collapse = TRUE, unique = FALSE) {
   helper <- function(str) {
     if (is.na(str)) {
       return(NA)
@@ -13,9 +13,11 @@ flatten_by <- function(char_vec, separator = ";", collapse = TRUE) {
       str_split_1(x, pattern = separator)
     }) |> unlist()
   }
-  applied <- lapply(char_vec, helper) |>
-    unlist() |>
-    unique()
+
+  applied <- lapply(char_vec, helper) |> unlist()
+  if (unique) {
+    applied <- unique(applied)
+  }
   if (collapse) {
     paste0(applied, collapse = separator)
   } else {
@@ -31,4 +33,14 @@ into_char_list <- function(col, separator = ";") {
       str_split_1(x, ";")
     }
   })
+}
+
+modes <- function(x) {
+  x <- discard(x, is.na)
+  if (length(x) == 0) {
+    return(NA)
+  }
+  ux <- unique(x)
+  tab <- tabulate(match(x, ux))
+  ux[tab == max(tab)]
 }
