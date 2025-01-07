@@ -10,14 +10,14 @@ vaf_merged_file <- here("analyses", "output", "pdac_vaf_merged.tsv")
 
 if (!file.exists(vaf_merged_file)) {
   data_path <- "/data/project/stemcell/shannc/output/PDAC"
-  files <- list.files(data_path, pattern = "8-P[0-9]+-VEP_small.tsv", recursive = TRUE, full.names = TRUE)
+  files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv", recursive = TRUE, full.names = TRUE)
   tsvs <- lapply(files, \(x) {
     tb <- read_with_filename(x, "sample") |> select(sample, VAF, SYMBOL, CLIN_SIG, Consequence)
     tb |>
       group_by(SYMBOL) |>
       summarise(
         VAF = mean(VAF),
-        across(where(is.character), \(x) flatten_by(x, collapse = TRUE))
+        across(where(is.character), \(x) flatten_by(x, collapse = TRUE, unique = FALSE))
       )
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9]+"))
@@ -28,7 +28,7 @@ if (!file.exists(vaf_merged_file)) {
 }
 
 ## * Plotting
-min_samples <- 2 # Genes must be found in this number of samples
+min_samples <- 17 # Genes must be found in this number of samples
 formatted <- merged |>
   filter(
     !is.na(SYMBOL) &
@@ -39,16 +39,17 @@ formatted <- merged |>
       map_lgl(CLIN_SIG, \(x) "pathogenic" %in% x)
   ) |>
   group_by(SYMBOL) |>
-  filter(n() > min_samples) |>
+  filter(n() >= min_samples) |>
   ungroup() |>
   mutate(Type = map_chr(Consequence, \(x) {
     if (length(x) > 1) {
-      "Multiple"
+      val <- modes(x) |> first()
     } else {
-      first(x) |>
-        str_to_title() |>
-        str_replace_all("_", " ")
+      val <- first(x)
     }
+    val |>
+      str_to_title() |>
+      str_replace_all("_", " ")
   }))
 
 plot <- formatted |> ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = Type)) +
