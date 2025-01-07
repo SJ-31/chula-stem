@@ -20,7 +20,13 @@ from reportlab.platypus import (
 import chula_stem.report.format as fr
 from chula_stem.databases import get_therapy_df
 from chula_stem.plotting import plot_cnvkit
-from chula_stem.report import ResultsReport, add_pstyles, draw_paragraph
+from chula_stem.report import (
+    PATIENT_DATA,
+    SAMPLE_DATA,
+    ResultsReport,
+    add_pstyles,
+    draw_paragraph,
+)
 from chula_stem.report.spec import (
     AVAILABLE_WIDTH,
     BOLD_FONT,
@@ -46,8 +52,8 @@ class VariantCallingReport(ResultsReport):
         self,
         filename: str,
         metadata: dict,
-        pandrugs2_cache: str = "",
-        civic_cache: str = "",
+        pandrugs2_cache: str = "pandrugs2_cache.json",
+        civic_cache: str = "civic_cache.json",
         vep_small: str = "",
         vep_sv: str = "",
         classify_cnv: str = "",
@@ -61,6 +67,8 @@ class VariantCallingReport(ResultsReport):
         font=FONT,
         bold_font=BOLD_FONT,
         plot=True,
+        filter_confident_therapies=True,
+        show_therapies=True,
     ) -> None:
         super().__init__(
             filename=filename,
@@ -77,6 +85,7 @@ class VariantCallingReport(ResultsReport):
             "footer_pos": (A4[0] - 2 * cm, A4[1] - cm),
             "header_style": STYLE["table_title_style"],
         }
+        self.show_therapies = show_therapies
         self.metadata: dict = metadata
         self.civic_cache: str = civic_cache
         self.pandrugs2_cache: str = pandrugs2_cache
@@ -103,14 +112,19 @@ class VariantCallingReport(ResultsReport):
             {"file": msisensor_pro, "column": "gene_name"},
         ]
         therapy_data_cache: str = "therapy_data.parquet"
-        if os.path.exists(therapy_data_cache):
+        if os.path.exists(therapy_data_cache) and self.show_therapies:
             therapy_df = pl.read_parquet(therapy_data_cache)
-        else:
+        elif self.show_therapies:
             gene_list = fr.get_genes(gene_spec)
             therapy_df: pl.DataFrame = get_therapy_df(
-                gene_list, civic_cache=civic_cache, pandrugs2_cache=pandrugs2_cache
+                gene_list,
+                civic_cache=civic_cache,
+                pandrugs2_cache=pandrugs2_cache,
+                filter_confident=filter_confident_therapies,
             )
             therapy_df.write_parquet(therapy_data_cache)
+        else:
+            therapy_df = pl.DataFrame()
 
         calls = [
             lambda: fr.vep_fmt(vep_small, "small"),
@@ -156,9 +170,10 @@ class VariantCallingReport(ResultsReport):
                 spec["gene_col"] = "Affected Gene"
             variant_spec.append(spec)
 
-        self.data["therapies"], self.data["study_references"] = fr.therapy_fmt(
-            therapy_df, variant_spec
-        )
+        if self.show_therapies:
+            self.data["therapies"], self.data["study_references"] = fr.therapy_fmt(
+                therapy_df, variant_spec
+            )
         self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[0]
         self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
         self.stats["counts"]["Mutational Signatures"] = sum(
@@ -221,19 +236,16 @@ class VariantCallingReport(ResultsReport):
             # 0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),
             None: ParagraphStyle("values", fontName=FONT, fontSize=fontsize),
         }
-        patient_data = [
-            ["Name:", self.metadata.get("patient_name", "-")],
-            ["Gender:", self.metadata.get("gender", "-")],
-            ["Date of Birth:", self.metadata.get("patient_birthdate", "-")],
-            ["Physician:", self.metadata.get("physician", "-")],
-            ["Diagnosis:", self.metadata.get("diagnosis", "-")],
-            ["Hospital:", self.metadata.get("hospital", "-")],
-        ]
-        sample_data = [
-            ["ID:", self.metadata.get("id", "-")],
-            ["Collection Date:", self.metadata.get("collection_date", "-")],
-            ["Type:", self.metadata.get("sample_type", "-")],
-        ]
+        patient_data, sample_data = [], []
+        for spec, add_to in zip(
+            [PATIENT_DATA, SAMPLE_DATA],
+            [patient_data, sample_data],
+        ):
+            for k, v in spec.items():
+                if k not in self.ignored_data_fields:
+                    row = [f"{k}:", self.metadata.get(v, "-")]
+                    add_to.append(row)
+
         patient_data = add_pstyles(patient_data, styles, nested=True)
         sample_data = add_pstyles(sample_data, styles, nested=True)
         cell_styles = style_cells((0, 0), ncols=2, valign="TOP")
@@ -390,24 +402,25 @@ class VariantCallingReport(ResultsReport):
                 table_decorator,
                 f"non-rel_{table}.pdf",
             )
-        self.build_table(
-            self.spec,
-            therapy_style(),
-            self.data["therapies"],
-            "Relevant therapies",
-            "Relevant therapies (Continued)",
-            table_decorator,
-            "therapies.pdf",
-        )
-        self.build_table(
-            self.spec,
-            reference_list_style(),
-            self.data["study_references"],
-            "References",
-            "",
-            table_decorator,
-            "reference_list.pdf",
-        )
+        if self.show_therapies:
+            self.build_table(
+                self.spec,
+                therapy_style(),
+                self.data["therapies"],
+                "Relevant therapies",
+                "Relevant therapies (Continued)",
+                table_decorator,
+                "therapies.pdf",
+            )
+            self.build_table(
+                self.spec,
+                reference_list_style(),
+                self.data["study_references"],
+                "References",
+                "",
+                table_decorator,
+                "reference_list.pdf",
+            )
         for n, sample in enumerate(self.data["sigprofiler"]):
             if len(self.data["sigprofiler"]) == 1:
                 first = "Mutational signatures"
@@ -456,8 +469,9 @@ class VariantCallingReport(ResultsReport):
 
         offset = 2  # Account for front page and TOC page
         doc.insert_file("front_page.pdf")
-        toc.append([1, "Relevant therapies", len(doc) + offset])
-        doc.insert_file("therapies.pdf")
+        if self.show_therapies:
+            toc.append([1, "Relevant therapies", len(doc) + offset])
+            doc.insert_file("therapies.pdf")
 
         for t, n in self.variant_names.items():
             toc.append([1, n, len(doc) + offset])
@@ -478,8 +492,9 @@ class VariantCallingReport(ResultsReport):
                 toc.append([2, f"Sample {index}", len(doc) + offset])
                 doc.insert_file(s)
 
-        toc.append([1, "References", len(doc) + offset])
-        doc.insert_file("reference_list.pdf")
+        if self.show_therapies:
+            toc.append([1, "References", len(doc) + offset])
+            doc.insert_file("reference_list.pdf")
 
         self.build_toc(toc)
         doc.insert_file("toc.pdf", start_at=1)
