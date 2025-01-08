@@ -237,7 +237,7 @@ class VariantCallingReport(ResultsReport):
             )
 
         # Patient, sample info tables
-        fontsize = 9
+        fontsize = 8
         header_fontsize = 13
         info_table_widths = [100, 150]
         cell_row_height = 15

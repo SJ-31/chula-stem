@@ -117,8 +117,8 @@ class Widths:
         "Locus": AVAILABLE_WIDTH * 0.21,
         "CNV Type": AVAILABLE_WIDTH * 0.05,
         "Estimated Copy Number": AVAILABLE_WIDTH * 0.1,
-        "Known/predicted Dosage-sensitive Genes": AVAILABLE_WIDTH * 0.15,
-        "All Genes": AVAILABLE_WIDTH * 0.29,
+        "ClinVar": AVAILABLE_WIDTH * 0.10,
+        "All Genes": AVAILABLE_WIDTH * 0.34,
         "ClinGen": AVAILABLE_WIDTH * 0.08,
         "Database/Study Records": AVAILABLE_WIDTH * 0.12,
     }
@@ -172,7 +172,7 @@ class Rename:
     }
     cnv = {
         "Type": "CNV Type",
-        "Known or predicted dosage-sensitive genes": "Dosage-sensitive Genes",
+        "Classification": "ClinVar",
         "All protein coding genes": "Genes in Region",
         "ClinGen_report": "ClinGen",
         "source": "Source",

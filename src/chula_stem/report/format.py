@@ -13,7 +13,7 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 
-from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP
+from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
 
@@ -81,6 +81,8 @@ def get_copy_number(
         cnvkit: pl.DataFrame = pl.read_csv(
             cnvkit_path, separator="\t", null_values="NA", infer_schema_length=None
         ).rename({"cn": cn_col_name})
+        if "chromosome" in cnvkit.columns and "chr" not in cnvkit["chromosome"][0]:
+            cnvkit = cnvkit.with_columns(pl.col("chromosome").str.replace("^", "chr"))
         cnvkit = add_loc(cnvkit)
         df = df.join(cnvkit, how="left", on="Locus")
     if facets_path and cnvkit_path:
@@ -117,6 +119,7 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
                 get_clingen_link, return_dtype=pl.String
             )
         )
+        .filter(pl.col("gene_name").is_not_null())
         .with_columns(
             pl.struct(s="source", acc="accession")
             .map_elements(
@@ -186,8 +189,7 @@ def classify_cnv_fmt(
         .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
         .with_columns(
             pl.col("ClinGen").list.join(", "),
-            limit_genes(Rename.cnv["All protein coding genes"], 10),
-            limit_genes(Rename.cnv["Known or predicted dosage-sensitive genes"], 10),
+            limit_genes(Rename.cnv["All protein coding genes"], 25),
         )
     )
     cn_col = "CN"
@@ -196,14 +198,15 @@ def classify_cnv_fmt(
         get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name=cn_col)
         .select(wanted_cols)
         .cast(pl.String)
+        .with_columns(cs.by_dtype(pl.String).str.replace("^$", "-"))
         .fill_null("-")
     )
     relevant = with_cn.filter(
-        pl.col(Rename.cnv["Known or predicted dosage-sensitive genes"]) != "-"
+        (pl.col("ClinGen") != "-")
+        & (pl.col(cn_col) != "-")
+        & (pl.col("ClinGen").str.len_chars() > 1)
     )
-    nonrelevant = with_cn.filter(
-        pl.col(Rename.cnv["Known or predicted dosage-sensitive genes"]) == "-"
-    )
+    nonrelevant = with_cn.filter(~pl.col("Locus").is_in(relevant["Locus"]))
     return with_cn, relevant, nonrelevant
 
 
@@ -268,7 +271,11 @@ def vep_fmt(
         .sort(pl.col("impact_score"), descending=True)
         .group_by(pl.col(["Gene", "Locus"]))
         .agg(pl.all().first())
-        .filter(pl.col("Gene").is_not_null())
+        .filter(
+            (pl.col("Gene").is_not_null())
+            & (pl.col(clinsig) != "-")
+            & (~str_split_contains(clinsig, ["benign", "likely benign"], separator=";"))
+        )
         .cast(pl.String)
         .fill_null("-")
     )
@@ -281,12 +288,28 @@ def vep_fmt(
             how="vertical_relaxed",
         )
         df = df.with_columns(cs.by_dtype(pl.String).str.replace_all(";", ", "))
-        confident = df.filter(pl.col(clinsig) != "-")
+        confident = df.filter(pl.col(clinsig).str.contains("pathogenic"))
         others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
+        if variant_class != "sv":
+            others = filter_multiallelic(
+                others,
+                rename["VAF"],
+                lambda x: all(list(map(lambda vaf: float(vaf) >= 0.6, x))),
+                separator=",",
+            )
         relevant = confident.select(wanted_cols)
         nonrelevant = others.select(wanted_cols)
         return df, relevant, nonrelevant
     return tuple([empty_table(rename.values())] * 3)
+
+
+def str_split_contains(colname: str, query: list[str], separator: str = ";") -> pl.Expr:
+    """Split the column `colname` by separator, and return a boolean series
+    that is true if the row when split overlaps with query
+    """
+    return (
+        pl.col(colname).str.split(separator).list.set_intersection(query).list.len()
+    ) > 0
 
 
 def sort_clinsig(
