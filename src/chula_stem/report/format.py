@@ -9,6 +9,7 @@
 
 import re
 
+import numpy as np
 import polars as pl
 import polars.selectors as cs
 
@@ -78,7 +79,7 @@ def get_copy_number(
         df = df.join(facets, how="left", on="Locus")
     if cnvkit_path:
         cnvkit: pl.DataFrame = pl.read_csv(
-            cnvkit_path, separator="\t", null_values="NA"
+            cnvkit_path, separator="\t", null_values="NA", infer_schema_length=None
         ).rename({"cn": cn_col_name})
         cnvkit = add_loc(cnvkit)
         df = df.join(cnvkit, how="left", on="Locus")
@@ -208,22 +209,37 @@ def vep_fmt(
     )
     if variant_class == "sv":
         rename: dict = Rename.sv
+        try:
+            df = df.drop("VAF")
+        except:
+            pass
     else:
         rename: dict = Rename.snp
     clinsig: str = Rename.snp["CLIN_SIG"]
     wanted_cols: list = list(rename.values())
     df = df.drop("Gene").rename(rename)
-    try:
-        df = df.with_columns((pl.col(rename["VAF"]).cast(pl.Float64) * 100).round(3))
-    except pl.exceptions.InvalidOperationError:
-        df = df.with_columns(
-            pl.col(rename["VAF"]).map_elements(
-                lambda vaf: ",".join(
-                    list(map(lambda y: str(round(float(y), 3)), vaf.split(",")))
-                ),
-                return_dtype=pl.String,
-            )
-        )
+    if variant_class != "sv":
+        for col, round_to, scale in zip(
+            [rename["VAF"], rename["Alt_depth"]], [2, 0], [100, 1]
+        ):
+            try:
+                df = df.with_columns(
+                    (pl.col(col).cast(pl.Float64) * scale).round(round_to)
+                )
+            except pl.exceptions.InvalidOperationError:
+                df = df.with_columns(
+                    pl.col(col).map_elements(
+                        lambda vaf: ",".join(
+                            list(
+                                map(
+                                    lambda y: str(np.round(float(y) * scale, round_to)),
+                                    vaf.split(","),
+                                )
+                            )
+                        ),
+                        return_dtype=pl.String,
+                    )
+                )
     df = (
         df.with_columns(
             pl.col("HGVS").str.extract(r".*:(.*)$", 1),
@@ -234,7 +250,9 @@ def vep_fmt(
             .str.replace_all("&", ", ", literal=True)
             .str.replace_all("_", " ", literal=True),
         )
-        .with_columns(impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP))
+        .with_columns(
+            impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP, default=0)
+        )
         .sort(pl.col("impact_score"), descending=True)
         .group_by(pl.col(["Gene", "Locus"]))
         .agg(pl.all().first())
@@ -469,9 +487,9 @@ def sigprofiler_fmt(
             excluded: list = f.readlines()
     else:
         excluded: list = []
-    df = pl.read_csv(soln_activities_path, separator="\t").select(
-        ~cs.by_name(*excluded)
-    )
+    df = pl.read_csv(
+        soln_activities_path, separator="\t", infer_schema_length=None
+    ).select(~cs.by_name(*excluded))
     signatures: list = df.columns[1:]
     sig_cols = pl.col(signatures)
     samples: pl.Series = df["Samples"]
