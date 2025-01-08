@@ -40,7 +40,11 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
     report = None
     if report_type == "variant_calling":
         report = VariantCallingReport(
-            filename=out, metadata=spec.get("meta"), tmpdir=tmpdir, **kwargs
+            filename=out,
+            metadata=spec.get("meta", {}),
+            other_text=spec.get("other_text", {}),
+            tmpdir=tmpdir,
+            **kwargs,
         )
     if report:
         report.build()

@@ -6,43 +6,40 @@ process REPORT {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta_map), val(path_map)
+    tuple val(meta), val(path_map)
+    val(caches) // A list of caches to use
     val(type)
     val(module_number)
     //
 
     output:
-    tuple val(meta_map), path(output)
+    tuple val(meta), path(output)
     path("report_tmp")
     path("*.log")
     //
 
     script:
-    output = Utl.getName(module_number, meta_map, "Report", "pdf")
-    check = file("${meta_map.out}/${output}")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        cp -r ${meta_map.out}/report_tmp .
-        ln -sr ${meta_map.log}/report.log .
-        """
-    } else {
-        paths = path_map.collectEntries( {
-            k, v -> [(k): v instanceof Path ? v.toString() : v]
-        } )
-        all_meta = [meta: meta_map,
-                    paths: paths, misc: task.ext.args]
-        specification = Utl.mapToJson(all_meta)
-        """
-        echo -e '${specification}' > spec.json
+    output = Utl.getName(module_number, meta, "Report", "pdf")
+    check = file("${meta.out}/${output}")
+    paths = path_map.collectEntries( {
+        k, v -> [(k): v instanceof Path ? v.toString() : v]
+    } )
+    all_meta = ["meta": meta, "paths": paths, "misc": task.ext.args,
+                "other_text": params.report_text]
+    specification = Utl.mapToJson(all_meta)
+    """
+    if [[ "${check.exists()}" == 'true' ]]; then
+        cp -r ${meta.out}/report_tmp .
+    fi
 
-        pipeline_report -s spec.json \\
-            -o ${output} \\
-            -t ${type} \\
-            -d ./report_tmp
+    echo -e '${specification}' > spec.json
 
-        get_nextflow_log.bash report.log
-        """
-    }
+    pipeline_report -s spec.json \\
+        -o ${output} \\
+        -t ${type} \\
+        -d ./report_tmp
+
+    get_nextflow_log.bash report.log
+    """
     //
 }

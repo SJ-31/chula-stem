@@ -94,7 +94,7 @@ class URL:
 
 @dataclass
 class Widths:
-    sv_snp = {
+    snp = {
         "Locus": AVAILABLE_WIDTH * 0.13,
         "Variant Allele Frequency": AVAILABLE_WIDTH * 0.08,
         "Variant Read Support": AVAILABLE_WIDTH * 0.07,
@@ -102,6 +102,15 @@ class Widths:
         "HGVS": AVAILABLE_WIDTH * 0.14,
         "Database Name": AVAILABLE_WIDTH * 0.16,
         "Variant Type": AVAILABLE_WIDTH * 0.2,
+        "ClinVar": AVAILABLE_WIDTH * 0.1,
+    }
+    sv = {
+        "Locus": AVAILABLE_WIDTH * 0.13,
+        "Gene": AVAILABLE_WIDTH * 0.12,
+        "HGVS": AVAILABLE_WIDTH * 0.14,
+        "Database Name": AVAILABLE_WIDTH * 0.16,
+        "Variant Type": AVAILABLE_WIDTH * 0.2,
+        "SV Class": AVAILABLE_WIDTH * 0.15,
         "ClinVar": AVAILABLE_WIDTH * 0.1,
     }
     cnv = {
@@ -154,7 +163,6 @@ class Rename:
     }
     sv = {
         "SYMBOL": "Gene",
-        "VAF": "VAF (%)",
         "Loc": "Locus",
         "HGVSc": "HGVS",
         "Existing_variation": "Database Name",
@@ -165,7 +173,7 @@ class Rename:
     cnv = {
         "Type": "CNV Type",
         "Known or predicted dosage-sensitive genes": "Dosage-sensitive Genes",
-        "All protein coding genes": "All Genes",
+        "All protein coding genes": "Genes in Region",
         "ClinGen_report": "ClinGen",
         "source": "Source",
     }
@@ -196,9 +204,20 @@ def snp_style():
     return {
         "cell_pstyles": cell_pstyles,
         "header_pstyles": STYLE["header_pstyle"],
-        "cell_styles": STYLE["cell_style"](Widths.sv_snp),
-        "header_styles": STYLE["header_style"](Widths.sv_snp),
-        "col_widths": list(Widths.sv_snp.values()),
+        "cell_styles": STYLE["cell_style"](Widths.snp),
+        "header_styles": STYLE["header_style"](Widths.snp),
+        "col_widths": list(Widths.snp.values()),
+    }
+
+
+def sv_style():
+    cell_pstyles = {None: STYLE["cell_pstyle"]}
+    return {
+        "cell_pstyles": cell_pstyles,
+        "header_pstyles": STYLE["header_pstyle"],
+        "cell_styles": STYLE["cell_style"](Widths.sv),
+        "header_styles": STYLE["header_style"](Widths.sv),
+        "col_widths": list(Widths.sv.values()),
     }
 
 

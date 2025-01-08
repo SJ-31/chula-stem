@@ -37,14 +37,10 @@ from chula_stem.report.spec import (
     repeat_style,
     signature_style,
     snp_style,
+    sv_style,
     therapy_style,
 )
 from chula_stem.report.utils import style_cells
-
-# TODO: replace this with some info about pipeline or stem lab
-FRONT_PAGE_DETAILS: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"
-FRONT_PAGE_NOTE: str = "Ibea cum solupta vitent essitius numquae volorer runtios ullor  min corem invendit faciur, untium am quistectae inulpari cullibusae versperum, consequi inulparunt volecea siminci dellatquosa provid ma voluptas que assum que laut omnis aciet as"
-TITLE: str = "Variant calling report"
 
 
 class VariantCallingReport(ResultsReport):
@@ -52,6 +48,7 @@ class VariantCallingReport(ResultsReport):
         self,
         filename: str,
         metadata: dict,
+        other_text: dict = {},
         pandrugs2_cache: str = "pandrugs2_cache.json",
         civic_cache: str = "civic_cache.json",
         vep_small: str = "",
@@ -72,9 +69,11 @@ class VariantCallingReport(ResultsReport):
     ) -> None:
         super().__init__(
             filename=filename,
+            metadata=metadata,
             tmpdir=tmpdir,
             font=font,
             bold_font=bold_font,
+            other_text=other_text,
         )
         self.spec: dict = {
             "right_margin": 2 * cm,
@@ -86,7 +85,6 @@ class VariantCallingReport(ResultsReport):
             "header_style": STYLE["table_title_style"],
         }
         self.show_therapies = show_therapies
-        self.metadata: dict = metadata
         self.civic_cache: str = civic_cache
         self.pandrugs2_cache: str = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
@@ -95,8 +93,8 @@ class VariantCallingReport(ResultsReport):
             "small": snp_style(),
             "cnv": cnv_style(),
             "repeat": repeat_style(),
+            "sv": sv_style(),
         }
-        self.table_styles["sv"] = self.table_styles["small"]
         if plot:
             self.plot_cnvkit(cnvkit_cnr, cnvkit_cns)
 
@@ -138,8 +136,8 @@ class VariantCallingReport(ResultsReport):
                 [
                     "Small Variants",
                     "Structural Variants",
-                    "Tandem Repeats",
                     "Copy Number Variants",
+                    "Tandem Repeats",
                 ],
             )
         )
@@ -174,7 +172,9 @@ class VariantCallingReport(ResultsReport):
             self.data["therapies"], self.data["study_references"] = fr.therapy_fmt(
                 therapy_df, variant_spec
             )
-        self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[0]
+            self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[
+                0
+            ]
         self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
         self.stats["counts"]["Mutational Signatures"] = sum(
             [d.shape[0] for d in self.data["sigprofiler"]]
@@ -202,16 +202,25 @@ class VariantCallingReport(ResultsReport):
             c.line(x, y1, xend, y1)
             c.line(x, y2, xend, y2)
             c.restoreState()
-            note_style_top = ParagraphStyle("note", fontSize=8, fontName=BOLD_FONT)
+
+            note = self.get_other_text("front_page_note", "")
+            disclaimer = self.get_other_text("disclaimer", "")
+            title = self.get_other_text("title", "")
+            details = self.get_other_text("front_page_details", "")
+
+            # Notes and disclaimer
             note_style = ParagraphStyle("note", fontSize=8, fontName=FONT)
-            note_pos = (x, y1 - cm)
-            draw_paragraph("Note:", note_pos, note_style_top, c, d)
-            draw_paragraph(FRONT_PAGE_NOTE, (x, y1 - 1.9 * cm), note_style, c, d)
-
-            title_y = A4[1] - 3 * cm
-
+            note_pos = (x, cm * 2 + 10)
+            draw_paragraph(f"<b>Note:</b><br/>{note}", note_pos, note_style, c, d)
+            disclaimer_pos = (x, cm)
             draw_paragraph(
-                TITLE,
+                f"<b>Disclaimer:</b> {disclaimer}", disclaimer_pos, note_style, c, d
+            )
+
+            # Title
+            title_y = A4[1] - 3 * cm
+            draw_paragraph(
+                title,
                 (x, title_y),
                 STYLE["title_style"],
                 c,
@@ -219,7 +228,7 @@ class VariantCallingReport(ResultsReport):
                 width=AVAILABLE_WIDTH * 0.4,
             )
             draw_paragraph(
-                FRONT_PAGE_DETAILS,
+                details,
                 (2.8 * cm + AVAILABLE_WIDTH * 0.4, title_y),
                 STYLE["detail_style"],
                 c,
@@ -377,8 +386,6 @@ class VariantCallingReport(ResultsReport):
         """Create pdf files for all report elements individually, concatenate them
         and add header (time + page number)
         """
-        # TODO: create universal footer/header spec for tables
-        # TODO: create universal styles for variant tables
         table_decorator = STYLE["table_decorator"]
         self.build_front_page()
 
@@ -462,7 +469,6 @@ class VariantCallingReport(ResultsReport):
             color=(0.34902, 0.63529, 0.63529),
         )
 
-    # TODO: add in the front, back pages
     def merge(self) -> None:
         toc: list = []
         doc: Document = pymupdf.open()
@@ -504,4 +510,4 @@ class VariantCallingReport(ResultsReport):
             if i > 0:
                 self._add_page_numbers(p, total_pages)
         doc.set_toc(toc)
-        doc.save(self.filename)
+        doc.save(f"{self.original_dir}/{self.filename}")
