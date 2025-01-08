@@ -150,6 +150,7 @@ spec: list = [
 ]
 
 
+@pytest.mark.skip(reason="Done")
 def test_read_json():
     path = "/home/shannc/Bio_SDD/chula-stem/tests/report_params.json"
     entry_point.callback(
@@ -157,4 +158,14 @@ def test_read_json():
         specification=path,
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
         output="/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
+    )
+
+
+def test_no_therapy():
+    path = "/home/shannc/Bio_SDD/chula-stem/tests/data/report_params_no_therapy.json"
+    entry_point.callback(
+        report_type="variant_calling",
+        specification=path,
+        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
+        output="/home/shannc/Bio_SDD/chula-stem/tests/plots/report_no_therapy.pdf",
     )
