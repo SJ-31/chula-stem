@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Callable
 
 import polars as pl
@@ -19,6 +20,17 @@ from reportlab.platypus import (
 from chula_stem.report.spec import BOLD_FONT
 
 STYLES = getSampleStyleSheet()
+
+PATIENT_DATA = {
+    "Name": "patient_name",
+    "Gender": "gender",
+    "Date of Birth": "patient_birthdate",
+    "Physician": "physician",
+    "Diagnosis": "diagnosis",
+    "Hospital": "hospital",
+}
+
+SAMPLE_DATA = {"ID": "id", "Collection Date": "collection_date", "Type": "sample_type"}
 
 
 def filter_format_vep(input: str, sep="\t"):
@@ -58,7 +70,7 @@ def filter_format_vep(input: str, sep="\t"):
 # * Utility fns
 
 
-def no_data_decorator(c: Canvas, d: Document) -> None:
+def no_data_decorator(c: Canvas, d: Document, style: ParagraphStyle = None) -> None:
     style = ParagraphStyle(
         "nd", fontName=BOLD_FONT, fontSize=40, borderColor=colors.black
     )
@@ -117,14 +129,31 @@ def add_pstyles(
         return [style_fn(row, i) for i, row in enumerate(data)]
 
 
+# `other_text` currently accepts the following keys
+# - front_page_note
+# - title
+# - disclaimer
+# - front_page_details
+
+
 class ResultsReport:
     def __init__(
-        self, filename: str, font: str, bold_font: str, tmpdir: str = "temp"
+        self,
+        filename: str,
+        metadata: dict,
+        font: str,
+        bold_font: str,
+        tmpdir: str = "temp",
+        other_text: dict = {},
     ) -> None:
         self.filename: str = filename
         self.tmpdir: str = tmpdir
         self.font: str = font
         self.bold_font: str = bold_font
+        self.ignored_data_fields: set = set()
+        self.other_text: dict = other_text
+        self.metadata: dict = metadata
+        self.original_dir: str = os.getcwd()
         try:
             os.makedirs(self.tmpdir)
         except FileExistsError:
@@ -146,6 +175,19 @@ class ResultsReport:
         R.add_table(data, **table_styles)
         R.add_decorator(decorator)
         R.build()
+
+    def get_other_text(self, key: str, default: str = "-") -> str:
+        """Return a value from `other_text`
+        if the value of `key` is a valid file name, then its contents are used
+        otherwise, the string is taken as is
+        """
+        if key in self.other_text:
+            val = self.other_text[key]
+            print(val)
+            if (p := Path(val)).exists():
+                return p.read_text()
+            return val
+        return default
 
 
 # * Report element
