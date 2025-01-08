@@ -27,10 +27,25 @@ if (!file.exists(vaf_merged_file)) {
     mutate(across(c(Consequence, CLIN_SIG), into_char_list))
 }
 
-## * Plotting
-min_samples <- 17 # Genes must be found in this number of samples
+## * Format
+
+mode_and_capitalize <- function(char_vec, ignore = c()) {
+  if (length(ignore) != 0) {
+    char_vec <- discard(char_vec, \(x) x %in% ignore)
+  }
+  if (length(char_vec) > 1) {
+    val <- modes(char_vec) |> first()
+  } else {
+    val <- first(char_vec)
+  }
+  val |>
+    str_to_title() |>
+    str_replace_all("_", " ")
+}
+
+min_samples <- 16 # Genes must be found in this number of samples
 formatted <- merged |>
-  filter(
+  dplyr::filter(
     !is.na(SYMBOL) &
       VAF >= 0.3 &
       !is.na(CLIN_SIG) &
@@ -41,25 +56,40 @@ formatted <- merged |>
   group_by(SYMBOL) |>
   filter(n() >= min_samples) |>
   ungroup() |>
-  mutate(Type = map_chr(Consequence, \(x) {
-    if (length(x) > 1) {
-      val <- modes(x) |> first()
-    } else {
-      val <- first(x)
-    }
-    val |>
-      str_to_title() |>
-      str_replace_all("_", " ")
-  }))
+  mutate(
+    Type = map_chr(Consequence, mode_and_capitalize),
+    ClinVar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
+    ClinVar = case_match(ClinVar, "Na" ~ "Not provided", .default = ClinVar)
+  ) |>
+  arrange(desc(VAF))
 
-plot <- formatted |> ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = Type)) +
-  geom_tile() +
+## ** Plot
+
+heatmap_theme <- function() {
   theme_minimal() +
-  theme(
-    panel.grid.major.y = element_blank(),
-    panel.grid.major.x = element_blank()
-  ) +
-  ylab("Gene") +
-  xlab("Sample")
+    theme(
+      panel.grid.major.y = element_blank(),
+      panel.grid.major.x = element_blank()
+    ) +
+    ylab("Gene") +
+    xlab("Sample")
+}
 
-plot
+with_consequence <- formatted |>
+  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = Type)) +
+  geom_tile() +
+  heatmap_theme()
+
+with_clinsig <- formatted |>
+  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = ClinVar)) +
+  geom_tile() +
+  heatmap_theme()
+
+blank <- formatted |>
+  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF)) +
+  geom_tile() +
+  heatmap_theme()
+
+ggsave(here("analyses", "output", "pdac_vaf_consequence.png"), with_consequence, dpi = 500)
+ggsave(here("analyses", "output", "pdac_vaf_clinsig.png"), with_clinsig, dpi = 500)
+ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
