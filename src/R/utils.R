@@ -25,6 +25,14 @@ flatten_by <- function(char_vec, separator = ";", collapse = TRUE, unique = FALS
   }
 }
 
+tb2map <- function(tb, keys, values, list = TRUE) {
+  if (list) {
+    as.list(tb[[values]]) |> `names<-`(tb[[keys]])
+  } else {
+    tb[[values]] |> `names<-`(tb[[keys]])
+  }
+}
+
 into_char_list <- function(col, separator = ";") {
   lapply(col, \(x) {
     if (is.na(x)) {

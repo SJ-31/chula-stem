@@ -183,7 +183,6 @@ class ResultsReport:
         """
         if key in self.other_text:
             val = self.other_text[key]
-            print(val)
             if (p := Path(val)).exists():
                 return p.read_text()
             return val
