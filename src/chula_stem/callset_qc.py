@@ -66,7 +66,9 @@ def merge_variant_calls(
 
     :returns: filtered tsv file
     """
-    df = df.with_columns(cs.by_dtype(pl.String).str.replace_all("&", ";", literal=True))
+    df = df.with_columns(
+        cs.by_dtype(pl.String).str.replace_all("&", separator, literal=True)
+    )
     original_cols: list = df.columns
     to_average: list = []
     if "VAF" in original_cols:

@@ -120,7 +120,7 @@ cross_reference <- function(input, reference, type, clingen) {
     group_by(VariantID) |>
     filter(p_overlap == max(p_overlap) | is.na(p_overlap)) |>
     summarise(
-      across(is.character, \(x) paste0(unique(discard(x, is.na)), collapse = ";")),
+      across(is.character, \(x) paste0(unique(discard(x, is.na)), collapse = ", ")),
       across(is.numeric, dplyr::first)
     ) |>
     mutate(across(is.character, \(x) na_if(x, "")))
