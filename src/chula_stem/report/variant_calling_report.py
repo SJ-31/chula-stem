@@ -209,7 +209,7 @@ class VariantCallingReport(ResultsReport):
             details = self.get_other_text("front_page_details", "")
 
             # Notes and disclaimer
-            note_style = ParagraphStyle("note", fontSize=8, fontName=FONT)
+            note_style = ParagraphStyle("note", fontSize=7, fontName=FONT)
             note_pos = (x, cm * 2 + 10)
             draw_paragraph(f"<b>Note:</b><br/>{note}", note_pos, note_style, c, d)
             disclaimer_pos = (x, cm)
@@ -239,7 +239,7 @@ class VariantCallingReport(ResultsReport):
         # Patient, sample info tables
         fontsize = 8
         header_fontsize = 13
-        info_table_widths = [100, 150]
+        info_table_widths = [100, 180]
         cell_row_height = 15
         styles = {
             # 0: ParagraphStyle("keys", fontName=BOLD_FONT, fontSize=fontsize),

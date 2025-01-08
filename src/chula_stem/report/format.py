@@ -56,7 +56,12 @@ def add_link(text: str, link: str, **kwargs) -> str:
 
 
 def dbvar_link(x):
-    link = add_link(x, f"{URL.dbvar}/{x}", underline="yes")
+    if "," in x:
+        splits = map(lambda y: y.strip(), x.split(","))
+        links = [add_link(s, f"{URL.dbvar}/{s}", underline="yes") for s in splits]
+        link = ", ".join(links)
+    else:
+        link = add_link(x, f"{URL.dbvar}/{x}", underline="yes")
     return f"dbVar:{link}"
 
 
