@@ -108,6 +108,8 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
     df = pl.read_csv(
         msisensor_path, separator="\t", null_values="NA", infer_schema_length=None
     )
+    if df.is_empty():
+        return tuple([empty_table(Rename.repeat)] * 3)
     df = (
         add_loc(df, start_col="Start", end_col="End")
         .with_columns(
@@ -163,6 +165,12 @@ def classify_cnv_fmt(
             ),
         )
     )
+
+    def limit_genes(col, n):
+        return pl.col(col).str.split(",").list.head(n).list.join(",")
+
+    if cnv.is_empty():
+        return tuple([empty_table(Rename.cnv)] * 3)
     # "group_by" operation required because data was exploded to become longer on
     #   dosage-sensitive genes in the R script
     wanted_cols = ["Locus"] + list(Rename.cnv.values())
@@ -176,7 +184,11 @@ def classify_cnv_fmt(
         .rename(Rename.cnv)
         .group_by("Locus")
         .agg((~cs.by_name("ClinGen")).unique().first(), pl.col("ClinGen"))
-        .with_columns(pl.col("ClinGen").list.join(", "))
+        .with_columns(
+            pl.col("ClinGen").list.join(", "),
+            limit_genes(Rename.cnv["All protein coding genes"], 10),
+            limit_genes(Rename.cnv["Known or predicted dosage-sensitive genes"], 10),
+        )
     )
     cn_col = "CN"
     wanted_cols.insert(1, cn_col)
@@ -187,7 +199,7 @@ def classify_cnv_fmt(
         .fill_null("-")
     )
     relevant = with_cn.filter(
-        Rename.cnv["Known or predicted dosage-sensitive genes"] != "-"
+        pl.col(Rename.cnv["Known or predicted dosage-sensitive genes"]) != "-"
     )
     nonrelevant = with_cn.filter(
         pl.col(Rename.cnv["Known or predicted dosage-sensitive genes"]) == "-"
@@ -260,18 +272,21 @@ def vep_fmt(
         .cast(pl.String)
         .fill_null("-")
     )
-    df = pl.concat(
-        [
-            sort_clinsig(d, clinsig_col=clinsig, separator=";")
-            for d in df.partition_by("impact_score", maintain_order=True)
-        ],
-        how="vertical_relaxed",
-    )
-    confident = df.filter((pl.col("SOMATIC") == "1") & (pl.col(clinsig) != "-"))
-    others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
-    relevant = confident.select(wanted_cols)
-    nonrelevant = others.select(wanted_cols)
-    return df, relevant, nonrelevant
+    if not df.is_empty():
+        df = pl.concat(
+            [
+                sort_clinsig(d, clinsig_col=clinsig, separator=";")
+                for d in df.partition_by("impact_score", maintain_order=True)
+            ],
+            how="vertical_relaxed",
+        )
+        df = df.with_columns(cs.by_dtype(pl.String).str.replace_all(";", ", "))
+        confident = df.filter(pl.col(clinsig) != "-")
+        others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
+        relevant = confident.select(wanted_cols)
+        nonrelevant = others.select(wanted_cols)
+        return df, relevant, nonrelevant
+    return tuple([empty_table(rename.values())] * 3)
 
 
 def sort_clinsig(
@@ -309,6 +324,11 @@ def format_therapy_sources(sources: str, source_lookup: dict) -> list[str]:
         return num
 
     return [helper(s) for s in sources if s and s != "NA"]
+
+
+def empty_table(columns: list) -> pl.DataFrame:
+    schema = {c: pl.String for c in columns}
+    return pl.DataFrame(schema=schema)
 
 
 def therapy_fmt(
@@ -412,6 +432,9 @@ def therapy_fmt(
         .cast(pl.String)
         .pipe(empty_string2null)
         .fill_null("-")
+    )
+    therapy_df = therapy_df.with_columns(
+        cs.by_dtype(pl.String).str.replace_all(";", ", ")
     )
     source_df = pl.DataFrame(
         {"Number": source_dict.values(), "Source": source_dict.keys()}
