@@ -43,7 +43,7 @@ def merge_variant_calls(
     df: pl.DataFrame,
     grouping_cols: list,
     tool_source_tag: str = "TOOL_SOURCE",
-    minimum_callers: int = 2,
+    minimum_callers: int = 1,
     vaf_adaptive: bool = False,
     separator: str = ";",
 ) -> pl.DataFrame:
@@ -99,7 +99,6 @@ def merge_variant_calls(
         .with_columns(avg_expr + unique_expr)
         .with_columns(n_callers=pl.col(tool_source_tag).list.len())
     )
-    print(grouped)
     if vaf_adaptive:
         mutect_strelka_cols = [
             (pl.col(tool_source_tag).list.contains(c)).alias(f"has_{c}")
@@ -284,7 +283,7 @@ def region_filter(
 @click.option("--canonical", required=False, default=False, is_flag=True)
 @click.option("--accepted_filters", required=False, default="PASS")
 @click.option("--informative", required=False, default=False, is_flag=True)
-@click.option("--min_callers", required=False, default=2)
+@click.option("--min_callers", required=False, default=1)
 @click.option("--vaf_adaptive", required=False, default=False, is_flag=True)
 @click.option("--tool_source_tag", required=False, default="TOOL_SOURCE")
 @click.option("-g", "--ignore_regions", required=False, default="")
