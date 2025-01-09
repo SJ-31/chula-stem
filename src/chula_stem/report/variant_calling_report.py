@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 import datetime
 import os
+from pathlib import Path
 
 import polars as pl
 import pymupdf
@@ -42,6 +43,73 @@ from chula_stem.report.spec import (
 )
 from chula_stem.report.utils import style_cells
 
+HGVS_LINK: str = "https://hgvs-nomenclature.org/stable"
+
+# * Add acronyms
+ACRONYMS = [
+    (
+        "<b>• VRS:</b>",
+        "Variant Read Support (raw number of reads mapping to alternate allele)",
+    ),
+    ("<b>• VAF:</b>", "Variant Allele Frequency"),
+    (
+        "<b>• HGVS:</b>",
+        fr.add_link("Human Genome Variation Society nomenclature", HGVS_LINK),
+    ),
+]
+ACRONYM_STYLE = ParagraphStyle("acronyms", fontSize=8, fontName=FONT)
+ACRONYM_TABLE: Table = Table(
+    add_pstyles(ACRONYMS, ACRONYM_STYLE, True),
+    style=style_cells((0, 0), valign="TOP"),
+    colWidths=(AVAILABLE_WIDTH * 0.09, AVAILABLE_WIDTH * 0.91),
+    rowHeights=11,
+)
+
+
+def override_style(style: ParagraphStyle, **kwargs) -> ParagraphStyle:
+    """Return a new ParagraphStyle, inheriting attributes from `style`
+    and overriding any attributes specified in `override`
+    """
+    inherit: dict = {k: getattr(style, k) for k in dir(style) if not k.startswith("__")}
+    inherit.update(kwargs)
+    return ParagraphStyle(**inherit)
+
+
+# * Add criteria info
+CRITERIA_STYLE = ParagraphStyle("criteria", fontSize=8, fontName=FONT)
+CRITERIA = [
+    (
+        "",
+        "<b>In 'Relevant' table</b>",
+        "<b>All entries</b>",
+    ),
+    (
+        "<b>Small and Structural Variants</b>",
+        'Must have a ClinVar annotation to "pathogenic" or "likely pathogenic"',
+        'Removed entries having only ClinVar annotations of "benign" or "likely benign"',
+    ),
+    (
+        "<b>Copy Number Variants</b>",
+        "At least one gene in the interval must have ClinGen dosage-sensitive information",
+        "None",
+    ),
+    (
+        "<b>Tandem repeats</b>",
+        "Affected gene must have ClinGen disease-association information",
+        "Repeats must overlap known genes",
+    ),
+]
+CRITERIA_CELLS = (
+    style_cells((0, 0), valign="TOP")
+    + style_cells((0, 1), end=(2, 1), background="#c3e6e9")
+    + style_cells((0, 3), end=(2, 3), background="#c3e6e9")
+)
+CRITERIA_TABLE: Table = Table(
+    add_pstyles(CRITERIA, CRITERIA_STYLE, True),
+    style=CRITERIA_CELLS,
+    colWidths=(AVAILABLE_WIDTH * 0.3, AVAILABLE_WIDTH * 0.4, AVAILABLE_WIDTH * 0.3),
+)
+
 
 class VariantCallingReport(ResultsReport):
     def __init__(
@@ -51,6 +119,7 @@ class VariantCallingReport(ResultsReport):
         other_text: dict = {},
         pandrugs2_cache: str = "pandrugs2_cache.json",
         civic_cache: str = "civic_cache.json",
+        therapy_data_cache: str = "therapy_data.parquet",
         vep_small: str = "",
         vep_sv: str = "",
         classify_cnv: str = "",
@@ -109,7 +178,6 @@ class VariantCallingReport(ResultsReport):
             },
             {"file": msisensor_pro, "column": "gene_name"},
         ]
-        therapy_data_cache: str = "therapy_data.parquet"
         if os.path.exists(therapy_data_cache) and self.show_therapies:
             therapy_df = pl.read_parquet(therapy_data_cache)
         elif self.show_therapies:
@@ -367,8 +435,32 @@ class VariantCallingReport(ResultsReport):
                 c,
                 d,
             )
+            c.saveState()
+            c.setLineWidth(0.9)
+            c.setStrokeColor("#86cfd5")
+            y1 = cm * 21
+            c.line(cm * 2, y1, cm * 2 + AVAILABLE_WIDTH, y1)
 
-        doc.build([toc_table], onFirstPage=decorator)
+        doc.build(
+            [
+                toc_table,
+                Spacer(width=0, height=1.6 * cm),
+                Paragraph(
+                    "Acronyms",
+                    override_style(ACRONYM_STYLE, fontSize=12, textColor="#549e9e"),
+                ),
+                Spacer(width=0, height=5),
+                ACRONYM_TABLE,
+                Spacer(width=0, height=1.5 * cm),
+                Paragraph(
+                    "Criteria for variant inclusion",
+                    override_style(CRITERIA_STYLE, fontSize=12, textColor="#549e9e"),
+                ),
+                Spacer(width=0, height=5),
+                CRITERIA_TABLE,
+            ],
+            onFirstPage=decorator,
+        )
 
     @staticmethod
     def plot_cnvkit(cnr: str, cns: str) -> None:
@@ -510,4 +602,7 @@ class VariantCallingReport(ResultsReport):
             if i > 0:
                 self._add_page_numbers(p, total_pages)
         doc.set_toc(toc)
-        doc.save(f"{self.original_dir}/{self.filename}")
+        if not Path(self.filename).is_absolute():
+            doc.save(f"{self.original_dir}/{self.filename}")
+        else:
+            doc.save(self.filename)
