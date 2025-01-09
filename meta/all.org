@@ -8,6 +8,11 @@ For organoid establishment and culture, cancer and normal adjacent tissue biopsi
 * PDAC
 + Sequencing platform:
 + Capture kit: SureSelect Human All Exon V6
+* HCC
++ [[+ https://drive.google.com/drive/folders/1-7pRRFO_zJWeztu1Yl_bp5_pKFYWbDOh][Link]]
++ Sequencing platform: NovaSeq 6000
++ RNASeq: ???, but unstranded
++ Capture kit: SureSelect Human All Exon V6
 
 * Data sources
 ** Variants

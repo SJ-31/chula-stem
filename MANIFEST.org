@@ -1,3 +1,26 @@
+* Homo_sapiens.GRCh38.cdna.all.fa.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/transcriptomes/Homo_sapiens.GRCh38.cdna.all.fa.gz=
+*Date added*: <2025-01-09 Thu>
+*Source:* [[https://ftp.ensembl.org/pub/release-113/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz][Ensembl cDNA]]
+
+All cDNA sequences corresponding to Ensembl human genes (genome build GRCh38), excluding nCRNA
+* kallisto_GRCh38_ensembl.idx
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/transcriptomes/Homo_sapiens.GRCh38.cdna.all.fa.gz=
+*Date added:* <2025-01-09 Thu>
+*Source:* Custom
+Kallisto index (=kallisto index -i ...= ) of Ensembl cDNA sequences (Homo_sapiens.GRCh38.cdna.all.fa.gz) converted into RNA with =seqkit seq --dna2rna=
+* Homo_sapiens.GRCh38.113.gtf.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/genomes/Homo_sapiens.GRCh38.113.gtf.gz=
+*Date added*: <2025-01-09 Thu>
+*Source:* [[https://ftp.ensembl.org/pub/release-113/gtf/homo_sapiens/][Ensembl annotation data]]
+
+Ensembl gene annotation data for human genome GRCh38, version 113
+* Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa.gz
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/genomes/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa.gz=
+*Date added*: <2025-01-09 Thu>
+*Source:* [[https://www.ensembl.org/Homo_sapiens/Info/Index][Ensembl genomes]]
+
+Ensembl's primary assembly of the GRCh38 genome, added into the directory on 2024-8-15
 * SureSelectHumanAllExonV6Hg38
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38=
 *Date added*: <2024-11-22 Thu>
