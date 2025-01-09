@@ -135,9 +135,7 @@ workflow whole_exome {
     /*
     * Copy number abberation
     */
-
-    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5) // TODO: this is only temporary,
-    // in the real run use dbSNP or the combined snps file instead
+    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
     // TODO: join this with an estimate of window_size from cnvkit's autobin
     FACETS(FACETS_PILEUP.out.pileup, 5)
 
@@ -207,13 +205,6 @@ workflow whole_exome {
                                  "log": "${params.logdir}/${it[0].id}/metrics"],
                         it[1], it[2]] }
 
-    // def getIdType = {  [it[0].id, it[0].type, it[0], it[1]]  }
-
-    // to_metrics = PREPROCESS_FASTQ.out.bam.map(getIdType)
-    //     .join(PREPROCESS_FASTQ.out.bam_index.map(getIdType),
-    //           by: [0, 1]) // [id, type, meta, bam, meta, bai]
-    //     .map({ [it[2], it[3], it[5]] })
-    //     .map(replaceOut)
     to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
                                [PREPROCESS_FASTQ.out.bam_index],
                                on: ["id", "type"]).map(replaceOut)
@@ -232,7 +223,7 @@ workflow whole_exome {
                                                     PICARD.out.metrics,
                                                     BCFTOOLS_STATS.out.py)
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
-        "filename": cohort_name], it] })
+                                     "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 8)
 
 }

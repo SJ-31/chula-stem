@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-dir="${2}"
+dir="${1}"
 
 if [[ -z "${dir}" ]]; then
     echo "No directory to place routine specified!"

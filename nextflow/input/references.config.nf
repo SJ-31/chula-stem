@@ -8,6 +8,7 @@ civic_cache = "/data/home/shannc/.cache/civic.json"
 pandrugs2_cache = "/data/home/shannc/.cache/pandrugs2.json"
 
 homopolymers_microsatellites= "$refdir/tool_specific/mishomopoly_GRCh38_filtered.tsv"
+cosmic_reference = "${projectDir}/config/cosmic_signatures_v3.4-2024-12-26.csv"
 
 targets= "$kitdir/Regions.bed.gz"
 baits= "$kitdir/Covered.bed.gz"

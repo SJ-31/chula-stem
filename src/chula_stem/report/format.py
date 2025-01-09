@@ -293,18 +293,16 @@ def vep_fmt(
             how="vertical_relaxed",
         )
         df = df.with_columns(cs.by_dtype(pl.String).str.replace_all(";", ", "))
-        confident = df.filter(pl.col(clinsig).str.contains("pathogenic"))
-        others = df.filter(~pl.col("VAR_ID").is_in(confident["VAR_ID"]))
+        relevant = df.filter(pl.col(clinsig).str.contains("pathogenic"))
+        nonrelevant = df.filter(~pl.col("VAR_ID").is_in(relevant["VAR_ID"]))
         if variant_class != "sv":
-            others = filter_multiallelic(
-                others,
+            nonrelevant = filter_multiallelic(
+                nonrelevant,
                 rename["VAF"],
                 lambda x: all(list(map(lambda vaf: float(vaf) >= 0.6, x))),
                 separator=",",
             )
-        relevant = confident.select(wanted_cols)
-        nonrelevant = others.select(wanted_cols)
-        return df, relevant, nonrelevant
+        return df, relevant.select(wanted_cols), nonrelevant.select(wanted_cols)
     return tuple([empty_table(rename.values())] * 3)
 
 
