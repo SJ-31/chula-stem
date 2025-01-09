@@ -1,7 +1,26 @@
 #!/usr/bin/env bash
 
 # Helper script to clean up and prepare vcf file for standardization
-clear_flag="${1}"
-bcftools annotate -x "${clear_flag}" "${2}" | \
+while getopts "a:i:c:r:t:n:v:o:f:" f; do
+    case "$f" in
+        r) reference=${OPTARG} ;; # Reference genome fasta
+        c) clear_flag=${OPTARG} ;;
+        i) input=${OPTARG} ;;
+        o) output=${OPTARG} ;;
+        *)
+            echo "Invalid flag!"
+            exit 1
+            ;;
+    esac
+done
+
+clean_vcf () {
     awk 'BEGIN { FS="\t"; OFS="\t" } $5 !~ /\*/ {print}' | \
-bcftools view -O z > tmp.vcf.gz
+    bcftools norm --fasta-ref "${reference}" -O z > "${1}"
+}
+
+if [[ -n "${clear_flag}" ]]; then
+    bcftools annotate -x "${clear_flag}" "${input}" | clean_vcf "${output}"
+else
+    bcftools view "${input}" | clean_vcf "${output}"
+fi

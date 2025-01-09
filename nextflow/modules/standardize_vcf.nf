@@ -1,4 +1,4 @@
-// Collect and standardize variant metrics from vcf files as a tsv
+// Attempt to recalculate variant metrics from vcf files to standardize
 // Includes...
 // - Variant Allele Fraction (INFO/AF): with `ChromosomeCounts`
 // - Read depth (INFO/DP): with `Coverage`
@@ -13,7 +13,7 @@
 
 process STANDARDIZE_VCF {
     ext version: params.gatk_version
-    errorStrategy "ignore"
+    // errorStrategy "ignore"
     // BUG: <2025-01-03 Fri> gatk has an Invalid File pointer error
     // when trying to read the recal bam file it produced...
 
@@ -52,7 +52,10 @@ process STANDARDIZE_VCF {
         """
     } else {
         """
-        standardize_vcf_clean.bash "${clear_flag}" ${vcf}
+        standardize_vcf_clean.bash -c "${clear_flag}" \\
+            -r ${reference} \\
+            -i ${vcf} \\
+            -o tmp.vcf.gz
 
         gatk IndexFeatureFile -I tmp.vcf.gz
         gatk VariantAnnotator ${args} \\
@@ -60,7 +63,8 @@ process STANDARDIZE_VCF {
             ${read_flag} \\
             ${annotation_flag} \\
             -O ${output} \\
-            --add-output-vcf-command-line
+            --add-output-vcf-command-line || \\
+                standardize_vcf_clean.bash -r ${reference} -i ${vcf} -o ${output}
 
         get_nextflow_log.bash ${suffix}.log
         """
