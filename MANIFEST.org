@@ -27,7 +27,7 @@ Signature,Class,Proposed_aetiology,Studies,COSMIC_link
 #+end_src
 + Proposed aetiologies are taken directly from the COSMIC page
 
-* Clingen-Dosage-Sensitivity-2024-12-16.csv
+* Clingen-Gene-Disease-Summary-2024-12-19.csv
 *Absolute path:*         =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv=
 *Date added*: <2024-12-19 Thu>
 *Source:* [[https://search.clinicalgenome.org/kb/gene-validity/download][ClinGen]]
@@ -83,7 +83,7 @@ Contains 1000G project data, and Mills gold standard indels. Recommended for use
 *Date added:* <2024-12-17 Tue>
 *Source:* https://datasetgnomad.blob.core.windows.net/dataset/release/4.1/genome_sv/gnomad.v4.1.sv.sites.vcf.gz.tbi
 ** Description
-Gnomad Copy number data, generated in the same way as the SV data
+Gnomad Copy number data, obtained the same way as the SV data
 * gnomad.v4.1.sv.sites.vcf.gz
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/variants/structural/gnomad.v4.1.sv.sites.vcf.gz=
 *Date added*: FILL

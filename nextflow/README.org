@@ -4,8 +4,8 @@
     * All input data e.g. reference genomes, bait files, population variation data are specified with =params.ref=, a groovy map
       * The required entries for each pipeline are detailed below under "Input"
     * See ./config/run_conf_template.config.nf and the =nextflow.config= file for more information
-  * Place tool-specific configuration in the =<pipeline_name>_tool_config.nf= file, see the =config= directory for examples
-    * TODO: is this name right?
+  * Specify tool-specific [[https://www.nextflow.io/docs/latest/process.html#directives][directives]] (e.g. container, memory usage) with =params.tools=, e.g. in a file =<pipeline_name>_tools_config.nf=. see the =config= directory for examples
+    * Most tools can be passed custom command-line arguments with =task.ext.args=. The format is a Groovy list, each element either a flag or flag-value pair, which will be separated by spaces when passed with the rest of the tool's flags.
   * Cohort information to be displayed in the report (e.g. address, notes, sample collection dates) is stored in the groovy map =params.report_data=
 * Whole-exome sequencing (=wes.nf= )
 A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re/sarek/3.4.4/][nf-core's sarek]] and GATK best practices. The final output
@@ -37,8 +37,8 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
 + =clingen_dosage=: file containing ClinGen dosage-sensitive gene and region data (see [[https://search.clinicalgenome.org/kb/downloads][Dosage Sensitivity Curations]])
 + =cnv_reference=: a BED file containing dbVar and gnomAD copy number variant data, generated with a custom script (=resources/prepare_cnv_repeat_data.bash=)
   * Has 7 headers: chr, start, stop, genes, source, type, accession
-    TODO: describe what each of these headers are
-   generated with a custom script (=resources/prepare_cnv_repeat_data.bash=)
+    * "source": which database the variant is from (dbVar:<study> or gnomAD)
+    * "accession": dbVar accesssion of the variant (prefixed with =nssv=  or =essv= )
 + =msi_reference=:  the equivalent of =cnv_reference= for repetitive elements, generated with the same script; a BED file containing dbVar and clinVar repetitive element data
 + =civic_cache=: path to json file containing cached calls to Civic API (is automatically generated and updated if it doesn't exist)
 + =pandrugs2_cache=: path to json file containing cached calls to Pandrugs2 API (is automatically generated and updated if it doesn't exist)
