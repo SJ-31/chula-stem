@@ -47,16 +47,22 @@ from requests import Session
 @click.option(
     "-v",
     "--civic-cache",
-    default="civic.json",
+    default="",
     show_default=True,
-    help="Path to write Civic cache",
+    help="Path to write Civic cache. If not supplied, do not lookup with Civic",
 )
 @click.option(
     "-p",
     "--pandrugs2-cache",
-    default="pandrugs2.json",
+    default="",
     show_default=True,
-    help="Path to write Pandrugs2 cache",
+    help="Path to write Pandrugs2 cache. If not supplied, do not lookup with Pandrugs2",
+)
+@click.option(
+    "-i",
+    "--ignore_failed_file",
+    required=True,
+    help="If supplied, will ignore all genes in this file",
 )
 def therapy_cache_from_files(
     input_files: str,
@@ -559,15 +565,17 @@ class PanDrugs2(TherapyDB):
                     pl.col(make_unique).list.unique(),
                 )
             )
-        elif not df.is_empty():
-            to_list = list(
-                filter(
-                    lambda x: x not in get_first + ["dScore", "disease"],
-                    df.columns,
-                )
+        to_list = list(
+            filter(
+                lambda x: x not in get_first + ["dScore", "disease"],
+                df.columns,
             )
-            list_exprs = [pl.col(u).map_elements(lambda x: [x]) for u in to_list]
-            df = df.with_columns(list_exprs)
+        )
+        list_exprs = [
+            pl.col(u).map_elements(lambda x: [x], return_dtype=pl.List(pl.String))
+            for u in to_list
+        ]
+        df = df.with_columns(list_exprs)
         return df
 
     @override
