@@ -1,6 +1,9 @@
 #!/usr/bin/env ipython
 import chula_stem.plotting as plo
 
+cns = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
+cnr = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr"
+
 
 def test_plot_cnvkit():
     plotdir = "/home/shannc/Bio_SDD/chula-stem/tests/plots"
