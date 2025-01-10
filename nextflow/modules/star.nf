@@ -1,5 +1,6 @@
 process STAR {
     ext version: "2.7.11b"
+    label "big_mem"
 
     publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
@@ -7,6 +8,7 @@ process STAR {
     input:
     tuple val(meta), val(reads)
     val(reference) // Path to star index diretory
+    val(strandedness)
     val(module_number)
     //
 
@@ -21,6 +23,7 @@ process STAR {
 
     j_suffix = params.detect_fusion ? "out.junction" : "empty"
     chimeric_junction = Utl.getName(module_number, meta, "STAR_CHIMERIC", j_suffix)
+    strandedness_flag = params.strandedness ? "--soloStrand ${strandedness.toLowerCase()}" : " "
 
     check1 = file("${meta.out}/${output}")
     check2 = file("${meta.out}/${chimeric_junction}")
@@ -46,6 +49,7 @@ process STAR {
             "--alignSplicedMateMapLmin 30",
     ].findAll({ !other_args.contains(it.split()[0]) })
     fusion_flag = params.detect_fusion ? fusion_flag_list.join(" ") : ""
+    compression_flag = params.fastq_uncompress ? " --readFilesCommand ${params.fastq_uncompress}" : ""
 
     args = task.ext.args.join(" ")
     if (check1.exists() && check2.exists()) {
@@ -59,6 +63,8 @@ process STAR {
         STAR ${args } --genomeDir ${reference} \\
             --readFilesIn ${reads[0]} ${reads[1]} \\
             --runThreadN ${task.cpus} \\
+            ${compression_flag} \\
+            ${strandedness_flag} \\
             ${fusion_flag}
 
         if [[ ${params.detect_fusion} == "true" ]]; then

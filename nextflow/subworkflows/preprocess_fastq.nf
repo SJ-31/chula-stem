@@ -28,8 +28,8 @@ workflow  PREPROCESS_FASTQ {
 
     FASTP(input, 1)
     if (data_type == "rnaseq") {
-        STAR(FASTP.out.passed, params.ref.star_index, 2)
-        MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
+        STAR(FASTP.out.passed, params.ref.star_index, params.strandedness, 2)
+        MARK_DUPLICATES(STAR.out.mapped, params.ref.genome, 3)
         bams = MARK_DUPLICATES.out.dedup
         chimeric_junction = STAR.out.chimeric
     } else {
