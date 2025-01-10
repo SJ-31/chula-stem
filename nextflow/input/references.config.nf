@@ -2,6 +2,7 @@ refdir = "/data/project/stemcell/shannc/reference"
 kitdir = "$refdir/exome_kits/SureSelectHumanAllExonV6Hg38"
 
 genome = "$refdir/genomes/GRCh38.p14_filtered.fasta"
+genome_ensembl = "${refdir}/genomes/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa"
 genome_gff = "$refdir/genomes/GRCh38.p14_filtered.gff"
 genome_sdf = "$refdir/genomes/GRCh38.p14_filtered.sdf"
 civic_cache = "/data/home/shannc/.cache/civic.json"

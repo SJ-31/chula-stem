@@ -1,3 +1,14 @@
+* 2024-06-18_IntOGen-Drivers
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/2024-06-18_IntOGen-Drivers=
+*Date added*: <2025-01-09 Thu>
+*Source:* [[https://www.intogen.org/search][Intogen]]
+Intogen driver gene data
+* census.csv
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/census.csv=
+*Date added*: <2025-01-10 Fri>
+*Source:* [[https://cancer.sanger.ac.uk/census][Cancer Gene Census]]
+
+COSMIC cancer gene census
 * Homo_sapiens.GRCh38.cdna.all.fa.gz
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/transcriptomes/Homo_sapiens.GRCh38.cdna.all.fa.gz=
 *Date added*: <2025-01-09 Thu>
