@@ -41,10 +41,10 @@ process KALLISTO {
     } else {
         """
         kallisto quant --index=${index} \\
-            ${strandedness_flag}
+            ${strandedness_flag} \\
             --threads=${task.cpus} \\
             --output-dir="." \\
-            ${reads}
+            ${reads[0]} ${reads[1]}
 
         mv abundance.tsv ${tsv}
         mv abundance.h5 ${h5}
