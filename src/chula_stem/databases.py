@@ -10,6 +10,7 @@ import polars as pl
 import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+from polars.exceptions import InvalidOperationError
 from requests import Session
 
 # * Utilities
@@ -207,7 +208,13 @@ class TherapyDB(ABC):
                 results.append(current.with_columns(db=pl.lit(self.name)))
             sleep(self.api_wait)  # API permits 2 requests per second
         if results:
-            df = pl.concat(results, how="vertical_relaxed")
+            try:
+                df = pl.concat(results, how="vertical_relaxed")
+            except InvalidOperationError:
+                print(results)
+                raise InvalidOperationError(
+                    "cannot cast List type (inner: 'String', to: 'String')"
+                )
             if not previous.is_empty():
                 df = pl.concat([previous, df], how="vertical_relaxed")
             self.write_cache(df)
@@ -551,31 +558,6 @@ class PanDrugs2(TherapyDB):
             )
         )
         df = df.filter(pl.col("dScore") == pl.col("dScore").max())
-
-        get_first: list = ["source", "gene", "status"]
-        make_unique: list = ["disease", "gScore", "therapyType"]
-        if df.shape[0] > 1:
-            others: list = list(filter(lambda x: x not in make_unique, df.columns))
-            others.remove("dScore")
-            df = (
-                df.group_by(pl.col("dScore"))
-                .agg(pl.col(make_unique).flatten(), pl.col(others))
-                .with_columns(
-                    pl.col(get_first).list.first(),
-                    pl.col(make_unique).list.unique(),
-                )
-            )
-        to_list = list(
-            filter(
-                lambda x: x not in get_first + ["dScore", "disease"],
-                df.columns,
-            )
-        )
-        list_exprs = [
-            pl.col(u).map_elements(lambda x: [x], return_dtype=pl.List(pl.String))
-            for u in to_list
-        ]
-        df = df.with_columns(list_exprs)
         return df
 
     @override
@@ -593,14 +575,21 @@ class PanDrugs2(TherapyDB):
         )
         if not response.ok or not (data := response.json().get("geneDrugGroup")):
             return pl.DataFrame()
-        df: pl.DataFrame = PanDrugs2.parse_gene_response(data).with_columns(
+        parsed: pl.DataFrame = PanDrugs2.parse_gene_response(data)
+        df: pl.DataFrame = parsed.with_columns(
             pl.lit(gene).alias("gene"),
-            pl.col("therapies").map_elements(
-                lambda x: [x], return_dtype=pl.List(pl.String)
-            ),
         )
         if confident:
             df = self.get_confident(df)
+        df = (
+            df.group_by("gene")
+            .agg(pl.all().first())
+            .with_columns(
+                pl.col("therapies").map_elements(
+                    lambda x: [x], return_dtype=pl.List(pl.String)
+                )
+            )
+        )
         return df.select(sorted(df.columns))
 
 
