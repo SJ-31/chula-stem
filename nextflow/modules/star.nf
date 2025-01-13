@@ -63,6 +63,7 @@ process STAR {
         STAR ${args } --genomeDir ${reference} \\
             --readFilesIn ${reads[0]} ${reads[1]} \\
             --runThreadN ${task.cpus} \\
+            --outSAMtype BAM SortedByCoordinate \\
             ${compression_flag} \\
             ${strandedness_flag} \\
             ${fusion_flag}
@@ -72,6 +73,8 @@ process STAR {
         else
             touch ${chimeric_junction}
         fi
+
+        mv Aligned.sortedByCoord.out.bam ${output}
 
         get_nextflow_log.bash star.log
         """
