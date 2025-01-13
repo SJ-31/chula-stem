@@ -25,7 +25,8 @@ process REPORT {
         k, v -> [(k): v instanceof Path ? v.toString() : v]
     } )
     all_meta = ["meta": meta + params.report_data,
-                "paths": paths, "misc": task.ext.args,
+                "paths": paths + task.ext.extra_paths,
+                "misc": task.ext.misc,
                 "other_text": params.report_text]
     specification = Utl.mapToJson(all_meta)
     """

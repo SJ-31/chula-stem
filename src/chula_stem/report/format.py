@@ -14,6 +14,7 @@ import polars as pl
 import polars.selectors as cs
 
 from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
+from chula_stem.databases import TherapyDB
 from chula_stem.report.spec import URL, Rename
 from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
 
@@ -386,16 +387,8 @@ def therapy_fmt(
             pl.lit(type).alias("type")
         )
         dfs.append(df)
-    wanted_cols = [
-        "gene",
-        "disease",
-        "type",
-        "source",
-        "therapies",
-        "db",
-        "db_link",
-    ]
 
+    wanted_cols: tuple = TherapyDB.shared_cols + ("type",)
     therapy_df = (
         pl.concat(dfs)
         .select(wanted_cols)

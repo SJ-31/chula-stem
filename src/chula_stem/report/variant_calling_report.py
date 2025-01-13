@@ -33,6 +33,7 @@ from chula_stem.report.spec import (
     BOLD_FONT,
     FONT,
     STYLE,
+    Rename,
     cnv_style,
     reference_list_style,
     repeat_style,
@@ -230,10 +231,10 @@ class VariantCallingReport(ResultsReport):
             }
             if type == "cnv":
                 spec["is_list"] = True
-                spec["gene_col"] = "All Genes"
+                spec["gene_col"] = Rename.cnv["All protein coding genes"]
                 spec["separator"] = ","
             elif type == "repeat":
-                spec["gene_col"] = "Affected Gene"
+                spec["gene_col"] = Rename.repeat["gene_name"]
             variant_spec.append(spec)
 
         if self.show_therapies:
