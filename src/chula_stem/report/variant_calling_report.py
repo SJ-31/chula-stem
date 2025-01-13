@@ -512,15 +512,16 @@ class VariantCallingReport(ResultsReport):
                 table_decorator,
                 "therapies.pdf",
             )
-            self.build_table(
-                self.spec,
-                reference_list_style(),
-                self.data["study_references"],
-                "References",
-                "",
-                table_decorator,
-                "reference_list.pdf",
-            )
+            if not self.data["study_references"].is_empty():
+                self.build_table(
+                    self.spec,
+                    reference_list_style(),
+                    self.data["study_references"],
+                    "References",
+                    "",
+                    table_decorator,
+                    "reference_list.pdf",
+                )
         for n, sample in enumerate(self.data["sigprofiler"]):
             if len(self.data["sigprofiler"]) == 1:
                 first = "Mutational signatures"
@@ -591,7 +592,7 @@ class VariantCallingReport(ResultsReport):
                 toc.append([2, f"Sample {index}", len(doc) + offset])
                 doc.insert_file(s)
 
-        if self.show_therapies:
+        if self.show_therapies and os.path.exists("reference_list.pdf"):
             toc.append([1, "References", len(doc) + offset])
             doc.insert_file("reference_list.pdf")
 
