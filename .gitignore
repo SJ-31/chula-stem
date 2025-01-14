@@ -4,6 +4,7 @@ tests/patient*
 *.nf.test.snap
 tests/*.pdf
 *.nf-test.log*
+nf_metrics
 analyses/data
 analyses/data_all
 analyses/*.pdf

@@ -1,0 +1,33 @@
+nextflow_process {
+
+    name "Test Process HTSEQ_COUNT"
+    script "modules/htseq_count.nf"
+    process "HTSEQ_COUNT"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/rnaseq_paths.yaml")
+            }
+            process {
+                """
+                algn = "/data/project/stemcell/shannc/output/HCC/RNASEQ/P17/tumor/3-P17_tumor-dedup.bam"
+                input[0] = [["out": "$params.out/htseq_count",
+                    "log": "${params.out}/htseq_count", "filename": "P17_tumor"],
+                    algn]
+                input[1] = params.genome_gtf
+                input[2] = "pos"
+                input[3] = "reverse"
+                input[4] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

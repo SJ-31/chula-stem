@@ -1,0 +1,35 @@
+nextflow_process {
+
+    name "Test Process VCFEVAL"
+    script "modules/vcfeval.nf"
+    process "VCFEVAL"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                params.stem = "/data/project/stemcell"
+            }
+            process {
+                """
+                // define inputs of the process here. Example:
+                input[0] = [["out": "$params.out/vcfeval",
+                        "log": "$params.log/vcfeval",
+                    "id": "sample2",
+                ],
+                    "$params.stem/shannc/tests/PDAC1.final.vcf.gz",
+                    "$params.stem/shannc/output/PDAC/P1/variant_calling/5-Mutect2/5-P1-Mutect2_filtered.vcf.gz"]
+                input[1] = "$params.stem/shannc/reference/genomes/GRCh38.p14_filtered.sdf"
+                input[2] = "$params.stem/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/Regions.bed.gz"
+                input[3] = 1
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

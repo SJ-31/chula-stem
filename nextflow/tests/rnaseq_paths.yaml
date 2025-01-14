@@ -1,0 +1,4 @@
+genome_gtf: "/data/project/stemcell/shannc/reference/genomes/Homo_sapiens.GRCh38.113.gtf"
+genome: "/data/project/stemcell/shannc/reference/genomes/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa"
+out: "/data/project/stemcell/shannc/tests/rnaseq_test"
+log: "/data/project/stemcell/shannc/tests/rnaseq_test/log"
