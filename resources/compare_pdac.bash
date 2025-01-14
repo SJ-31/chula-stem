@@ -39,6 +39,7 @@ for id in ${patient_ids[@]}; do
         --bed-regions=/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/Regions.bed.gz  \
         --output="${evaldir}" \
         --baseline="${old_renamed}" \
+        --output-mode=combine \
         --calls="${new_moved}" \
         --template=/data/project/stemcell/shannc/reference/genomes/GRCh38.p14_filtered.sdf
     fi
