@@ -5,8 +5,11 @@ tests/patient*
 tests/*.pdf
 *.nf-test.log*
 analyses/data
+analyses/data_all
 analyses/*.pdf
 /nextflow/.nf-test*
+resources/*json
+*.sif
 *slurm-*.out
 *.vcf.gz*
 *.tsv
