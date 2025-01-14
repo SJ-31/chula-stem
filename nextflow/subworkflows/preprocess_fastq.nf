@@ -28,10 +28,12 @@ workflow  PREPROCESS_FASTQ {
 
     FASTP(input, 1)
     if (data_type == "rnaseq") {
-        STAR(FASTP.out.passed, params.ref.star_index, params.strandedness, 2)
+        STAR(FASTP.out.passed, params.ref.star_index, params.strandedness,
+             true, params.ref.genome_gff, data_type, 2)
         MARK_DUPLICATES(STAR.out.mapped, params.ref.genome, 3)
         bams = MARK_DUPLICATES.out.dedup
         chimeric_junction = STAR.out.chimeric
+        counts = STAR.out.counts
     } else {
         BWA(FASTP.out.passed, params.ref.genome, 2)
         MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
@@ -39,6 +41,7 @@ workflow  PREPROCESS_FASTQ {
              false, 4)
         bams = BQSR.out.bam
         chimeric_junction = Channel.empty()
+        counts = Channel.empty()
     }
     SAMTOOLS_INDEX(bams) // indices are required by certain callers
 
@@ -48,4 +51,5 @@ workflow  PREPROCESS_FASTQ {
     fastp_json = FASTP.out.json
     trimmed = FASTP.out.passed
     chimeric = chimeric_junction
+    counts = counts
 }

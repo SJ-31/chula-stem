@@ -14,6 +14,7 @@ workflow rnaseq {
     // }
     KALLISTO(PREPROCESS_FASTQ.out.trimmed, params.ref.kallisto_index,
              params.strandedness, 2)
-    STAR_FUSION(PREPROCESS_FASTQ.out.chimeric, params.ref.star_lib, 2)
-
+    if (params.detect_fusion) {
+        STAR_FUSION(PREPROCESS_FASTQ.out.chimeric, params.ref.star_lib, 2)
+    }
 }

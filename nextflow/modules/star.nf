@@ -8,12 +8,16 @@ process STAR {
     input:
     tuple val(meta), val(reads)
     val(reference) // Path to star index diretory
-    val(strandedness)
+    val(strandedness) // forward|reverse|unstranded
+    val(count) // Boolean value for whether or not to count reads
+    val(gtf) // Genome gtf or gff file for counting reads
+    val(type) // sc-rnaseq|rnaseq
     val(module_number)
     //
 
     output:
     tuple val(meta), path(output), emit: mapped
+    tuple val(meta), path(counts), emit: counts, optional: true
     tuple val(meta), path(chimeric_junction), emit: chimeric, optional: true
     path("*.log")
     //
@@ -22,13 +26,32 @@ process STAR {
     output = Utl.getName(module_number, meta, null, "bam")
 
     j_suffix = params.detect_fusion ? "out.junction" : "empty"
-    chimeric_junction = Utl.getName(module_number, meta, "STAR_CHIMERIC", j_suffix)
+    c_suffix = count && gtf ? "tsv" : "empty"
+
+    chimeric_junction = Utl.getName(module_number, meta, "STAR_Chimeric", j_suffix)
+    counts = Utl.getName(module_number, meta, "STAR_Counts", c_suffix)
+
     strandedness_flag = params.strandedness ? "--soloStrand ${strandedness.toLowerCase()}" : " "
 
     check1 = file("${meta.out}/${output}")
     check2 = file("${meta.out}/${chimeric_junction}")
 
-    other_args = task.ext.args.collect({ it.split()[0] })
+    if (count && gtf) {
+        count_flags = " --quantMode GeneCounts --sjdbGTFfile ${gtf}"
+        if (strandedness == "forward") {
+            get_counts_command = "cut -f 1,3 ReadsPerGene.out.tab > ${counts}"
+        } else if (strandedness == "reverse") {
+            get_counts_command = "cut -f 1,4 ReadsPerGene.out.tab > ${counts}"
+        } else {
+            get_counts_command = "cut -f 1,2 ReadsPerGene.out.tab > ${counts}"
+        }
+    } else {
+        count_flags = ""
+        get_counts_command = ""
+    }
+
+    // TODO: add flags for star-solo (single-cell rnaseq)
+
     fusion_flag_list = [
             "--chimSegmentMin 12",
             "--chimJunctionOverhangMin 8",
@@ -47,8 +70,8 @@ process STAR {
             "--alignInsertionFlush Right",
             "--alignSplicedMateMapLminOverLmate 0",
             "--alignSplicedMateMapLmin 30",
-    ].findAll({ !other_args.contains(it.split()[0]) })
-    fusion_flag = params.detect_fusion ? fusion_flag_list.join(" ") : ""
+    ]
+    fusion_flag = params.detect_fusion ? Utl.overrideArgs(fusion_flag_list, task.ext.args) : ""
     compression_flag = params.fastq_uncompress ? " --readFilesCommand ${params.fastq_uncompress}" : ""
 
     args = task.ext.args.join(" ")
@@ -64,17 +87,24 @@ process STAR {
             --readFilesIn ${reads[0]} ${reads[1]} \\
             --runThreadN ${task.cpus} \\
             --outSAMtype BAM SortedByCoordinate \\
+            ${count_flags} \\
             ${compression_flag} \\
             ${strandedness_flag} \\
             ${fusion_flag}
 
         if [[ ${params.detect_fusion} == "true" ]]; then
             mv Chimeric.out.junction ${chimeric_junction}
-        else
-            touch ${chimeric_junction}
         fi
 
-        mv Aligned.sortedByCoord.out.bam ${output}
+        ${get_counts_command}
+
+        gatk AddOrReplaceReadGroups \\
+            -I Aligned.sortedByCoord.out.bam \\
+            -O ${output} \\
+            --RGLB $meta.RGLB \\
+            --RGPL $meta.RGPL \\
+            --RGPU $meta.RGPU \\
+            --RGSM $meta.RGSM
 
         get_nextflow_log.bash star.log
         """
