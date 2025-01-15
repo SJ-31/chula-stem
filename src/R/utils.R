@@ -1,5 +1,17 @@
+library(tidyverse)
+
 read_with_filename <- function(x, col = "filename") {
   read_tsv(x) |> mutate(!!col := basename(x))
+}
+
+basename_no_ext <- function(file) {
+  bname <- basename(file)
+  splits <- bname |> str_split_1("\\.")
+  if (length(splits) > 1) {
+    paste0(head(splits, n = -1), collapse = ".")
+  } else {
+    bname
+  }
 }
 
 #' Flatten the character vector `char_vec` by `separator`, then

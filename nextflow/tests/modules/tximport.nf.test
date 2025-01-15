@@ -1,0 +1,33 @@
+nextflow_process {
+
+    name "Test Process TXIMPORT"
+    script "modules/tximport.nf"
+    process "TXIMPORT"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/rnaseq_paths.yaml")
+            }
+            process {
+                """
+                abund = "/data/project/stemcell/shannc/output/HCC/RNASEQ/P17/tumor/2-P17_tumor-kallisto.tsv"
+                input[0] = [["out": "$params.out/tximport",
+                    "log": "${params.out}/tximport", "filename": "P17_tumor"],
+                    abund]
+                input[1] = "kallisto"
+                input[2] = params.genome_gtf
+                input[3] = 3
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}
