@@ -22,7 +22,7 @@ process OCTOPUS {
     script:
     output = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
     check = file("${meta.out}/${output}")
-    prev_flag = previous_variants ? "--source-candidates ${previous_variants}" : ""
+    prev_flag = file(previous_variants).size() != 0 ? "--source-candidates ${previous_variants}" : ""
     if (!params.tumor_only) {
         bam_flag = "-I ${normal} ${tumor} --normal-sample ${meta.RGSM_normal}"
     } else {
