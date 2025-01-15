@@ -1,50 +1,44 @@
-include { FASTP } from "../modules/fastp.nf"
-include { BWA } from "../modules/bwa.nf"
-include { MARK_DUPLICATES } from "../modules/mark_duplicates.nf"
-include { BQSR } from "../modules/bqsr.nf"
-include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
+include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MUTECT2 } from "../modules/mutect2.nf"
 include { GENOMICS_DB_IMPORT } from '../modules/genomics_db_import.nf'
 include { EMPTY_FILES as EMPTY_FILES_1 } from '../modules/empty_files.nf'
 include { EMPTY_FILES as EMPTY_FILES_2 } from '../modules/empty_files.nf'
+include { CLAIRS_TO } from "../modules/clairs_to.nf"
 include { CREATE_PANEL_OF_NORMALS } from "../modules/create_panel_of_normals.nf"
+include { OCTOPUS } from "../modules/octopus.nf"
+
+params.tumor_only = true
 
 workflow panel_of_normals {
 
-    main:
-    input = Channel.fromPath(params.input)
-        .splitCsv(header: true)
-        .map { [["id": it.patient,
-                "out": "${params.outdir}/${it.patient}/${it.source}",
-                "type": it.source,
-                "log": "${params.logdir}/${it.patient}/${it.source}",
-                "filename": "${it.patient}_${it.source}", // Output filename
-                "RGLB": it.read_group_library, // Read group info used by GATK tools
-                "RGPL": it.read_group_platform,
-                "RGPU": it.read_group_platform_unit,
-                "RGSM": it.read_group_sample_name
-            ], [file(it.fastq_1), file(it.fastq_2)]] }
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, params.omics_type)
+    if (params.previous_vcfs) {
+        previous_vcfs = Channel.fromList(params.previous_vcfs.readLines()
+                                        .collect({ file(it) }))
+    } else {
+        previous_vcfs = Channel.empty()
+    }
 
-    FASTP(input, 1)
-    BWA(FASTP.out.passed, params.ref.genome, 2)
-    MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
-    BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants, 4)
-    SAMTOOLS_INDEX(BQSR.out.bam)
+    empty_bams = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
+    empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
 
-    empty_bams = EMPTY_FILES_1(BQSR.out.bam, 1).map(params.prependId)
-    empty_indices = EMPTY_FILES_2(SAMTOOLS_INDEX.out.index, 1).map(params.getId)
+    to_mutect2 = Utl.joinFirst(empty_bams, [PREPROCESS_FASTQ.out.bam,
+                                         PREPROCESS_FASTQ.out.bam_index,
+                                         empty_indices])
+    to_clairs = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
+                              [PREPROCESS_FASTQ.out.bam_index,
+                               empty_indices])
+    to_oct = Utl.joinFirst(to_mutect2, [empty_indices])
 
-    to_mutect = empty_bams.join(BQSR.out.bam.map(params.getId))
-        .join(SAMTOOLS_INDEX.out.index.map(params.getId))
-        .join(empty_indices)
-        .map({ it[1..-1] })
+    MUTECT2(to_mutect2, params.ref.genome, params.ref.targets, params.ref.germline, 5)
+    CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
+    OCTOPUS(to_oct, params.ref.genome, params.ref.targets, 5)
 
-    MUTECT2(to_mutect, params.ref.genome, params.ref.targets, params.ref.germline, 5)
-
-    to_genomics_db = MUTECT2.out.variants.map({ it[1] })
-        .collect().map({ [["filename": params.cohort,
-                           "out": params.outdir,
-                           "log": params.logdir ], it] })
+    all_variants = MUTECT2.out.variants.mix(CLAIRS_TO.out.variants, OCTOPUS.out.variants)
+    to_genomics_db = all_variants.map({ it[1] }).mix(previous_vcfs).collect()
+        .map({ [["filename": params.cohort,
+                 "out": params.outdir,
+                 "log": params.logdir ], it] })
 
     GENOMICS_DB_IMPORT(to_genomics_db, params.ref.genome, params.ref.targets_il, 6)
     CREATE_PANEL_OF_NORMALS(GENOMICS_DB_IMPORT.out.db, params.ref.genome, 7)
