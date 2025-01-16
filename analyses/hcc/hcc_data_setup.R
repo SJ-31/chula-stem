@@ -64,4 +64,11 @@ counts <- reduce(tb_list, \(x, y) full_join(x, y, by = join_by(gene_name))) |>
   mutate(across(where(is.numeric), \(x) replace_na(x, 0))) %>%
   DGEList(counts = ., samples = metadata, group = group_spec)
 
+counts$samples$tissue <- case_match(
+  counts$samples$type,
+  "Solid Tissue Normal" ~ "N",
+  "Primary Tumor" ~ "T",
+  "Recurrent Tumor" ~ "T"
+)
+
 write_rds(counts, counts_file)
