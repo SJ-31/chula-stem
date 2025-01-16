@@ -20,7 +20,6 @@ from reportlab.platypus import (
 
 import chula_stem.report.format as fr
 from chula_stem.databases import get_therapy_df
-from chula_stem.plotting import plot_cnvkit
 from chula_stem.report import (
     PATIENT_DATA,
     SAMPLE_DATA,
@@ -467,6 +466,7 @@ class VariantCallingReport(ResultsReport):
     def plot_cnvkit(cnr: str, cns: str) -> None:
         sizes = {"ncol": 3, "height": 30, "dpi": 200, "width": 20}
         file = "cnvkit.png"
+        # TODO: <2025-01-16 Thu> replace this with better fn
         plot_cnvkit(cnr, cns, None, sizes, file)
         doc: Document = pymupdf.open()
         page = doc.new_page()

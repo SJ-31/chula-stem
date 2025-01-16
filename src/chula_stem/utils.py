@@ -6,7 +6,6 @@ from tempfile import TemporaryFile
 import click
 import pandas as pd
 import polars as pl
-from rpy2.robjects.packages import importr
 
 
 # rx method is equivalent to [], rx2 is [[]]
@@ -38,36 +37,14 @@ def contain_join(
     return x.join_where(y, *predicates)
 
 
-def r2pd(robject) -> pd.DataFrame:
-    import rpy2.robjects as ro
-    from rpy2.robjects import pandas2ri
-
-    with (ro.default_converter + pandas2ri.converter).context():
-        obj = ro.conversion.get_conversion().rpy2py(robject)
-        if isinstance(obj, tuple) and isinstance(obj[0], pd.DataFrame):
-            return obj[0]
-        return obj
-
-
 @click.command()
 @click.option("-i", "--input", required=True, help="Input file")
 @click.option("-o", "--output", required=True, help="Output")
 @click.option("-c", "--caller", required=True, help="Tool producing CNV calls")
-def classify_cnv_format(caller: str, input: str, output: str):
-    _classify_cnv(caller, input, output)
-
-
-def read_facets_rds(rds_path: str) -> pl.DataFrame:
-    base = importr("base")
-    df: pd.DataFrame = r2pd(base.readRDS(rds_path).rx2("segs"))
-    try:
-        df = df.astype({"chrom": "int32"})
-    except:
-        pass
-    return pl.from_pandas(df, schema_overrides={"chrom": pl.String})
-
-
-def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
+@click.option(
+    "-t", "--tumor_sample", required=False, help="Name of tumor sample", default=""
+)
+def classify_cnv_format(caller: str, input: str, output: str, tumor_sample: str):
     import polars as pl
 
     def dup_or_del(x):
@@ -104,6 +81,16 @@ def _classify_cnv(caller: str, input: str, output: str, tumor_sample: str = ""):
     df.filter(pl.col("cn") != 2).with_columns(
         type=pl.col("cn").map_elements(dup_or_del, return_dtype=pl.String)
     ).drop("cn").write_csv(output, separator="\t", include_header=False)
+
+
+def read_facets_rds(rds_path: str) -> pl.DataFrame:
+    base = importr("base")
+    df: pd.DataFrame = r2pd(base.readRDS(rds_path).rx2("segs"))
+    try:
+        df = df.astype({"chrom": "int32"})
+    except:
+        pass
+    return pl.from_pandas(df, schema_overrides={"chrom": pl.String})
 
 
 @click.command()
@@ -208,6 +195,12 @@ def make_freec_config(
         w.write("".join(modified))
 
 
+def in_vcf_header(vcf: str, string: str) -> bool:
+    from subprocess import run
+
+    return run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
+
+
 @click.command()
 @click.option("-i", "--input", required=True, help="Input vcf file")
 @click.option("-o", "--output", required=True, help="Output tsv")
@@ -244,33 +237,9 @@ def make_freec_config(
     required=True,
     help="Info field in vcf containing VEP annotations",
 )
+@click.option("--vaf_tag", required=False, help="Name of VAF tag", default="AF")
+@click.option("--ad_tag", required=False, help="Name of AD tag", default="AD")
 def format_vep_vcf(
-    input,
-    output,
-    tumor_sample,
-    normal_sample,
-    vep_info_field,
-    tool_source_tag,
-    variant_class,
-):
-    _format_vep_vcf(
-        input,
-        output,
-        tumor_sample,
-        normal_sample,
-        vep_info_field,
-        tool_source_tag,
-        variant_class=variant_class,
-    )
-
-
-def in_vcf_header(vcf: str, string: str) -> bool:
-    from subprocess import run
-
-    return run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
-
-
-def _format_vep_vcf(
     input: str,
     output: str,
     tumor_sample: str,

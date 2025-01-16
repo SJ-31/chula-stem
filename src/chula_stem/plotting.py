@@ -3,9 +3,6 @@ import inspect
 from pathlib import Path
 
 import click
-import rpy2
-from rpy2.robjects import NULL, ListVector
-from rpy2.robjects.packages import STAP
 
 
 def parse_args():
@@ -49,40 +46,6 @@ def parse_args():
         "units": args["units"],
     }
     return args, sizing
-
-
-def none2null(item):
-    if item is None:
-        return NULL
-    if isinstance(item, dict):
-        changed = dict(
-            list(map(lambda x: (x[0], NULL) if x[1] is None else x, item.items()))
-        )
-        return changed
-    if isinstance(item, tuple):
-        change_fn = tuple
-    else:
-        change_fn = list
-    return change_fn(map(lambda x: NULL if x is None else x, item))
-
-
-def plot_cnvkit(cnr: str, cns: str, chr: str, sizing: dict, output: str = "cnvkit.png"):
-    source: str = get_rscripts().joinpath("plotting.R").read_text()
-    chr = NULL if not chr else chr.split(",")
-    conv = ListVector(none2null(sizing))
-    plot_lib: STAP = STAP(source, "plotting")
-    plot_lib.plot_cnvkit(cns, cnr, chr, conv, output)
-
-
-def plot_main(args, sizing):
-    if args["name"] == "cnvkit":
-        plot_cnvkit(
-            cnr=args["cnr"],
-            cns=args["cns"],
-            chr=args["loci"],
-            output=args["output"],
-            sizing=sizing,
-        )
 
 
 def get_rscripts() -> Path:
