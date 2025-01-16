@@ -20,7 +20,7 @@ process CLAIRS_TO {
     output = Utl.getName(module_number, meta, "ClairS-TO", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
-    prev_flag = file(previous_variants).size() != 0 ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
+    prev_flag = previous_variants.size() != 0 ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
