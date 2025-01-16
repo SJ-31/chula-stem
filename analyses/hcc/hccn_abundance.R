@@ -1,5 +1,5 @@
 here::i_am("analyses/hcc/hccn_abundance.R")
-source(here("analyses", "hcc", "main.R"))
+source(here::here("analyses", "hcc", "main.R"))
 # Attempt to determine fold changes by comparing gene expression between samples directly
 # 1. Visualize and correct for batch effects (due to use of public data)
 # 2. Carry out between-sample normalization on raw counts
@@ -8,13 +8,14 @@ source(here("analyses", "hcc", "main.R"))
 
 ## * Batch effect visualization
 
-to_keep <- filterByExpr(y = counts)
+to_keep <- filterByExpr(y = counts, min.count = 10)
 counts <- counts[to_keep, , keep.lib.sizes = FALSE]
 
-to_keep <- filterByExpr(y = counts)
 normalized <- edgeR::normLibSizes(counts)
 
-norm_plot <- pca_dgelist(normalized, plot_aes = list(shape = "group", color = "type"))
+norm_plot <- pca_dgelist(normalized, plot_aes = list(shape = "group", color = "type")) +
+  labs(title = "PCA of expression (log2 normalized CPM)")
+
 raw_plot <- pca_dgelist(counts, plot_aes = list(shape = "group", color = "type"))
 save_fn(norm_plot, "norm_pca.png")
 save_fn(raw_plot, "raw_pca.png")
@@ -33,6 +34,7 @@ combat_plot <- pca_dgelist(list(
 ), plot_aes = list(shape = "group", color = "type"))
 save_fn(combat_plot, "combat_pca.png")
 # <2025-01-16 Thu> Looks good actually
+# But don't use for downstream analysis, designed for array data
 
 # Combat version for raw count data
 combat_seq_corrected <- sva::ComBat_seq(counts$counts,
@@ -42,7 +44,8 @@ combat_seq_corrected <- sva::ComBat_seq(counts$counts,
 )
 ccounts <- DGEList(counts = combat_seq_corrected, samples = counts$samples, genes = counts$genes) |>
   normLibSizes()
-corrected_plot <- pca_dgelist(ccounts, plot_aes = list(shape = "group", color = "type"))
+corrected_plot <- pca_dgelist(ccounts, plot_aes = list(shape = "group", color = "type")) +
+  labs(title = "Batch effect-corrected PCA of expression (log2 normalized CPM)")
 save_fn(corrected_plot, "combat_seq_pca.png")
 # <2025-01-16 Thu> Batch effect reduced slightly, but still not as much as the
 # normal version of ComBat
@@ -51,7 +54,7 @@ save_fn(corrected_plot, "combat_seq_pca.png")
 ## * DE
 do_de <- function(dgelist) {
   data <- dgelist$samples
-  design <- model.matrix(~ case + tissue, data = data)
+  design <- model.matrix(~ cases + tissue, data = data)
   rownames(design) <- colnames(dgelist)
   disp <- estimateCommonDisp(dgelist, design)
   de <- exactTest(disp)
@@ -85,3 +88,28 @@ compare_17 <- function(counts_table, file) {
 normalized_counts <- cpm(ccounts$counts) # CPM
 compare_17(normalized_counts, here(outdir, "cpm_P17_tcga_normal.tsv"))
 compare_17(combat_corrected, here(outdir, "log2cpm_P17_tcga_normal.tsv"))
+
+## * Get HGs
+# Obtain genes whose expression is the most stable across the corrected data
+# and whose expression isn't 0
+get_gene_std <- function(dgelist) {
+  c <- cpm(dgelist, log = TRUE)
+  tibble(sd = apply(c, 1, sd), gene_name = dgelist$genes[, 1])
+}
+
+gstd <- get_gene_std(normalized)
+gstd_corrected <- get_gene_std(ccounts)
+
+sd_plot <- ggplot(
+  inner_join(gstd, gstd_corrected, by = join_by(gene_name), suffix = c("", "_corrected")),
+  aes(x = sd, y = sd_corrected)
+) +
+  geom_point() +
+  ylab("Batch effect-corrected std") +
+  xlab("std") +
+  labs(title = "Standard deviation of normalized gene CPM across samples")
+
+
+gstd_corrected |>
+  filter(gene_name %in% tpm_not_zero) |>
+  arrange(sd)
