@@ -1,5 +1,4 @@
 ## * Data setup
-data_dir <- here("analyses", "data_all")
 id_mapping <- read_tsv(here(
   data_dir, "reference", "genomes",
   "Homo_sapiens.GRCh38.113.gene_id_mapping.tsv"
