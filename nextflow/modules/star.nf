@@ -9,9 +9,10 @@ process STAR {
     tuple val(meta), val(reads)
     val(reference) // Path to star index diretory
     val(strandedness) // forward|reverse|unstranded
+    val(mark_duplicates) // Mode for marking duplicates (see manual)
+    // "-" for none, "UniqueIdentical", "UniqueIdenticalNotMulti"
     val(count) // Boolean value for whether or not to count reads
     val(gtf) // Genome gtf or gff file for counting reads
-    val(type) // sc-rnaseq|rnaseq
     val(module_number)
     //
 
@@ -31,10 +32,7 @@ process STAR {
     chimeric_junction = Utl.getName(module_number, meta, "STAR_Chimeric", j_suffix)
     counts = Utl.getName(module_number, meta, "STAR_Counts", c_suffix)
 
-    strandedness_flag = params.strandedness ? "--soloStrand ${strandedness.toLowerCase()}" : " "
-
-    check1 = file("${meta.out}/${output}")
-    check2 = file("${meta.out}/${chimeric_junction}")
+    check = file("${meta.out}/${output}")
 
     if (count && gtf) {
         count_flags = " --quantMode GeneCounts --sjdbGTFfile ${gtf}"
@@ -49,8 +47,6 @@ process STAR {
         count_flags = ""
         get_counts_command = ""
     }
-
-    // TODO: add flags for star-solo (single-cell rnaseq)
 
     fusion_flag_list = [
             "--chimSegmentMin 12",
@@ -73,12 +69,12 @@ process STAR {
     ]
     fusion_flag = params.detect_fusion ? Utl.overrideArgs(fusion_flag_list, task.ext.args) : ""
     compression_flag = params.fastq_uncompress ? " --readFilesCommand ${params.fastq_uncompress}" : ""
-
+    duplicates_flag = Utl.overrideArgs(["--bamRemoveDuplicatesType ${mark_duplicates}"],
+                                       task.ext.args)
     args = task.ext.args.join(" ")
-    if (check1.exists() && check2.exists()) {
+    if (check.exists()) {
         """
-        ln -sr ${check1} .
-        ln -sr ${check2} .
+        ln -sr ${check} .
         ln -sr ${meta.log}/star.log .
         """
     } else {
@@ -89,7 +85,7 @@ process STAR {
             --outSAMtype BAM SortedByCoordinate \\
             ${count_flags} \\
             ${compression_flag} \\
-            ${strandedness_flag} \\
+            ${duplicates_flag} \\
             ${fusion_flag}
 
         if [[ ${params.detect_fusion} == "true" ]]; then

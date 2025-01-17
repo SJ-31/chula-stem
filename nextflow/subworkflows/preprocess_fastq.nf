@@ -10,7 +10,7 @@ workflow  PREPROCESS_FASTQ {
     manifest
     outdir
     logdir
-    data_type
+    omics_type
 
     main:
     input = Channel.fromPath(manifest)
@@ -27,11 +27,10 @@ workflow  PREPROCESS_FASTQ {
             ], [file(it.fastq_1), file(it.fastq_2)]] }
 
     FASTP(input, 1)
-    if (data_type == "rnaseq") {
+    if (omics_type == "rnaseq") {
         STAR(FASTP.out.passed, params.ref.star_index, params.strandedness,
-             true, params.ref.genome_gff, data_type, 2)
-        MARK_DUPLICATES(STAR.out.mapped, params.ref.genome, 3)
-        bams = MARK_DUPLICATES.out.dedup
+             "UniqueIdenticalNotMulti", true, params.ref.genome_gff, 2)
+        bams = STAR.out.mapped
         chimeric_junction = STAR.out.chimeric
         counts = STAR.out.counts
     } else {
