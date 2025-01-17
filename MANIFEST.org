@@ -1,3 +1,10 @@
+* TCGA_HCC
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/public_data/TCGA_HCC=
+*Date added*: <2025-01-15 Wed>
+*Source:* [[https://www.cancer.gov/ccg/research/genome-sequencing/tcga/studied-cancers/hepatocellular-carcinoma-study][TCGA Hepatocellular Carcinoma data from (available on GDC)]]
+
+STAR raw read counts of hepatocellular carcinoma (both normal and tumor) samples downloaded from the Genomic Data Portal. The data are from the TCGA project - [[https://www.cell.com/cell/fulltext/S0092-8674(17)30639-6][Comprehensive and Integrative Genomic Characterization of Hepatocellular Carcinoma]]
+
 * 2024-06-18_IntOGen-Drivers
 *Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/2024-06-18_IntOGen-Drivers=
 *Date added*: <2025-01-09 Thu>

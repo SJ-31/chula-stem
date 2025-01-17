@@ -86,7 +86,7 @@ class Utl {
         return JsonOutput.prettyPrint(JsonOutput.toJson(m))
     }
 
-    // Any cli args specified in args_b will override those in args_a
+    // Remove cli args or flags specified in args_a that have been specified in args_b
     public static overrideArgs(args_a, args_b) {
         def to_check = args_b.collect({ it.split()[0] })
         def final_args = args_a.findAll({ !to_check.contains(it.split()[0]) })
