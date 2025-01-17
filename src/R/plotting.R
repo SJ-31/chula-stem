@@ -27,24 +27,56 @@ format_chr_data <- function(tb, divide_by = 1000) {
   )
 }
 
+plot_cnvkit_gene <- function(cnv_tb, locus) {
+
+}
+
+parse_chr_range <- function(chr_range) {
+  splits <- str_split_1(chr_range, ":")
+  chr <- splits[1]
+  if (length(splits) > 1) {
+    endpoints <- str_split_1(splits[2], "-")
+    list(chr = chr, ir = IRanges(as.numeric(endpoints[1]), as.numeric(endpoints[2])))
+  } else {
+    list(chr = chr, ir = NULL)
+  }
+}
+
 plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
   cn_calls <- read_tsv(cns) |> format_chr_data()
   ratios <- read_tsv(cnr) |> format_chr_data()
+  range_given <- FALSE
   if (!is.null(chr) && length(chr) >= 1) {
-    cn_calls <- cn_calls |> filter(chromosome %in% chr)
-    ratios <- ratios |> filter(chromosome %in% chr)
+    if (str_detect(chr, "-")) range_given <- TRUE
+    range <- parse_chr_range(chr)
+    cn_calls <- cn_calls |> dplyr::filter(chromosome %in% range$chr)
+    ratios <- ratios |> dplyr::filter(chromosome %in% range$chr)
   }
-  plot <- ratios |>
-    inner_join(cn_calls,
-      by = join_by(chromosome, between(mid, y$start, y$end)),
-      suffix = c("", "_right")
-    ) |>
+  merged <- ratios |> inner_join(cn_calls,
+    by = join_by(chromosome, between(mid, y$start, y$end)), suffix = c("", "_right")
+  )
+  if (range_given) {
+    vals <- map2(merged$start_right, merged$end_right, \(s, e) {
+      intersect <- pintersect(IRanges(s, e), range$ir, resolve.empty = "start.x")
+      if (width(intersect) > 0) {
+        tibble(start_right = start(intersect), end_right = end(intersect))
+      } else {
+        tibble(start_right = NA, end_right = NA)
+      }
+    }) |> bind_rows()
+    merged <- merged |>
+      dplyr::select(-start_right, -end_right) |>
+      bind_cols(vals) |>
+      dplyr::filter(start >= start(range$ir) & end <= end(range$ir))
+  }
+  plot <- merged |>
     ggplot(aes(x = mid, y = log2, alpha = weight), stat = "identity") +
     ylab("Copy Number Ratio (log2)") +
     geom_point(size = 0.5) +
     scale_y_continuous(
       breaks = scales::breaks_pretty(n = 15),
-      minor_breaks = scales::minor_breaks_n(5)
+      minor_breaks = scales::minor_breaks_n(5),
+      limits = c(min(ratios$log2), max(ratios$log2)),
     ) +
     geom_segment(aes(
       x = start_right, xend = end_right,
@@ -81,7 +113,11 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
         panel.background = element_rect(fill = "white", colour = "white")
       ) + labs(title = title)
   } else {
-    plot <- plot + xlab("Position (mb)") + labs(title = glue("Chromosome {chr}"))
+    without_chr <- str_replace(chr, "^chr", "")
+    plot <- plot + xlab("Position (mb)") + labs(title = glue("Chromosome {without_chr}"))
+  }
+  if (range_given) {
+    plot <- plot + scale_x_continuous(limits = c(range$start, range$end))
   }
   if (!is.null(output)) {
     ggsave(output, plot,
