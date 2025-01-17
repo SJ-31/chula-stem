@@ -30,6 +30,7 @@ process BWA {
         bwa-mem2 mem \\
             -o aligned.sam \\
             -v 3 \\
+            -t ${task.cpus} \\
             $reference \\
             ${reads[0]} ${reads[1]}
 

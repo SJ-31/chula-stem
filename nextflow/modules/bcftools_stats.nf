@@ -19,7 +19,6 @@ process BCFTOOLS_STATS {
     output = Utl.getName(module_number, meta, "Bcftools_stats")
     check = file("${meta.out}/${output}")
     region_flag = target_intervals != "" ? "--regions-file ${target_intervals}" : ""
-    args = task.ext.args.join(" ")
     if (check.exists()) {
         """
         cp -r ${check} .

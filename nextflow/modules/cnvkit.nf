@@ -35,9 +35,9 @@ process CNVKIT {
         """
     } else {
         """
-        cnvkit.py batch \
-                ${tumor} \
-            -r ${cnn_reference} \
+        cnvkit.py batch \\
+                ${tumor} \\
+            -r ${cnn_reference} \\
             -d ${out}
 
         cd "${out}"
@@ -48,12 +48,12 @@ process CNVKIT {
         cd ..
 
         if [[ "${clonal}" == "true" ]]; then
-            cnvkit.py call \
-                "${out}/${out}.call.cns" \
-                --vcf "${snps}" \
-                --purity "${purity_val}" \
-                --ploidy "${ploidy_val}" \
-                --method clonal \
+            cnvkit.py call \\
+                "${out}/${out}.call.cns" \\
+                --vcf "${snps}" \\
+                --purity "${purity_val}" \\
+                --ploidy "${ploidy_val}" \\
+                --method clonal \\
                 --output "${out}.call.clonal.cns"
             mv "${out}.call.clonal.cns" "${out}"
         fi
