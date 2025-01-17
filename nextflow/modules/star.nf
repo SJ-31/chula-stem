@@ -32,7 +32,9 @@ process STAR {
     chimeric_junction = Utl.getName(module_number, meta, "STAR_Chimeric", j_suffix)
     counts = Utl.getName(module_number, meta, "STAR_Counts", c_suffix)
 
-    check = file("${meta.out}/${output}")
+    check1 = file("${meta.out}/${output}")
+    check2 = file("${meta.out}/${chimeric_junction}")
+    check3 = file("${meta.out}/${counts}")
 
     if (count && gtf) {
         count_flags = " --quantMode GeneCounts --sjdbGTFfile ${gtf}"
@@ -72,9 +74,11 @@ process STAR {
     duplicates_flag = Utl.overrideArgs(["--bamRemoveDuplicatesType ${mark_duplicates}"],
                                        task.ext.args)
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (check1.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${check1} .
+        if [[ -e ${check2} ]]; then ln -sr ${check2} .; fi
+        if [[ -e ${check3} ]]; then ln -sr ${check3} .; fi
         ln -sr ${meta.log}/star.log .
         """
     } else {
