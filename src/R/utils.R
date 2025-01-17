@@ -4,6 +4,13 @@ read_with_filename <- function(x, col = "filename") {
   read_tsv(x) |> mutate(!!col := basename(x))
 }
 
+t2tb <- function(x, names = "rowname") {
+  t(x) |>
+    as.data.frame() |>
+    rownames_to_column(var = names) |>
+    as_tibble()
+}
+
 basename_no_ext <- function(file) {
   bname <- basename(file)
   splits <- bname |> str_split_1("\\.")
@@ -63,4 +70,21 @@ modes <- function(x) {
   ux <- unique(x)
   tab <- tabulate(match(x, ux))
   ux[tab == max(tab)]
+}
+
+to <- function(obj, x, val) {
+  obj[[x]] <- val
+  obj
+}
+
+
+htest2tb <- function(test) {
+  tibble(
+    null = test$`null.value`,
+    alternative = test$alternative,
+    method = test$method,
+    data = test$`data.name`,
+    statistic = test$statistic,
+    p_value = test$`p.value`
+  )
 }

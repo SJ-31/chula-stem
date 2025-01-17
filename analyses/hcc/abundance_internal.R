@@ -98,25 +98,62 @@ hg3 <- c("GNAI3")
 all_hg <- c(hg1, hg2, hg3)
 
 samples <- colnames(tpm) |> discard(\(x) x %in% c("length"))
-met_change <- fold_change("MET", all_hg, tpm, samples = samples, verbose = TRUE)
+
+met_change <- fold_change("MET", all_hg, tpm, samples = samples, verbose = TRUE) |>
+  inner_join(counts$samples, by = join_by(x$sample == y$files)) |>
+  select(-lib.size, -norm.factors)
+
 met_change_file <- here(outdir, "met_fold_change_internal.tsv")
 
-test_change <- wilcox.test(
-  x = filter(met_change, sample == M$wanted_sample)[, 3][[1]],
-  y = filter(met_change, sample == M$tcgn_normals)[, 3][[1]],
-  data = ""
-)
 
-longer <- pivot_longer(met_change, cols = where(is.numeric)) %>%
-  inner_join(counts$samples, by = join_by(x$sample == y$files)) |>
-  filter(sample == M$wanted_sample | tissue == "N")
+test_against <- function(housekeeping) {
+  hg <- filter(met_change, tissue == "N") |> pluck(housekeeping)
+  s <- filter(met_change, tissue == "T") |> pluck(housekeeping)
+  wilcox.test(s, hg, alternative = "less") |>
+    to("data.name", glue("MET fold change against {housekeeping}")) |>
+    to("alternative", "MET greater") |>
+    htest2tb()
+}
 
-fold_plot <- ggplot(longer, aes(y = value, x = name, color = tissue)) +
+
+wilcox_results <- lapply(all_hg, test_against) |> bind_rows()
+
+
+## * Plot
+
+standardize <- function(tb) {
+  fn <- function(x) { # Standard
+    (x - mean(x)) / sd(x)
+  }
+  ## fn <- function(x) { # Robust scaling
+  ##   (x - median(x)) / (quantile(x, 0.75) - quantile(x, 0.25))
+  ## }
+  tb |> mutate(across(where(is.numeric), fn))
+  ## tb |> mutate(across(where(is.numeric), \(x) (x - min(x)) / (max(x) - min(x))))
+  ## tb
+}
+
+longer <- met_change |>
+  standardize() |>
+  pivot_longer(cols = where(is.numeric))
+
+fold_plot <- longer |>
+  filter(sample == M$wanted_sample | tissue == "N") |>
+  ggplot(aes(y = value, x = name, color = tissue)) +
+  geom_boxplot() +
+  xlab("Housekeeping gene") +
+  ylab("MET fold-change (%)")
+
+fold2 <- longer |>
+  ggplot(aes(y = value, x = name, color = tissue)) +
   geom_boxplot() +
   xlab("Housekeeping gene") +
   ylab("MET fold-change (%)")
 
 write_tsv(met_change, met_change_file)
 save_fn(fold_plot, "met_fold_change.png")
+save_fn(fold2, "met_fold_change_all.png")
 
-# TODO: look at the data TMM normalized data to find housekeeping genes manually
+## ggplot(longer, aes(y = value, fill = name, x = name)) +
+##   geom_boxplot() +
+##   facet_wrap(~tissue)
