@@ -29,7 +29,6 @@ workflow panel_of_normals {
                               [PREPROCESS_FASTQ.out.bam_index,
                                empty_indices])
     to_oct = Utl.joinFirst(to_mutect2, [empty_indices])
-
     MUTECT2(to_mutect2, params.ref.genome, params.ref.targets, params.ref.germline, 5)
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
     OCTOPUS(to_oct, params.ref.genome, params.ref.targets, 5)

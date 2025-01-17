@@ -38,7 +38,7 @@ workflow whole_exome_tumor_only {
     /*
      * Preprocessing
      */
-    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes")
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
 
     empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
     tumors = PREPROCESS_FASTQ.out.bam.map { [
@@ -163,11 +163,9 @@ workflow whole_exome_tumor_only {
                               ["suffix": "VEP_small", "variant_class": "small",
                                "qc": params.small_qc])
 
-
     to_vep_sv = Utl.modifyMeta(CONCAT_SV.out.vcf,
                            ["suffix": "VEP_SV", "variant_class": "sv",
                             "qc": params.sv_qc])
-
 
     VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
 

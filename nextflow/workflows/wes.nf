@@ -43,7 +43,7 @@ workflow whole_exome {
     /*
      * Preprocessing
      */
-    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes")
+    PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
     // After preprocessing, branch data into tumor and normal then pair up by id and join with
     //  index
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)

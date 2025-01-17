@@ -5,12 +5,13 @@ include { BQSR } from "../modules/bqsr.nf"
 include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 include { STAR } from "../modules/star.nf"
 
-workflow  PREPROCESS_FASTQ {
+workflow PREPROCESS_FASTQ {
     take:
     manifest
     outdir
     logdir
     omics_type
+    offset // Offset for module number
 
     main:
     input = Channel.fromPath(manifest)
@@ -26,18 +27,18 @@ workflow  PREPROCESS_FASTQ {
                 "RGSM": it.read_group_sample_name
             ], [file(it.fastq_1), file(it.fastq_2)]] }
 
-    FASTP(input, 1)
+    FASTP(input, offset + 1)
     if (omics_type == "rnaseq") {
         STAR(FASTP.out.passed, params.ref.star_index, params.strandedness,
-             "UniqueIdenticalNotMulti", true, params.ref.genome_gff, 2)
+             "UniqueIdenticalNotMulti", true, params.ref.genome_gff, offset + 2)
         bams = STAR.out.mapped
         chimeric_junction = STAR.out.chimeric
         counts = STAR.out.counts
     } else {
-        BWA(FASTP.out.passed, params.ref.genome, 2)
-        MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, 3)
+        BWA(FASTP.out.passed, params.ref.genome, offset + 2)
+        MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, offset + 3)
         BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants,
-             false, 4)
+             false, offset + 4)
         bams = BQSR.out.bam
         chimeric_junction = Channel.empty()
         counts = Channel.empty()
