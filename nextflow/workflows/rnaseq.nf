@@ -21,4 +21,20 @@ workflow rnaseq {
     if (params.detect_fusion) {
         STAR_FUSION(PREPROCESS_FASTQ.out.chimeric, params.ref.star_lib, 2)
     }
+
+    // Metrics
+    //
+    metric_bams = Utl.modifyMeta(PREPROCESS_FASTQ.out.bam,
+                                 ["out": { "${params.outdir}/${it[0].id}/metrics" },
+                                  "log": { "${params.logdir}/${it[0].id}/metrics" }])
+
+    DUPRADAR(metric_bams, params.ref.genome_gff, params.strandedness, true, 4)
+
+    to_picard = Utl.joinFirst(metric_bams, [PREPROCESS_FASTQ.out.bam_index])
+    PICARD(to_picard, "rnaseq", params.ref.genome, "", "", params.ref.genome_gff, 4)
+
+    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics)
+        .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
+                                     "filename": cohort_name], it] })
+    MULTIQC(to_multiqc, 5)
 }
