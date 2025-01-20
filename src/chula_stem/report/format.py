@@ -16,7 +16,11 @@ import polars.selectors as cs
 from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
 from chula_stem.databases import TherapyDB
 from chula_stem.report.spec import URL, Rename
-from chula_stem.utils import add_loc, empty_string2null, read_facets_rds
+from chula_stem.utils import (
+    add_loc,
+    empty_string2null,
+    str_split_unique,
+)
 
 TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 
@@ -216,6 +220,13 @@ def classify_cnv_fmt(
     return with_cn, relevant, nonrelevant
 
 
+def format_var_type(var: str) -> str:
+    to_remove = ["_variant$"]
+    for pat in to_remove:
+        var = re.sub(pat, "", var)
+    return var.strip()
+
+
 def vep_fmt(
     vep_path: str,
     variant_class: str,
@@ -262,16 +273,13 @@ def vep_fmt(
                     )
                 )
     df = (
-        df.with_columns(
-            pl.col("HGVS").str.extract(r".*:(.*)$", 1),
-            pl.col("Variant Type").str.replace("_variant$", ""),
-        )
+        df.with_columns(pl.col("HGVS").str.extract(r".*:(.*)$", 1))
+        .pipe(lambda x: str_split_unique(x, "Variant Type", ";", ";", format_var_type))
         .with_columns(
             cs.by_dtype(pl.String)
             .str.replace_all("&", ", ", literal=True)
             .str.replace_all("_", " ", literal=True),
         )
-        .pipe(lambda x: str_split_unique(x, "Variant Type", ",", ", "))
         .with_columns(
             impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP, default=0)
         )
