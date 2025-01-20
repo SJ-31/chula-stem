@@ -2,13 +2,32 @@
 
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
+from typing import Callable
 
 import click
-import pandas as pd
 import polars as pl
 
 
-# rx method is equivalent to [], rx2 is [[]]
+def str_split_unique(
+    df: pl.DataFrame,
+    col: str,
+    separator: str,
+    collapse: str | None = None,
+    processing_fn: Callable = str.strip,
+) -> pl.DataFrame:
+    collapse = collapse if collapse is not None else separator
+    return df.with_columns(
+        pl.col(col)
+        .str.split(separator)
+        .list.unique()
+        .map_elements(
+            lambda str_list: list(map(lambda y: processing_fn(y), str_list)),
+            return_dtype=pl.List(pl.String),
+        )
+        .list.join(collapse)
+    )
+
+
 def empty_string2null(df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(
         pl.when(pl.col(pl.String).str.len_chars() == 0)
@@ -54,13 +73,6 @@ def classify_cnv_format(caller: str, input: str, output: str, tumor_sample: str)
         df = pl.read_csv(input, separator="\t", infer_schema_length=None).select(
             ["chromosome", "start", "end", "cn"]
         )
-    elif caller.lower() == "facets":
-        base = importr("base")
-        df: pl.DataFrame = (
-            read_facets_rds(input)
-            .select(["chrom", "start", "end", "tcn.em"])
-            .rename({"tcn.em": "cn"})
-        )
     elif caller.lower() == "dellycnv":
         from subprocess import run
 
@@ -81,16 +93,6 @@ def classify_cnv_format(caller: str, input: str, output: str, tumor_sample: str)
     df.filter(pl.col("cn") != 2).with_columns(
         type=pl.col("cn").map_elements(dup_or_del, return_dtype=pl.String)
     ).drop("cn").write_csv(output, separator="\t", include_header=False)
-
-
-def read_facets_rds(rds_path: str) -> pl.DataFrame:
-    base = importr("base")
-    df: pd.DataFrame = r2pd(base.readRDS(rds_path).rx2("segs"))
-    try:
-        df = df.astype({"chrom": "int32"})
-    except:
-        pass
-    return pl.from_pandas(df, schema_overrides={"chrom": pl.String})
 
 
 @click.command()
