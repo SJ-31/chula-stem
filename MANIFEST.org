@@ -1,3 +1,8 @@
+* GCA_000001405.15_GRCh38_no_alt_analysis_set_100.bw
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/tool_specific/GCA_000001405.15_GRCh38_no_alt_analysis_set_100.bw=
+*Date added*: <2025-01-20 Mon>
+*Source:* [[https://s3.amazonaws.com/purecn/GCA_000001405.15_GRCh38_no_alt_analysis_set_100.bw]]
+100-kmer mappability file for hg38, intended for use with PureCN, prepared by the Waldron lab.
 * TCGA_HCC
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/public_data/TCGA_HCC=
 *Date added*: <2025-01-15 Wed>
