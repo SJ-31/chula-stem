@@ -135,9 +135,6 @@ workflow whole_exome {
     /*
     * Copy number abberation
     */
-    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
-    // TODO: join this with an estimate of window_size from cnvkit's autobin
-    FACETS(FACETS_PILEUP.out.pileup, 5)
 
     def nullIfNotNum = { it.text.isNumber() ? it.text : null }
     purity_ploidy = FACETS.out.purity_ploidy
@@ -150,11 +147,15 @@ workflow whole_exome {
                                 "log": "${params.outdir}/cnvkit_reference"])
                                 .merge(collected_normals),
                     params.ref.genome, params.ref.baits_unzipped,
-                    params.ref.genome_blacklist, 4)
+                    params.ref.genome_blacklist, true, "hybrid", 4)
         cnvkit_reference = CNVKIT_PREP.out.reference.first()
+        cnvkit_autobin = CNVKIT_PREP.out.autobin.first()
     } else {
         cnvkit_reference = params.ref.cnvkit_reference
+        cnvkit_autobin = params.ref.cnvkit_autobin
     }
+    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
+    FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
 
     to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
             .join(Utl.getId(QC_SMALL.out.vcf))

@@ -5,7 +5,8 @@ process FACETS {
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(counts_file), val(window_size) // Output from facets_pileup
+    tuple val(meta), path(counts_file) // Output from facets_pileup
+    val(cnvkit_autobin) // estimate of bin size produced by `cnvkit.py autobin` stdout
     val(module_number)
     //
 
@@ -23,8 +24,14 @@ process FACETS {
     tsv = "${prefix}/${prefix}_hisens.tsv"
     check2 = file("${meta.out}/${tsv}")
     with_caller = meta + ["caller": "facets"]
-    window_size = window_size ? window_size : 250
+    if (cnvkit_autobin) {
+        bin_size = file(cnvkit_autobin).readLines()[1].split()[2]
+        size_flag = Utl.overrideArgs(["--snp-window-size ${bin_size}"], task.ext.args)
+    } else {
+        size_flag = ""
+    }
     args = task.ext.args.join(" ")
+
     if (check.exists() && check2.exists()) {
         """
         cp -r $check .
@@ -33,11 +40,15 @@ process FACETS {
         """
     } else {
         """
+        if [[ -e ${cnvkit_autobin} ]];
+
+        fi
+
         run-facets-wrapper.R \\
             --counts-file ${counts_file} \\
             --sample-id ${prefix} \\
             --genome ${task.ext.genome} \\
-            --snp-window-size ${window_size} \\
+            ${size_flag} \\
             ${args}
 
         cut -f 2 ${prefix}/${prefix}.txt | tail -n 1 > ${prefix}/purity.txt
