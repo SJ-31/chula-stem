@@ -138,7 +138,7 @@ workflow whole_exome_tumor_only {
                                 "log": "${params.outdir}/cnvkit_cnn"])
                         .merge(Channel.fromPath("${params.configdir}/EMPTY.txt")),
                     params.ref.genome, params.ref.baits_unzipped,
-                    params.ref.genome_blacklist, 4)
+                    params.ref.genome_blacklist, false, "hybrid", 4)
         cnvkit_reference = CNVKIT_PREP.out.reference.first()
     } else {
         cnvkit_reference = params.ref.cnvkit_reference
