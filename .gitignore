@@ -136,3 +136,9 @@ docs
 /tests/report_params.yaml
 /.command_history.el
 /8-cohort-MultiQC.html
+/analyses/hcc/.nextflow.pid
+/analyses/hcc/.nextflow/
+/analyses/hcc/Unzipped_covered.antitarget.bed
+/analyses/hcc/Unzipped_covered.target.bed
+/analyses/hcc/binned.txt
+/analyses/hcc/window.txt

@@ -271,20 +271,21 @@ def vep_fmt(
             .str.replace_all("&", ", ", literal=True)
             .str.replace_all("_", " ", literal=True),
         )
+        .pipe(lambda x: str_split_unique(x, "Variant Type", ",", ", "))
         .with_columns(
             impact_score=pl.col("IMPACT").replace_strict(IMPACT_MAP, default=0)
         )
         .sort(pl.col("impact_score"), descending=True)
         .group_by(pl.col(["Gene", "Locus"]))
         .agg(pl.all().first())
-        .filter(
-            (pl.col("Gene").is_not_null())
-            & (pl.col(clinsig) != "-")
-            & (~str_split_contains(clinsig, ["benign", "likely benign"], separator=";"))
-        )
+        .filter((pl.col("Gene").is_not_null()) & (pl.col(clinsig) != "-"))
         .cast(pl.String)
         .fill_null("-")
     )
+    if variant_class != "sv":
+        df = df.filter(
+            ~str_split_contains(clinsig, ["benign", "likely benign"], separator=";")
+        )
     if not df.is_empty():
         df = pl.concat(
             [
