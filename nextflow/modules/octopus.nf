@@ -37,7 +37,7 @@ process OCTOPUS {
         """
     } else {
         """
-        if [[ -e "${previous_variants}" ]]; then
+        if [[ -e "${previous_variants}" && -n "${prev_flag}" ]]; then
             bcftools index ${previous_variants}
         fi
 
@@ -49,7 +49,7 @@ process OCTOPUS {
             --threads ${task.cpus} \\
             --output tmp.vcf
 
-        if [[ ${params.tumor_only} == "false" ]]; then
+        if [[ "${params.tumor_only}" == "false" ]]; then
             bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" tmp.vcf | \\
                 vcf_info_add_tag.bash -n ${params.source_name} \\
                     -d "$params.source_description" \\
