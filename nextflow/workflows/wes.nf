@@ -143,18 +143,24 @@ workflow whole_exome {
     purity_ploidy = FACETS.out.purity_ploidy
         .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
-    collected_normals = normals.map({ it[2] }).toList()
-    CNVKIT_PREP(Channel.of(["filename": cohort_name,
-                            "out": "${params.outdir}/cnvkit_reference",
-                            "log": "${params.outdir}/cnvkit_reference"])
-                            .merge(collected_normals),
-                params.ref.genome, params.ref.baits_unzipped, params.ref.genome_blacklist, 4)
+    if (!params.ref.cnvkit_reference) {
+        collected_normals = normals.map({ it[2] }).toList()
+        CNVKIT_PREP(Channel.of(["filename": cohort_name,
+                                "out": "${params.outdir}/cnvkit_reference",
+                                "log": "${params.outdir}/cnvkit_reference"])
+                                .merge(collected_normals),
+                    params.ref.genome, params.ref.baits_unzipped,
+                    params.ref.genome_blacklist, 4)
+        cnvkit_reference = CNVKIT_PREP.out.reference.first()
+    } else {
+        cnvkit_reference = params.ref.cnvkit_reference
+    }
 
     to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
             .join(Utl.getId(QC_SMALL.out.vcf))
             .join(purity_ploidy))
 
-    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
+    CNVKIT(to_cnvkit, cnvkit_reference, "hybrid", 5)
 
     CLASSIFY_CNV_FORMAT(CNVKIT.out.cns.mix(FACETS.out.rds), 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed

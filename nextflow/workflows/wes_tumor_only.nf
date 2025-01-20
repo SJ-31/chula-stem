@@ -40,7 +40,7 @@ workflow whole_exome_tumor_only {
      */
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
 
-    empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, 1)
+    empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, "", 1)
     tumors = PREPROCESS_FASTQ.out.bam.map { [
                         ["type": "paired",
                         "id": it[0].id,
@@ -52,7 +52,7 @@ workflow whole_exome_tumor_only {
     // tumors: [meta, bam]
 
     indices = PREPROCESS_FASTQ.out.bam_index
-    empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, 1)
+    empty_indices = EMPTY_FILES_2(PREPROCESS_FASTQ.out.bam_index, "", 1)
     all_indices = Utl.getId(indices).mix(Utl.getId(empty_indices))
         .groupTuple()
 
@@ -132,18 +132,23 @@ workflow whole_exome_tumor_only {
     */
     purity_ploidy = tumors.map({ [it[0].id, null, null] })
 
-    CNVKIT_PREP(Channel.of(["filename": "flat_reference",
-                            "out": "${params.outdir}/cnvkit_cnn",
-                            "log": "${params.outdir}/cnvkit_cnn"])
-                    .merge(Channel.fromPath("${params.configdir}/EMPTY.txt")),
-                params.ref.genome, params.ref.baits_unzipped,
-                params.ref.genome_blacklist, 4)
+    if (!params.ref.cnvkit_reference) {
+        CNVKIT_PREP(Channel.of(["filename": "flat_reference",
+                                "out": "${params.outdir}/cnvkit_cnn",
+                                "log": "${params.outdir}/cnvkit_cnn"])
+                        .merge(Channel.fromPath("${params.configdir}/EMPTY.txt")),
+                    params.ref.genome, params.ref.baits_unzipped,
+                    params.ref.genome_blacklist, 4)
+        cnvkit_reference = CNVKIT_PREP.out.reference.first()
+    } else {
+        cnvkit_reference = params.ref.cnvkit_reference
+    }
 
     to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
                           .join(Utl.getId(QC_SMALL.out.vcf))
                           .join(purity_ploidy))
 
-    CNVKIT(to_cnvkit, CNVKIT_PREP.out.reference.first(), "hybrid", 5)
+    CNVKIT(to_cnvkit, cnvkit_reference, "hybrid", 5)
 
     CLASSIFY_CNV_FORMAT(CNVKIT.out.cns, 5)
 
