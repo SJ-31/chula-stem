@@ -7,6 +7,7 @@ process EMPTY_FILES {
 
     input:
     tuple val(meta), path(file)
+    val(name)
     val(count)
     //
 
@@ -15,10 +16,10 @@ process EMPTY_FILES {
     //
 
     script:
-    name = file.baseName
+    n = name ? name : file.baseName
     """
     for i in \$(seq 1 ${count}); do
-        touch "${name}_\${i}.empty"
+        touch "${n}_\${i}.empty"
     done
     """
     //
