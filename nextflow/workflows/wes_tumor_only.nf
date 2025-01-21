@@ -28,8 +28,10 @@ include { CROSS_REFERENCE as CROSS_REFERENCE_CNV } from "../modules/cross_refere
 include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
 include { FACETS } from "../modules/facets.nf"
 include { VEP } from "../modules/vep.nf"
-include { CLAIRS } from '../modules/clairs.nf'
-include { MUTECT2 } from '../modules/mutect2.nf'
+include { CLAIRS } from "../modules/clairs.nf"
+include { MUTECT2 } from "../modules/mutect2.nf"
+include { REPORT } from "../modules/report.nf"
+include { GET_THERAPY_CACHE } from "../modules/get_therapy_cache.nf"
 
 workflow whole_exome_tumor_only {
 
@@ -94,22 +96,21 @@ workflow whole_exome_tumor_only {
         MUTECT2_COMPLETE.out, [CLAIRS_TO.out.variants]
     ).map({ toConcat("Small_all", "annotations", it) })
 
-    CONCAT_SMALL_1(small_variants_to_oct, params.ref.genome, 6)
+    CONCAT_SMALL_1(small_variants_to_oct, 6)
 
     to_octopus = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
 
     OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
 
     CONCAT_SMALL_2(Utl.joinFirst(CONCAT_SMALL_1.out.vcf, [OCTOPUS.out.variants])
-                    .map({ toConcat("Small_all", "annotations", it) }),
-                   params.ref.genome, 6)
+                    .map({ toConcat("Small_all", "annotations", it) }), 6)
 
     small_variants = CONCAT_SMALL_2.out.vcf
 
     structural_variants = Utl.joinFirst(MANTA.out.somatic, [GRIDSS.out.variants])
         .map({ toConcat("SV_all", "annotations", it) })
 
-    CONCAT_SV(structural_variants, params.ref.genome, 6)
+    CONCAT_SV(structural_variants, 6)
 
     /*
      * Metric collection and QC
@@ -221,8 +222,42 @@ workflow whole_exome_tumor_only {
                                                     PICARD.out.metrics,
                                                     BCFTOOLS_STATS.out.py)
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
-        "filename": cohort_name], it] })
+                                     "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 8)
 
-}
+    // Combine channels for report
+    vep_grouped = Utl.getId(CALLSET_QC_TSV.out.tsv)
+        .groupTuple(sort: { (it.baseName =~ /VEP_small/) ? 1 : -1 })
+    vep_to_report = vep_grouped
+        .map({ [it[0]] + [vep_small: it[1][1], vep_sv: it[1][0]] })
 
+    others = Utl.joinFirst(SIGPROFILERASSIGNMENT.out.activities,
+                           [CNVKIT.out.cns, CNVKIT.out.cnr,
+                            CROSS_REFERENCE_CNV.out.tsv,
+                            CROSS_REFERENCE_MSI.out.tsv ]).map(
+        { [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
+                   cnvkit_cnr: it[3], classify_cnv: it[4],
+                   msisensor_pro: it[5],
+                   civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
+                   pandrugs2_cache: params.ref.pandrugs2_cache ? params.ref.pandrugs2_cache : "pandrugs2_cache.json",
+                   cosmic_reference: params.ref.cosmic_reference], ]})
+
+    to_report = Utl.modifyMeta(Utl.delId(Utl.getId(others, true).join(vep_to_report))
+                               .map({ [it[0], it[1] + it[2]] }),
+                               [out: { "${params.outdir}/${it.id}" },
+                                log: { "${params.logdir}/${it.id}" }])
+
+    // if (!params.ref.civic_cache && !params.ref.pandrugs2_cache) {
+    //     all_vep = vep_grouped.map({ it[1] }).flatten().collect().map({
+    //         [[out: "${params.outdir}/cache", log: params.logdir], it]
+    //     })
+    //     GET_THERAPY_CACHE(all_vep)
+    //     caches = GET_THERAPY_CACHE.out.civic
+    //         .mix(GET_THERAPY_CACHE.out.pandrugs2).collect()
+    // } else {
+    //     caches = Channel.fromPath(params.ref.civic_cache)
+    //         .mix(Channel.fromPath(params.ref.pandrugs2_cache)).collect()
+    // }
+    caches = [] // <2025-01-08 Wed> for temporary debugging
+    REPORT(to_report, caches, "variant_calling", 8)
+}

@@ -7,7 +7,6 @@ process CONCAT_VCF {
 
     input:
     tuple val(meta), path(vcfs, arity: "2..*")
-    val(reference)
     val(module_number)
     //
 

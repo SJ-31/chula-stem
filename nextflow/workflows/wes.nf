@@ -101,7 +101,7 @@ workflow whole_exome {
                                             MUSE2.out.variants])
         .map({ toConcat("Concat_to_oct", "paired", it) })
 
-    CONCAT_SMALL_1(small_variants_to_geno, params.ref.genome, 6)
+    CONCAT_SMALL_1(small_variants_to_geno, 6)
 
     // Octopus and Clairs uses previous variants to aid calling
     to_geno = Utl.joinFirst(paired, [CONCAT_SMALL_1.out.vcf])
@@ -111,13 +111,13 @@ workflow whole_exome {
     to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,
                                       [OCTOPUS.out.variants,
                                        CLAIRS.out.variants])
-    CONCAT_SMALL_2(to_concat_small_2, params.ref.genome, 6)
+    CONCAT_SMALL_2(to_concat_small_2, 6)
 
     structural_variants = Utl.joinFirst(MANTA.out.somatic,
                                         [DELLY_SV.out.variants, GRIDSS.out.variants])
         .map({ toConcat("SV_all", "annotations", it) })
 
-    CONCAT_SV(structural_variants, params.ref.genome, 6)
+    CONCAT_SV(structural_variants, 6)
 
     to_std_small = Utl.joinFirst(CONCAT_SMALL_2.out.vcf,
                                  [branched.normal, branched.tumor])
@@ -141,7 +141,8 @@ workflow whole_exome {
         .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
     if (!params.ref.cnvkit_reference) {
-        collected_normals = normals.map({ it[2] }).toList()
+        collected_normals = normals.map({ it[2] })
+            .mix(PREPROCESS_FASTQ.out.bam_index.map({ it[1] })).toList()
         CNVKIT_PREP(Channel.of(["filename": cohort_name,
                                 "out": "${params.outdir}/cnvkit_reference",
                                 "log": "${params.outdir}/cnvkit_reference"])
