@@ -29,10 +29,11 @@ process CLAIRS_TO {
         """
     } else {
         """
+        name=\$( tag_from_sam.bash ${tumor} RG SM )
         run_clairs_to ${args} \\
             --tumor_bam_fn ${tumor} \\
             --ref_fn ${reference} \\
-            --sample_name ${meta.RGSM_tumor} \\
+            --sample_name \${name} \\
             --threads ${task.cpus} \\
             --platform ${task.ext.platform} \\
             ${target_flag} \\
