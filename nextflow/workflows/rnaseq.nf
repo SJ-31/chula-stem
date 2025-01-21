@@ -33,7 +33,9 @@ workflow rnaseq {
     to_picard = Utl.joinFirst(metric_bams, [PREPROCESS_FASTQ.out.bam_index])
     PICARD(to_picard, "rnaseq", params.ref.genome, "", "", params.ref.genome_gff, 4)
 
-    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics)
+    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics,
+                                                     PREPROCESS_FASTQ.out.counts
+    )
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
                                      "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 5)

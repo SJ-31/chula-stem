@@ -86,7 +86,7 @@ CRITERIA = [
     (
         "<b>Small and Structural Variants</b>",
         'Must have a ClinVar annotation to "pathogenic" or "likely pathogenic"',
-        'Removed entries having only ClinVar annotations of "benign" or "likely benign"',
+        'Removed entries having only ClinVar annotations of "benign" or "likely benign" (small variants only)',
     ),
     (
         "<b>Copy Number Variants</b>",

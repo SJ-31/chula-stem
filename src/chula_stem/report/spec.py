@@ -133,10 +133,10 @@ class Widths:
     }
     signature = {
         "Signature": AVAILABLE_WIDTH * 0.12,
-        "Count": AVAILABLE_WIDTH * 0.15,
+        "Count": AVAILABLE_WIDTH * 0.18,
         "Frequency": AVAILABLE_WIDTH * 0.1,
         "Collection": AVAILABLE_WIDTH * 0.1,
-        "Proposed Aetiology": AVAILABLE_WIDTH * 0.53,
+        "Proposed Aetiology": AVAILABLE_WIDTH * 0.50,
     }
     therapy = {
         "Therapy": AVAILABLE_WIDTH * 0.19,

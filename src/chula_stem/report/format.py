@@ -82,6 +82,7 @@ def get_copy_number(
     """
     wanted_cols = df.columns + [cn_col_name]
     if facets_path:
+        # TODO: need to fix this
         facets: pl.DataFrame = read_facets_rds(facets_path).rename(
             {"tcn.em": cn_col_name}
         )

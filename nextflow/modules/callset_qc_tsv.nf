@@ -13,7 +13,7 @@ process CALLSET_QC_TSV {
     //      element tools, as those are likely to be more accurate in such cases
     //      Can be disabled by just sending an empty file
     val(qc)
-    // Meta must have a key "qc" whose value is a map specifying filters to apply
+    // Meta can also have a key "qc" whose value is a map specifying filters to apply
     // Currently supported are..
     // -- General
     //  - min_tumor_depth: the minimum number of ALT reads found in the tumor (FORMAT/DP)
@@ -42,6 +42,7 @@ process CALLSET_QC_TSV {
     output = Utl.getName(module_number, meta, "QC", "tsv")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
+    outlog = "${output}_qc_tsv.log"
 
     ignore_flag = !ignore_regions.empty() ? " --ignore_regions ${ignore_regions} " : ""
 
@@ -65,7 +66,7 @@ process CALLSET_QC_TSV {
     if (check.exists()) {
         """
         ln -sr ${check} .
-        ln -sr ${meta.log}/filter_qc.log .
+        ln -sr ${meta.log}/${outlog} .
         """
     } else {
         """
@@ -77,7 +78,8 @@ process CALLSET_QC_TSV {
             ${filter_flag} \\
             ${all}
 
-        get_nextflow_log.bash qc_tsv.log
+        get_nextflow_log.bash ${outlog}
+        echo "QC flags\n${all}" >> ${outlog}
         """
     }
     //

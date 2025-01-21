@@ -7,6 +7,7 @@ process CREATE_PANEL_OF_NORMALS {
     input:
     tuple val(meta), path(genomics_db)
     val(reference)
+    val(germline_resource)
     val(module_number)
     //
 
