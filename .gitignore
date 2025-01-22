@@ -142,3 +142,4 @@ docs
 /analyses/hcc/Unzipped_covered.target.bed
 /analyses/hcc/binned.txt
 /analyses/hcc/window.txt
+/nextflow/bin/tag_from_sam.bash
