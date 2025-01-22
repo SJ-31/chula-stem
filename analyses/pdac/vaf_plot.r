@@ -1,5 +1,6 @@
 library(tidyverse)
 library(ggplot2)
+library(paletteer)
 library(glue)
 library(here)
 library(reticulate)
@@ -77,12 +78,12 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
 recode_var_types <- function(types) {
   case_when(
     grepl("utr variant", types) ~ "UTR variant",
-    grepl("Stop", types) ~ "Stop variant",
-    grepl("Start", types) ~ "Start variant",
     grepl("Splice", types) ~ "Splice variant",
     grepl("Regulatory", types) ~ "Regulatory variant",
-    grepl("Inframe", types) ~ "Inframe variant",
+    grepl("Inframe", types) ~ "Inframe deletion/insertion",
+    grepl("Downstream|Upstream", types) ~ "Downstream/upstream gene variant",
     grepl("Non coding", types) ~ "Non-coding sequence variant",
+    grepl("mirna|Incomplete|Nmd|Start|Stop", types) ~ "Other",
     types == "Protein altering variant" ~ "Missense variant",
     .default = types
   )
@@ -107,22 +108,8 @@ sum_vafs <- select(merged, SYMBOL, sum_VAF) |>
   tb2map("SYMBOL", "sum_VAF", FALSE) |>
   sort(decreasing = TRUE)
 
-mean_vafs <- select(merged, mean_VAF, sum_VAF) |>
-  distinct() |>
-  tb2map("mean_VAF", "sum_VAF", FALSE) |>
-  sort(decreasing = TRUE)
-
-# todo: <2025-01-21 tue> this isn't sorting correctly
-vaf_levels <- names(mean_vafs) |>
-  as.numeric() |>
-  round(2) |>
-  as.character() |>
-  unique()
 
 merged$SYMBOL <- factor(merged$SYMBOL, levels = names(sum_vafs))
-merged$mean_vaf_char <- factor(as.character(round(merged$mean_VAF, 2)),
-  levels = vaf_levels
-)
 
 min_samples <- 16 # genes must be found in this number of samples
 
@@ -140,12 +127,12 @@ custom_filtered <- merged |>
   ungroup()
 
 
-## * plot
+## * Plot
 
 vaf_heatmap <- function(plot) {
   plot +
     geom_tile() +
-    xlab("sample") + ylab("gene") +
+    xlab("Sample") + ylab("Gene") +
     theme_grey() +
     theme(
       plot.background = element_blank(),
@@ -162,7 +149,6 @@ with_consequence <- custom_filtered |>
   prettify() |>
   ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = type)) |>
   vaf_heatmap()
-
 
 with_clinsig <- custom_filtered |>
   prettify() |>
@@ -188,13 +174,22 @@ n_samples <- sbs$sample |>
   unique() |>
   length()
 
+sample_freq <- replicate_figure |>
+  group_by(SYMBOL) |>
+  summarise(freq = (round(n() / n_samples, 2) * 100) |> as.character() %>% paste0(., " %"))
+
+
 sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
   geom_bar(position = "fill", stat = "identity") +
   guides(fill = guide_legend(title = element_blank())) +
   guides(fill = guide_legend(title = element_blank())) +
-  theme_void()
+  theme_void() +
+  scale_fill_paletteer_d("ggthemes::excel_Depth")
 
 # TODO: you don't actually know yet how to get tmb so this is some dummy data
+rep_theme <- "ggthemes::Classic_20"
+axis_title_size <- 12
+
 tmb_merged <- vep_data |>
   mutate(
     sample = str_extract(sample, "P[0-9_]+"),
@@ -202,10 +197,24 @@ tmb_merged <- vep_data |>
     key = recode_var_types(key)
   ) |>
   dplyr::filter(category == "Consequences (all)")
+tmb_max <- group_by(tmb_merged, sample) |>
+  summarise(value = sum(value)) |>
+  pluck("value") |>
+  max()
 tmb_plot <- tmb_merged |> ggplot(aes(x = sample, y = value, fill = key)) +
   geom_bar(position = "stack", stat = "identity") +
   theme_void() +
-  theme(axis.title.x = element_blank())
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(angle = 90, face = "italic", size = axis_title_size),
+    axis.ticks.length.y.left = unit(5, "points"),
+    axis.line.y = element_line(),
+    axis.ticks.y = element_line(), axis.text.y = element_text()
+  ) +
+  ylab("Variant count") +
+  guides(fill = guide_legend(title = element_blank(), position = "bottom")) +
+  scale_fill_paletteer_d(rep_theme) +
+  scale_y_continuous(limits = c(0, tmb_max), expand = c(0, 0), breaks = c(0, tmb_max))
 
 counts_plot <- replicate_figure |>
   prettify() |>
@@ -214,7 +223,8 @@ counts_plot <- replicate_figure |>
   scale_y_discrete(limits = rev) +
   theme_void() +
   theme(
-    axis.text.x = element_text(), axis.title.x = element_text(),
+    axis.text.x = element_text(),
+    axis.title.x = element_text(face = "italic", size = axis_title_size),
     axis.line.x = element_line(), axis.ticks.x = element_line(),
     axis.ticks.length.x = unit(5, "points")
   ) +
@@ -223,48 +233,54 @@ counts_plot <- replicate_figure |>
     breaks = c(0, n_samples), expand = c(0, 0)
   ) +
   xlab("Number of samples") +
-  guides(fill = "none")
+  guides(fill = "none") +
+  scale_fill_paletteer_d(rep_theme)
 
 r1 <- replicate_figure |>
   prettify() |>
   ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = type)) |>
   vaf_heatmap() +
-  scale_y_discrete(limits = rev) + guides(fill = "none")
+  scale_y_discrete(limits = rev) + guides(fill = "none") +
+  scale_fill_paletteer_d(rep_theme) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = axis_title_size),
+    axis.title.y = element_text(size = axis_title_size, face = "italic")
+  )
 
-r2 <- replicate_figure |>
-  prettify() |>
-  ggplot(aes(x = sample, y = mean_vaf_char, alpha = VAF, fill = type)) |>
-  vaf_heatmap() +
-  scale_y_discrete(limits = rev)
+r2 <- r1 + scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
+  guides(fill = "none") + theme(axis.ticks.y = element_blank())
+
+freq_plot <- ggdraw(get_y_axis(r2))
+r3 <- ggdraw(insert_yaxis_grob(r1, get_y_axis(r2),
+  position = "right",
+  width = unit(0.03, "null")
+))
 
 # Get and remove legends
 type_legend <- ggpubr::get_legend(tmb_plot)
 vaf_legend <- ggpubr::get_legend(r1)
 tmb_plot <- tmb_plot + guides(fill = "none")
+
+legends <- ggarrange(ggdraw(type_legend), NULL, ggdraw(vaf_legend))
 r1 <- r1 + guides(alpha = "none")
 
-replicate_plot <- ggdraw(insert_yaxis_grob(r1, get_y_axis(r2, position = "right")))
-
-# <2025-01-22 Wed> Sad hack to change widths
 replicate_plot <- ggarrange(
-  tmb_plot, NULL, NULL,
-  NULL, NULL, NULL,
-  r1, NULL, counts_plot,
-  sbs_plot, NULL, NULL,
-  ncol = 3, nrow = 4, align = "hv",
-  widths = c(0.7, -0.07, 0.3), heights = c(0.2, -0.08, 0.6, 0.2)
+  tmb_plot, NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL,
+  r1, NULL, freq_plot, counts_plot,
+  sbs_plot, NULL, NULL, NULL,
+  ncol = 4, nrow = 4, align = "hv",
+  widths = c(0.7, 0.01, -0.05, 0.3), heights = c(0.2, -0.08, 0.6, 0.2)
 )
 replicate_plot
 
-# TODO: need graph of TMB
-# TODO: need sideways bar plot showing sample count
-# TODO: need column plot showing the frequency of mutation types
+ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0.1))
 
 ggsave(here("analyses", "output", "pdac_vaf_replicate.png"),
   replicate_plot,
   dpi = 500, width = 15
 )
-
 
 ## ** Cross-referenced
 intogen <- read_tsv(here("analyses/data/2024-06-18_IntOGen-Drivers/Compendium_Cancer_Genes.tsv"))
