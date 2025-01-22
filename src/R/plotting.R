@@ -128,3 +128,30 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
     plot
   }
 }
+
+pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"), log = TRUE) {
+  if (class(dgelist) == "DGEList") {
+    counts <- edgeR::cpm(dgelist$counts, log = log) # Convert counts into counts per million
+    # When dgelist is normalized with `normLibSizes`, then cpm automatically generates
+    # normalized counts from the computed normalization factors
+    # This is roughly equivalent to the following:
+    # 1. Get effective library size
+    ## effective_lib_size <- dgelist$samples$lib.size * dgelist$samples$norm.factors
+    # 2. Scale the counts by the lib size
+    ## counts <- t(t(counts) / effective_lib_size)
+  } else {
+    counts <- dgelist$counts
+  }
+  pca <- prcomp(t(counts))
+  summary <- summary(pca)
+  var_pca1 <- summary$importance[, 1]["Proportion of Variance"]
+  var_pca2 <- summary$importance[, 2]["Proportion of Variance"]
+  pcs <- as_tibble(pca$x) |> bind_cols(dgelist$samples)
+  plot_aes <- rlang::syms(plot_aes)
+  aes_fn <- do.call(\(...) aes(x = PC1, y = PC2, ...), plot_aes)
+  plot <- ggplot(pcs, aes_fn) +
+    geom_point() +
+    xlab(glue("PC1 ({var_pca1})")) +
+    ylab(glue("PC2 ({var_pca2})"))
+  plot
+}

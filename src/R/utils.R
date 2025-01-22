@@ -11,6 +11,7 @@ t2tb <- function(x, names = "rowname") {
     as_tibble()
 }
 
+
 basename_no_ext <- function(file) {
   bname <- basename(file)
   splits <- bname |> str_split_1("\\.")
@@ -87,4 +88,11 @@ htest2tb <- function(test) {
     statistic = test$statistic,
     p_value = test$`p.value`
   )
+}
+
+get_legend <- function(myggplot) {
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
 }
