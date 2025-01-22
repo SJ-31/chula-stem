@@ -81,6 +81,8 @@ recode_var_types <- function(types) {
     grepl("Start", types) ~ "Start variant",
     grepl("Splice", types) ~ "Splice variant",
     grepl("Regulatory", types) ~ "Regulatory variant",
+    grepl("Inframe", types) ~ "Inframe variant",
+    grepl("Non coding", types) ~ "Non-coding sequence variant",
     types == "Protein altering variant" ~ "Missense variant",
     .default = types
   )
@@ -88,10 +90,10 @@ recode_var_types <- function(types) {
 
 prettify <- function(tb) {
   tb |> mutate(
-    type = map_chr(consequence, mode_and_capitalize),
-    clinvar = map_chr(clin_sig, \(x) mode_and_capitalize(x, "benign")),
+    type = map_chr(Consequence, mode_and_capitalize),
+    clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
     clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar),
-    type = recode_var_types()
+    type = recode_var_types(type)
   )
 }
 
@@ -128,10 +130,10 @@ custom_filtered <- merged |>
   dplyr::filter(
     !is.na(SYMBOL) &
       VAF >= 0.3 &
-      !is.na(clin_sig) &
-      !is.na(consequence) &
-      map_lgl(consequence, \(x) "missense_variant" %in% x) &
-      map_lgl(clin_sig, \(x) "pathogenic" %in% x)
+      !is.na(CLIN_SIG) &
+      !is.na(Consequence) &
+      map_lgl(Consequence, \(x) "missense_variant" %in% x) &
+      map_lgl(CLIN_SIG, \(x) "pathogenic" %in% x)
   ) |>
   group_by(SYMBOL) |>
   dplyr::filter(n() >= min_samples) |>
@@ -180,7 +182,7 @@ ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
 ## ** replicate plot
 sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
-target_genes <- c("kras", "tp53", "muc5b", "kmt2c", "arid1a", "smad4", "gli3", "cdkn2a")
+target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
 replicate_figure <- merged |> dplyr::filter(SYMBOL %in% target_genes)
 n_samples <- sbs$sample |>
   unique() |>
@@ -207,7 +209,7 @@ tmb_plot <- tmb_merged |> ggplot(aes(x = sample, y = value, fill = key)) +
 
 counts_plot <- replicate_figure |>
   prettify() |>
-  ggplot(aes(y = SYMBOL, fill = Type)) +
+  ggplot(aes(y = SYMBOL, fill = type)) +
   geom_bar() +
   scale_y_discrete(limits = rev) +
   theme_void() +
@@ -225,13 +227,13 @@ counts_plot <- replicate_figure |>
 
 r1 <- replicate_figure |>
   prettify() |>
-  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = Type)) |>
+  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = type)) |>
   vaf_heatmap() +
   scale_y_discrete(limits = rev) + guides(fill = "none")
 
 r2 <- replicate_figure |>
   prettify() |>
-  ggplot(aes(x = sample, y = mean_vaf_char, alpha = VAF, fill = Type)) |>
+  ggplot(aes(x = sample, y = mean_vaf_char, alpha = VAF, fill = type)) |>
   vaf_heatmap() +
   scale_y_discrete(limits = rev)
 
