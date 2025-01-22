@@ -75,26 +75,48 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
     str_replace_all("_", " ")
 }
 
+IGNORED_VARIANTS <- c(
+  "non_coding_transcript_variant",
+  "non_coding_transcript_exon_variant",
+  "incomplete_terminal_codon_variant"
+)
+
 recode_var_types <- function(types) {
   case_when(
     grepl("utr variant", types) ~ "UTR variant",
     grepl("Splice", types) ~ "Splice variant",
     grepl("Regulatory", types) ~ "Regulatory variant",
     grepl("Inframe", types) ~ "Inframe deletion/insertion",
-    grepl("Downstream|Upstream", types) ~ "Downstream/upstream gene variant",
-    grepl("Non coding", types) ~ "Non-coding sequence variant",
-    grepl("mirna|Incomplete|Nmd|Start|Stop", types) ~ "Other",
+    grepl("Downstream|Upstream|Intergenic", types) ~ "Intergenic variant",
+    grepl("Nmd", types) ~ "NMD transcript variant",
+    grepl("mirna|Start|Stop", types) ~ "Other",
     types == "Protein altering variant" ~ "Missense variant",
+    types == "Coding sequence variant" ~ "Other",
     .default = types
   )
 }
 
+tmb_merged <- vep_data |>
+  filter(!key %in% IGNORED_VARIANTS) |>
+  mutate(
+    sample = str_extract(sample, "P[0-9_]+"),
+    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " ")),
+    key = recode_var_types(key)
+  ) |>
+  dplyr::filter(category == "Consequences (all)")
+
+TYPE_ORDER <- tmb_merged |>
+  group_by(key) |>
+  summarise(mean = mean(value)) |>
+  arrange(mean) |>
+  pluck("key")
+
 prettify <- function(tb) {
   tb |> mutate(
-    type = map_chr(Consequence, mode_and_capitalize),
+    type = map_chr(Consequence, \(x) mode_and_capitalize(x, IGNORED_VARIANTS)),
     clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
     clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar),
-    type = recode_var_types(type)
+    type = factor(recode_var_types(type), levels = TYPE_ORDER)
   )
 }
 
@@ -131,7 +153,7 @@ custom_filtered <- merged |>
 
 vaf_heatmap <- function(plot) {
   plot +
-    geom_tile() +
+    geom_tile(width = 0.95, height = 0.95) +
     xlab("Sample") + ylab("Gene") +
     theme_grey() +
     theme(
@@ -178,7 +200,6 @@ sample_freq <- replicate_figure |>
   group_by(SYMBOL) |>
   summarise(freq = (round(n() / n_samples, 2) * 100) |> as.character() %>% paste0(., " %"))
 
-
 sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
   geom_bar(position = "fill", stat = "identity") +
   guides(fill = guide_legend(title = element_blank())) +
@@ -187,38 +208,44 @@ sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
   scale_fill_paletteer_d("ggthemes::excel_Depth")
 
 # TODO: you don't actually know yet how to get tmb so this is some dummy data
-rep_theme <- "ggthemes::Classic_20"
+rep_theme <- "tidyquant::tq_light"
 axis_title_size <- 12
 
-tmb_merged <- vep_data |>
-  mutate(
-    sample = str_extract(sample, "P[0-9_]+"),
-    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " ")),
-    key = recode_var_types(key)
-  ) |>
-  dplyr::filter(category == "Consequences (all)")
 tmb_max <- group_by(tmb_merged, sample) |>
   summarise(value = sum(value)) |>
   pluck("value") |>
   max()
-tmb_plot <- tmb_merged |> ggplot(aes(x = sample, y = value, fill = key)) +
+
+tmb_plot <- tmb_merged |>
+  ggplot(aes(
+    x = sample, y = value,
+    fill = factor(key, levels = TYPE_ORDER)
+  )) +
   geom_bar(position = "stack", stat = "identity") +
   theme_void() +
+  ylab("Variant count") +
   theme(
     axis.title.x = element_blank(),
-    axis.title.y = element_text(angle = 90, face = "italic", size = axis_title_size),
+    axis.title.y = element_text(
+      angle = 90, face = "italic", size = axis_title_size,
+      margin = margin(1, 0.5, 0, 0, unit = "cm")
+    ),
     axis.ticks.length.y.left = unit(5, "points"),
     axis.line.y = element_line(),
     axis.ticks.y = element_line(), axis.text.y = element_text()
   ) +
-  ylab("Variant count") +
   guides(fill = guide_legend(title = element_blank(), position = "bottom")) +
-  scale_fill_paletteer_d(rep_theme) +
+  scale_fill_paletteer_d(rep_theme, drop = FALSE) +
   scale_y_continuous(limits = c(0, tmb_max), expand = c(0, 0), breaks = c(0, tmb_max))
+
+# Sanity check to make sure the legend is aligned
+check <- replicate_figure %>%
+  prettify() %>%
+  select(SYMBOL, type, sample)
 
 counts_plot <- replicate_figure |>
   prettify() |>
-  ggplot(aes(y = SYMBOL, fill = type)) +
+  ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER))) +
   geom_bar() +
   scale_y_discrete(limits = rev) +
   theme_void() +
@@ -234,14 +261,18 @@ counts_plot <- replicate_figure |>
   ) +
   xlab("Number of samples") +
   guides(fill = "none") +
-  scale_fill_paletteer_d(rep_theme)
+  scale_fill_paletteer_d(rep_theme, drop = FALSE)
 
 r1 <- replicate_figure |>
   prettify() |>
-  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = type)) |>
+  ggplot(aes(
+    x = sample, y = SYMBOL, # turned off alpha, was confusing
+    fill = factor(type, levels = TYPE_ORDER)
+  )) |>
   vaf_heatmap() +
-  scale_y_discrete(limits = rev) + guides(fill = "none") +
-  scale_fill_paletteer_d(rep_theme) +
+  scale_y_discrete(limits = rev) +
+  scale_fill_paletteer_d(rep_theme, drop = FALSE) +
+  guides(fill = "none") +
   theme(
     axis.title.x = element_blank(),
     axis.text.x = element_text(size = axis_title_size),
@@ -259,10 +290,13 @@ r3 <- ggdraw(insert_yaxis_grob(r1, get_y_axis(r2),
 
 # Get and remove legends
 type_legend <- ggpubr::get_legend(tmb_plot)
-vaf_legend <- ggpubr::get_legend(r1)
+## vaf_legend <- ggpubr::get_legend(r1)
 tmb_plot <- tmb_plot + guides(fill = "none")
 
-legends <- ggarrange(ggdraw(type_legend), NULL, ggdraw(vaf_legend))
+## legends <- ggarrange(ggdraw(type_legend), NULL, ggdraw(vaf_legend),
+##   nrow = 1, widths = c(0.5, -0.3, 0.5)
+## )
+
 r1 <- r1 + guides(alpha = "none")
 
 replicate_plot <- ggarrange(
@@ -271,14 +305,14 @@ replicate_plot <- ggarrange(
   r1, NULL, freq_plot, counts_plot,
   sbs_plot, NULL, NULL, NULL,
   ncol = 4, nrow = 4, align = "hv",
-  widths = c(0.7, 0.01, -0.05, 0.3), heights = c(0.2, -0.08, 0.6, 0.2)
+  widths = c(0.7, 0.01, -0.06, 0.3), heights = c(0.2, -0.08, 0.6, 0.2)
 )
-replicate_plot
 
-ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0.1))
+final_rep <- ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0.1))
+final_rep
 
 ggsave(here("analyses", "output", "pdac_vaf_replicate.png"),
-  replicate_plot,
+  final_rep,
   dpi = 500, width = 15
 )
 
