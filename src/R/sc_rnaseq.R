@@ -231,14 +231,9 @@ save_sce <- function(sce, filename) {
   }
 }
 
-
 parse_args <- function() {
   library("optparse")
   parser <- OptionParser()
-  parser <- add_option(parser, c("-v", "--verbose"),
-    action = "store_true",
-    default = TRUE, help = "Print extra output [default]"
-  )
   parser <- add_option(parser, c("-b", "--batch"),
     default = NULL,
     type = "character", help = "column containing batch data"
@@ -250,7 +245,7 @@ parse_args <- function() {
   parser <- add_option(parser, c("-m", "--n_mads"),
     default = 3, help = "Minimum number of MADs to consider a cell as an outlier"
   )
-  parser <- add_option(parser, c("-s", "--qc_spec"),
+  parser <- add_option(parser, c("-q", "--qc_spec"),
     type = "character",
     help = "A json file defining additional qc parameters passed to scuttle::isOutlier.
 Each key is the name of a column (metric) in the SingleCellExperiment object to operate on,
