@@ -6,6 +6,34 @@ library(tidyverse)
 library(glue)
 library(zellkonverter)
 
+#' Compute Gini impurity of clustered SingleCellExperiment object
+#'  as described in scBubbleTree package
+#'
+#' @param clusters either a vector of cluster assignments for each cell or a column
+#'    of colData(sce) containing those assignments
+#' @param label_col a column of colData(sce) to compute Gini impurity on
+sce_gini <- function(sce, clusters, label_col) {
+  df <- colData(sce)
+  if (length(clusters) == ncol(df)) {
+    df$temp.clusters <- clusters
+    clusters <- "temp.clusters"
+  }
+  if (!clusters %in% colnames(df)) {
+    stop("`clusters` must be a valid column in sce's colData!")
+  }
+  ginis <- list()
+  whole <- lapply(unique(df[[clusters]]), \(x) {
+    cur <- df[df[[clusters]] == x, ]
+    freq <- table(cur[[label_col]]) / nrow(cur)
+    gini <- sum(freq * (1 - freq))
+    ginis[[x]] <<- gini
+    gini
+  }) |>
+    unlist() |>
+    sum()
+  list(cluster_gini = ginis, whole_gini = whole)
+}
+
 # Requires a SingleCellExperiment object
 # Use zellkonverter as entry into SCverse
 
