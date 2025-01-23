@@ -15,6 +15,8 @@ reticulate::source_python(here("src", "chula_stem", "utils.py"), py_utils)
 
 vaf_merged_file <- here("analyses", "output", "pdac_vaf_merged.tsv")
 sbs_merged_file <- here("analyses", "output", "pdac_sbs.tsv")
+sbs_merged_file_mp <- here("analyses", "output", "pdac_sbs_mp.tsv")
+sbs_merged_file_all <- here("analyses", "output", "pdac_sbs_all.tsv")
 vaf_merged_transcripts_file <- here("analyses", "output", "pdac_vaf_merged_transcripts.tsv")
 data_path <- here("analyses", "data_all", "output", "PDAC")
 
@@ -35,13 +37,13 @@ if (!file.exists(vaf_merged_file)) {
       group_by(SYMBOL) |>
       summarise(
         VAF = mean(VAF),
-        across(where(is.character), \(x) flatten_by(x, collapse = TRUE, unique = FALSE))
+        across(where(is.character), \(x) utils$flatten_by(x, collapse = TRUE, unique = FALSE))
       ) |>
       mutate(census_mutations = map_chr(census_mutations, \(x) {
         if (is.na(x)) {
           return(x)
         }
-        first(modes(str_split_1(x, ";") |> discard(\(x) x == "NA")))
+        first(utils$modes(str_split_1(x, ";") |> discard(\(x) x == "NA")))
       }))
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
@@ -49,7 +51,7 @@ if (!file.exists(vaf_merged_file)) {
   q()
 } else {
   merged <- read_tsv(vaf_merged_file) |>
-    mutate(across(c(Consequence, CLIN_SIG), into_char_list))
+    mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
 }
 
 multiqc_file <- here(data_path, "8-cohort-MultiQC_data", "vep.txt")
@@ -66,7 +68,7 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
     char_vec <- discard(char_vec, \(x) x %in% ignore)
   }
   if (length(char_vec) > 1) {
-    val <- modes(char_vec) |> first()
+    val <- utils$modes(char_vec) |> first()
   } else {
     val <- first(char_vec)
   }
@@ -127,11 +129,18 @@ merged <- merged |>
 
 sum_vafs <- select(merged, SYMBOL, sum_VAF) |>
   distinct() |>
-  tb2map("SYMBOL", "sum_VAF", FALSE) |>
+  utils$tb2map("SYMBOL", "sum_VAF", FALSE) |>
+  sort(decreasing = TRUE) # Sort order by the summed VAF
+
+by_frequency <- select(merged, SYMBOL, sample) |>
+  distinct() |>
+  group_by(SYMBOL) |>
+  summarise(count = n()) |>
+  utils$tb2map("SYMBOL", "count", FALSE) |>
   sort(decreasing = TRUE)
 
-
-merged$SYMBOL <- factor(merged$SYMBOL, levels = names(sum_vafs))
+## merged$SYMBOL <- factor(merged$SYMBOL, levels = names(sum_vafs))
+merged$SYMBOL <- factor(merged$SYMBOL, levels = names(by_frequency))
 
 min_samples <- 16 # genes must be found in this number of samples
 
@@ -189,6 +198,8 @@ ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
 
 ## ** replicate plot
 sbs <- read_tsv(sbs_merged_file)
+sbs_mp <- read_tsv(sbs_merged_file_mp)
+sbs2 <- read_tsv(sbs_merged_file_all)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
 replicate_figure <- merged |> dplyr::filter(SYMBOL %in% target_genes)
@@ -202,7 +213,6 @@ sample_freq <- replicate_figure |>
 
 sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
   geom_bar(position = "fill", stat = "identity") +
-  guides(fill = guide_legend(title = element_blank())) +
   guides(fill = guide_legend(title = element_blank())) +
   theme_void() +
   scale_fill_paletteer_d("ggthemes::excel_Depth")
@@ -278,6 +288,7 @@ r1 <- replicate_figure |>
     axis.text.x = element_text(size = axis_title_size),
     axis.title.y = element_text(size = axis_title_size, face = "italic")
   )
+r1
 
 r2 <- r1 + scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
   guides(fill = "none") + theme(axis.ticks.y = element_blank())
@@ -341,7 +352,7 @@ with_census <- inner_join(merged, census, by = join_by(
     (!is.na(Tumour_TypesSomatic)))
 
 
-mutation_types <- flatten_by(census$Mutation_Types, ",", collapse = FALSE) |>
+mutation_types <- utils$flatten_by(census$Mutation_Types, ",", collapse = FALSE) |>
   unlist() |>
   map_chr(\(x) trimws(x)) |>
   unique()
