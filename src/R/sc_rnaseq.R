@@ -1,5 +1,6 @@
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
+library(edgeR)
 library(tidyverse)
 library(glue)
 library(zellkonverter)
@@ -122,4 +123,41 @@ qc_thresholds <- function(sce_metrics, thresholds) {
   df <- as.data.frame(threshold_tracker)
   df$discard <- apply(df, 1, any)
   df
+}
+
+#' Helper function for producing a diagnostic plot of cell loss
+#'  Based on the plot described in Chapter 1.5 of OSCA Advanced
+#'
+#' @param gene_spec A list where names are cell types or conditions and values are the
+#'    characteristic genes of that condition or type
+#' @return A ggplot object plotting log-FC (discarded/kept) over log average count
+diagnose_cell_loss <- function(sce, gene_spec, discard = NULL, identifier = "SYMBOL") {
+  if (is.null(discard)) d <- sce$discard else d <- discard
+  discarded <- calculateAverage(counts(sce)[, d])
+  kept <- calculateAverage(counts(sce)[, !d])
+  logged <- edgeR::cpm(cbind(discarded, kept), log = TRUE)
+  id_vec <- rowData(sce)[[identifier]]
+  log_fc <- logged[, 1] - logged[, 2] # Expression fold-change (discarded/kept)
+  log_avg_counts <- rowMeans(logged)
+  tb <- tibble(!!as.symbol(identifier) := id_vec,
+    log_fc = log_fc,
+    log_avg_counts = log_avg_counts
+  )
+  tb$Category <- map_chr(tb[[identifier]], \(x) {
+    for (n in names(gene_spec)) {
+      if (x %in% gene_spec[[n]]) {
+        return(n)
+      }
+    }
+    "Other"
+  })
+  ggplot(tb, aes(x = log_avg_counts, y = log_fc, color = Category)) +
+    geom_point() +
+    xlab("Log average count") +
+    ylab("Log fold change (discarded/kept)")
+}
+
+
+main <- function() {
+
 }
