@@ -1,0 +1,36 @@
+###For more options see: http://boevalab.com/FREEC/tutorial.html#CONFIG ###
+
+[general]
+chrLenFile =  # Genome fasta index
+window = 0 # 0 for WES? 50000 for WGS
+ploidy = 2,3 # Estimates of ploidy, it will choose the one that explains the data best
+# outputDir = /myOutputDirectory/
+# contamination = # Level of contamination, 0-1
+# contaminationAdjustment = TRUE # Automatically evaluate level of contamination
+#sex=XY
+# breakPointType=4 ???
+chrFiles =  # Path to chromosome FASTAs
+maxThreads=6
+
+breakPointThreshold=1.2 # Recommended here
+noisyData=TRUE # Set TRUE for targeted data e.g. exome
+printNA=FALSE # Print NA instead of -1
+
+readCountThreshold=50
+
+[sample]
+mateFile = # Tumor bam file
+inputFormat = BAM
+mateOrientation = FR # FR for Illumina paired-ends
+
+[control]
+mateFile = # Normal bam file
+inputFormat = BAM
+mateOrientation = FR
+
+[BAF]
+# SNPfile = # vcf/vcf.gz file with known (germline) SNPs
+minimalCoveragePerPosition = 5
+
+[target]
+# captureRegions = # Target capture file as sorted .BED file

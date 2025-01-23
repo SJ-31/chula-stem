@@ -1,0 +1,160 @@
+Signature,Proposed_Aetiology,Link,Collection
+SBS1,Spontaneous deamination of 5-methylcytosine (clock-like signature),https://cancer.sanger.ac.uk/signatures/sbs/sbs1,SBS
+SBS2,Activity of APOBEC family of cytidine deaminases,https://cancer.sanger.ac.uk/signatures/sbs/sbs2,SBS
+SBS3,Defective homologous recombination DNA damage repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs3,SBS
+SBS4,Tobacco smoking,https://cancer.sanger.ac.uk/signatures/sbs/sbs4,SBS
+SBS5,Unknown (clock-like signature),https://cancer.sanger.ac.uk/signatures/sbs/sbs5,SBS
+SBS6,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs6,SBS
+SBS7a,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs7a,SBS
+SBS7b,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs7b,SBS
+SBS7c,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs7c,SBS
+SBS7d,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs7d,SBS
+SBS8,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs8,SBS
+SBS9,Polimerase eta somatic hypermutation activity,https://cancer.sanger.ac.uk/signatures/sbs/sbs9,SBS
+SBS10a,Polymerase epsilon exonuclease domain mutations,https://cancer.sanger.ac.uk/signatures/sbs/sbs10a,SBS
+SBS10b,Polymerase epsilon exonuclease domain mutations,https://cancer.sanger.ac.uk/signatures/sbs/sbs10b,SBS
+SBS10c,Defective POLD1 proofreading,https://cancer.sanger.ac.uk/signatures/sbs/sbs10c,SBS
+SBS10d,Defective POLD1 proofreading,https://cancer.sanger.ac.uk/signatures/sbs/sbs10d,SBS
+SBS11,Temozolomide treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs11,SBS
+SBS12,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs12,SBS
+SBS13,Activity of APOBEC family of cytidine deaminases,https://cancer.sanger.ac.uk/signatures/sbs/sbs13,SBS
+SBS14,Concurrent polymerase epsilon mutation and defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs14,SBS
+SBS15,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs15,SBS
+SBS16,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs16,SBS
+SBS17a,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs17a,SBS
+SBS17b,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs17b,SBS
+SBS18,Damage by reactive oxygen species,https://cancer.sanger.ac.uk/signatures/sbs/sbs18,SBS
+SBS19,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs19,SBS
+SBS20,Concurrent POLD1 mutations and defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs20,SBS
+SBS21,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs21,SBS
+SBS22a,Aristolochic acid exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs22a,SBS
+SBS22b,Aristolochic acid exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs22b,SBS
+SBS23,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs23,SBS
+SBS24,Aflatoxin exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs24,SBS
+SBS25,Chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs25,SBS
+SBS26,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs26,SBS
+SBS28,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs28,SBS
+SBS29,Tobacco chewing,https://cancer.sanger.ac.uk/signatures/sbs/sbs29,SBS
+SBS30,Defective DNA base excision repair due to NTHL1 mutations,https://cancer.sanger.ac.uk/signatures/sbs/sbs30,SBS
+SBS31,Platinum chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs31,SBS
+SBS32,Azathioprine treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs32,SBS
+SBS33,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs33,SBS
+SBS34,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs34,SBS
+SBS35,Platinum chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs35,SBS
+SBS36,Defective DNA base excision repair due to MUTYH mutations,https://cancer.sanger.ac.uk/signatures/sbs/sbs36,SBS
+SBS37,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs37,SBS
+SBS38,Indirect effect of ultraviolet light,https://cancer.sanger.ac.uk/signatures/sbs/sbs38,SBS
+SBS39,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs39,SBS
+SBS40a,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs40a,SBS
+SBS40b,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs40b,SBS
+SBS40c,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs40c,SBS
+SBS41,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs41,SBS
+SBS42,Haloalkane exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs42,SBS
+SBS44,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/sbs/sbs44,SBS
+SBS84,Activity of activation-induced cytidine deaminase (AID),https://cancer.sanger.ac.uk/signatures/sbs/sbs84,SBS
+SBS85,Indirect effects of activation-induced cytidine deaminase (AID),https://cancer.sanger.ac.uk/signatures/sbs/sbs85,SBS
+SBS86,Unknown chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs86,SBS
+SBS87,Thiopurine chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/sbs/sbs87,SBS
+SBS88,Colibactin exposure (E.coli bacteria carrying pks pathogenicity island),https://cancer.sanger.ac.uk/signatures/sbs/sbs88,SBS
+SBS89,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs89,SBS
+SBS90,Duocarmycin exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs90,SBS
+SBS91,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs91,SBS
+SBS92,Tobacco smoking,https://cancer.sanger.ac.uk/signatures/sbs/sbs92,SBS
+SBS93,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs93,SBS
+SBS94,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs94,SBS
+SBS96,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs96,SBS
+SBS97,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs97,SBS
+SBS98,Unknown,https://cancer.sanger.ac.uk/signatures/sbs/sbs98,SBS
+SBS99,Melphalan exposure,https://cancer.sanger.ac.uk/signatures/sbs/sbs99,SBS
+SBS27,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs27/,SBS
+SBS43,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs43/,SBS
+SBS45,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs45/,SBS
+SBS46,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs46/,SBS
+SBS47,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs47/,SBS
+SBS48,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs48/,SBS
+SBS49,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs49/,SBS
+SBS50,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs50/,SBS
+SBS51,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs51/,SBS
+SBS52,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs52/,SBS
+SBS53,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs53/,SBS
+SBS54,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs54/,SBS
+SBS55,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs55/,SBS
+SBS56,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs56/,SBS
+SBS57,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs57/,SBS
+SBS58,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs58/,SBS
+SBS59,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs59/,SBS
+SBS60,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs60/,SBS
+SBS95,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/sbs/sbs95/,SBS
+DBS1,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/dbs/dbs1,DBS
+DBS2,Tobacco smoking and other mutagens (e.g. acetaldehyde),https://cancer.sanger.ac.uk/signatures/dbs/dbs2,DBS
+DBS3,Polymerase epsilon exonuclease domain mutations,https://cancer.sanger.ac.uk/signatures/dbs/dbs3,DBS
+DBS4,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs4,DBS
+DBS5,Platinum chemotherapy treatment,https://cancer.sanger.ac.uk/signatures/dbs/dbs5,DBS
+DBS6,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs6,DBS
+DBS7,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/dbs/dbs7,DBS
+DBS8,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs8,DBS
+DBS9,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs9,DBS
+DBS10,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/dbs/dbs10,DBS
+DBS11,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs11,DBS
+DBS12,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs12,DBS
+DBS13,HR deficiency,https://cancer.sanger.ac.uk/signatures/dbs/dbs13,DBS
+DBS15,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs15,DBS
+DBS16,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs16,DBS
+DBS17,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs17,DBS
+DBS18,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs18,DBS
+DBS19,Unknown,https://cancer.sanger.ac.uk/signatures/dbs/dbs19,DBS
+DBS20,Aristolochic acid exposure,https://cancer.sanger.ac.uk/signatures/dbs/dbs20,DBS
+DBS14,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/dbs/dbs14/,DBS
+ID1,Slippage during DNA replication of the replicated DNA strand,https://cancer.sanger.ac.uk/signatures/id/id1,ID
+ID2,Slippage during DNA replication of the replicated DNA strand,https://cancer.sanger.ac.uk/signatures/id/id2,ID
+ID3,Tobacco smoking,https://cancer.sanger.ac.uk/signatures/id/id3,ID
+ID4,Unknown,https://cancer.sanger.ac.uk/signatures/id/id4,ID
+ID5,Unknown,https://cancer.sanger.ac.uk/signatures/id/id5,ID
+ID6,Defective homologous recombination DNA damage repair,https://cancer.sanger.ac.uk/signatures/id/id6,ID
+ID7,Defective DNA mismatch repair,https://cancer.sanger.ac.uk/signatures/id/id7,ID
+ID8,Repair of DNA double strand breaks by NHEJ or mutations in TOP2A,https://cancer.sanger.ac.uk/signatures/id/id8,ID
+ID9,Unknown,https://cancer.sanger.ac.uk/signatures/id/id9,ID
+ID10,Unknown,https://cancer.sanger.ac.uk/signatures/id/id10,ID
+ID11,Unknown,https://cancer.sanger.ac.uk/signatures/id/id11,ID
+ID12,Unknown,https://cancer.sanger.ac.uk/signatures/id/id12,ID
+ID13,Ultraviolet light exposure,https://cancer.sanger.ac.uk/signatures/id/id13,ID
+ID14,Unknown,https://cancer.sanger.ac.uk/signatures/id/id14,ID
+ID15,Unknown,https://cancer.sanger.ac.uk/signatures/id/id15,ID
+ID16,Unknown,https://cancer.sanger.ac.uk/signatures/id/id16,ID
+ID17,Mutations in topoisomerase TOP2A,https://cancer.sanger.ac.uk/signatures/id/id17,ID
+ID18,Colibactin exposure (E.coli bacteria carrying pks pathogenicity island),https://cancer.sanger.ac.uk/signatures/id/id18,ID
+ID19,Unknown,https://cancer.sanger.ac.uk/signatures/id/id19,ID
+ID20,Unknown,https://cancer.sanger.ac.uk/signatures/id/id20,ID
+ID21,Unknown,https://cancer.sanger.ac.uk/signatures/id/id21,ID
+ID22,Unknown,https://cancer.sanger.ac.uk/signatures/id/id22,ID
+ID23,Aristolochic acid exposure,https://cancer.sanger.ac.uk/signatures/id/id23,ID
+CN1,Diploidy,https://cancer.sanger.ac.uk/signatures/cn/cn1,CN
+CN2,Tetraploidy,https://cancer.sanger.ac.uk/signatures/cn/cn2,CN
+CN3,Octoploidy,https://cancer.sanger.ac.uk/signatures/cn/cn3,CN
+CN4,Chromothripsis,https://cancer.sanger.ac.uk/signatures/cn/cn4,CN
+CN5,Chromothripsis,https://cancer.sanger.ac.uk/signatures/cn/cn5,CN
+CN6,Chromothripsis before whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn6,CN
+CN7,Chromothripsis associated amplification,https://cancer.sanger.ac.uk/signatures/cn/cn7,CN
+CN8,Chromothripsis associated amplification,https://cancer.sanger.ac.uk/signatures/cn/cn8,CN
+CN9,Focal LOH - diploid and chromosomal instability,https://cancer.sanger.ac.uk/signatures/cn/cn9,CN
+CN10,Focal LOH - 1x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn10,CN
+CN11,Focal LOH - 2x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn11,CN
+CN12,Focal LOH - chromosomal instability and 1x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn12,CN
+CN13,Chromosomal LOH,https://cancer.sanger.ac.uk/signatures/cn/cn13,CN
+CN14,Chromosomal LOH - 1x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn14,CN
+CN15,Chromosomal LOH - 2x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn15,CN
+CN16,Chromosomal LOH - chromosomal instability and 1x whole genome duplication,https://cancer.sanger.ac.uk/signatures/cn/cn16,CN
+CN17,Tandem duplication and HRD,https://cancer.sanger.ac.uk/signatures/cn/cn17,CN
+CN18,Unknown,https://cancer.sanger.ac.uk/signatures/cn/cn18,CN
+CN19,Unknown,https://cancer.sanger.ac.uk/signatures/cn/cn19,CN
+CN20,Unknown,https://cancer.sanger.ac.uk/signatures/cn/cn20,CN
+CN21,Unknown,https://cancer.sanger.ac.uk/signatures/cn/cn21,CN
+CN25,dMMR,https://cancer.sanger.ac.uk/signatures/cn/cn25,CN
+CN22,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/cn/cn22/,CN
+CN23,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/cn/cn23/,CN
+CN24,Possible sequencing artefact,https://cancer.sanger.ac.uk/signatures//signatures/cn/cn24/,CN
+RNA-SBS1,ADAR activity,https://cancer.sanger.ac.uk/signatures/rna-sbs/rna-sbs1,RNA SBS
+RNA-SBS2,RNA editing activity of APOBEC3A,https://cancer.sanger.ac.uk/signatures/rna-sbs/rna-sbs2,RNA SBS
+RNA-SBS3,Unknown,https://cancer.sanger.ac.uk/signatures/rna-sbs/rna-sbs3,RNA SBS
+RNA-SBS4,Unknown,https://cancer.sanger.ac.uk/signatures/rna-sbs/rna-sbs4,RNA SBS
+RNA-SBS5,Unknown,https://cancer.sanger.ac.uk/signatures/rna-sbs/rna-sbs5,RNA SBS

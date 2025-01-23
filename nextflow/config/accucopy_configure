@@ -1,0 +1,3 @@
+samtools_path   /usr/local/bin/samtools
+caller_path    /usr/local/strelka
+accucopy_path   /usr/local/Accucopy
