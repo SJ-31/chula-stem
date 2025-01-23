@@ -4,6 +4,8 @@ include { MARK_DUPLICATES } from "../modules/mark_duplicates.nf"
 include { BQSR } from "../modules/bqsr.nf"
 include { SAMTOOLS_INDEX } from "../modules/samtools_index.nf"
 include { STAR } from "../modules/star.nf"
+include { STAR_SOLO } from "../modules/star_solo.nf"
+include { SC_RNASEQ_QC } from "../modules/sc_rnaseq_qc.nf"
 
 workflow PREPROCESS_FASTQ {
     take:
@@ -34,6 +36,13 @@ workflow PREPROCESS_FASTQ {
         bams = STAR.out.mapped
         chimeric_junction = STAR.out.chimeric
         counts = STAR.out.counts
+    } else if (omics_type == "sc_rnaseq") {
+        STAR_SOLO(FASTP.out.passed, params.ref.star_index, params.strandedness, true,
+                  params.ref.genome_gff, params.ref.barcodes, offset + 2)
+        bams = STAR_SOLO.out.mapped
+        chimeric_junction = STAR_SOLO.out.chimeric
+        SC_RNASEQ_QC(STAR_SOLO.out.counts, params.ref.genome_gff_sqlite, offset + 3)
+        counts = SC_RNASEQ_QC.out.counts
     } else {
         BWA(FASTP.out.passed, params.ref.genome, offset + 2)
         MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, offset + 3)
