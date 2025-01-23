@@ -1,65 +1,6 @@
-library(tidyverse)
-library(ggplot2)
-library(paletteer)
-library(glue)
 library(here)
-library(reticulate)
-library(ggpubr)
-library(cowplot)
-
 here::i_am("./analyses/pdac/vaf_plot.r")
-utils <- new.env()
-source(here("src", "R", "utils.R"), local = utils)
-py_utils <- new.env()
-reticulate::source_python(here("src", "chula_stem", "utils.py"), py_utils)
-
-vaf_merged_file <- here("analyses", "output", "pdac_vaf_merged.tsv")
-sbs_merged_file <- here("analyses", "output", "pdac_sbs.tsv")
-sbs_merged_file_mp <- here("analyses", "output", "pdac_sbs_mp.tsv")
-sbs_merged_file_all <- here("analyses", "output", "pdac_sbs_all.tsv")
-vaf_merged_transcripts_file <- here("analyses", "output", "pdac_vaf_merged_transcripts.tsv")
-data_path <- here("analyses", "data_all", "output", "PDAC")
-
-# TODO: when pdac is done, recreate this file
-if (!file.exists(vaf_merged_file)) {
-  files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv$", recursive = TRUE, full.names = TRUE)
-  tsvs <- lapply(files, \(x) {
-    tb <- read_with_filename(x, "sample") |> select(sample, VAF, Feature, SYMBOL, CLIN_SIG, Consequence, SOURCE)
-    tb |>
-      mutate(census_mutations = map_chr(Consequence, \(x) {
-        case_when(
-          str_detect(x, "missense") ~ "Mis",
-          str_detect(x, "frameshift") ~ "F",
-          str_detect(x, "deletion|lost") ~ "D",
-          .default = NA
-        )
-      })) |>
-      group_by(SYMBOL) |>
-      summarise(
-        VAF = mean(VAF),
-        across(where(is.character), \(x) utils$flatten_by(x, collapse = TRUE, unique = FALSE))
-      ) |>
-      mutate(census_mutations = map_chr(census_mutations, \(x) {
-        if (is.na(x)) {
-          return(x)
-        }
-        first(utils$modes(str_split_1(x, ";") |> discard(\(x) x == "NA")))
-      }))
-  })
-  merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
-  write_tsv(merged, vaf_merged_file)
-  q()
-} else {
-  merged <- read_tsv(vaf_merged_file) |>
-    mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
-}
-
-multiqc_file <- here(data_path, "8-cohort-MultiQC_data", "vep.txt")
-vep_data_file <- here("analyses", "output", "pdac_vep_data.tsv")
-if (!file.exists(vep_data_file)) {
-  py_utils$parse_multiqc_vep(multiqc_file, vep_data_file)
-}
-vep_data <- read_tsv(vep_data_file)
+source(here("analyses", "pdac", "main.R"))
 
 ## * Format
 
@@ -207,6 +148,24 @@ n_samples <- sbs$sample |>
   unique() |>
   length()
 
+## *** Add filter
+filter_version <- "CLIN_SIG"
+FILTER <- TRUE
+if (filter_version == "CLIN_SIG") {
+  accepted_clinsig <- c(
+    "pathogenic", "likely_pathogenic", "association"
+  )
+  replicate_figure <- replicate_figure |>
+    filter(map_lgl(CLIN_SIG, \(x) length(intersect(x, accepted_clinsig)) > 0))
+} else if (filter_version == "CONSEQUENCE") {
+  accepted_consequence <- c("missense_variant", "frameshift_variant")
+}
+order <- replicate_figure$SYMBOL |>
+  table() |>
+  sort(decreasing = TRUE) |>
+  names()
+replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
+
 sample_freq <- replicate_figure |>
   group_by(SYMBOL) |>
   summarise(freq = (round(n() / n_samples, 2) * 100) |> as.character() %>% paste0(., " %"))
@@ -217,10 +176,10 @@ sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
   theme_void() +
   scale_fill_paletteer_d("ggthemes::excel_Depth")
 
-# TODO: you don't actually know yet how to get tmb so this is some dummy data
 rep_theme <- "tidyquant::tq_light"
 axis_title_size <- 12
 
+## *** TMB plot
 tmb_max <- group_by(tmb_merged, sample) |>
   summarise(value = sum(value)) |>
   pluck("value") |>
@@ -248,11 +207,7 @@ tmb_plot <- tmb_merged |>
   scale_fill_paletteer_d(rep_theme, drop = FALSE) +
   scale_y_continuous(limits = c(0, tmb_max), expand = c(0, 0), breaks = c(0, tmb_max))
 
-# Sanity check to make sure the legend is aligned
-check <- replicate_figure %>%
-  prettify() %>%
-  select(SYMBOL, type, sample)
-
+## *** Counts plot
 counts_plot <- replicate_figure |>
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER))) +
@@ -273,6 +228,7 @@ counts_plot <- replicate_figure |>
   guides(fill = "none") +
   scale_fill_paletteer_d(rep_theme, drop = FALSE)
 
+## *** Heatmap
 r1 <- replicate_figure |>
   prettify() |>
   ggplot(aes(
@@ -298,6 +254,8 @@ r3 <- ggdraw(insert_yaxis_grob(r1, get_y_axis(r2),
   position = "right",
   width = unit(0.03, "null")
 ))
+
+## ** Arranging
 
 # Get and remove legends
 type_legend <- ggpubr::get_legend(tmb_plot)
@@ -326,71 +284,3 @@ ggsave(here("analyses", "output", "pdac_vaf_replicate.png"),
   final_rep,
   dpi = 500, width = 15
 )
-
-## ** Cross-referenced
-intogen <- read_tsv(here("analyses/data/2024-06-18_IntOGen-Drivers/Compendium_Cancer_Genes.tsv"))
-census <- read_csv(here("analyses/data/census.csv")) |>
-  rename_with(\(x) str_replace_all(x, " ", "_") |> str_remove_all("[()]")) |>
-  mutate(Role_in_Cancer = map_chr(Role_in_Cancer, \(x) {
-    if (is.na(x)) {
-      return(x)
-    }
-    str_split_1(x, ",") |>
-      trimws() |>
-      sort() |>
-      paste0(collapse = ", ")
-  }))
-
-## *** Census
-
-with_census <- inner_join(merged, census, by = join_by(
-  x$SYMBOL == y$Gene_Symbol,
-  x$census_mutations == y$Mutation_Types
-)) |>
-  dplyr::filter((Tier == 1) &
-    (Hallmark == "Yes") &
-    (!is.na(Tumour_TypesSomatic)))
-
-
-mutation_types <- utils$flatten_by(census$Mutation_Types, ",", collapse = FALSE) |>
-  unlist() |>
-  map_chr(\(x) trimws(x)) |>
-  unique()
-# Mis = missense
-# T = translocation
-# D = large deletion
-# F = frameshift
-# N = ???
-# O = other
-# A = amplification
-# S = splice site
-# M = mesenchymal???
-
-# <2025-01-10 Fri> Genes shown in this plot meet the following criteria
-# - have the same consequences as observed in the COSMIC census
-#     from Missense, Frameshift and Deletion
-# - are Tier 1, so have documented cancer activity
-# - Is associated with a known somatic tumor type
-# - Has a known hallmark
-
-with_census_plot <- with_census |>
-  prettify() |>
-  ggplot(aes(
-    x = sample, y = factor(SYMBOL, levels = names(sum_vafs)),
-    fill = Role_in_Cancer, alpha = VAF
-  )) |>
-  vaf_heatmap() + geom_text(aes(label = round(VAF, 2))) +
-  scale_y_discrete(limits = rev)
-
-ggsave(here("analyses", "output", "pdac_cosmic_census.png"), with_census_plot, dpi = 500, width = 15)
-
-
-## *** Intogen
-
-intogen_filtered <- intogen |> filter((IS_DRIVER == "TRUE") & (ROLE != "ambiguous") &
-  (TOTAL_SAMPLES >= 50))
-with_intogen <- merged |>
-  separate_longer_delim("Feature", ";") |>
-  inner_join(intogen_filtered, by = join_by(SYMBOL, x$Feature == y$TRANSCRIPT)) |>
-  group_by(SYMBOL, sample) |>
-  summarise(VAF = mean(VAF))

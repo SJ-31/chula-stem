@@ -61,26 +61,27 @@ def get_substitution_types(
 
 dfs: list[pl.DataFrame] = []
 dfs2: list[pl.DataFrame] = []
-files = list(outpath.rglob("7-P*-Small_high_conf.vcf.gz"))
 cwd = os.getcwd()
-with TemporaryDirectory() as tmpdir:
-    os.chdir(tmpdir)
-    for f in files:
-        sample_name = re.findall(r"-(P[0-9_]+)-", f.stem)[0]
-        bcftools_stats(f, "tmp_stats.txt")
-        df = get_substitution_types("tmp_stats.txt").with_columns(
-            sample=pl.lit(sample_name)
-        )
-        df2 = get_substitution_types("tmp_stats.txt", False).with_columns(
-            sample=pl.lit(sample_name)
-        )
-        dfs.append(df)
-        dfs2.append(df2)
-os.chdir(cwd)
-final = pl.concat(dfs)
-final.write_csv(target, separator="\t")
-final2 = pl.concat(dfs2)
-final2.write_csv(target2, separator="\t")
+if outpath.exists():
+    files = list(outpath.rglob("7-P*-Small_high_conf.vcf.gz"))
+    with TemporaryDirectory() as tmpdir:
+        os.chdir(tmpdir)
+        for f in files:
+            sample_name = re.findall(r"-(P[0-9_]+)-", f.stem)[0]
+            bcftools_stats(f, "tmp_stats.txt")
+            df = get_substitution_types("tmp_stats.txt").with_columns(
+                sample=pl.lit(sample_name)
+            )
+            df2 = get_substitution_types("tmp_stats.txt", False).with_columns(
+                sample=pl.lit(sample_name)
+            )
+            dfs.append(df)
+            dfs2.append(df2)
+    os.chdir(cwd)
+    final = pl.concat(dfs)
+    final.write_csv(target, separator="\t")
+    final2 = pl.concat(dfs2)
+    final2.write_csv(target2, separator="\t")
 
 old_path: Path = Path("/data/project/stemcell/PDAC/Exome_PDAC_HN00215149")
 if old_path.exists():
