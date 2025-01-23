@@ -1,5 +1,6 @@
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
+library(scDblFinder)
 library(scater)
 library(edgeR)
 library(tidyverse)
@@ -22,12 +23,14 @@ sce_gini <- function(sce, clusters, label_col) {
     stop("`clusters` must be a valid column in sce's colData!")
   }
   ginis <- list()
+  n <- nrow(df)
   whole <- lapply(unique(df[[clusters]]), \(x) {
     cur <- df[df[[clusters]] == x, ]
-    freq <- table(cur[[label_col]]) / nrow(cur)
+    n_i <- nrow(cur)
+    freq <- table(cur[[label_col]]) / n_i
     gini <- sum(freq * (1 - freq))
     ginis[[x]] <<- gini
-    gini
+    gini * (n_i / n) # Apply weight
   }) |>
     unlist() |>
     sum()
@@ -214,14 +217,40 @@ plot_qc <- function(sce, y_axes, x_axis, titles = NULL, facet = NULL, discard_co
     plots[[i]] <- p
   }
   arranged <- ggarrange(plotlist = plots, common.legend = TRUE, ncol = 1)
+  arranged
 }
 
+save_sce <- function(sce, filename) {
+  if (str_detect(filename, "\\.hd5ad")) {
+    zellkonverter::writeH5AD(sce, file = filename)
+  } else {
+    saveRDS(sce, filename)
+  }
+}
 
 ## * CLI entry point
+scdbl_wrapper <- function(sce, args) {
+  if (!is.null(args$scDblFinder_params)) {
+    params <- rjson::fromJSON(file = args$scDblFinder_params)
+    do.call(\(...) scDblFinder(sce, ...), args)
+  } else {
+    scDblFinder(sce)
+  }
+}
+
 
 main <- function(args) {
   # TODO: <2025-01-23 Thu> must check that counts_to_sce works
   sce <- counts_to_sce(args$input)
+  if (args$detect_doublets) {
+    sce <- scdbl_wrapper(sce, args)
+  }
+  if (args$discard %in% c("both", "doublets")) {
+    discarded <- sce[sce$scDblFinder.class != "singlet", ]
+    sce <- sce[sce$scDblFinder.class == "singlet", ]
+    outname <- paste0(args$output, "_doublets", ".", args$discard_suffix)
+    save_sce(discarded, outname)
+  }
   if (!is.null(args$simple_thresholds)) {
     thresh <- rjson::fromJSON(file = args$simple_thresholds)
     qc <- qc_thresholds(sce, thresh)
@@ -241,27 +270,17 @@ main <- function(args) {
     gs <- rjson::fromJSON(file = args$marker_genes)
     diagnose_cell_loss(sce, gene_spec = gs)
   }
-  if (args$discard) {
+  if (args$discard %in% c("both", "quality")) {
     discarded <- sce[sce$discard, ]
     sce <- sce[!sce$discard, ]
-    if (!is.null(args$discard_out)) {
-      save_sce(discarded, args$discard_out)
-    }
+    outname <- paste0(args$output, "_low_quality", ".", args$discard_suffix)
+    save_sce(discarded, outname)
   }
-  save_sce(sce, args$filename)
+  save_sce(sce, args$output)
 }
 
-save_sce <- function(sce, filename) {
-  if (str_detect(filename, "\\.hd5ad")) {
-    zellkonverter::writeH5AD(sce, file = filename)
-  } else {
-    saveRDS(sce, filename)
-  }
-}
 
-parse_args <- function() {
-  library("optparse")
-  parser <- OptionParser()
+add_quality_args <- function(parser) {
   parser <- add_option(parser, c("-b", "--batch"),
     default = NULL,
     type = "character", help = "column containing batch data"
@@ -318,18 +337,39 @@ and the value is a list of arguments passed to isOutlier for that metric",
     type = "character",
     help = "Name of loss plot output file", default = "loss_diagnostics.png"
   )
-  parser <- add_option(parser, c("-d", "--discard"),
+  parser
+}
+
+add_doublet_args <- function(parser) {
+  parser <- add_option(parser, c("-d", "--detect_doublets"),
     type = "logical",
-    default = FALSE,
+    help = "Whether or not to detect doublets"
+  )
+  parser <- add_option(parser, c("-r", "--scDblFinder_params"),
+    type = "character",
+    help = "json file of arguments to pass to scDblFinder::scDblFinder",
+    default = NULL
+  )
+  parser
+}
+
+parse_args <- function() {
+  library("optparse")
+  parser <- OptionParser()
+  parser <- add_option(parser, c("-d", "--discard"),
+    type = "character",
+    default = "none",
     action = "store_true",
     help = "Whether or not to remove cells based on the qc, or only flag them in metadata"
   )
-  parser <- add_option(parser, "--discard_out",
+  parser <- add_option(parser, "--discard_suffix",
     type = "character",
-    help = "Output file containing discarded cells", default = NULL
+    help = "Suffix for file containing discarded cells", default = "h5ad"
   )
   parser <- add_option(parser, c("-i", "--input"), type = "character", help = "Input filename")
   parser <- add_option(parser, c("-o", "--output"), type = "character", help = "Output file name")
+  parser <- add_quality_args(parser)
+  parser <- add_doublet_args(parser)
   parse_args(parser)
 }
 
