@@ -1,5 +1,6 @@
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
+library(scater)
 library(edgeR)
 library(tidyverse)
 library(glue)
@@ -51,8 +52,9 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
 #' @param subfields character vector passed to sub.fields
 #' @param batch_col column in the sce metadata containing batch information
 #'
-qc_wrapper <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
-                       batch_col = NULL) {
+qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
+                    batch_col = NULL) {
+  subfields <- keep(subfields, \(x) x %in% colnames(colData(sce)))
   reasons <- scuttle::perCellQCFilters(sce, sub.fields = subfields, batch = batch_col)
   if (!is.null(qc_spec)) {
     reasons_plus <- lapply(names(qc_spec), \(x) {
@@ -157,7 +159,158 @@ diagnose_cell_loss <- function(sce, gene_spec, discard = NULL, identifier = "SYM
     ylab("Log fold change (discarded/kept)")
 }
 
+plot_qc <- function(sce, y_axes, x_axis, titles = NULL, facet = NULL, discard_col = "discard") {
+  plots <- list()
+  if (!discard_col %in% colnames(colData(sce))) {
+    discard_col <- NULL
+  }
+  if (is.null(titles)) {
+    titles <- str_to_title(y_axes) |> str_replace_all("_", " ")
+  }
+  for (i in seq_along(y_axes)) {
+    y <- y_axes[i]
+    title <- titles[i]
+    args <- list(x = x_axis, y = y, color_by = discard_col, show_violin = TRUE)
+    if (!is.null(facet)) args$other_fields <- facet
+    p <- do.call(\(...) plotColData(sce, ...), args) + ggtitle(title)
+    if (!is.null(discard_col)) p <- p + guides(color = guide_legend(title = "Discard"))
+    if (!is.null(facet)) p <- p + facet_wrap(as.formula(paste("~", facet)))
+    if (i != 1 && !is.null(facet)) p <- p + theme(strip.text = element_blank(), strip.background = element_blank())
+    if (i != length(y_axes)) {
+      p <- p + theme(
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank()
+      )
+    }
+    plots[[i]] <- p
+  }
+  arranged <- ggarrange(plotlist = plots, common.legend = TRUE, ncol = 1)
+}
 
-main <- function() {
 
+## * CLI entry point
+
+main <- function(args) {
+  # TODO: <2025-01-23 Thu> must check that counts_to_sce works
+  sce <- counts_to_sce(args$input)
+  if (!is.null(args$simple_thresholds)) {
+    thresh <- rjson::fromJSON(file = args$simple_thresholds)
+    qc <- qc_thresholds(sce, thresh)
+    colData(sce) <- cbind(colData(sce), qc)
+  } else {
+    qc_spec <- rjson::fromJSON(file = args$qc_spec)
+    qc <- qc_mads(sce, qc_spec, subfields = args$subfields, batch_col = args$batch)
+    colData(sce) <- cbind(colData(sce), qc$df)
+    write_tsv(qc$thresholds, args$thresholds_output)
+  }
+  if (args$plot && !is.null(args$x_axis)) {
+    y <- str_split_1(args$y_axes, ",")
+    plot <- plot_qc(sce, y, args$x_axis, facet = args$facet)
+    ggsave(filename = args$plot_name, plot = plot, dpi = 500, height = 20, width = 20)
+  }
+  if (!is.null(args$marker_genes)) {
+    gs <- rjson::fromJSON(file = args$marker_genes)
+    diagnose_cell_loss(sce, gene_spec = gs)
+  }
+  if (args$discard) {
+    discarded <- sce[sce$discard, ]
+    sce <- sce[!sce$discard, ]
+    if (!is.null(args$discard_out)) {
+      save_sce(discarded, args$discard_out)
+    }
+  }
+  save_sce(sce, args$filename)
+}
+
+save_sce <- function(sce, filename) {
+  if (str_detect(filename, "\\.hd5ad")) {
+    zellkonverter::writeH5AD(sce, file = filename)
+  } else {
+    saveRDS(sce, filename)
+  }
+}
+
+
+parse_args <- function() {
+  library("optparse")
+  parser <- OptionParser()
+  parser <- add_option(parser, c("-v", "--verbose"),
+    action = "store_true",
+    default = TRUE, help = "Print extra output [default]"
+  )
+  parser <- add_option(parser, c("-b", "--batch"),
+    default = NULL,
+    type = "character", help = "column containing batch data"
+  )
+  parser <- add_option(parser, "--subfields",
+    default = "subsets_mito_percent",
+    help = "Additional metric columns passed to the sub.fields argument of scuttle::perCellQCFilters"
+  )
+  parser <- add_option(parser, c("-m", "--n_mads"),
+    default = 3, help = "Minimum number of MADs to consider a cell as an outlier"
+  )
+  parser <- add_option(parser, c("-s", "--qc_spec"),
+    type = "character",
+    help = "A json file defining additional qc parameters passed to scuttle::isOutlier.
+Each key is the name of a column (metric) in the SingleCellExperiment object to operate on,
+and the value is a list of arguments passed to isOutlier for that metric",
+    default = NULL
+  )
+  parser <- add_option(parser, c("-t", "--thresholds_output"),
+    type = "character",
+    help = "Name of tsv file containing output thresholds from scuttle::perCellQCFilters",
+    default = "thresholds.tsv"
+  )
+  parser <- add_option(parser, c("-s", "--simple_thresholds"),
+    type = "character",
+    help = "A json file defining the desired thresholds. If supplied, MAD thresholding is not carried out",
+    default = NULL
+  )
+  parser <- add_option(parser, c("-p", "--plot"),
+    type = "logical", default = TRUE,
+    help = "Whether or not to produce diagnostic plots"
+  )
+  parser <- add_option(parser, c("-x", "--x_axis"),
+    type = "character",
+    help = "Metric to use as x axis",
+    default = NULL
+  )
+  parser <- add_option(parser, c("-g", "--marker_genes"),
+    type = "character",
+    help = "path to a json file containing marker genes to use for diagnosing cell type loss",
+    default = NULL
+  )
+  parser <- add_option(parser, c("-y", "--y_axes"),
+    type = "character",
+    help = "Comma-delimited list of SCE metric columns to plot on y axes",
+    default = "sum,detected,subsets_mito_percent"
+  )
+  parser <- add_option(parser, c("-f", "--facet"), type = "character", help = "Facet of plot")
+  parser <- add_option(parser, c("-n", "--plot_name"),
+    type = "character",
+    help = "Name of plot output file", default = "diagnostics.png"
+  )
+  parser <- add_option(parser, c("-l", "--loss_plot_name"),
+    type = "character",
+    help = "Name of loss plot output file", default = "loss_diagnostics.png"
+  )
+  parser <- add_option(parser, c("-d", "--discard"),
+    type = "logical",
+    default = FALSE,
+    action = "store_true",
+    help = "Whether or not to remove cells based on the qc, or only flag them in metadata"
+  )
+  parser <- add_option(parser, "--discard_out",
+    type = "character",
+    help = "Output file containing discarded cells", default = NULL
+  )
+  parser <- add_option(parser, c("-i", "--input"), type = "character", help = "Input filename")
+  parser <- add_option(parser, c("-o", "--output"), type = "character", help = "Output file name")
+  parse_args(parser)
+}
+
+if (sys.nframe() == 0) {
+  args <- parse_args()
+  main(args)
 }
