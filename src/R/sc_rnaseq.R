@@ -1,6 +1,7 @@
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
 library(tidyverse)
+library(glue)
 library(zellkonverter)
 
 # Requires a SingleCellExperiment object
@@ -47,12 +48,17 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
 #' @param qc_spec a list of lists. keys are the name of the qc metric column to run the
 #'    outlier detection on, and values are arguments passed to isOutlier for that metric
 #' @param subfields character vector passed to sub.fields
+#' @param batch_col column in the sce metadata containing batch information
 #'
-qc_wrapper <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent") {
-  reasons <- scuttle::perCellQCFilters(sce, sub.fields = subfields)
+qc_wrapper <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
+                       batch_col = NULL) {
+  reasons <- scuttle::perCellQCFilters(sce, sub.fields = subfields, batch = batch_col)
   if (!is.null(qc_spec)) {
     reasons_plus <- lapply(names(qc_spec), \(x) {
-      result <- do.call(\(...) scuttle::isOutlier(sce[[x]], ...), qc_spec[[x]])
+      result <- do.call(
+        \(...) scuttle::isOutlier(sce[[x]], batch = batch_col, ...),
+        qc_spec[[x]]
+      )
       to_df <- list()
       pars <- paste0(qc_spec[[x]], collapse = "_")
       colname <- paste0(x, "_", pars)
@@ -72,4 +78,48 @@ qc_wrapper <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent") 
     }
   }) |> bind_rows()
   list(df = reasons, thresholds = thresholds)
+}
+
+#' Filter out cells with fixed thresholds
+#'
+#' @param sce_metrics a dataframe of sce metrics (row x metric) e.g. calculated
+#' with perCellQCMetrics. Alternatively, an sce object where the metrics are in the
+#' colData
+#' @param threshold a list of metric->list(v=, d=),
+#' where "metric" is a column in the metadata of the sce object
+#' "d" (direction) is one of g|l|geq|leq or eq
+#' "v" is the value
+#' EX: if g, the cell value must be greater than the supplied value
+qc_thresholds <- function(sce_metrics, thresholds) {
+  threshold_tracker <- list()
+  if (class(sce_metrics) == "SingleCellExperiment") {
+    df <- colData(sce_metrics)
+  }
+  for (t in names(thresholds)) {
+    if (t %in% colnames(df)) {
+      val <- thresholds[[t]]$v
+      direction <- thresholds[[t]]$d
+      result <- switch(direction,
+        g = {
+          df[[t]] > val
+        },
+        l = {
+          df[[t]] < val
+        },
+        geq = {
+          df[[t]] >= val
+        },
+        leq = {
+          df[[t]] <= val
+        },
+        eq = {
+          df[[t]] == val
+        }
+      )
+      threshold_tracker[[glue("{t}_{direction}_{val}")]] <- result
+    }
+  }
+  df <- as.data.frame(threshold_tracker)
+  df$discard <- apply(df, 1, any)
+  df
 }
