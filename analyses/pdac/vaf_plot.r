@@ -1,4 +1,5 @@
 library(here)
+library(ggpubr)
 here::i_am("./analyses/pdac/vaf_plot.r")
 source(here("analyses", "pdac", "main.R"))
 
@@ -143,14 +144,15 @@ sbs_mp <- read_tsv(sbs_merged_file_mp)
 sbs2 <- read_tsv(sbs_merged_file_all)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
-replicate_figure <- merged |> dplyr::filter(SYMBOL %in% target_genes)
+replicate_figure <- merged |>
+  dplyr::filter(SYMBOL %in% target_genes) |>
+  distinct(SYMBOL, sample, .keep_all = TRUE)
 n_samples <- sbs$sample |>
   unique() |>
   length()
 
 ## *** Add filter
-filter_version <- "CLIN_SIG"
-FILTER <- TRUE
+filter_version <- "MUTECT"
 if (filter_version == "CLIN_SIG") {
   accepted_clinsig <- c(
     "pathogenic", "likely_pathogenic", "association"
@@ -159,6 +161,10 @@ if (filter_version == "CLIN_SIG") {
     filter(map_lgl(CLIN_SIG, \(x) length(intersect(x, accepted_clinsig)) > 0))
 } else if (filter_version == "CONSEQUENCE") {
   accepted_consequence <- c("missense_variant", "frameshift_variant")
+} else if (filter_version == "KNOWN") {
+  replicate_figure <- filter_known(replicate_figure, dbsnp_file)
+} else if (filter_version == "MUTECT") {
+  replicate_figure <- replicate_figure |> filter(grepl("mutect2", SOURCE))
 }
 order <- replicate_figure$SYMBOL |>
   table() |>
@@ -244,7 +250,6 @@ r1 <- replicate_figure |>
     axis.text.x = element_text(size = axis_title_size),
     axis.title.y = element_text(size = axis_title_size, face = "italic")
   )
-r1
 
 r2 <- r1 + scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
   guides(fill = "none") + theme(axis.ticks.y = element_blank())
@@ -280,7 +285,9 @@ replicate_plot <- ggarrange(
 final_rep <- ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0.1))
 final_rep
 
-ggsave(here("analyses", "output", "pdac_vaf_replicate.png"),
-  final_rep,
-  dpi = 500, width = 15
-)
+save_fn(final_rep, "pdac_vaf_replicate.png")
+
+## * Plot metrics
+replicate_figure |>
+  ggplot(aes(x = SYMBOL, y = Alt_depth, fill = SYMBOL)) +
+  geom_boxplot()
