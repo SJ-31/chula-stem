@@ -145,14 +145,13 @@ sbs2 <- read_tsv(sbs_merged_file_all)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
 replicate_figure <- merged |>
-  dplyr::filter(SYMBOL %in% target_genes) |>
-  distinct(SYMBOL, sample, .keep_all = TRUE)
+  dplyr::filter(SYMBOL %in% target_genes)
 n_samples <- sbs$sample |>
   unique() |>
   length()
 
 ## *** Add filter
-filter_version <- "MUTECT"
+filter_version <- "KNOWN"
 if (filter_version == "CLIN_SIG") {
   accepted_clinsig <- c(
     "pathogenic", "likely_pathogenic", "association"
@@ -173,6 +172,7 @@ order <- replicate_figure$SYMBOL |>
 replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
 
 sample_freq <- replicate_figure |>
+  distinct(SYMBOL, sample, .keep_all = TRUE) |>
   group_by(SYMBOL) |>
   summarise(freq = (round(n() / n_samples, 2) * 100) |> as.character() %>% paste0(., " %"))
 
@@ -215,6 +215,7 @@ tmb_plot <- tmb_merged |>
 
 ## *** Counts plot
 counts_plot <- replicate_figure |>
+  distinct(sample, SYMBOL, .keep_all = TRUE) |>
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER))) +
   geom_bar() +
@@ -288,6 +289,25 @@ final_rep
 save_fn(final_rep, "pdac_vaf_replicate.png")
 
 ## * Plot metrics
-replicate_figure |>
-  ggplot(aes(x = SYMBOL, y = Alt_depth, fill = SYMBOL)) +
-  geom_boxplot()
+smm <- replicate_figure |>
+  group_by(SYMBOL) |>
+  summarise(
+    median = median(Alt_depth), max = max(Alt_depth), min = min(Alt_depth),
+    mean_vaf = median(VAF)
+  )
+
+metric_plot <- replicate_figure |>
+  group_by(SYMBOL) |>
+  mutate(mean_vaf = mean(VAF)) |>
+  ggplot(aes(x = SYMBOL, y = log(Alt_depth))) +
+  geom_boxplot(aes(fill = mean_vaf)) +
+  geom_label(
+    data = smm, aes(x = SYMBOL, y = log(median), label = median),
+  ) +
+  geom_label(data = smm, aes(x = SYMBOL, y = log(min), label = min)) +
+  geom_label(data = smm, aes(x = SYMBOL, y = log(max), label = max)) +
+  scale_fill_paletteer_c("ggthemes::Green") +
+  guides(fill = guide_legend(title = "Mean VAF")) +
+  ylab("Log Alternate allele depth") +
+  xlab("Gene")
+save_fn(metric_plot, "gene_metrics.png")
