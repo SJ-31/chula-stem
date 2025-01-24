@@ -1,5 +1,6 @@
 #!/usr/bin/env ipython
 
+import ast
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 from typing import Callable
@@ -350,3 +351,29 @@ def add_loc(
         )
         .drop("__range")
     )
+
+
+def parse_multiqc_vep(input: str, output: str = "") -> pl.DataFrame:
+    vep = pl.read_csv(input, separator="\t")
+    vep_data: dict = {"sample": [], "category": [], "key": [], "value": []}
+    cols = [
+        "Variant classes",
+        "Consequences (most severe)",
+        "Consequences (all)",
+        "Coding consequences",
+        "Variants by chromosome",
+        "Position in protein",
+        "General statistics",
+    ]
+    for row in vep.iter_rows(named=True):
+        sample: str = row["Sample"]
+        for col in cols:
+            parsed = ast.literal_eval(row[col])
+            vep_data["sample"].extend([sample] * len(parsed))
+            vep_data["category"].extend([col] * len(parsed))
+            vep_data["key"].extend(parsed.keys())
+            vep_data["value"].extend(parsed.values())
+    df = pl.DataFrame(vep_data)
+    if output:
+        df.write_csv(output, separator="\t")
+    return df
