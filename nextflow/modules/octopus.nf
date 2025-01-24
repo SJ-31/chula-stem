@@ -15,13 +15,15 @@ process OCTOPUS {
     //
 
     output:
-    tuple val(meta), path(output), emit: variants
+    tuple val(meta), path(somatic), emit: variants
+    path(output)
     path("*.log")
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
-    check = file("${meta.out}/${output}")
+    output = Utl.getName(module_number, meta, "Octopus_all", "vcf.gz")
+    somatic = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
+    check1 = file("${meta.out}/${output}")
     prev_flag = previous_variants.size() != 0 ? "--source-candidates ${previous_variants}" : ""
     if (!params.tumor_only) {
         bam_flag = "-I ${normal} ${tumor} --normal-sample ${meta.RGSM_normal}"
@@ -30,10 +32,12 @@ process OCTOPUS {
     }
     targets_flag = target_intervals ? "--regions-file ${target_intervals} " : ""
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (check1.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${check1} .
         ln -sr ${meta.log}/octopus.log .
+
+        bcftools filter -i "INFO/SOMATIC == 1" ${output} -O z > ${somatic}
         """
     } else {
         """
@@ -66,6 +70,7 @@ process OCTOPUS {
                 -i tmp.vcf \\
                 -o ${output}
         fi
+        bcftools filter -i "INFO/SOMATIC == 1" ${output} -O z > ${somatic}
 
         get_nextflow_log.bash octopus.log
         """
