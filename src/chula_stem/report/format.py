@@ -229,17 +229,26 @@ def format_var_type(var: str) -> str:
 
 
 def vep_fmt(
-    vep_path: str,
-    variant_class: str,
+    vep_path: str, variant_class: str, existing_variants: list[str] | None = None
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
-    into a reportlab table
+        into a reportlab table
+    :param: existing_variants Accept only variants whose ids are in this list
+        i.e. dbSNP, COSMIC that
     """
     df: pl.DataFrame = pl.read_csv(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
     ).with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
     )
+    if existing_variants:
+        df = df.filter(
+            pl.col("Existing_variation")
+            .str.split(";")
+            .list.set_intersection(existing_variants)
+            .len()
+            >= 1
+        )
     if variant_class == "sv":
         rename: dict = Rename.sv
         try:

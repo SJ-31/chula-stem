@@ -129,6 +129,7 @@ class VariantCallingReport(ResultsReport):
         msisensor_pro: str = "",
         sigprofiler: str = "",
         cosmic_reference: str = "",
+        existing_variants_file: str = "",
         tmpdir: str = "temp",
         font=FONT,
         bold_font=BOLD_FONT,
@@ -192,9 +193,15 @@ class VariantCallingReport(ResultsReport):
         else:
             therapy_df = pl.DataFrame()
 
+        if not existing_variants_file:
+            existing_variants = None
+        else:
+            with open(existing_variants_file, "r") as f:
+                existing_variants = f.read().splitlines()
+
         calls = [
-            lambda: fr.vep_fmt(vep_small, "small"),
-            lambda: fr.vep_fmt(vep_sv, "sv"),
+            lambda: fr.vep_fmt(vep_small, "small", existing_variants),
+            lambda: fr.vep_fmt(vep_sv, "sv", existing_variants),
             lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit_cns),
             lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]
