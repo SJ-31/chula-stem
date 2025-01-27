@@ -66,11 +66,16 @@ for (i in seq_along(y_axes)) {
 arranged <- ggarrange(plotlist = plots, common.legend = TRUE, ncol = 1)
 
 
-
 # Make sure that we aren't removing valid cells with both high mitochondrial percentages
 # and high total counts (e.g. metabolically active cells)
 mito_sum_plot <- plotColData(sce, x = "sum", "subsets_mito_percent", colour_by = "discard")
 
 batch_check <- isOutlier(sce$sum, type = "higher", batch = sce$disease)
 
-## plotColData(sce, x = "disease", y = "sum", colour_by = I(batch_check))
+tb <- colData(sce_d) |> as_tibble()
+
+tb |> ggplot(aes(
+  x = factor(scDblFinder.cluster), y = cell.type,
+  alpha = stat_count()
+)) +
+  geom_tile()

@@ -3,7 +3,6 @@
 
 import pytest
 from chula_stem.utils import _format_vep_vcf
-from rpy2.robjects.packages import STAP, importr
 
 vepdir = "/home/shannc/Bio_SDD/chula-stem/tests/vep"
 

@@ -7,7 +7,7 @@ library(here)
 here::i_am("tests/test_random.r")
 src <- Sys.getenv("stem_r_src")
 source(here("src", "R", "utils.R"))
-## source(glue("{src}/plotting.R"))
+source(here("src", "R", "plotting.R"))
 
 cns_file <- "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
 # Contains copy number calls
@@ -108,11 +108,8 @@ all_ctb <- ctb$All_protein_coding_genes |>
   unique()
 
 # Filter genes on the current chromosome and those flagged as dosage-sensitive
-## genes_filtered <- genes(ensdb, filter = ~ gene_name %in% genes$all & seq_name == current_chr)
+genes_filtered <- genes(ensdb, filter = ~ gene_name %in% genes$all & seq_name == current_chr)
 
-## all_vep |>
-##   dplyr::filter(SYMBOL %in% genes_filtered$symbol) |>
-##   pluck("SYMBOL")
 
 ## ** Filter on current gene
 # This could be replaced with a range as well
@@ -144,3 +141,16 @@ plotTracks(tracks,
   transcriptAnnotation = "transcript", collapseTranscripts = TRUE,
   shape = "arrow"
 )
+
+test_plotcnvkit <- here("tests", "plots", "cnvkit1.png")
+
+## * Test
+range <- "chr1:5000-10000"
+gene_data
+plot_cnvkit(cns_file, cnr_file, "chr1", list(), test_plotcnvkit)
+
+p <- plot_cnvkit(cns_file, cnr_file, range, list(), test_plotcnvkit)
+
+s <- 100
+e <- 1200000
+cn_calls |> dplyr::filter(start >= s & end <= e)
