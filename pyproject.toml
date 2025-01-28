@@ -5,14 +5,14 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.8"
-dependencies = ["pandas", "click", "polars==1.17", "pymupdf",
-"reportlab", "gql[aiohttp]", "requests"]
+dependencies = ["pandas", "click", "polars==1.17", "pymupdf", "reportlab", "gql[aiohttp]", "requests"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "chula_stem._rust"
@@ -20,6 +20,7 @@ module-name = "chula_stem._rust"
 [project.scripts]
 format_vep_vcf = "chula_stem.utils:format_vep_vcf"
 classify_cnv_format = "chula_stem.utils:classify_cnv_format"
+pair_fastq = "chula_stem.utils:pair_fastq"
 callset_qc = "chula_stem.callset_qc:qc_main"
 pipeline_report = "chula_stem.report.cli:entry_point"
 get_therapy_cache = "chula_stem.databases:therapy_cache_from_files"

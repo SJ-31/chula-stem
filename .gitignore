@@ -143,3 +143,8 @@ docs
 /analyses/hcc/binned.txt
 /analyses/hcc/window.txt
 /nextflow/bin/tag_from_sam.bash
+/analyses/pdac/20240412_HN00215149_18samples_EXO_Report/
+/analyses/pdac/TESLA3_annotated_oncoKB.maf
+/analyses/pdac/var_head.txt
+/tests/test.vcf
+/tests/report_params_no_therapy.json
