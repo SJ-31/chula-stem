@@ -113,3 +113,45 @@ get_legend <- function(myggplot) {
   legend <- tmp$grobs[[leg]]
   return(legend)
 }
+
+
+#' Retrieve RNA seq counts from separate count files and aggregate into
+#' single genes X samples counts file
+#'
+#' @param metadata_tb a tb describing experiment metadata. Must have
+#' at least a column `files` listing paths to all files and a column `cases` with
+#' sample names
+#' @param id_mapping a two-column tb or df where the first column is the old ids and
+#'    the second column is the new
+get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
+                              file_col = "files") {
+  sum_counts <- function(tb) {
+    cols <- colnames(tb)
+    gcol <- cols[1]
+    scol <- cols[2]
+    summed <- filter(tb, !is.na(!!as.symbol(gcol)) & !is.na(!!as.symbol(scol))) |>
+      group_by(!!as.symbol(gcol)) |>
+      summarise(!!as.symbol(scol) := sum(!!as.symbol(scol)))
+    summed
+  }
+
+  if (!is.null(id_mapping)) {
+    mapping_cols <- colnames(id_mapping)
+    id_mapping <- dplyr::rename(id_mapping, gene_id = all_of(mapping_cols[1]))
+    gcol <- mapping_cols[2]
+  } else {
+    gcol <- "gene_id"
+  }
+  counts <- apply(metadata_tb, 1, \(x) {
+    col <- x[sample_col]
+    tb <- read_tsv(x[file_col], col_names = c("gene_id", col))
+    if (!is.null(id_mapping)) {
+      joined <- inner_join(tb, id_mapping, by = join_by(gene_id))
+      joined[, c(gcol, col)] |> sum_counts()
+    } else {
+      tb
+    }
+  }) |>
+    reduce(\(x, y) left_join(x, y, by = join_by(!!as.symbol(gcol))))
+  counts
+}
