@@ -26,6 +26,14 @@ process VEP {
     variant_class = meta.variant_class ? meta.variant_class : "small"
     // One of "sv" or "small"
     normal_flag = !params.tumor_only ? "-n ${meta.RGSM_normal}" : ""
+    input = params.ref.pon ? "pon_filtered.vcf" : vcf
+    if (params.ref.pon) {
+        pon_filter_command = """
+        rtg vcffilter -i ${vcf} --exclude-vcf=${params.ref.pon} -o pon_filtered.vcf
+        """
+    } else {
+        pon_filter_command = ""
+    }
     args = task.ext.args.join(" ")
     if (check.exists() && check2.exists()) {
         """
@@ -36,9 +44,11 @@ process VEP {
         """
     } else {
         """
+        ${pon_filter_command}
+
         vep --cache \\
             $args \\
-            --input_file $vcf \\
+            --input_file ${input} \\
             --dir_cache ${task.ext.cache} \\
             --species ${task.ext.species} \\
             --fasta $reference \\

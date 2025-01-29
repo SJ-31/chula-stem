@@ -40,6 +40,17 @@ process CALLSET_QC {
     all = filter_list.findAll({ it != "" && it != null })
         .collect({ "bcftools filter -i '${it}'" }).join(" | ")
     all = all != "" && all != null ? "${all} -O z > ${output}" : "bcftools view -O z > ${output}"
+
+    input = params.ref.pon ? "pon_filtered.vcf.gz" : vcf
+    if (params.ref.pon) {
+        pon_filter_command = """
+        rtg vcffilter -i ${vcf} --exclude-vcf=${params.ref.pon} -o - | \\
+            bcftools view -O z -W -o pon_filtered.vcf.gz
+        """
+    } else {
+        pon_filter_command = ""
+    }
+
     if (check.exists()) {
         """
         ln -sr ${check} .
@@ -47,10 +58,12 @@ process CALLSET_QC {
         """
     } else {
         """
+        ${pon_filter_command}
+
         echo ${meta.RGSM_normal} > normal.txt
         echo ${meta.RGSM_tumor} > tumor.txt
 
-        bcftools filter -e 'FILTER="."' ${vcf} | ${all}
+        bcftools filter -e 'FILTER="."' ${input} | ${all}
 
         get_nextflow_log.bash filter_qc.log
         """

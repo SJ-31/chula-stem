@@ -9,6 +9,7 @@ nextflow_process {
         when {
             params {
                 load("$baseDir/tests/wes_params.yaml")
+                ref = ["pon": "/data/project/stemcell/shannc/output/WES_PON/7-all_normals-PON.vcf.gz"]
             }
             process {
                 """
@@ -18,12 +19,11 @@ nextflow_process {
                     "RGSM_normal": "10_blood",
                     "RGSM_tumor": "10_cancer"
                 ],
-                    "/data/project/stemcell/shannc/tests/wes_test/standardize/5-null-Standardized.vcf.gz"]
-                input[1] = ""
-                input[2] = 3
-                input[3] = 1000
-                input[4] = ["PASS"]
-                input[5] = 9
+                    "/data/project/stemcell/shannc/tests/wes_test/standardize/4-null-Standardized.vcf.gz"]
+                qc = ["max_normal_depth": 3, "min_tumor_depth": 9,
+                    "accepted_filters": ["PASS"]]
+                input[1] = qc
+                input[2] = 2
                 """
             }
         }
