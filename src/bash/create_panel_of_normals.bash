@@ -14,7 +14,7 @@ done
 
 clean_vcf () {
     bcftools view -G | \
-        bcftools annotate -x INFO,FORMAT,QUAL -O z -W -o "${1}" --threads "${threads}"
+        bcftools annotate -x INFO,FILTER,FORMAT,QUAL -O z -W -o "${1}" --threads "${threads}"
 }
 
 mkdir cleaned

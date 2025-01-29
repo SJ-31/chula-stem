@@ -1,13 +1,13 @@
 process CREATE_PANEL_OF_NORMALS {
-    ext version: params.gatk_version
+    ext version: "1"
 
     publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(genomics_db)
-    val(reference)
-    val(germline_resource)
+    tuple val(meta), val(vcfs)
+    val(minimum)
+    val(other_vcfs)
     val(module_number)
     //
 
@@ -18,8 +18,9 @@ process CREATE_PANEL_OF_NORMALS {
 
     script:
     output = Utl.getName(module_number, meta, "PON", "vcf.gz")
+    to_sample_spec = vcfs.toList().join("\n")
+    to_other_spec = other_vcfs.join("\n")
     check = file("${meta.out}/${output}")
-    args = task.ext.args.join(" ")
     if (check.exists()) {
         """
         ln -sr ${check} .
@@ -27,12 +28,17 @@ process CREATE_PANEL_OF_NORMALS {
         """
     } else {
         """
-        gatk CreateSomaticPanelOfNormals ${args} \\
-            -R ${reference} -V ${genomics_db} \\
-            -O ${output}
+        echo -e -n "${to_sample_spec}" > samples.txt
+        echo -e -n "${to_other_spec}" > other.txt
+
+        create_panel_of_normals.bash -l samples.txt \\
+            -m ${minimum} \\
+            -v other.txt \\
+            -t ${task.cpus} \\
+            -o ${output}
 
         get_nextflow_log.bash create_panel_of_normals.log
         """
     }
-    //
 }
+// Variant resources like dbSNP or gNOMAD have no samples by default
