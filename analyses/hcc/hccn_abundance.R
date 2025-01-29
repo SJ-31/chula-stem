@@ -5,11 +5,13 @@ source(here::here("analyses", "hcc", "main.R"))
 # 2. Carry out between-sample normalization on raw counts
 # 3. Compare CPM of MET in P17 and the average of the public normal samples
 
+normalized_out <- here("analyses", "output", "HCC_abundance", "normalized.csv")
 
 ## * Batch effect visualization
 
 to_keep <- filterByExpr(y = counts, min.count = 10)
 counts <- counts[to_keep, , keep.lib.sizes = FALSE]
+
 
 normalized <- edgeR::normLibSizes(counts)
 
@@ -20,6 +22,18 @@ raw_plot <- pca_dgelist(counts, plot_aes = list(shape = "group", color = "type")
 save_fn(norm_plot, "norm_pca.png")
 save_fn(raw_plot, "raw_pca.png")
 # <2025-01-16 Thu> Batch effect is clearly visible
+
+## ** Get normalized counts for models <2025-01-28 Tue>
+chula_raw_counts <- readRDS(chula_raw_counts_file) |> column_to_rownames(var = "gene_id")
+sample_info <- data.frame(row.names = colnames(chula_raw_counts), cancer_type = rep("HCC", ncol(chula_raw_counts)))
+dge <- DGEList(counts = chula_raw_counts, samples = sample_info)
+to_cpm <- edgeR::normLibSizes(dge) |>
+  edgeR::cpm(log = TRUE, prior.count = 1) |>
+  as_tibble() |>
+  mutate(gene = rownames(dge)) |>
+  relocate(gene, .before = everything())
+write_csv(to_cpm, here(outdir, "hcc_expr.csv"))
+
 
 ## ** Attempt correction with ComBat
 full_model <- model.matrix(~ as.factor(tissue), data = counts$samples)
@@ -85,7 +99,7 @@ compare_17 <- function(counts_table, file) {
   write_tsv(merged, file)
 }
 
-normalized_counts <- cpm(ccounts$counts) # CPM
+normalized_counts <- edgeR::cpm(ccounts$counts) # CPM
 compare_17(normalized_counts, here(outdir, "cpm_P17_tcga_normal.tsv"))
 compare_17(combat_corrected, here(outdir, "log2cpm_P17_tcga_normal.tsv"))
 
@@ -108,8 +122,3 @@ sd_plot <- ggplot(
   ylab("Batch effect-corrected std") +
   xlab("std") +
   labs(title = "Standard deviation of normalized gene CPM across samples")
-
-
-gstd_corrected |>
-  filter(gene_name %in% tpm_not_zero) |>
-  arrange(sd)

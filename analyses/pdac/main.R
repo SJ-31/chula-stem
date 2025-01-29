@@ -14,12 +14,12 @@ reticulate::source_python(here("src", "chula_stem", "utils.py"), py_utils)
 
 outdir <- here("analyses", "output", "pdac")
 save_fn <- function(plot, name) {
-  ggsave(here(outdir, name), plot = plot, dpi = 500, width = 15)
+  ggsave(here(outdir, name), plot = plot, dpi = 500, width = 15, height = 10)
 }
 
 
 vaf_merged_file <- here("analyses", "output", "pdac_vaf_merged.tsv")
-sbs_merged_file <- here("analyses", "output", "pdac_sbs.tsv")
+sbs_merged_file <- here("analyses", "output", "pdac", "sbs.tsv")
 sbs_merged_file_mp <- here("analyses", "output", "pdac_sbs_mp.tsv")
 sbs_merged_file_all <- here("analyses", "output", "pdac_sbs_all.tsv")
 vaf_merged_transcripts_file <- here("analyses", "output", "pdac_vaf_merged_transcripts.tsv")

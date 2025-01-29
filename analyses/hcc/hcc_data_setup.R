@@ -51,6 +51,13 @@ chula_counts <- lapply(chula_meta$files, \(x) {
     format_counts()
 })
 
+chula_raw_counts_file <- here(outdir, "chula_raw_counts.rds")
+chula_raw_counts <- apply(chula_meta, 1, \(x) {
+  read_tsv(x["files"], col_names = c("gene_id", x["cases"])) |>
+    filter(!grepl("N_", gene_id))
+}) |> reduce(\(x, y) left_join(x, y, by = join_by(gene_id)))
+saveRDS(chula_raw_counts, chula_raw_counts_file)
+
 ## ** Join counts
 
 metadata <- bind_rows(tcga_meta, chula_meta) |> mutate(files = basename(files))

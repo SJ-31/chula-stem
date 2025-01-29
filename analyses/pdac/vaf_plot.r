@@ -140,8 +140,6 @@ ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
 
 ## ** replicate plot
 sbs <- read_tsv(sbs_merged_file)
-sbs_mp <- read_tsv(sbs_merged_file_mp)
-sbs2 <- read_tsv(sbs_merged_file_all)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
 replicate_figure <- merged |>
