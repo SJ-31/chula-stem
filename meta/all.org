@@ -1,23 +1,60 @@
+* HPC account
 Have 10TB of shared space in the =/data/project/stemcell= directory
++ Available QOS
+  * interactive-cpu, ngs16, cpu24h, interactive-gpu, gpu5g
+* Data
 All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
-* Exome CRC
+** CRC
+*** Exome
 + Sequencing platform: NovaSeq 6000
 + Capture kit: SureSelect Human All Exon V6
-** Sample collection
+**** Sample collection
  "Colorectal cancer tissues were obtained from primary rectal cancer patients during Endoscopic procedure. The approval of collecting patient data and tissues in this study was approved by the institutional review board of the Faculty of Medicine of Chulalongkorn University, and informed consent was provided from all patients. IRB No. 021/62.
 For organoid establishment and culture, cancer and normal adjacent tissue biopsies were cut into 1x1 mm pieces and washed 5 times with AdDF+++ (AdvancedDMEM/F12 (Gibco, Thermo sciencetific) supplemented with 1x anti-anti (Gibco, Thermo sciencetific), 1X Glutamax (Gibco, Thermo sciencetific) and 10mM HEPES (Gibco, Thermo sciencetific)). Tissues were incubated with DispaseII (Gibco, Thermo sciencetific) and CollagenaseD (Roche, Sigma Aldrich) for 1 hour at 37°C then vortex at high speed for 5 secs, 3 times. Small clump cells in suspension were collected by centrifugation and washed 5 times with AdDF+++. Cell pellet was resupended in 70% Matrigel (Corning) and dropped on pre-warmed 24 well culture plate. After matrigel solidification, 500 ul of Colorectal organoid culture media (AdvancedDMEM/F12 containing 10% R-Spondin condition media, 10% Wnt3a condition media, 1 mM N-Acetylcysteine, 10 mM Nicotinamide, 1x B27 supplement, 1x N2 supplement, 100 ng/ml Noggin, 1uM Gastrin-I, 50 ng/ml EGF, 50 uM A83-01, 1uM SB202190) was added. Organoids were cultured at 37°C 5% CO2. Media was changed every 4 days and passaged every 1-2 weeks \textbf{y} mechanically dissociated using P1000 pipette tip."
-* PDAC (Pancreatic ductal adenocarcinoma)
+*** RNASeq
++ Sequencing platform: Illumina HiSeq
+  * Adapter sequences
+    * P7 adapter（read1）：AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+    * P5 adapter（read2）：AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
++ Isolated poly(A) mRNA with magnetic isolation module (rRNA removal kit)
++ Capture kit:
++ Sequencing protocol
+  #+begin_quote
+  Total RNA of each sample was extracted using TRIzol Reagent (Invitrogen)/RNeasy Mini Kit
+(Qiagen)/other kits. Total RNA of each sample was quantified and qualified by Agilent 2100 Bioanalyzer
+(Agilent Technologies, Palo Alto, CA, USA), NanoDrop (Thermo Fisher Scientific Inc.) and 1% agrose
+gel. 1 μg total RNA with RIN value above 6.5 was used for following library preparation. Next generation
+sequencing library preparations were constructed according to the manufacturer’s protocol. The poly(A)
+mRNA isolation was performed using Poly(A) mRNA Magnetic Isolation Module or rRNA removal Kit.
+The mRNA fragmentation and priming was performed using First Strand Synthesis Reaction Buffer and
+Random Primers. First strand cDNA was synthesized using ProtoScript II Reverse Transcriptase and the
+second-strand cDNA was synthesized using Second Strand Synthesis Enzyme Mix. The purified double-
+stranded cDNA by beads was then treated with End Prep Enzyme Mix to repair both ends and add a dA-
+tailing in one reaction, followed by a T-A ligation to add adaptors to both ends. Size selection of Adaptor-
+ligated DNA was then performed using beads, and fragments of ~420 bp (with the approximate insert size
+of 300 bp) were recovered. Each sample was then amplified by PCR for 13 cycles using P5 and P7
+primers, with both primers carrying sequences which can anneal with flow cell to perform bridge PCR
+and P7 primer carrying a six-base index allowing for multiplexing. The PCR products were cleaned up
+using beads, validated using an Qsep100 (Bioptic，Taiwan， China), and quantified by Qubit3.0
+Fluorometer (Invitrogen, Carlsbad, CA, USA).
+Then libraries with different indices were multiplexed and loaded on an Illumina HiSeq instrument
+according to manufacturer’s instructions (Illumina, San Diego, CA, USA). Sequencing was carried out
+using a 2x150bp paired-end (PE) configuration; image analysis and base calling were conducted by the
+HiSeq Control Software (HCS) + OLB + GAPipeline-1.6 (Illumina) on the HiSeq instrument.
+The sequences were processed and analyzed by GENEWIZ.
+  #+end_quote
+** PDAC (Pancreatic ductal adenocarcinoma)
+*** Exome
 + Sequencing platform:
 + Capture kit: SureSelect Human All Exon V6
-* HCC (Hepatocellular carcinoma)
+** HCC (Hepatocellular carcinoma)
 + [[+ https://drive.google.com/drive/folders/1-7pRRFO_zJWeztu1Yl_bp5_pKFYWbDOh][Link]]
-+ RNASeq
+*** RNASeq
   * Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])
     * Captures poly-A containing mRNA with poly-T oligos attached to magnetic beads
     * Strand specificity with dUTP marking method, reverse-forward orientation
       * R1 maps to antisense strand, R2 to sense strand i.e. R1 has the same sequence as the antisense strand
   * HTS: NovaSeq6000 150bp PE
-+ Whole exome
+*** Exome
   * Capture kit: SureSelect Human All Exon V6
   * Sequencing platform: NovaSeq 6000
-

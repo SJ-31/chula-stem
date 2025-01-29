@@ -42,6 +42,7 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
 + =msi_reference=:  the equivalent of =cnv_reference= for repetitive elements, generated with the same script; a BED file containing dbVar and clinVar repetitive element data
 + =civic_cache=: path to json file containing cached calls to Civic API (is automatically generated and updated if it doesn't exist)
 + =pandrugs2_cache=: path to json file containing cached calls to Pandrugs2 API (is automatically generated and updated if it doesn't exist)
++ =pon= : path to a panel of normals. Any variants found in this file will be excluded from the final callset
 ** Steps
 *** Preprocessing
 + Quality control ([[https://github.com/OpenGene/fastp][fastp]])

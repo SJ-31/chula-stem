@@ -31,3 +31,5 @@ msi_reference= "$refdir/variants/structural/aggregated_msi.tsv"
 
 clingen_dosage = "$refdir/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv"
 clingen_gene = "$refdir/therapeutics/Clingen-Gene-Disease-Summary-2024-12-19.csv"
+
+gatk_pon =  "$refdir/variants/gatk_resources/1000g_pon.hg38.vcf.gz"
