@@ -1,3 +1,5 @@
+# --- CODE BLOCK ---
+
 library(tidyverse)
 library(GenomicRanges)
 library(glue)
@@ -9,6 +11,8 @@ src <- Sys.getenv("stem_r_src")
 source(here("src", "R", "utils.R"))
 source(here("src", "R", "plotting.R"))
 
+
+# --- CODE BLOCK ---
 cns_file <- "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
 # Contains copy number calls
 cnr_file <- "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr"
@@ -26,6 +30,32 @@ facets <- readRDS(facets_rds)
 
 regions_bed <- "/home/shannc/Bio_SDD/chula-stem/tests/data/Unzipped_regions.bed"
 
+## * Map ensembl ids to entrez
+# --- CODE BLOCK ---
+Sys.setenv(BIOMART_CACHE = here(".cache", "biomaRt"))
+library(biomaRt)
+mart <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+filters <- biomaRt::listFilters(mart) %>% as_tibble()
+att <- biomaRt::listAttributes(mart) |> as_tibble()
+test_file <- here("analyses", "output", "HCC_abundance", "hcc_expr.csv")
+expr <- read.csv(test_file, row.names = 1)
+gene_names <- rownames(expr)
+
+# --- CODE BLOCK ---
+query <- biomaRt::getBM(
+  attributes = c(
+    "entrezgene_id", "ensembl_gene_id"
+  ), filters = "ensembl_gene_id", values = gene_names,
+  mart = mart
+)
+merged <- base::merge(expr, query, by.x = 0, by.y = "ensembl_gene_id")
+tb <- as_tibble(merged) %>% filter(!is.na(entrezgene_id))
+
+ans <- ensembl2entrez(expr)
+result <- here("analyses", "output", "HCC_abundance", "hcc_expr_entrez.csv")
+write.csv(ans, result)
+
+# --- CODE BLOCK ---
 
 ## * Setup for plotting cn data <2025-01-10 Fri>
 library(Gviz)

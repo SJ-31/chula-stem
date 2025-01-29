@@ -11,6 +11,23 @@ t2tb <- function(x, names = "rowname") {
     as_tibble()
 }
 
+ensembl2entrez <- function(df) {
+  mart <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+  columns <- colnames(df)
+  genes <- rownames(df)
+  query <- biomaRt::getBM(
+    attributes = c(
+      "entrezgene_id", "ensembl_gene_id"
+    ), filters = "ensembl_gene_id", values = genes,
+    mart = mart
+  )
+  merged <- base::merge(df, query, by.x = 0, by.y = "ensembl_gene_id")
+  merged <- merged[!is.na(merged$entrezgene_id), ] %>%
+    distinct(entrezgene_id, .keep_all = TRUE)
+  rownames(merged) <- merged$entrezgene_id
+  merged[, columns]
+}
+
 
 basename_no_ext <- function(file) {
   bname <- basename(file)
