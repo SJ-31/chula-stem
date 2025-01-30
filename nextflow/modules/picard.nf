@@ -10,6 +10,7 @@ process PICARD {
     val(reference)
     val(target_intervals)
     val(bait_intervals)
+    val(strandedness)
     val(gene_annotations_refFlat)
     val(module_number)
     // Both baits and targets must be in interval list format
@@ -23,6 +24,13 @@ process PICARD {
     out2 = Utl.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${out2}")
+    if (strandedness == "reverse" ) {
+       strandedness_flag = "SECOND_READ_TRANSCRIPTION_STRAND "
+    } else if (strandedness == "forward" || strandedness == "unstranded") {
+       strandedness_flag = "FIRST_READ_TRANSCRIPTION_STRAND"
+    } else {
+       strandedness_flag =  ""
+    }
     if (check.exists() && check2.exists()) {
         """
         ln -sr ${check} .

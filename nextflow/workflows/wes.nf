@@ -219,7 +219,7 @@ workflow whole_exome {
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,
-           "", 8)
+           "", "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
     to_bcftools_stats = Utl.addSuffix(small_all, "Bcftools_stats_small")

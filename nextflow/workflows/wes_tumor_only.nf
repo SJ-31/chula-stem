@@ -164,7 +164,8 @@ workflow whole_exome_tumor_only {
     /*
      * Variant annotation
      */
-    // QC for VEP will be carried out separately
+    // QC for VEP will be carried out separately on the TSV file,
+    // so it does not receive the QC vcf
     to_vep_small = Utl.modifyMeta(STANDARDIZE_VCF.out.vcf,
                               ["suffix": "VEP_small", "variant_class": "small",
                                "qc": params.small_qc])
@@ -208,7 +209,7 @@ workflow whole_exome_tumor_only {
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,
-           "", 8)
+           "", "", 8)
     MOSDEPTH(to_metrics, params.ref.targets, 8)
 
 

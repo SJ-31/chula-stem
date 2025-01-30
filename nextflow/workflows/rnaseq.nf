@@ -37,7 +37,8 @@ workflow rnaseq {
     DUPRADAR(metric_bams, params.ref.genome_gff, params.strandedness, true, 4)
 
     to_picard = Utl.joinFirst(metric_bams, [PREPROCESS_FASTQ.out.bam_index])
-    PICARD(to_picard, "rnaseq", params.ref.genome, "", "", params.ref.genome_gff, 4)
+    PICARD(to_picard, "rnaseq", params.ref.genome, "", "", params.ref.genome_gff,
+           params.strandedness, 4)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics,
                                                      PREPROCESS_FASTQ.out.counts)
