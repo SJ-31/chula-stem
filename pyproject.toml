@@ -11,6 +11,8 @@ dependencies = [
   "polars==1.17",
   "pymupdf",
   "reportlab",
+  "scanpy",
+  "scipy",
   "gql[aiohttp]",
   "requests",
 ]
@@ -32,3 +34,4 @@ pair_fastq = "chula_stem.utils:pair_fastq"
 callset_qc = "chula_stem.callset_qc:qc_main"
 pipeline_report = "chula_stem.report.cli:entry_point"
 get_therapy_cache = "chula_stem.databases:therapy_cache_from_files"
+read_10x_mtx = "chula_stem.sc_rnaseq:read_10x_mtx"

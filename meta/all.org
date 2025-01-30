@@ -43,6 +43,9 @@ using a 2x150bp paired-end (PE) configuration; image analysis and base calling w
 HiSeq Control Software (HCS) + OLB + GAPipeline-1.6 (Illumina) on the HiSeq instrument.
 The sequences were processed and analyzed by GENEWIZ.
   #+end_quote
++ *Misc:*
+  * Files containing N-W-GF are normal with growth factor
+  * Files with the -2 suffix are post-treatment
 ** PDAC (Pancreatic ductal adenocarcinoma)
 *** Exome
 + Sequencing platform:
@@ -50,11 +53,23 @@ The sequences were processed and analyzed by GENEWIZ.
 ** HCC (Hepatocellular carcinoma)
 + [[+ https://drive.google.com/drive/folders/1-7pRRFO_zJWeztu1Yl_bp5_pKFYWbDOh][Link]]
 *** RNASeq
-  * Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])
-    * Captures poly-A containing mRNA with poly-T oligos attached to magnetic beads
-    * Strand specificity with dUTP marking method, reverse-forward orientation
-      * R1 maps to antisense strand, R2 to sense strand i.e. R1 has the same sequence as the antisense strand
-  * HTS: NovaSeq6000 150bp PE
+- Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])
+  * Captures poly-A containing mRNA with poly-T oligos attached to magnetic beads
+  * Strand specificity with dUTP marking method, reverse-forward orientation
+    * R1 maps to antisense strand, R2 to sense strand i.e. R1 has the same sequence as the antisense strand
+- HTS: NovaSeq6000 150bp PE
+- *Misc:*
+  * Samples 9 and above (as well as sample 1) were cultured in hepatocyte media
 *** Exome
   * Capture kit: SureSelect Human All Exon V6
   * Sequencing platform: NovaSeq 6000
+** CCA (Cholangiocarcinoma)
+*** RNASeq
+TODO: check the library prep
+- Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])
+  * Captures poly-A containing mRNA with poly-T oligos attached to magnetic beads
+  * Strand specificity with dUTP marking method, reverse-forward orientation
+    * R1 maps to antisense strand, R2 to sense strand i.e. R1 has the same sequence as the antisense strand
+- HTS: NovaSeq6000 150bp PE
+- *Misc:*
+  * Files with "LIN28B" are from normal samples with LIN28 overexpression

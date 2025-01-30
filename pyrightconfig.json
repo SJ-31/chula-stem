@@ -3,6 +3,7 @@
     "reportAttributeAccessIssue": "none",
     "reportOptionalSubscript": "none",
     "reportAssignmentType": "none",
+    "reportCallIssue": false,
     "reportIncompleteStub": false,
     "reportAny": false,
     "reportUnknownParameterType": false,
