@@ -139,6 +139,7 @@ ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
 
 
 ## ** replicate plot
+# --- CODE BLOCK ---
 sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
@@ -160,6 +161,7 @@ if (filter_version == "CLIN_SIG") {
   accepted_consequence <- c("missense_variant", "frameshift_variant")
 } else if (filter_version == "KNOWN") {
   replicate_figure <- filter_known(replicate_figure, dbsnp_file)
+  print("Filtering by known variants")
 } else if (filter_version == "MUTECT") {
   replicate_figure <- replicate_figure |> filter(grepl("mutect2", SOURCE))
 }
@@ -285,7 +287,7 @@ final_rep <- ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0
 final_rep
 
 save_fn(final_rep, "pdac_vaf_replicate.png")
-
+# --- CODE BLOCK ---
 ## * Plot metrics
 smm <- replicate_figure |>
   group_by(SYMBOL) |>

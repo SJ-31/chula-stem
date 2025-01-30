@@ -27,7 +27,6 @@ data_path <- here("analyses", "data_all", "output", "PDAC")
 ref_path <- here("analyses", "data_all", "reference")
 dbsnp_file <- here(ref_path, "variants", "dbSNP_somatic.csv")
 
-# TODO: when pdac is done, recreate this file
 if (!file.exists(vaf_merged_file)) {
   files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv$", recursive = TRUE, full.names = TRUE)
   tsvs <- lapply(files, \(x) {
@@ -36,22 +35,6 @@ if (!file.exists(vaf_merged_file)) {
       VAF, Feature, SYMBOL, Existing_variation,
       CLIN_SIG, Consequence, SOURCE
     )
-    ## tb |> <2025-01-24 Fri> Takes too long and you don't use this anyway
-    ##   mutate(census_mutations = map_chr(Consequence, \(x) {
-    ##     case_when(
-    ##       str_detect(x, "missense") ~ "Mis",
-    ##       str_detect(x, "frameshift") ~ "F",
-    ##       str_detect(x, "deletion|lost") ~ "D",
-    ##       .default = NA
-    ##     )
-    ##   })) |>
-    ##   mutate(across(where(is.character), \(x) utils$flatten_by(x, collapse = TRUE, unique = FALSE))) |>
-    ##   mutate(census_mutations = map_chr(census_mutations, \(x) {
-    ##     if (is.na(x)) {
-    ##       return(x)
-    ##     }
-    ##     first(utils$modes(str_split_1(x, ";") |> discard(\(x) x == "NA")))
-    ##   }))
     tb
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
@@ -73,11 +56,18 @@ filter_known <- function(tb, dbsnp) {
   if (is.character(dbsnp)) {
     dbsnp <- read_csv(dbsnp_file)
   }
+  tb <- tb |> filter(!is.na(Existing_variation))
   cur_cols <- colnames(tb) |> setdiff("Existing_variation")
-  tb |>
-    separate_longer_delim(Existing_variation, ";") |>
-    filter(Existing_variation %in% dbsnp$ID | grepl("COSV", Existing_variation)) |>
-    distinct(pick(all_of(cur_cols)))
+  cosmic <- tb |>
+    filter(grepl("COSV", Existing_variation)) |>
+    select(-Existing_variation)
+  tb$Existing_variation <- lapply(tb$Existing_variation, \(x) {
+    str_split_1(x, ";")
+  })
+  in_dbsnp <- tb |>
+    filter(map_lgl(Existing_variation, \(x) length(intersect(x, dbsnp$ID)) > 0)) |>
+    select(-Existing_variation)
+  bind_rows(in_dbsnp, cosmic) |> distinct()
 }
 
 vaf_heatmap <- function(plot) {

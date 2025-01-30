@@ -8,12 +8,18 @@ from tempfile import TemporaryDirectory
 import polars as pl
 
 outpath: Path = Path("/home/shannc/Bio_SDD/chula-stem/analyses/data_all/output/PDAC")
-target = "/home/shannc/Bio_SDD/chula-stem/analyses/output/pdac_sbs.tsv"
+target = "/home/shannc/Bio_SDD/chula-stem/analyses/output/pdac/sbs.tsv"
 target2 = "/home/shannc/Bio_SDD/chula-stem/analyses/output/pdac_sbs_all.tsv"
+
+# <2025-01-27 Mon>
+# + You checked to see if removing duplicate variants and normalizing variants
+# will make a difference
+# + 2025-01-28 There
 
 
 def bcftools_stats(input, output) -> None:
-    run(f"bcftools stats {input} > {output}", shell=True)
+    command = f"bcftools norm -a --atom-overlaps '*' -d none {input}"
+    run(f"{command} | bcftools stats > {output}", shell=True)
 
 
 def get_substitution_types(
@@ -82,20 +88,3 @@ if outpath.exists():
     final.write_csv(target, separator="\t")
     final2 = pl.concat(dfs2)
     final2.write_csv(target2, separator="\t")
-
-old_path: Path = Path("/data/project/stemcell/PDAC/Exome_PDAC_HN00215149")
-if old_path.exists():
-    old_dfs = []
-    with TemporaryDirectory() as tmpdir:
-        os.chdir(tmpdir)
-        for f in old_path.rglob("*final.vcf"):
-            sample_name = f.stem.replace(".final.vcf", "")
-            bcftools_stats(f, "tmp_stats.txt")
-            odf = get_substitution_types("tmp_stats.txt").with_columns(
-                sample=pl.lit(sample_name)
-            )
-            old_dfs.append(odf)
-    os.chdir(cwd)
-    ptarget = "/data/home/shannc/chula-stem/analyses/output/pdac_sbs_previous.tsv"
-    old_final = pl.concat(old_dfs)
-    old_final.write_csv(ptarget)
