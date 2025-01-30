@@ -13,7 +13,7 @@ process DUPRADAR {
 
     output:
     tuple val(meta), path(output), emit: plots
-    path("${output}/${output}.py"), emit: py
+    tuple val(meta), path("${output}/${output}.tsv"), emit: tsv
     path("*.log")
     //
 
@@ -31,7 +31,7 @@ process DUPRADAR {
         mkdir ${output}
         dupradar.R -b ${bam} \\
             -g ${reference} \\
-            -o ${output}/duplicates.tsv \\
+            -o ${output}/${output}.tsv \\
             -s ${strandedness} \\
             --box_plot ${output}/box_plot.png \\
             --density_plot ${output}/density_plot.png \\
