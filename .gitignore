@@ -5,6 +5,9 @@ tests/patient*
 tests/*.pdf
 *.nf-test.log*
 nf_metrics
+Rplots.pdf
+package.json
+package-lock.json
 analyses/data
 analyses/data_all
 analyses/*.pdf
