@@ -1,22 +1,34 @@
 #!/usr/bin/env Rscript
-
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
 library(tximport)
+library(ensembldb)
 
 
 get_tx2gene <- function(reference) {
-  if (str_detect(reference, "\\.gtf|\\.gff")) {
-    gtf <- rtracklayer::readGFF(reference) |> as_tibble()
-  } else if (str_detect(reference, "\\.rds")) {
-    gtf <- readRDS(reference)
+  if (str_detect(reference, "\\.sqlite")) {
+    ensdb <- EnsDb(reference)
+    tx2gene <- AnnotationDbi::select(ensdb,
+      columns = c("TXID", "GENEID"), keytype = "GENEID",
+      keys = keys(ensdb)
+    )
+    geneids2name <- AnnotationDbi::select(ensdb,
+      columns = c("GENEID", "GENENAME"), keytype = "GENEID",
+      keys = keys(ensdb)
+    )
+  } else {
+    if (str_detect(reference, "\\.gtf|\\.gff")) {
+      gtf <- rtracklayer::readGFF(reference) |> as_tibble()
+    } else if (str_detect(reference, "\\.rds")) {
+      gtf <- readRDS(reference)
+    }
+    tx2gene <- gtf |>
+      dplyr::select(transcript_id, gene_id) |>
+      dplyr::filter(!is.na(transcript_id))
+    geneids2name <- gtf |>
+      dplyr::select(gene_id, gene_name) |>
+      unique()
   }
-  tx2gene <- gtf |>
-    dplyr::select(transcript_id, gene_id) |>
-    dplyr::filter(!is.na(transcript_id))
-  geneids2name <- gtf |>
-    dplyr::select(gene_id, gene_name) |>
-    unique()
   list(tx2gene = tx2gene, geneids2name = geneids2name)
 }
 

@@ -124,7 +124,8 @@ get_legend <- function(myggplot) {
 #' @param id_mapping a two-column tb or df where the first column is the old ids and
 #'    the second column is the new
 get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
-                              file_col = "files") {
+                              file_col = "files", gene_col = 1, count_col = 2,
+                              read_fn = \(x) read_tsv(col_names = FALSE)) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -144,7 +145,8 @@ get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "case
   }
   counts <- apply(metadata_tb, 1, \(x) {
     col <- x[sample_col]
-    tb <- read_tsv(x[file_col], col_names = c("gene_id", col))
+    tb <- read_fn(x[file_col]) |> dplyr::select(all_of(c(gene_col, count_col)))
+    colnames(tb) <- c("gene_id", col)
     if (!is.null(id_mapping)) {
       joined <- inner_join(tb, id_mapping, by = join_by(gene_id))
       joined[, c(gcol, col)] |> sum_counts()
