@@ -6,7 +6,13 @@ import time as tt
 import numpy as np
 import pandas as pd
 from keras.models import load_model
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
 from datasets import load_dataset
 
@@ -21,6 +27,18 @@ def load_label_encodings(data_dir):
     int_to_label = dict((int(k), v) for k, v in _encoding.items())
     label_to_int = dict((v, int(k)) for k, v in _encoding.items())
     return int_to_label, label_to_int
+
+
+def sk_report_performance(labels, predictions, prefix: str = "average_"):
+    metrics = ["precision", "recall", "f1_score"]
+    metrics = list(map(lambda x: f"{prefix}{x}", metrics))
+    scores = [
+        precision_score(labels, predictions, average="weighted", zero_division=0),
+        recall_score(labels, predictions, average="weighted", zero_division=0),
+        f1_score(labels, predictions, average="weighted"),
+    ]
+    df = pd.DataFrame({"metric": metrics, "score": scores})
+    return df
 
 
 def predict(
@@ -40,7 +58,12 @@ def predict(
     pred_labels = [from_int_to_label[k] for k in pred_labels]
     with_pred = pd.DataFrame({"prediction": pred_labels, "sample": samples})
 
-    result: dict = {"cm": None, "report": None, "prediction": with_pred}
+    result: dict = {
+        "cm": None,
+        "report": None,
+        "prediction": with_pred,
+        "metrics": None,
+    }
     if labels.any():
         cm_labels = list(set(pred_labels) | set(labels))
         cm_labels.sort()
@@ -49,12 +72,15 @@ def predict(
         report = classification_report(labels, pred_labels, labels=cm_labels)
         result["report"] = report
         result["cm"] = cm
+        metrics = sk_report_performance(labels, pred_labels)
+        print(metrics)
+        result["metrics"] = metrics
         acc = np.sum(_confusion_matrix.diagonal()) / np.sum(_confusion_matrix)
         print(f"overall accuracy: {acc * 100}%")
     return result
 
 
-def load_input(file: str, data_dir: str):
+def load_input(file: str, data_dir: str, label_column: str):
     """`file` is either a gene x sample matrix, or a sample x gene matrix
         the latter case is if labels are known (in a column called "tumor_type")
         and the file is provided for testing purposes.
@@ -66,11 +92,11 @@ def load_input(file: str, data_dir: str):
         and a series of labels if provided
     """
     df = pd.read_csv(file, index_col=0)
-    if "tumor_type" in df.columns:
-        labels: pd.Series = df["tumor_type"]
-        df = np.transpose(df.drop(["tumor_type"], axis=1))
+    if label_column in df.columns:
+        labels: pd.Series = df[label_column]
+        df = np.transpose(df.drop([label_column], axis=1))
     else:
-        labels = pd.Series(None, index=df.columns, name="tumor_type")
+        labels = pd.Series(None, index=df.columns, name=label_column)
 
     target_genes = pd.read_csv(
         f"{data_dir}/features_791.csv", header=None, index_col=0
@@ -116,6 +142,13 @@ if __name__ == "__main__":
         action="store",
     )
     parser.add_argument(
+        "-l",
+        "--label_column",
+        default="label",
+        help="For test datasets (sample x genes), the column indicating the label of the sample",
+        action="store",
+    )
+    parser.add_argument(
         "--model",
         required=False,
         default="inception",
@@ -144,13 +177,14 @@ if __name__ == "__main__":
 
     keras_model = load_model(model_files[args.model])
 
-    input, labels = load_input(args.input, args.data_dir)
-    print(input, labels)
+    input, labels = load_input(args.input, args.data_dir, args.label_column)
     result = predict(input, labels, keras_model)
     result["prediction"].to_csv(args.output, index=False)
     if result["cm"] is not None:
-        result["cm"].to_csv(args.confusion_matrix, index=False)
+        result["cm"].to_csv(args.confusion_matrix)
     if result["report"] is not None:
         with open(args.report, "w") as f:
             f.write(result["report"])
+    if result["metrics"] is not None:
+        result["metrics"].to_csv(args.metrics)
     print(f"--- {tt.time() - start_time} seconds ---")

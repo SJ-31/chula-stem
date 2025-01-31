@@ -46,6 +46,18 @@ def load_input(file: str, label_column: str):
     return transposed, labels
 
 
+def sk_report_performance(labels, predictions, prefix: str = "average_"):
+    metrics = ["precision", "recall", "f1_score"]
+    metrics = list(map(lambda x: f"{prefix}{x}", metrics))
+    scores = [
+        precision_score(labels, predictions, average="weighted", zero_division=0),
+        recall_score(labels, predictions, average="weighted", zero_division=0),
+        f1_score(labels, predictions, average="weighted"),
+    ]
+    df = pd.DataFrame({"metric": metrics, "score": scores})
+    return df
+
+
 def predict(
     input: pd.DataFrame,
     labels: pd.Series,
@@ -70,17 +82,11 @@ def predict(
     )
     predictions = [LABEL_DICT_REV[i] for i in pre_label]
     with_pred = pd.DataFrame({"prediction": predictions, "sample": samples})
-    result = {"prediction": with_pred, "cm": None, "report": None}
+    result = {"prediction": with_pred, "cm": None, "report": None, "metrics": None}
     if labels.any():
-        print(
-            "average precision_score",
-            precision_score(predictions, labels, average="weighted", zero_division=0),
-        )
-        print(
-            "average recall_score",
-            recall_score(predictions, labels, average="weighted", zero_division=0),
-        )
-        print("average f1_score", f1_score(predictions, labels, average="weighted"))
+        metrics = sk_report_performance(labels, predictions)
+        print(metrics)
+        result["metrics"] = metrics
         result["report"] = classification_report(labels, predictions)
         sorted_labels = list(set(predictions) | set(labels))
         sorted_labels.sort()
@@ -127,6 +133,13 @@ def parse_args():
         help="Path to weights",
     )
     parser.add_argument(
+        "-m",
+        "--metrics",
+        required=False,
+        default="metrics.csv",
+        help="file to write metrics to",
+    )
+    parser.add_argument(
         "-l",
         "--label_column",
         default="label",
@@ -171,7 +184,9 @@ if __name__ == "__main__":
     result = predict(data, labels, args.weights, args.batch_size)
     result["prediction"].to_csv(args.output, index=False)
     if result["cm"] is not None:
-        result["cm"].to_csv(args.confusion_matrix, index=False)
+        result["cm"].to_csv(args.confusion_matrix)
+    if result["metrics"] is not None:
+        result["metrics"].to_csv(args.metrics)
     if result["report"] is not None:
         with open(args.report, "w") as f:
             f.write(result["report"])
