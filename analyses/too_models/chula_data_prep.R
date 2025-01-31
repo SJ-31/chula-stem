@@ -48,7 +48,6 @@ for (i in seq_along(workdirs)) {
       rownames_to_column(as.data.frame(t$abundance), var = "gene_id")
     }
   )
-  print(tpm)
   c <- U$get_rnaseq_counts(meta)
 
   tpms[[i]] <- tpm
