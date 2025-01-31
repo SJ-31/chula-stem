@@ -125,7 +125,7 @@ get_legend <- function(myggplot) {
 #'    the second column is the new
 get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
                               file_col = "files", gene_col = 1, count_col = 2,
-                              read_fn = \(x) read_tsv(col_names = FALSE)) {
+                              read_fn = \(x) read_tsv(x, col_names = FALSE)) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -156,4 +156,22 @@ get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "case
   }) |>
     reduce(\(x, y) left_join(x, y, by = join_by(!!as.symbol(gcol))))
   counts
+}
+
+
+#' Transpose a dataframe or tibble while explicitly specifying column names
+#'
+#' @param colnames either a vector of column names, or the index/name
+#' of the new column names in the df
+transpose <- function(df, colnames = 1) {
+  if (length(colnames) != ncol(df) && is.numeric(colnames)) {
+    tmp <- colnames
+    colnames <- df[, colnames]
+    df <- df[, -tmp]
+  } else if (length(colnames) != ncol(df)) {
+    tmp <- colnames
+    colnames <- df[[colnames]]
+    df[[tmp]] <- NULL
+  }
+  t(df) |> `colnames<-`(colnames)
 }
