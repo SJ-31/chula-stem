@@ -36,13 +36,13 @@ process FASTP {
         """
     } else {
         """
-        fastp -i ${reads[0]} -I ${reads[1]} \\
-            -h ${prefix}.html \\
-            -j ${prefix}.json \\
-            -R ${meta.id}_report \\
-            --failed_out ${meta.id}.fail.fastq.gz \\
+        fastp -i "${reads[0]}" -I "${reads[1]}" \\
+            -h "${prefix}".html \\
+            -j "${prefix}".json \\
+            -R "${meta.id}"_report \\
+            --failed_out "${meta.id}".fail.fastq.gz \\
             ${args} \\
-            -o $output1 -O $output2
+            -o "$output1" -O "$output2"
 
         get_nextflow_log.bash fastp.log
         """
