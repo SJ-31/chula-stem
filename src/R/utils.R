@@ -125,7 +125,7 @@ get_legend <- function(myggplot) {
 #'    the second column is the new
 get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
                               file_col = "files", gene_col = 1, count_col = 2,
-                              read_fn = \(x) read_tsv(x, col_names = FALSE)) {
+                              read_fn = \(x) read_tsv(x, col_names = FALSE, gene_col = "gene_id")) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -153,6 +153,7 @@ get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "case
     } else {
       tb
     }
+    print(tb)
   }) |>
     reduce(\(x, y) left_join(x, y, by = join_by(!!as.symbol(gcol))))
   counts

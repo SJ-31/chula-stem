@@ -92,4 +92,12 @@ class Utl {
         def final_args = args_a.findAll({ !to_check.contains(it.split()[0]) })
         return final_args.join(" ")
     }
+
+    // Convert a list of maps `lst` into a string csv representation
+    public static listOfMaps2Csv(lst) {
+        def keys = [lst[0].keySet().join(",")]
+        def joined = lst.collect { it.values().join(",") }
+        return (keys + joined).join("\n")
+    }
+
 }

@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 library(tidyverse)
 R_SRC <- Sys.getenv("R_SRC")
 U <- new.env()

@@ -1,12 +1,23 @@
 #!/usr/bin/env ipython
 
 import ast
+import itertools
+import re
+from os import sep
+from pathlib import Path
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
 from typing import Callable
 
 import click
 import polars as pl
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
 
 def str_split_unique(
@@ -376,4 +387,63 @@ def parse_multiqc_vep(input: str, output: str = "") -> pl.DataFrame:
     df = pl.DataFrame(vep_data)
     if output:
         df.write_csv(output, separator="\t")
+    return df
+
+
+@click.command()
+@click.argument("path_text", required=True)
+@click.option("-r", "--remove", required=False, help="Text to remove from the paths")
+@click.option(
+    "-s", "--separator", required=False, help="Separator in a pair", default="\t"
+)
+@click.option(
+    "-x",
+    "--regex",
+    required=False,
+    help="Interpret 'remove' as a regex pattern",
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    "-c",
+    "--count",
+    required=False,
+    help="For regex patterns, number of times to remove",
+    default=0,
+)
+def pair_fastq(
+    path_text: str,
+    separator: str,
+    regex: bool,
+    count: int,
+    remove: str,
+) -> None:
+    if Path(path_text).exists():
+        path_text = Path(path_text).read_text()
+    path_text = path_text.strip()
+    if "\n" in path_text:
+        lines = path_text.splitlines()
+    elif '"' in path_text:
+        lines = list(map(lambda x: x.replace('"', ""), path_text.split('" "')))
+    else:
+        lines = path_text.split(" ")
+    if remove and not regex:
+        lines = map(lambda x: x.replace(remove, ""), lines)
+    elif remove:
+        lines = map(lambda x: re.sub(remove, "", x, count=count), lines)
+    paired_up = "\n".join(
+        [separator.join(c) for c in itertools.batched(sorted(lines), 2)]
+    )
+    print(paired_up)
+
+
+def sk_report_performance(labels, predictions, prefix: str = "average_"):
+    metrics = ["precision", "recall", "f1_score"]
+    metrics = list(map(lambda x: f"{prefix}{x}", metrics))
+    scores = [
+        precision_score(labels, predictions, average="weighted", zero_division=0),
+        recall_score(labels, predictions, average="weighted", zero_division=0),
+        f1_score(labels, predictions, average="weighted"),
+    ]
+    df = pd.DataFrame({"metric": metrics, "score": scores})
     return df
