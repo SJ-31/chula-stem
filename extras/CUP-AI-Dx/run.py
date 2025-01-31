@@ -142,6 +142,13 @@ if __name__ == "__main__":
         action="store",
     )
     parser.add_argument(
+        "-m",
+        "--metrics",
+        default="metrics.csv",
+        help="File to write performance metrics to",
+        action="store",
+    )
+    parser.add_argument(
         "-l",
         "--label_column",
         default="label",

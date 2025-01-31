@@ -27,7 +27,22 @@ def reshape_data(data):
     return data.reshape(data.shape[0], 1, data.shape[1])
 
 
-def load_input(file: str, label_column: str):
+def raw_to_kegg(df, data_dir: str):
+    kegg_info = pd.read_csv(f"{data_dir}/KEGG_Pathway_information.csv", header=0)
+    all_gene_list = []
+    for gene_set in kegg_info["gene_name"]:
+        all_gene_list.extend(gene_set.split("/"))
+
+    gene_num = 1
+    kegg_data_dict = dict()
+    for gene in all_gene_list:
+        kegg_data_dict["gene" + str(gene_num)] = df[gene]
+        gene_num = gene_num + 1
+    converted = pd.DataFrame(kegg_data_dict)
+    return converted
+
+
+def load_input(file: str, label_column: str, data_dir: str):
     """`file` is either a gene x sample matrix, or a sample x gene matrix
         the latter case is if labels are known (in a column called "tumor_type")
         and the file is provided for testing purposes.
@@ -42,8 +57,20 @@ def load_input(file: str, label_column: str):
         df = np.transpose(df.drop([label_column], axis=1))
     else:
         labels = pd.Series(None, index=df.columns, name=label_column)
-    transposed: pd.DataFrame = np.transpose(df)
-    return transposed, labels
+
+    rows = []
+    with open(f"{data_dir}/features.txt", "r") as f:
+        target_genes = f.read().splitlines()
+
+    for t in target_genes:
+        try:
+            rows.append(df.loc[[t],])
+        except KeyError:
+            rows.append(pd.DataFrame(0, columns=df.columns, index=[t]))
+    selected = pd.concat(rows, axis=0)
+    transposed: pd.DataFrame = np.transpose(selected)
+    converted = raw_to_kegg(transposed, data_dir)
+    return converted, labels
 
 
 def sk_report_performance(labels, predictions, prefix: str = "average_"):
@@ -139,6 +166,7 @@ def parse_args():
         default="metrics.csv",
         help="file to write metrics to",
     )
+    parser.add_argument("--data_dir", default="data", action="store")
     parser.add_argument(
         "-l",
         "--label_column",
@@ -180,7 +208,7 @@ if __name__ == "__main__":
         dropout=0.1,
         emb_dropout=0.1,
     ).to(DEVICE)
-    data, labels = load_input(args.input, args.label_column)
+    data, labels = load_input(args.input, args.label_column, args.data_dir)
     result = predict(data, labels, args.weights, args.batch_size)
     result["prediction"].to_csv(args.output, index=False)
     if result["cm"] is not None:
