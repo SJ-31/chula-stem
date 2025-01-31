@@ -1,6 +1,5 @@
 include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MUTECT2 } from "../modules/mutect2.nf"
-include { GENOMICS_DB_IMPORT } from '../modules/genomics_db_import.nf'
 include { EMPTY_FILES as EMPTY_FILES_1 } from '../modules/empty_files.nf'
 include { EMPTY_FILES as EMPTY_FILES_2 } from '../modules/empty_files.nf'
 include { EMPTY_FILES as EMPTY_FILES_3 } from '../modules/empty_files.nf'
