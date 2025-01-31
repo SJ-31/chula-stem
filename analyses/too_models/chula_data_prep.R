@@ -1,4 +1,5 @@
 library(tximport)
+EXCLUDE <- c("log")
 
 get_meta <- function(workflow_output, type = "STAR") {
   if (type == "STAR") {
@@ -6,8 +7,10 @@ get_meta <- function(workflow_output, type = "STAR") {
   } else if (type == "kallisto") {
     filename <- "_tumor-kallisto.tsv"
   }
+  cases <- list.dirs(workflow_output, recursive = FALSE, full.names = FALSE) |>
+    discard(\(x) x %in% EXCLUDE)
   tibble(
-    cases = list.files(workflow_output, pattern = "P.*"),
+    cases = cases,
     files = paste0(
       workflow_output, "/", cases, "/tumor/2-",
       cases, filename
@@ -22,20 +25,21 @@ tx2gene <- AnnotationDbi::select(M$db,
   keys = keys(M$db)
 )
 
-workdirs <- c(here(M$remote, "output", "HCC", "RNASEQ"))
-## workdirs <- c(
-##   here(M$remote, "output", "HCC", "RNASEQ"),
-##   here(M$remote, "output", "HCC", "RNASEQ"),
-##   here(M$remote, "output", "HCC", "RNASEQ"),
-## )
-tumor_types <- c("HCC")
-## types <- c("HCC", "CCA", "CRC")
+workdirs <- c(
+  here(M$remote, "output", "HCC", "RNASEQ"),
+  here(M$remote, "output", "CCA", "RNASEQ")
+)
+tumor_types <- c(
+  "LIHC",
+  "CHOL"
+)
 metadata <- list()
 counts <- list()
 tpms <- list()
+
 for (i in seq_along(workdirs)) {
   workdir <- workdirs[i]
-  meta <- get_meta(workdir) |> mutate(tumor_type = tumor_types[i])
+  meta <- get_meta(workdir, type = "STAR") |> mutate(tumor_type = tumor_types[i])
   k_meta <- get_meta(workdir, type = "kallisto") |> mutate(tumor_type = tumor_types[i])
 
   tpm <- U$get_rnaseq_counts(k_meta,
@@ -54,10 +58,10 @@ for (i in seq_along(workdirs)) {
   counts[[i]] <- c
   metadata[[i]] <- meta
 }
-metadata <- bind_rows(metadata)
 
-counts <- reduce(counts, \(x) left_join(x, y, by = join_by(gene_id)))
-tpms <- reduce(tpms, \(x) left_join(x, y, by = join_by(gene_id)))
+metadata <- bind_rows(metadata)
+counts <- purrr::reduce(counts, \(x, y) left_join(x, y, by = join_by(gene_id)))
+tpms <- purrr::reduce(tpms, \(x, y) left_join(x, y, by = join_by(gene_id)))
 
 write_tsv(metadata, M$chula_meta_file)
 write_rds(counts, M$chula_raw_counts_file)
