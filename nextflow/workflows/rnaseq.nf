@@ -40,8 +40,8 @@ workflow rnaseq {
     PICARD(to_picard, "rnaseq", params.ref.genome, "", "", params.strandedness,
            params.ref.genome_ref_flat, 4)
 
-    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics,
-                                                     PREPROCESS_FASTQ.out.counts)
+    
+    to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics)
         .flatten().collect().map({ [["out": params.outdir,
                                      "log": params.logdir,
                                      "filename": cohort_name], it] })
