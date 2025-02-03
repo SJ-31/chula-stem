@@ -96,6 +96,15 @@ to <- function(obj, x, val) {
 }
 
 
+read_existing <- function(filename, expr, read_fn = identity()) {
+  if (file.exists(filename)) {
+    read_fn(filename)
+  } else {
+    expr(filename)
+  }
+}
+
+
 htest2tb <- function(test) {
   tibble(
     null = test$`null.value`,
@@ -125,7 +134,7 @@ get_legend <- function(myggplot) {
 #'    the second column is the new
 get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
                               file_col = "files", gene_col = 1, count_col = 2,
-                              read_fn = \(x) read_tsv(x, col_names = FALSE, gene_col = "gene_id")) {
+                              read_fn = \(x) read_tsv(x, col_names = FALSE)) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -153,7 +162,6 @@ get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "case
     } else {
       tb
     }
-    print(tb)
   }) |>
     reduce(\(x, y) left_join(x, y, by = join_by(!!as.symbol(gcol))))
   counts
@@ -175,4 +183,11 @@ transpose <- function(df, colnames = 1) {
     df[[tmp]] <- NULL
   }
   t(df) |> `colnames<-`(colnames)
+}
+
+
+x2counts <- function(sce) {
+  assay(sce, "counts") <- assay(sce, "X")
+  assay(sce, "X") <- NULL
+  sce
 }

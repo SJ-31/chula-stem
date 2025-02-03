@@ -37,6 +37,31 @@ sce_gini <- function(sce, clusters, label_col) {
   list(cluster_gini = ginis, whole_gini = whole)
 }
 
+
+add_feature_info <- function(sce, db, keytype = "GENEID") {
+  if (is.character(db)) {
+    db <- EnsDb(db)
+  }
+
+  anno_cols <- c("GENENAME", "GENEID", "GENEBIOTYPE", "SEQNAME")
+  anno <- AnnotationDbi::select(db,
+    keys = rownames(sce), keytype = keytype,
+    columns = anno_cols
+  ) |> as_tibble()
+  tmp <- tibble(join = rownames(sce))
+
+  anno$join <- anno[[keytype]]
+
+  rowData(sce) <- left_join(tmp, anno, by = join_by(join)) |>
+    dplyr::distinct(join, .keep_all = TRUE) |>
+    dplyr::select(-join)
+
+  n_missing <- is.na(rowData(sce)$GENEID) |> sum()
+  message(glue("Missing genes: {n_missing}"))
+  rowData(sce)$is_mito <- (rowData(sce)$SEQNAME == "MT") %>% replace_na(FALSE)
+  sce
+}
+
 # Requires a SingleCellExperiment object
 # Use zellkonverter as entry into SCverse
 
@@ -58,16 +83,8 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
   }
   metric_subsets <- list()
   if (!is.null(db)) {
-    anno_cols <- c("SYMBOL", "GENEID", "GENEBIOTYPE", "SEQNAME")
-    anno <- AnnotationDbi::select(db,
-      keys = rownames(data), keytype = "GENEID",
-      columns = anno_cols
-    )
-    rowData(sce) <- left_join(sce.frame(GENEID = rownames(sce)), anno,
-      by = join_by(GENEID)
-    )
-    is_mito <- (rowData(data)$SEQNAME == "MT") %>% replace_na(FALSE)
-    metric_subsets$mito <- is_mito
+    sce <- add_feature_info(sce, db)
+    metric_subsets$mito <- rowData(sce)$is_mito
   }
   for (c in cell_meta) {
     colData(sce)[[c]] <- c
@@ -86,11 +103,14 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
 qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
                     batch_col = NULL) {
   subfields <- keep(subfields, \(x) x %in% colnames(colData(sce)))
-  reasons <- scuttle::perCellQCFilters(sce, sub.fields = subfields, batch = batch_col)
+  reasons <- scuttle::perCellQCFilters(sce,
+    sub.fields = subfields,
+    batch = sce[[batch_col]]
+  )
   if (!is.null(qc_spec)) {
     reasons_plus <- lapply(names(qc_spec), \(x) {
       result <- do.call(
-        \(...) scuttle::isOutlier(sce[[x]], batch = batch_col, ...),
+        \(...) scuttle::isOutlier(sce[[x]], batch = sce[[batch_col]], ...),
         qc_spec[[x]]
       )
       to_df <- list()
