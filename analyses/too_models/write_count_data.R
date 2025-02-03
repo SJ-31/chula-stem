@@ -6,6 +6,7 @@ source(here::here("analyses", "too_models", "main.R"))
 
 
 prepare_counts <- function(dge, type) {
+  # dge$counts is a gene x sample matrix
   if (type == "edgeR_cpm") {
     # Get cpm without normalization
     cur_counts <- edgeR::cpm(dge, log = TRUE, prior.count = 1)
@@ -22,6 +23,10 @@ prepare_counts <- function(dge, type) {
     cur_counts <- DGEobj.utils::convertCounts(dge$counts,
       unit = "fpkm", geneLength = gene_lengths, log = TRUE
     )
+  } else if (type == "log2_scaled") {
+    cur_counts <- scale(dge$counts, center = TRUE, scale = TRUE) |> log2()
+  } else if (type == "log2") {
+    cur_counts <- log2(dge$counts)
   } else {
     errorCondition("Type not recognized!")
   }
@@ -44,14 +49,21 @@ replace_ensembl_ids <- function(df, new_id_col) {
   merged |> select(all_of(kept))
 }
 
-# <2025-01-30 Thu> Maybe add in normalized counts
-quant_types <- c("edgeR_normalized_cpm", "kallisto_tpm", "edgeR_cpm", "log2_fpkm")
+quant_types <- c(
+  "edgeR_normalized_cpm", "kallisto_tpm", "edgeR_cpm", "log2_fpkm",
+  "log2_scaled"
+)
 unique_tumor_types <- unique(chula_meta$tumor_type)
 naming_schemes <- list(
   entrez = \(x) replace_ensembl_ids(x, "entrez"),
   ensembl = \(x) x,
   hugo = \(x) replace_ensembl_ids(x, "gene_name")
 )
+
+filter_fn <- function(dge) {
+  to_keep <- edgeR::filterByExpr(dge, min.count = 10)
+  dge[to_keep, ]
+}
 
 # Produce a sample x genes csv, with a column for tumor_type
 for (n in names(naming_schemes)) {
@@ -60,14 +72,18 @@ for (n in names(naming_schemes)) {
     tumor_type <- c()
     dir.create(here(M$out, q))
     for (i in seq_along(unique_tumor_types)) {
+      # Separates dataset into tumor types before normalization (relevant to advanced
+      # normalization e.g. edgeR)
       t <- unique_tumor_types[i]
       cur_type <- chula_meta |> filter(tumor_type == t)
       if (q == "kallisto_tpm") {
-        cur_counts <- chula_tpm |>
-          select(gene_id, all_of(cur_type$cases)) |>
-          mutate(across(where(is.numeric), \(x) log2(x + 1)))
+        cur <- chula_tpm[, cur_type$cases] |> filter_fn()
+        cur_counts <- prepare_counts(cur, "log2")
+      } else if (q == "cupai_log2") {
+        cur <- chula_tpm_counts[, cur_type$cases] |> filter_fn()
+        cur_counts <- prepare_counts(cur, "log2_scaled")
       } else {
-        cur <- chula_counts[, cur_type$cases]
+        cur <- chula_counts[, cur_type$cases] |> filter_fn()
         cur_counts <- prepare_counts(cur, q)
       }
       all[[t]] <- cur_counts
