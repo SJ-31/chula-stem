@@ -23,6 +23,7 @@ M$chula_raw_counts_file <- here(M$out, "chula_raw_counts.rds")
 M$chula_tpm_file <- here(M$out, "chula_tpm.rds")
 M$chula_count_tpm_file <- here(M$out, "chula_tpm_scaled_count.rds")
 M$chula_meta_file <- here(M$out, "chula_metadata.tsv")
+M$tcga_data <- here(M$data, "tcga")
 
 if (!file.exists(M$chula_raw_counts_file)) {
   tmp <- new.env()
@@ -41,6 +42,15 @@ chula_tpm <- read_rds(M$chula_tpm_file) |>
 
 chula_tpm_counts <- read_rds(M$chula_count_tpm_file) |>
   DGEList(samples = chula_meta, group = chula_meta$tumor_type)
+
+tcga_counts <- local({
+  dge <- readRDS(here(M$tcga_data, "tcga_all_tumors.rds"))
+  dge <- dge[grepl("ENSG", dge$genes$gene_id), ]
+  dge$genes$gene_id <- gsub("\\..*", "", dge$genes$gene_id)
+  dge
+})
+
+tcga_meta <- as_tibble(tcga_counts$samples) |> mutate(cases = colnames(tcga_counts))
 
 plot <- P$pca_dgelist(chula_counts,
   plot_aes =
