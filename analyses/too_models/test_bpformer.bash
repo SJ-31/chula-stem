@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+prefix="${1}"
 
-for f in ../output/too_models/*/*hugo.csv; do
+for f in ../output/too_models/*/"${prefix}"-*hugo.csv; do
     dir=$(dirname "$f")
     prediction="${dir}/bpformer.csv"
     report="${dir}/bpformer_report.txt"
