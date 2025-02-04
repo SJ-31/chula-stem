@@ -34,7 +34,7 @@ workdirs <- c(
 tumor_types <- c(
   "LIHC",
   "CHOL",
-  "COAD"
+  "COADREAD"
 )
 metadata <- list()
 counts <- list()
