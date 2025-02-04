@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
@@ -139,46 +139,21 @@ def parse_args():
         "-b", "--batch_size", default=64, help="Model batch size", action="store"
     )
     parser.add_argument(
-        "-c",
-        "--confusion_matrix",
-        default="confusion_matrix.csv",
-        help="file to write confusion matrix output to",
-        action="store",
-    )
-    parser.add_argument(
-        "-r",
-        "--report",
-        default="classification_report.txt",
-        help="file to write classification report to",
-        action="store",
-    )
-    parser.add_argument(
         "-w",
         "--weights",
         required=False,
         default="best_weight.pth",
         help="Path to weights",
     )
-    parser.add_argument(
-        "-m",
-        "--metrics",
-        required=False,
-        default="metrics.csv",
-        help="file to write metrics to",
-    )
+    parser.add_argument("--model", default="", help="", action="store")
     parser.add_argument("--data_dir", default="data", action="store")
+    parser.add_argument("-p", "--prefix", default="cupai", help="Prefix for output")
+    parser.add_argument("-o", "--outdir", default=".", help="Output directory")
     parser.add_argument(
         "-l",
         "--label_column",
         default="label",
         help="For test datasets (sample x genes), the column indicating the label of the sample",
-        action="store",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default="prediction.csv",
-        help="output to predictions for each sample",
         action="store",
     )
     return parser.parse_args()
@@ -208,13 +183,23 @@ if __name__ == "__main__":
         dropout=0.1,
         emb_dropout=0.1,
     ).to(DEVICE)
+
+    def out(name):
+        return f"{args.outdir}/{args.prefix}{name}"
+
+    os.makedirs(args.outdir, exist_ok=True)
     data, labels = load_input(args.input, args.label_column, args.data_dir)
+    input_summary = np.transpose(data.agg(func=["mean", np.sum]))
+    input_summary.columns = ["gene_id", "value"]
+
+    input_summary.to_csv(out("input_summary.csv"))
     result = predict(data, labels, args.weights, args.batch_size)
-    result["prediction"].to_csv(args.output, index=False)
+
+    result["prediction"].to_csv(out("prediction.csv"), index=False)
     if result["cm"] is not None:
-        result["cm"].to_csv(args.confusion_matrix)
+        result["cm"].to_csv(out("confusion_matrix.csv"))
     if result["metrics"] is not None:
-        result["metrics"].to_csv(args.metrics)
+        result["metrics"].to_csv(out("metrics.csv"))
     if result["report"] is not None:
-        with open(args.report, "w") as f:
+        with open(out("report.txt"), "w") as f:
             f.write(result["report"])

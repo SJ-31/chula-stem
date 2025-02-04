@@ -1,7 +1,9 @@
 #!/usr/bin/env ipython
 import argparse
 import json
+import os
 import time as tt
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -127,27 +129,8 @@ if __name__ == "__main__":
         help="csv file containing expression data",
         action="store",
     )
-    parser.add_argument(
-        "-c",
-        "--confusion_matrix",
-        default="confusion_matrix.csv",
-        help="file to write confusion matrix output to",
-        action="store",
-    )
-    parser.add_argument(
-        "-r",
-        "--report",
-        default="classification_report.txt",
-        help="file to write classification report to",
-        action="store",
-    )
-    parser.add_argument(
-        "-m",
-        "--metrics",
-        default="metrics.csv",
-        help="File to write performance metrics to",
-        action="store",
-    )
+    parser.add_argument("-p", "--prefix", default="cupai", help="Prefix for output")
+    parser.add_argument("-o", "--outdir", default=".", help="Output directory")
     parser.add_argument(
         "-l",
         "--label_column",
@@ -160,13 +143,6 @@ if __name__ == "__main__":
         required=False,
         default="inception",
         choices=["inception", "cnn", "resnet"],
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default="prediction.csv",
-        help="output to predictions for each sample",
-        action="store",
     )
     parser.add_argument(
         "--models_dir", default="models", action="store", required=False
@@ -182,16 +158,30 @@ if __name__ == "__main__":
         "resnet": f"{args.models_dir}/resnet.h5",
     }
 
+    OUT = args.outdir
+
+    def out(name):
+        return f"{OUT}/{args.prefix}{name}"
+
+    os.makedirs(OUT, exist_ok=True)
+    print(f"---- Saving to {OUT}")
     keras_model = load_model(model_files[args.model])
 
     input, labels = load_input(args.input, args.data_dir, args.label_column)
+    input_summary = np.transpose(input.agg(func=["mean", np.sum]))
+    input_summary.columns = ["mean", "sum"]
+
+    print(f"Input of shape: {input.shape}")
+    input_summary.to_csv(out("input_summary.csv"))
+    print(input)
     result = predict(input, labels, keras_model)
-    result["prediction"].to_csv(args.output, index=False)
+
+    result["prediction"].to_csv(out("prediction.csv"), index=False)
     if result["cm"] is not None:
-        result["cm"].to_csv(args.confusion_matrix)
+        result["cm"].to_csv(out("confusion_matrix.csv"))
     if result["report"] is not None:
-        with open(args.report, "w") as f:
+        with open(out("report.txt"), "w") as f:
             f.write(result["report"])
     if result["metrics"] is not None:
-        result["metrics"].to_csv(args.metrics)
+        result["metrics"].to_csv(out("metrics.txt"))
     print(f"--- {tt.time() - start_time} seconds ---")

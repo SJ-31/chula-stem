@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 
-while getopts "o:l:e:i:p:c:r:m:" f; do
+while getopts "o:l:i:s:p:m:" f; do
     case "$f" in
-        i) input=$(realpath "${OPTARG}") ;;
-        p) prediction=$(realpath "${OPTARG}") ;;
-        r) report=$(realpath "${OPTARG}") ;;
+        i) input=$(readlink -m "${OPTARG}") ;;
         m) model=${OPTARG} ;;
-        c) cm=$(realpath "${OPTARG}") ;;
-        e) metrics=$(realpath "${OPTARG}") ;;
+        s) model_spec=${OPTARG} ;;
+        p) prefix=${OPTARG} ;;
         l) label=${OPTARG} ;;
-        o) outdir=${OPTARG} ;;
+        o) outdir=$(readlink -m "${OPTARG}") ;;
         *) echo "Invalid flag"; exit 1;;
     esac
 done
@@ -25,8 +23,7 @@ pushd "${dir}" || echo "No directory!"
 if [[ "${model}" == "TULIP" ]]; then
     python tulip.py -i "${input}" -t 17 -o "${outdir}"
 else
-    python run.py -i "${input}" -o "${prediction}" -r "${report}" \
-        -c "${cm}" -l "${label}" \
-        -m "${metrics}"
+    python run.py -i "${input}" -o "${outdir}" -p "${prefix}" \
+        -l "${label}" --model "${model_spec}"
 fi
 popd
