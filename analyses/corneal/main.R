@@ -15,6 +15,8 @@ library(zellkonverter)
 library(sva)
 
 ad <- reticulate::import("anndata")
+sc_pp <- reticulate::import("scanpy.pp")
+sc <- reticulate::import("scanpy")
 
 save_fn <- function(plot, name) {
   ggsave(here(outdir, name), plot = plot, dpi = 500, width = 8, height = 8)
@@ -31,19 +33,24 @@ hg37 <- here(M$local, "Homo_sapiens.GRCh37.87.sqlite")
 
 
 get_combined <- function(outfile) {
+  hg37_db <- EnsDb(hg37)
   fibro <- readH5AD(fibro_file) |>
-    S$add_feature_info(hg37, keytype = "GENENAME") |>
+    S$add_feature_info(hg37_db, keytype = "GENENAME") |>
     SCE2AnnData()
 
   corneal <- readH5AD(corneal_file) |>
-    S$add_feature_info(hg37, keytype = "GENENAME") |>
+    S$add_feature_info(hg38, keytype = "GENENAME") |>
     SCE2AnnData()
+
   colon <- readH5AD(colon_file) |>
-    S$add_feature_info(hg37, keytype = "GENENAME") |>
+    S$add_feature_info(hg37_db, keytype = "GENENAME") |>
     SCE2AnnData()
-  combined <- ad$concat(c(fibro, corneal, colon), merge = "same")
-  print(combined)
-  sce <- AnnData2SCE(combined)
+
+  py$combined <- ad$concat(c(fibro, corneal, colon), merge = "same", join = "outer")
+  sc_pp$pca(py$combined)
+  sc$external$pp$scanorama_integrate(py$combined, "source")
+
+  sce <- AnnData2SCE(py$combined)
   sce <- scuttle::addPerCellQC(sce,
     subsets = list(mito = rowData(sce)$is_mito),
     assay.type = "X"
@@ -56,16 +63,20 @@ get_combined <- function(outfile) {
 
 # WARNING: because the cell types are confounded with the batch (i.e. different studies)
 # we can't be sure that differences are due to cell type and not batch effect
-# TODO: read the experimental protocol to see if they differ strongly with each other
 
 fibro_file <- here(M$outdir, "fibro.h5ad") # GRCh37
+# 10x Chromium, NovaSeq 6000
 corneal_file <- here(M$outdir, "corneal.h5ad") # GRCh38
+# 10x Chromium, following standard 10 × Genomics 3′ V3.1 chemistry protocol
+# NovaSeq 6000
 colon_file <- here(M$outdir, "colon.h5ad") # GRCh37
+# 10x Chromium, NovaSeq 6000
+
+# At least the sequencing platforms are the same
 
 combined_file <- here(M$outdir, "combined_w_ann.h5ad")
 sce <- U$read_existing(combined_file, get_combined, \(x) readH5AD(x, X_name = "counts"))
 
-# TODO: check if the qc thresholds make sense for these cell types
 # TODO: check if P' Ta wants you to filter by cell types too
 mads <- S$qc_mads(sce, batch_col = "source")
 colData(sce) <- cbind(colData(sce), mads$df)

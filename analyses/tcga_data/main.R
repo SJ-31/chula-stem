@@ -41,6 +41,7 @@ get_tcga <- function(data_dir, tumor_type, strnd = "unstranded",
 }
 
 rds_list <- list.files(outdir, pattern = "\\.rds", full.names = TRUE)
+rds_list <- rds_list |> discard(\(x) str_detect(x, "tcga_all_tumors.rds"))
 all_tcga <- lapply(rds_list, \(x) readRDS(x)) |> `names<-`(basename(rds_list))
 
 combined <- local({
