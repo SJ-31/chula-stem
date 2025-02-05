@@ -191,3 +191,31 @@ x2counts <- function(sce) {
   assay(sce, "X") <- NULL
   sce
 }
+
+#' Extracts a random subset of the dgelist, optionally by selecting from
+#' a specific metadata column in the `samples` dataframe
+#'
+#' @param value take the random subset from samples with this value in `samples_col`
+#' leaving the others unchanged
+#' e.g. dgelist_random(X, 5, "tumor_type", value = "LIHC") takes
+#'
+dgelist_random <- function(dge, n, samples_col = NULL, value = NULL) {
+  helper <- function(obj) {
+    selection <- sample(colnames(obj), n)
+    obj[, selection]
+  }
+
+  if (is.null(samples_col)) {
+    helper(dge)
+  } else if (!is.null(value)) {
+    others <- dge[, dge$samples[[samples_col]]]
+    chosen <- dge[, dge$samples[[samples_col]] == value]
+    cbind(others, helper(chosen))
+  } else {
+    dges <- lapply(unique(dge$samples[[samples_col]]), \(x) {
+      cur <- dge[, dge$samples[[samples_col]] == x]
+      helper(cur)
+    })
+    purrr::reduce(dges, \(x, y) cbind(x, y))
+  }
+}
