@@ -3,7 +3,6 @@ import argparse
 import json
 import os
 import time as tt
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -16,6 +15,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
+import model_utils as mu
 from datasets import load_dataset
 
 # Model expects a matrix of gene x samples where genes are in enterez ids and
@@ -108,46 +108,21 @@ def load_input(file: str, data_dir: str, label_column: str):
         df.index = [f"X{i}" for i in df.index]
 
     rows = []
+    missing = set()
     for t in target_genes:
         try:
             rows.append(df.loc[[t],])
         except KeyError:
-            rows.append(pd.DataFrame(0, columns=df.columns, index=[t]))
+            rows.append(pd.DataFrame(None, columns=df.columns, index=[t]))
+            print(f"WARNNG: feature {t} missing")
+            missing.add(t)
     selected = pd.concat(rows, axis=0)
     transposed: pd.DataFrame = np.transpose(selected)
-    return transposed, labels
+    return transposed, labels, missing
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", default="data", action="store")
-    parser.add_argument(
-        "-i",
-        "--input",
-        default="",
-        required=True,
-        help="csv file containing expression data",
-        action="store",
-    )
-    parser.add_argument("-p", "--prefix", default="cupai", help="Prefix for output")
-    parser.add_argument("-o", "--outdir", default=".", help="Output directory")
-    parser.add_argument(
-        "-l",
-        "--label_column",
-        default="label",
-        help="For test datasets (sample x genes), the column indicating the label of the sample",
-        action="store",
-    )
-    parser.add_argument(
-        "--model",
-        required=False,
-        default="inception",
-        choices=["inception", "cnn", "resnet"],
-    )
-    parser.add_argument(
-        "--models_dir", default="models", action="store", required=False
-    )
-    args = parser.parse_args()
+    args = mu.parse_args()
     from_int_to_label, from_label_to_int = load_label_encodings(args.data_dir)
 
     start_time = tt.time()
@@ -167,13 +142,8 @@ if __name__ == "__main__":
     print(f"---- Saving to {OUT}")
     keras_model = load_model(model_files[args.model])
 
-    input, labels = load_input(args.input, args.data_dir, args.label_column)
-    input_summary = np.transpose(input.agg(func=["mean", np.sum]))
-    input_summary.columns = ["mean", "sum"]
-
-    print(f"Input of shape: {input.shape}")
-    input_summary.to_csv(out("input_summary.csv"))
-    print(input)
+    input, labels, missing = load_input(args.input, args.data_dir, args.label_column)
+    mu.write_input_summary(input, out("input_summary.csv"), missing_features=missing)
     result = predict(input, labels, keras_model)
 
     result["prediction"].to_csv(out("prediction.csv"), index=False)

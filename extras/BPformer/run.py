@@ -13,6 +13,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
+import model_utils as mu
 from dataset import MyDataSet
 from model import Pathway_Guided_Transformer
 from utils import TCGA_labelDict, evaluate
@@ -62,15 +63,18 @@ def load_input(file: str, label_column: str, data_dir: str):
     with open(f"{data_dir}/features.txt", "r") as f:
         target_genes = f.read().splitlines()
 
+    missing = set()
     for t in target_genes:
         try:
             rows.append(df.loc[[t],])
         except KeyError:
-            rows.append(pd.DataFrame(0, columns=df.columns, index=[t]))
+            missing.add(t)
+            print(f"WARNNG: feature {t} missing")
+            rows.append(pd.DataFrame(None, columns=df.columns, index=[t]))
     selected = pd.concat(rows, axis=0)
     transposed: pd.DataFrame = np.transpose(selected)
     converted = raw_to_kegg(transposed, data_dir)
-    return converted, labels
+    return converted, labels, missing, transposed
 
 
 def sk_report_performance(labels, predictions, prefix: str = "average_"):
@@ -188,11 +192,14 @@ if __name__ == "__main__":
         return f"{args.outdir}/{args.prefix}{name}"
 
     os.makedirs(args.outdir, exist_ok=True)
-    data, labels = load_input(args.input, args.label_column, args.data_dir)
-    input_summary = np.transpose(data.agg(func=["mean", np.sum]))
-    input_summary.columns = ["gene_id", "value"]
+    data, labels, missing, before = load_input(
+        args.input, args.label_column, args.data_dir
+    )
+    mu.write_input_summary(data, out("input_summary_kegg.csv"))
+    mu.write_input_summary(
+        before, out("input_summary_genes.csv"), missing_features=missing
+    )
 
-    input_summary.to_csv(out("input_summary.csv"))
     result = predict(data, labels, args.weights, args.batch_size)
 
     result["prediction"].to_csv(out("prediction.csv"), index=False)
