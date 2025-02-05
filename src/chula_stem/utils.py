@@ -3,7 +3,7 @@
 import ast
 import itertools
 import re
-from os import sep
+from functools import reduce
 from pathlib import Path
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
@@ -11,13 +11,6 @@ from typing import Callable
 
 import click
 import polars as pl
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-)
 
 
 def str_split_unique(
@@ -391,59 +384,55 @@ def parse_multiqc_vep(input: str, output: str = "") -> pl.DataFrame:
 
 
 @click.command()
-@click.argument("path_text", required=True)
-@click.option("-r", "--remove", required=False, help="Text to remove from the paths")
 @click.option(
-    "-s", "--separator", required=False, help="Separator in a pair", default="\t"
+    "-d",
+    "--dir",
+    default=".",
+    help="Directory containing the count files.",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option("-p", "--pattern", default=None, help="Glob pattern to match files.")
+@click.option("-i", "--id-col", default=0, help="Index of the ID column.", type=int)
+@click.option(
+    "-c", "--count-col", default=1, help="Index of the count column.", type=int
 )
 @click.option(
-    "-x",
-    "--regex",
-    required=False,
-    help="Interpret 'remove' as a regex pattern",
-    is_flag=True,
-    default=False,
+    "-o",
+    "--outfile",
+    default="counts.csv",
+    help="Output file name.",
+    type=click.Path(writable=True),
 )
+@click.option("-s", "--sep", default="\t", help="Column separator.")
 @click.option(
-    "-c",
-    "--count",
-    required=False,
-    help="For regex patterns, number of times to remove",
-    default=0,
+    "-H", "--has-header", is_flag=True, help="Specify if input files have a header row."
 )
-def pair_fastq(
-    path_text: str,
-    separator: str,
-    regex: bool,
-    count: int,
-    remove: str,
+def combine_counts(
+    dir=".",
+    pattern=None,
+    id_col=0,
+    count_col=1,
+    outfile="counts.csv",
+    sep="\t",
+    has_header=False,
 ) -> None:
-    if Path(path_text).exists():
-        path_text = Path(path_text).read_text()
-    path_text = path_text.strip()
-    if "\n" in path_text:
-        lines = path_text.splitlines()
-    elif '"' in path_text:
-        lines = list(map(lambda x: x.replace('"', ""), path_text.split('" "')))
+    if pattern:
+        files = Path(dir).glob(pattern)
     else:
-        lines = path_text.split(" ")
-    if remove and not regex:
-        lines = map(lambda x: x.replace(remove, ""), lines)
-    elif remove:
-        lines = map(lambda x: re.sub(remove, "", x, count=count), lines)
-    paired_up = "\n".join(
-        [separator.join(c) for c in itertools.batched(sorted(lines), 2)]
+        files = Path(dir).iterdir()
+
+    def read_fn(file) -> pl.DataFrame:
+        df = pl.read_csv(
+            file,
+            separator=sep,
+            has_header=has_header,
+            columns=[id_col, count_col],
+            new_columns=["feature_id", "count"],
+        )
+        return df
+
+    dfs: list[pl.DataFrame] = [read_fn(f) for f in files]
+    combined: pl.DataFrame = reduce(
+        lambda x, y: x.join(y, on="feature_id", how="full"), dfs
     )
-    print(paired_up)
-
-
-def sk_report_performance(labels, predictions, prefix: str = "average_"):
-    metrics = ["precision", "recall", "f1_score"]
-    metrics = list(map(lambda x: f"{prefix}{x}", metrics))
-    scores = [
-        precision_score(labels, predictions, average="weighted", zero_division=0),
-        recall_score(labels, predictions, average="weighted", zero_division=0),
-        f1_score(labels, predictions, average="weighted"),
-    ]
-    df = pd.DataFrame({"metric": metrics, "score": scores})
-    return df
+    combined.write_csv(outfile, null_value="NA")
