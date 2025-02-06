@@ -137,6 +137,43 @@ qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
   list(df = reasons, thresholds = thresholds, qc_applied = qc_cols)
 }
 
+#' Aggregate count data into pseudobulks, returning
+#' a DGEList
+#'
+#' @param cluster_col column of colData(sce) specifying cluster assignments used
+#' for aggregation
+#' @param method count aggregation method, one of "sum" or "mean"
+#' @param char_agg function to aggregate colData() of type "character". By
+#'  default takes unique values and collapses with comma delimiter
+#' @param numeric_agg function to aggregate numeric colData(). Mean by default
+#'
+sce2pseudobulk <- function(sce, cluster_col = "cluster", pb_method = "sum",
+                           aslot = "counts",
+                           numeric_agg = \(x) mean(x, na.rm = TRUE),
+                           char_agg = \(x) paste0(unique(sort(x)), collapse = ",")) {
+  cluster <- colData(sce)[[cluster_col]]
+  meta <- group_by(as_tibble(colData(sce)), !!as.symbol(cluster_col)) |>
+    summarize(
+      across(where(is.numeric), numeric_agg),
+      across(where(is.character), char_agg)
+    )
+
+  if (pb_method == "sum") {
+    cluster_mat <- model.matrix(~ 0 + cluster)
+    aggregate <- assay(sce, aslot) %*% cluster_mat
+  } else if (pb_method == "mean") {
+    counts <- assay(sce, aslot)
+    cells <- colnames(counts)
+    aggregate <- do.call(cbind, lapply(unique(cluster), \(c) {
+      current <- cells[cluster == c]
+      rowMeans(counts[, current])
+    }))
+  }
+  pb <- DGEList(aggregate, genes = rowData(sce), samples = meta)
+  pb
+}
+
+
 
 #' Specify exactly for what reasons a cell is being discarded
 #'

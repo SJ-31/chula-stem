@@ -1,3 +1,7 @@
+// All-in-one module for QC on SC-RNASeq data
+// Carries out both doublet detection and filtering for low-quality cells,
+//      producing diagnostic plots
+
 process SC_RNASEQ_QC {
     ext version: "1"
 
