@@ -103,9 +103,11 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
 qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
                     batch_col = NULL) {
   subfields <- keep(subfields, \(x) x %in% colnames(colData(sce)))
+  batch <- NULL
+  if (!is.null(batch_col)) batch <- sce[[batch_col]]
   reasons <- scuttle::perCellQCFilters(sce,
     sub.fields = subfields,
-    batch = sce[[batch_col]]
+    batch = batch
   )
   if (!is.null(qc_spec)) {
     reasons_plus <- lapply(names(qc_spec), \(x) {
@@ -131,8 +133,38 @@ qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
       tibble(metric = x, lower = t["lower"], higher = t["higher"])
     }
   }) |> bind_rows()
-  list(df = reasons, thresholds = thresholds)
+  qc_cols <- colnames(reasons) |> discard(\(x) x == "discard")
+  list(df = reasons, thresholds = thresholds, qc_applied = qc_cols)
 }
+
+
+#' Specify exactly for what reasons a cell is being discarded
+#'
+#' @description
+#' Add a column to colData(sce) denoting the reason for which a cell is being
+#' discarded in MADs-based filtering. By default, the full name of the reason is given
+#' only if it is the sole reason - if a cell is discarded on 2+ reasons the number
+#' is given instead
+#'
+identify_reasons <- function(sce, qc_cols, show_full = FALSE, reason_col = "discard_reason") {
+  get_reason <- function(qc_row) {
+    failed_qc <- purrr::keep(qc_row, \(x) x)
+    if (length(failed_qc) == 0) {
+      "kept"
+    } else if (length(failed_qc) == 1) {
+      names(failed_qc)
+    } else if (show_full) {
+      paste0(names(failed_qc), collapse = ";")
+    } else {
+      as.character(length(failed_qc))
+    }
+  }
+  qc <- colData(sce)[, qc_cols]
+  colData(sce)[[reason_col]] <- apply(qc, 1, \(x) get_reason(x))
+  sce
+}
+
+
 
 #' Filter out cells with fixed thresholds
 #'
