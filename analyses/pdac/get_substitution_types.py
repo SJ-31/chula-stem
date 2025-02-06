@@ -6,15 +6,12 @@ from subprocess import run
 from tempfile import TemporaryDirectory
 
 import polars as pl
+from pyhere import here
 
-outpath: Path = Path("/home/shannc/Bio_SDD/chula-stem/analyses/data_all/output/PDAC")
-target = "/home/shannc/Bio_SDD/chula-stem/analyses/output/pdac/sbs.tsv"
-target2 = "/home/shannc/Bio_SDD/chula-stem/analyses/output/pdac_sbs_all.tsv"
+data = Path(here("analyses", "data_all", "output", "PDAC"))
 
-# <2025-01-27 Mon>
-# + You checked to see if removing duplicate variants and normalizing variants
-# will make a difference
-# + 2025-01-28 There
+outdir = here("analyses", "output", "pdac")
+target = here(outdir, "sbs.tsv")
 
 
 def bcftools_stats(input, output) -> None:
@@ -68,8 +65,8 @@ def get_substitution_types(
 dfs: list[pl.DataFrame] = []
 dfs2: list[pl.DataFrame] = []
 cwd = os.getcwd()
-if outpath.exists():
-    files = list(outpath.rglob("7-P*-Small_high_conf.vcf.gz"))
+if data.exists():
+    files = list(data.rglob("7-P*-Small_high_conf.vcf.gz"))
     with TemporaryDirectory() as tmpdir:
         os.chdir(tmpdir)
         for f in files:
@@ -86,5 +83,3 @@ if outpath.exists():
     os.chdir(cwd)
     final = pl.concat(dfs)
     final.write_csv(target, separator="\t")
-    final2 = pl.concat(dfs2)
-    final2.write_csv(target2, separator="\t")

@@ -1,7 +1,5 @@
-library(here)
 library(ggpubr)
-here::i_am("./analyses/pdac/vaf_plot.r")
-source(here("analyses", "pdac", "main.R"))
+source(here::here("analyses", "pdac", "main.R"))
 
 ## * Format
 
@@ -18,7 +16,12 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
     str_to_title() |>
     str_replace_all("_", " ")
 }
-
+ACCEPTED_CONSEQUENCE <- c(
+  "missense_variant", "frameshift_variant",
+  "downstream_gene_variant", "upstream_gene_variant",
+  "stop_gained", "splice_region_variant", "inframe_deletion",
+  "splice_donor_5th_base_variant"
+)
 IGNORED_VARIANTS <- c(
   "non_coding_transcript_variant",
   "non_coding_transcript_exon_variant",
@@ -42,10 +45,11 @@ recode_var_types <- function(types) {
 
 tmb_merged <- vep_data |>
   filter(!key %in% IGNORED_VARIANTS) |>
+  filter(key %in% ACCEPTED_CONSEQUENCE) |>
   mutate(
     sample = str_extract(sample, "P[0-9_]+"),
-    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " ")),
-    key = recode_var_types(key)
+    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " "))
+    ## key = recode_var_types(key)
   ) |>
   dplyr::filter(category == "Consequences (all)")
 
@@ -59,8 +63,8 @@ prettify <- function(tb) {
   tb |> mutate(
     type = map_chr(Consequence, \(x) mode_and_capitalize(x, IGNORED_VARIANTS)),
     clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
-    clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar),
-    type = factor(recode_var_types(type), levels = TYPE_ORDER)
+    clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar)
+    ## type = factor(recode_var_types(type), levels = TYPE_ORDER)
   )
 }
 
@@ -133,16 +137,12 @@ blank <- custom_filtered |>
   ggplot(aes(x = sample, y = SYMBOL, alpha = VAF)) |>
   vaf_heatmap()
 
-ggsave(here("analyses", "output", "pdac_vaf_consequence.png"), with_consequence, dpi = 500)
-ggsave(here("analyses", "output", "pdac_vaf_clinsig.png"), with_clinsig, dpi = 500)
-ggsave(here("analyses", "output", "pdac_vaf_blank.png"), blank, dpi = 500)
-
-
 ## ** replicate plot
 # --- CODE BLOCK ---
 sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
+
 replicate_figure <- merged |>
   dplyr::filter(SYMBOL %in% target_genes)
 n_samples <- sbs$sample |>
@@ -150,7 +150,8 @@ n_samples <- sbs$sample |>
   length()
 
 ## *** Add filter
-filter_version <- "KNOWN"
+## --- CODE BLOCK ---
+filter_version <- "CONSEQUENCE"
 if (filter_version == "CLIN_SIG") {
   accepted_clinsig <- c(
     "pathogenic", "likely_pathogenic", "association"
@@ -158,7 +159,11 @@ if (filter_version == "CLIN_SIG") {
   replicate_figure <- replicate_figure |>
     filter(map_lgl(CLIN_SIG, \(x) length(intersect(x, accepted_clinsig)) > 0))
 } else if (filter_version == "CONSEQUENCE") {
-  accepted_consequence <- c("missense_variant", "frameshift_variant")
+  replicate_figure <- filter_known(replicate_figure, dbsnp_file)
+  replicate_figure <- mutate(replicate_figure,
+    Consequence = lapply(Consequence, \(x) intersect(x, ACCEPTED_CONSEQUENCE))
+  ) |>
+    filter(map_lgl(Consequence, \(x) length(x) > 0))
 } else if (filter_version == "KNOWN") {
   replicate_figure <- filter_known(replicate_figure, dbsnp_file)
   print("Filtering by known variants")
@@ -170,6 +175,8 @@ order <- replicate_figure$SYMBOL |>
   sort(decreasing = TRUE) |>
   names()
 replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
+
+## --- CODE BLOCK ---
 
 sample_freq <- replicate_figure |>
   distinct(SYMBOL, sample, .keep_all = TRUE) |>
@@ -186,6 +193,7 @@ rep_theme <- "tidyquant::tq_light"
 axis_title_size <- 12
 
 ## *** TMB plot
+
 tmb_max <- group_by(tmb_merged, sample) |>
   summarise(value = sum(value)) |>
   pluck("value") |>

@@ -6,7 +6,6 @@ library(here)
 library(reticulate)
 library(cowplot)
 
-here::i_am("./analyses/pdac/main.R")
 utils <- new.env()
 source(here("src", "R", "utils.R"), local = utils)
 py_utils <- new.env()
@@ -17,15 +16,13 @@ save_fn <- function(plot, name) {
   ggsave(here(outdir, name), plot = plot, dpi = 500, width = 15, height = 10)
 }
 
+vaf_merged_file <- here(outdir, "pdac_vaf_merged.tsv")
+sbs_merged_file <- here(outdir, "sbs.tsv")
 
-vaf_merged_file <- here("analyses", "output", "pdac_vaf_merged.tsv")
-sbs_merged_file <- here("analyses", "output", "pdac", "sbs.tsv")
-sbs_merged_file_mp <- here("analyses", "output", "pdac_sbs_mp.tsv")
-sbs_merged_file_all <- here("analyses", "output", "pdac_sbs_all.tsv")
-vaf_merged_transcripts_file <- here("analyses", "output", "pdac_vaf_merged_transcripts.tsv")
+vaf_merged_transcripts_file <- here(outdir, "pdac_vaf_merged_transcripts.tsv")
 data_path <- here("analyses", "data_all", "output", "PDAC")
 ref_path <- here("analyses", "data_all", "reference")
-dbsnp_file <- here(ref_path, "variants", "dbSNP_somatic.csv")
+dbsnp_file <- here("analyses", "data", "dbSNP_somatic.csv")
 
 if (!file.exists(vaf_merged_file)) {
   files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv$", recursive = TRUE, full.names = TRUE)
@@ -39,14 +36,13 @@ if (!file.exists(vaf_merged_file)) {
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
   write_tsv(merged, vaf_merged_file)
-  q()
 } else {
   merged <- read_tsv(vaf_merged_file) |>
     mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
 }
 
-multiqc_file <- here(data_path, "8-cohort-MultiQC_data", "vep.txt")
-vep_data_file <- here("analyses", "output", "pdac_vep_data.tsv")
+multiqc_file <- here(outdir, "vep.txt")
+vep_data_file <- here(outdir, "pdac_vep_data.tsv")
 if (!file.exists(vep_data_file)) {
   py_utils$parse_multiqc_vep(multiqc_file, vep_data_file)
 }
