@@ -163,7 +163,7 @@ get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "case
       tb
     }
   }) |>
-    reduce(\(x, y) left_join(x, y, by = join_by(!!as.symbol(gcol))))
+    reduce(\(x, y) full_join(x, y, by = join_by(!!as.symbol(gcol))))
   counts
 }
 

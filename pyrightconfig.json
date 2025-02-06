@@ -3,6 +3,7 @@
     "reportAttributeAccessIssue": "none",
     "reportOptionalSubscript": "none",
     "reportAssignmentType": "none",
+    "reportUnusedCallResult": false,
     "reportCallIssue": false,
     "reportIncompleteStub": false,
     "reportAny": false,

@@ -421,18 +421,28 @@ def combine_counts(
     else:
         files = Path(dir).iterdir()
 
-    def read_fn(file) -> pl.DataFrame:
+    def read_fn(file, name) -> pl.DataFrame:
         df = pl.read_csv(
             file,
             separator=sep,
             has_header=has_header,
             columns=[id_col, count_col],
-            new_columns=["feature_id", "count"],
+            new_columns=["feature_id", name],
         )
         return df
 
-    dfs: list[pl.DataFrame] = [read_fn(f) for f in files]
+    dfs: list[pl.DataFrame] = [read_fn(f, f.stem) for f in files]
     combined: pl.DataFrame = reduce(
-        lambda x, y: x.join(y, on="feature_id", how="full"), dfs
+        lambda x, y: x.join(y, on="feature_id", how="full")
+        .with_columns(feature_id=pl.coalesce(["feature_id", "feature_id_right"]))
+        .drop("feature_id_right"),
+        dfs,
     )
     combined.write_csv(outfile, null_value="NA")
+
+
+def read_existing[T](filename: Path, expr: Callable[[Path], T], read_fn) -> T:
+    if filename.exists():
+        return read_fn(filename)
+    else:
+        return expr(filename)

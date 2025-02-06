@@ -1,6 +1,5 @@
 library(tidyverse)
 library(glue)
-library(ggpubr)
 library(grid)
 library(ggplot2)
 
@@ -130,8 +129,8 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
   }
 }
 
-pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"), log = TRUE) {
-  if (class(dgelist) == "DGEList") {
+pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"), log = TRUE, to_cpm = TRUE) {
+  if (class(dgelist) == "DGEList" && to_cpm) {
     counts <- edgeR::cpm(dgelist$counts, log = log) # Convert counts into counts per million
     # When dgelist is normalized with `normLibSizes`, then cpm automatically generates
     # normalized counts from the computed normalization factors
