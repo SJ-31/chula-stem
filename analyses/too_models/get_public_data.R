@@ -45,7 +45,7 @@ get_others <- function(f) {
   all <- lapply(names(others), \(x) {
     tb <- read_csv(others[[x]])
     cases <- tb |>
-      select(where(is.numeric)) |>
+      dplyr::select(where(is.numeric)) |>
       colnames()
     meta <- tibble(cases = cases, tumor_type = x)
     DGEList(tb, samples = meta, genes = data.frame(gene_ids = tb[, 1]))

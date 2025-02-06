@@ -15,7 +15,7 @@ sc_pp <- reticulate::import("scanpy.pp")
 sc <- reticulate::import("scanpy")
 
 save_fn <- function(plot, name) {
-  ggsave(here(outdir, name), plot = plot, dpi = 500, width = 10, height = 10)
+  ggsave(here(M$outdir, name), plot = plot, dpi = 500, width = 10, height = 10)
 }
 
 
@@ -60,7 +60,7 @@ get_fibro <- function(f) {
 
 get_corneal <- function(f) {
   read <- function(p) {
-    adata <- sc$read_10x_mtx(path = here(M$corneal_dir, p))
+    adata <- sc$read_10x_mtx(path = here(M$corneal_dir), prefix = p)
     adata$obs$sample <- str_remove(p, "_.*")
     adata
   }
@@ -74,9 +74,7 @@ get_corneal <- function(f) {
 
 get_colon <- function(f) {
   healthy <- c("-A1", "-C1", "-B1")
-  ## tb <- read.delim(here(M$colon_dir, "GSE116222_Expression_matrix.txt"))
-
-  df <- read_tsv(here("test.tsv"), col_names = FALSE) |> column_to_rownames("X1")
+  df <- read_tsv(here(M$colon_dir, "GSE116222_Expression_matrix.txt"), col_names = FALSE) |> column_to_rownames("X1")
   colnames(df) <- df[1, ]
   df <- df[-1, ]
   wanted_cols <- grepl(paste(healthy, collapse = "|"), colnames(df))
