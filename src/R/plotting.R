@@ -7,7 +7,7 @@ source(paste0(R_SRC, "/", "utils.R"))
 
 PY_SRC <- Sys.getenv("PY_SRC")
 pyplt <- new.env()
-reticulate::source_python(paste0(PY_SRC, "plotting.py"), envir = pyplt)
+reticulate::source_python(paste0(PY_SRC, "/", "plotting.py"), envir = pyplt)
 pg <- import("pygenomeviz")
 
 #' Returns "default" if the value of "key" in "list" is NULL
@@ -185,8 +185,8 @@ pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"
 get_range_list <- function(gr, offset = TRUE) {
   if (offset) {
     gr <- sort(gr)
-    o <- start(gr[1]) + 1
-    gr <- shift(gr, -o)
+    o <- -start(gr[1]) + 1
+    gr <- shift(gr, o)
   } else {
     o <- NULL
   }
@@ -200,21 +200,22 @@ get_range_list <- function(gr, offset = TRUE) {
 #' @param variants GRanges object  containing variants (must have mcols containing
 #' the variant information)
 #' @param gene GRanges object with 1 range containing the gene
-add_var_exon_track <- function(gv, gene, exons, variants, track_name = NULL) {
+add_var_exon_track <- function(gv, gene, exons, variants, cmap, track_name = NULL) {
   ranges <- get_range_list(exons)
   if (!is.null(track_name)) {
-    name <- names(gene)
+    name <- track_name
   } else {
     name <- names(gene)
   }
   track <- gv$add_feature_track(name, end(gene) - start(gene))
   rl <- get_range_list(exons, TRUE)
+
   strand <- ifelse(all(strand(exons) == "-"), -1, 1)
   track$add_exon_feature(rl$ranges, strand = strand, plotstyle = "box")
 
   for (i in seq_along(variants)) {
     v <- variants[i]
-    loc <- as.integer(start(v) - rl$offset)
+    loc <- as.integer(start(v) + rl$offset)
     var_names <- str_split_1(v$existing_variation, ";") # Prefer cosmic
     only_cosmic <- purrr::keep(var_names, \(x) str_detect(x, "COSV"))
     if (length(only_cosmic) > 0) {
@@ -234,13 +235,18 @@ add_var_exon_track <- function(gv, gene, exons, variants, track_name = NULL) {
 #' Produce a plot comparing the sample
 #'
 #' @param ensdb Ensembldb object
-#' @param bsg BSgenome object
 #'
-plot_sample_variants <- function(ensdb, bsg, vep_files,
+plot_sample_variants <- function(ensdb, vep_files,
                                  gene_name,
                                  outfile,
                                  canonical_tx = NULL,
                                  sample_names = NULL,
+                                 allowed_consequences = c(
+                                   "missense_variant", "frameshift_variant",
+                                   "downstream_gene_variant", "upstream_gene_variant",
+                                   "stop_gained", "splice_region_variant", "inframe_deletion",
+                                   "splice_donor_5th_base_variant"
+                                 ),
                                  palette = "") {
   library(ensembldb)
 
@@ -249,7 +255,7 @@ plot_sample_variants <- function(ensdb, bsg, vep_files,
   if (length(gene) == 0) {
     stop(glue("Gene {gene_name} not found in ensdb"))
   }
-  if (is.null(canonical_map) || intersect(names(transcripts), canonical_tx) <= 0) {
+  if (is.null(canonical_tx) || intersect(names(transcripts), canonical_tx) <= 0) {
     chosen_tx <- transcripts[[1]]
   } else {
     chosen_tx <- transcripts[names(transcripts) %in% canonical_tx][[1]]
@@ -258,20 +264,25 @@ plot_sample_variants <- function(ensdb, bsg, vep_files,
   if (is.null(sample_names)) {
     sample_names <- basename_no_ext(vep_files)
   }
-  cmap <- cur_vars$consequence |>
-    unlist() |>
+
+  vep_tbs <- lapply(vep_files, read_tsv)
+  all_consequences <- bind_rows(vep_tbs)$Consequence |>
     unique() |>
-    map_colors_d(palette)
+    flatten_by(collapse = FALSE, unique = TRUE) |>
+    unlist() |>
+    keep(\(x) x %in% allowed_consequences)
+
+  cmap <- map_colors_d(all_consequences, palette)
 
   plot_helper <- function(file, name) {
-    gr <- into_granges(file)
-    track <- gv$add_feature_track(name, end(gene) - start(gene))
+    gr <- into_granges(file, allowed_consequences = allowed_consequences)
     cur_vars <- gr[replace_na(gr$symbol == gene_name, FALSE)]
-    add_var_exon_track(gv, gene, chosen_tx, cur_vars, track_name = name)
+    add_var_exon_track(gv, gene, chosen_tx, cur_vars, track_name = name, cmap = cmap)
   }
 
+
   for (i in seq_along(vep_files)) {
-    plot_helper(vep_files[i], sample_names[i])
+    plot_helper(vep_tbs[[i]], sample_names[i])
   }
 
   pyplt$savefig(gv, outfile, custom_legend = cmap)

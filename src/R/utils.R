@@ -31,12 +31,15 @@ ensembl2entrez <- function(df) {
 
 basename_no_ext <- function(file) {
   bname <- basename(file)
-  splits <- bname |> str_split_1("\\.")
-  if (length(splits) > 1) {
-    paste0(head(splits, n = -1), collapse = ".")
-  } else {
-    bname
+  helper <- function(b) {
+    splits <- b |> str_split_1("\\.")
+    if (length(splits) > 1) {
+      paste0(head(splits, n = -1), collapse = ".")
+    } else {
+      b
+    }
   }
+  map_chr(bname, helper)
 }
 
 #' Flatten the character vector `char_vec` by `separator`, then
@@ -255,8 +258,13 @@ into_granges <- function(vep_file,
                            "consequence", "existing_variation"
                          )) {
   library(GenomicRanges)
+  if (is.character(vep_file)) {
+    tb <- read_tsv(vep_file)
+  } else {
+    tb <- vep_file
+  }
 
-  tb <- read_tsv(vep_file) |>
+  tb <- tb |>
     separate_longer_delim(STRAND, ";") |>
     mutate(Consequence = lapply(Consequence, \(x) intersect(str_split_1(x, ";"), allowed_consequences))) |>
     dplyr::filter(map_lgl(Consequence, \(x) length(x) > 0)) |>
