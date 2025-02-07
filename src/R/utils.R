@@ -219,3 +219,22 @@ dgelist_random <- function(dge, n, samples_col = NULL, value = NULL) {
     purrr::reduce(dges, \(x, y) cbind(x, y))
   }
 }
+
+
+#' Parse a vcf location string of chr:start-end  in a tibble
+#'
+parse_loc <- function(tb, loc_col = "Loc", alt_col = "Alt", ref_col = "Ref") {
+  separated <- separate_wider_delim(tb, all_of(loc_col),
+    delim = ":", names = c("chromosome", "start")
+  )
+  if (!str_detect(separated$chromosome[1], "chr")) {
+    separated$chromosome <- paste0("chr", separated$chromosome)
+  }
+  separated |>
+    mutate(
+      start = as.numeric(start),
+      end = start + (nchar(!!as.symbol(alt_col)) - nchar(!!as.symbol(ref_col))),
+      end = ifelse(end - start <= 0, start + 1, end)
+    ) |>
+    relocate(chromosome, start, end, .before = everything())
+}
