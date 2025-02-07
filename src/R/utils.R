@@ -238,3 +238,41 @@ parse_loc <- function(tb, loc_col = "Loc", alt_col = "Alt", ref_col = "Ref") {
     ) |>
     relocate(chromosome, start, end, .before = everything())
 }
+
+shift_stranded <- function(x, shift = 0L, ...) {
+  GenomicRanges::shift(x, shift = shift * ifelse("-" == strand(x), -1, 1), ...)
+}
+
+into_granges <- function(vep_file,
+                         allowed_consequences = c(
+                           "missense_variant", "frameshift_variant",
+                           "downstream_gene_variant", "upstream_gene_variant",
+                           "stop_gained", "splice_region_variant", "inframe_deletion",
+                           "splice_donor_5th_base_variant"
+                         ),
+                         wanted_cols = c(
+                           "ref", "alt", "vaf", "alt_depth", "gene_biotype", "symbol",
+                           "consequence", "existing_variation"
+                         )) {
+  tb <- read_tsv(vep_file) |>
+    separate_longer_delim(STRAND, ";") |>
+    mutate(Consequence = lapply(Consequence, \(x) intersect(str_split_1(x, ";"), allowed_consequences))) |>
+    dplyr::filter(map_lgl(Consequence, \(x) length(x) > 0)) |>
+    rename_with(str_to_lower) |>
+    dplyr::rename(gene_biotype = "biotype") |>
+    mutate(strand = case_match(strand,
+      "-1" ~ "-",
+      "1" ~ "+",
+      .default = "*"
+    ))
+  loc <- utils$parse_loc(tb, "loc", "alt", "ref")[, 1:3]
+
+  gr <- GRanges(
+    seqnames = loc$chromosome, ranges = IRanges(loc$start, loc$end),
+    strand = Rle(tb$strand)
+  )
+  for (col in wanted_cols) {
+    mcols(gr)[[col]] <- tb[[col]]
+  }
+  gr
+}
