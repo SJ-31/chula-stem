@@ -129,6 +129,22 @@ plot_cnvkit <- function(cns, cnr, chr, sizing, output) {
   }
 }
 
+#' Return a list mapping values to colors in `palette`
+#'
+#' @param palette The name of a paletteer_d palette
+map_colors_d <- function(values, palette) {
+  cmap <- paletteer_d(palette)
+  lengths <- map_dbl(list(values, cmap), length)
+  if (lengths[1] > lengths[2]) {
+    msg <- glue("The number of values exceeds the number of colors in {palette}!")
+    msg <- glue("{msg}\n N values: {lengths[1]}, N colors: {lengths[2]} ")
+    stop(msg)
+  }
+  p <- cmap[1:lengths[1] + 1] |> as.list()
+  setNames(p, values)
+}
+
+
 pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"), log = TRUE, to_cpm = TRUE) {
   if (class(dgelist) == "DGEList" && to_cpm) {
     counts <- edgeR::cpm(dgelist$counts, log = log) # Convert counts into counts per million
