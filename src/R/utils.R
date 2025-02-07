@@ -254,6 +254,8 @@ into_granges <- function(vep_file,
                            "ref", "alt", "vaf", "alt_depth", "gene_biotype", "symbol",
                            "consequence", "existing_variation"
                          )) {
+  library(GenomicRanges)
+
   tb <- read_tsv(vep_file) |>
     separate_longer_delim(STRAND, ";") |>
     mutate(Consequence = lapply(Consequence, \(x) intersect(str_split_1(x, ";"), allowed_consequences))) |>

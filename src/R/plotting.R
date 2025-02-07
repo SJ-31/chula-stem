@@ -2,6 +2,13 @@ library(tidyverse)
 library(glue)
 library(grid)
 library(ggplot2)
+R_SRC <- Sys.getenv("R_SRC")
+source(paste0(R_SRC, "/", "utils.R"))
+
+PY_SRC <- Sys.getenv("PY_SRC")
+pyplt <- new.env()
+reticulate::source_python(paste0(PY_SRC, "plotting.py"), envir = pyplt)
+pg <- import("pygenomeviz")
 
 #' Returns "default" if the value of "key" in "list" is NULL
 #'
@@ -170,4 +177,102 @@ pca_dgelist <- function(dgelist, plot_aes = list(shape = "group", color = "type"
     xlab(glue("PC1 ({var_pca1})")) +
     ylab(glue("PC2 ({var_pca2})"))
   plot
+}
+
+
+## * Gene-level variant plot
+
+get_range_list <- function(gr, offset = TRUE) {
+  if (offset) {
+    gr <- sort(gr)
+    o <- start(gr[1]) + 1
+    gr <- shift(gr, -o)
+  } else {
+    o <- NULL
+  }
+  ranges <- lapply(seq_along(gr), \(i) as.integer(c(start(gr[i]), end(gr[i]))))
+  return(list(ranges = ranges, offset = o))
+}
+
+#' Add an exon track with variant data to GenomeViz object `gv`
+#'
+#' @param exons GRanges object with exon ranges
+#' @param variants GRanges object  containing variants (must have mcols containing
+#' the variant information)
+#' @param gene GRanges object with 1 range containing the gene
+add_var_exon_track <- function(gv, gene, exons, variants, track_name = NULL) {
+  ranges <- get_range_list(exons)
+  if (!is.null(track_name)) {
+    name <- names(gene)
+  } else {
+    name <- names(gene)
+  }
+  track <- gv$add_feature_track(name, end(gene) - start(gene))
+  rl <- get_range_list(exons, TRUE)
+  strand <- ifelse(all(strand(exons) == "-"), -1, 1)
+  track$add_exon_feature(rl$ranges, strand = strand, plotstyle = "box")
+
+  for (i in seq_along(variants)) {
+    v <- variants[i]
+    loc <- as.integer(start(v) - rl$offset)
+    var_names <- str_split_1(v$existing_variation, ";") # Prefer cosmic
+    only_cosmic <- purrr::keep(var_names, \(x) str_detect(x, "COSV"))
+    if (length(only_cosmic) > 0) {
+      vn <- first(only_cosmic)
+    } else {
+      vn <- first(var_names)
+    }
+    color <- cmap[[first(v$consequence)]]
+    label <- glue("{v$ref}>{v$alt} {vn}")
+    track$add_text(
+      x = loc, text = label, fontname = "monospace", backgroundcolor = color,
+      show_line = TRUE, line_kws = list(color = "black", linewidth = "1")
+    )
+  }
+}
+
+#' Produce a plot comparing the sample
+#'
+#' @param ensdb Ensembldb object
+#' @param bsg BSgenome object
+#'
+plot_sample_variants <- function(ensdb, bsg, vep_files,
+                                 gene_name,
+                                 outfile,
+                                 canonical_tx = NULL,
+                                 sample_names = NULL,
+                                 palette = "") {
+  library(ensembldb)
+
+  transcripts <- exonsBy(ensdb, "tx", filter = GeneNameFilter(gene_name))
+  gene <- genes(db, filter = ~ symbol == gene_name)
+  if (length(gene) == 0) {
+    stop(glue("Gene {gene_name} not found in ensdb"))
+  }
+  if (is.null(canonical_map) || intersect(names(transcripts), canonical_tx) <= 0) {
+    chosen_tx <- transcripts[[1]]
+  } else {
+    chosen_tx <- transcripts[names(transcripts) %in% canonical_tx][[1]]
+  }
+  gv <- pg$GenomeViz()
+  if (is.null(sample_names)) {
+    sample_names <- basename_no_ext(vep_files)
+  }
+  cmap <- cur_vars$consequence |>
+    unlist() |>
+    unique() |>
+    map_colors_d(palette)
+
+  plot_helper <- function(file, name) {
+    gr <- into_granges(file)
+    track <- gv$add_feature_track(name, end(gene) - start(gene))
+    cur_vars <- gr[replace_na(gr$symbol == gene_name, FALSE)]
+    add_var_exon_track(gv, gene, chosen_tx, cur_vars, track_name = name)
+  }
+
+  for (i in seq_along(vep_files)) {
+    plot_helper(vep_files[i], sample_names[i])
+  }
+
+  pyplt$savefig(gv, outfile, custom_legend = cmap)
 }

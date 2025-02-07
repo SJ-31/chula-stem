@@ -128,7 +128,7 @@ def plotfig(
         nrows = len(tracks)
         if custom_legend:
             nrows += 2
-            height_ratios.extend([0.5, 0.3])  # Dirty hack for padding between legend
+            height_ratios.extend([0.1, 0.1])  # Dirty hack for padding between legend
         gs = GridSpec(nrows=nrows, ncols=1, height_ratios=height_ratios, hspace=0.8)
         gs.update(left=0, right=1, bottom=0, top=1, hspace=0, wspace=0)
 
