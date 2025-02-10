@@ -266,6 +266,7 @@ plot_sample_variants <- function(ensdb, vep_files,
   }
 
   vep_tbs <- lapply(vep_files, read_tsv)
+
   all_consequences <- bind_rows(vep_tbs)$Consequence |>
     unique() |>
     flatten_by(collapse = FALSE, unique = TRUE) |>
@@ -274,16 +275,20 @@ plot_sample_variants <- function(ensdb, vep_files,
 
   cmap <- map_colors_d(all_consequences, palette)
 
+  seen_consequence <- c()
+
   plot_helper <- function(file, name) {
     gr <- into_granges(file, allowed_consequences = allowed_consequences)
     cur_vars <- gr[replace_na(gr$symbol == gene_name, FALSE)]
+    seen_consequence <<- c(seen_consequence, unique(unlist(mcols(cur_vars)$consequence)))
     add_var_exon_track(gv, gene, chosen_tx, cur_vars, track_name = name, cmap = cmap)
   }
-
 
   for (i in seq_along(vep_files)) {
     plot_helper(vep_tbs[[i]], sample_names[i])
   }
+  seen_consequence <- unique(seen_consequence)
+  cmap <- cmap[names(cmap) %in% seen_consequence]
 
   pyplt$savefig(gv, outfile, custom_legend = cmap)
 }
