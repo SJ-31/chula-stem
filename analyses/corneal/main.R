@@ -20,8 +20,6 @@ save_fn <- function(plot, name) {
 
 
 ## --- CODE BLOCK ---
-hg37_db <- EnsDb(M$hg37)
-
 qc_helper <- function(adata, db, name, is_adata = TRUE) {
   if (is_adata) {
     sce <- AnnData2SCE(adata)
@@ -43,9 +41,13 @@ qc_helper <- function(adata, db, name, is_adata = TRUE) {
     x_axis = "sample",
     discard_col = "discard_reason"
   )
+
+  sce <- scDblFinder(sce, samples = sce$sample)
+
   save_fn(plot, glue("{name}_qc.png"))
   sce
 }
+
 
 
 get_fibro <- function(f) {
@@ -74,17 +76,26 @@ get_corneal <- function(f) {
 
 get_colon <- function(f) {
   healthy <- c("-A1", "-C1", "-B1")
+  ## df <- read_tsv(here("test.tsv"), col_names = FALSE) |> column_to_rownames("X1")
   df <- read_tsv(here(M$colon_dir, "GSE116222_Expression_matrix.txt"), col_names = FALSE) |> column_to_rownames("X1")
+
   colnames(df) <- df[1, ]
   df <- df[-1, ]
   wanted_cols <- grepl(paste(healthy, collapse = "|"), colnames(df))
   df <- df[, wanted_cols]
-  df <- df |> mutate(across(everything(), as.numeric))
+  df <- df |>
+    mutate(across(everything(), as.numeric)) |>
+    as.matrix()
 
   sce <- SingleCellExperiment::SingleCellExperiment(list(X = df))
   colData(sce)$source <- "colon"
   colData(sce)$sample <- str_remove(colnames(sce), ".*-")
   sce <- qc_helper(sce, EnsDb(M$hg37), "colon", FALSE)
+
+  ## assay(sce, "X") |>
+  ##   as.matrix() |>
+  ##   Matrix::Matrix(sparse = TRUE)
+
   writeH5AD(sce, f)
 }
 
@@ -102,7 +113,6 @@ get_combined <- function(outfile) {
     assay.type = "X"
   ) |> U$x2counts()
 
-  sce <- scDblFinder(sce, samples = sce$sample)
   writeH5AD(sce, outfile)
   sce
 }
@@ -113,8 +123,8 @@ corneal_file <- here(M$outdir, "corneal.h5ad")
 colon_file <- here(M$outdir, "colon.h5ad")
 
 corneal <- U$read_existing(corneal_file, get_corneal, readH5AD)
-colon <- U$read_existing(colon_file, get_colon, readH5AD)
 fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
+colon <- U$read_existing(colon_file, get_colon, readH5AD)
 
 ## * Get combined file
 
@@ -122,6 +132,7 @@ fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
 ## sce <- U$read_existing(combined_file, get_combined, \(x) readH5AD(x, X_name = "counts"))
 
 ## # Anotate based on LGR5 positive or negative
+# Want to compare expression of TET1, TET2 and TET3 genes
 
 ## ggplot(
 ##   as_tibble(colData(sce)),
@@ -130,10 +141,8 @@ fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
 ##   geom_boxplot()
 
 ## # Will carry out DGE as pseudobulks with edgeR
-## pbs <- Seurat::as.Seurat(sce, data = NULL) |>
-##   SeuratObject::RenameAssays("originalexp", "RNA") |>
-##   Seurat2PB(sample = "sample", cluster = "source")
+## dge <- S$sce2pseudobulk(sce)
 
 ## # TODO: build the design matrix
 
-## plot <- P$pca_dgelist(pbs, plot_aes = list(color = "cluster"))
+## plot <- P$pca_dgelist(dge, plot_aes = list(color = "cluster"))
