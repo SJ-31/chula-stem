@@ -1,3 +1,18 @@
+* Adult_Human_Skin.pkl
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/Adult_Human_Skin.pkl=
+*Date added*: <2025-02-11 Tue>
+*Source:* [[https://www.celltypist.org/models][CellTypist Adult human skin model]]
+
+* 9_healthy_reference_AP_large_intestine_finalmodel.pkl
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/9_healthy_reference_AP_large_intestine_finalmodel.pkl=
+*Date added*: <2025-02-11 Tue>
+*Source:* [[https://www.gutcellatlas.org/pangi.html][Large intestine]]
+Cell typist model of Large intestine cells collected from adult/paediatric samples (Pan-GI cell atlas)
+* CellMarker2_human.csv
+*Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/CellMarker2_human.csv=
+*Date added*: <2025-02-11 Tue>
+*Source:* [[http://117.50.127.228/CellMarker/CellMarker_download.html][CellMarker 2.0 Human Cell markers]]
+Human cell markers from CellMarker 2 used for marker-based annotation e.g. CellAssign
 * Homo_sapiens.GRCh38.113.ref_flat
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/genomes/Homo_sapiens.GRCh38.113.ref_flat=
 *Date added*: <2025-01-31 Fri>
