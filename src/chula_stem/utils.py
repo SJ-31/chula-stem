@@ -7,7 +7,7 @@ from functools import reduce
 from pathlib import Path
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
-from typing import Callable
+from typing import Any, Callable
 
 import click
 import polars as pl
@@ -439,6 +439,13 @@ def combine_counts(
         dfs,
     )
     combined.write_csv(outfile, null_value="NA")
+
+
+def do_call(fn, pars: dict | None):
+    if pars is None:
+        return fn(**{})
+    else:
+        return fn(**pars)
 
 
 def read_existing[T](filename: Path, expr: Callable[[Path], T], read_fn) -> T:
