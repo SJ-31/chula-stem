@@ -1,8 +1,6 @@
 #!/usr/bin/env ipython
 #
 
-import json
-
 import anndata as ad
 import anndata2ri
 import celltypist
@@ -11,16 +9,35 @@ import pandas as pd
 import polars as pl
 import polars.selectors as cs
 import scanpy as sc
-import scanpy.external as sce
-import scvi
 from celltypist import models
 from chula_stem import utils as ut
 from chula_stem.sc_rnaseq import cell_assign_wrapper, make_marker_df
 from pyhere import here
 from scipy import sparse
-from scvi.external import CellAssign
 
 outdir = here("analyses", "output", "corneal")
+
+
+def ct_annotate(
+    adata: ad.AnnData, adata_final: ad.AnnData, name: str, model_file: str
+) -> None:
+    """Helper for annotating with celltypist"""
+    to_celltypist = adata.copy()
+    sc.pp.normalize_per_cell(
+        to_celltypist, counts_per_cell_after=10**4
+    )  # per cell typist instructions
+    sc.pp.log1p(to_celltypist)
+    to_celltypist.X = to_celltypist.X.toarray()
+    li_model = models.Model.load(str(here("analyses", "data", model_file)))
+    predictions = celltypist.annotate(
+        to_celltypist, model=li_model, majority_voting=True
+    ).to_adata()
+
+    adata_final.obs["cell_type"] = predictions.obs.loc[
+        adata_final.obs.index, "majority_voting"
+    ]
+    fig = sc.pl.umap(adata_final, color=["cell_type", "leiden"], return_fig=True)
+    fig.savefig(here(outdir, f"{name}_celltypes.png"), bbox_inches="tight", dpi=500)
 
 
 # Modified version of normalize from scib that won't throw error with zeros
@@ -216,9 +233,6 @@ fibro_nd = fibro[fibro.obs["scDblFinder.class"] != "doublet", :]
 # pca_cluster(fibro, leiden_pars={"resolution": 1})
 pca_cluster(fibro_nd, leiden_pars={"resolution": 1})
 
-fig = sc.pl.umap(fibro_nd, color="leiden", add_outline=True, return_fig=True)
-fig.savefig(here(outdir, "fibro_leiden.png"), bbox_inches="tight", dpi=500)
-
 # TODO: how to quantitatively evaluate differences between these clusters in python
 fibro_final, fmarkers = get_clusters(fibro_nd)
 scib_normalize(  # Scran normalization on leiden clusters then log1p transform
@@ -230,16 +244,12 @@ print("Fibro after")
 print(fibro_final)
 
 # ** Cell annotation
-# <2025-02-11 Tue> Based on the marker genes provided by original authors, using
-
-with open(here("analyses", "corneal", "fibro_types.json"), "r") as f:
-    fibro_markers = make_marker_df(json.load(f))
-
-
-fibro_pred = cell_assign_wrapper(fibro_final, fibro_markers)
-
-sc.pl.umap(fibro_final, color=["cell_type", "leiden"], ncols=1)
-
+ct_annotate(
+    fibro,
+    fibro_final,
+    "fibroblast",
+    "Adult_Human_Skin.pkl",
+)
 # #  --- CODE BLOCK ---
 
 # * Get corneal
@@ -258,8 +268,6 @@ corneal = corneal[~corneal.obs.discard, :]
 corneal = corneal[corneal.obs["scDblFinder.class"] != "doublet", :]
 pca_cluster(corneal, leiden_pars={"resolution": 1})
 corneal_final, cmarkers = get_clusters(corneal)
-fig = sc.pl.umap(corneal, color="leiden", add_outline=True, return_fig=True)
-fig.savefig(here(outdir, "corneal_leiden.png"), bbox_inches="tight", dpi=500)
 scib_normalize(
     corneal_final,
     clusters=corneal_final.obs.leiden,
@@ -271,6 +279,23 @@ print("Corneal after")
 print(corneal_final)
 # #  --- CODE BLOCK ---
 
+# ** Cell annotation
+markers = pl.read_csv(here("analyses", "data", "CellMarker2_human.csv"))
+markers = markers.filter(
+    (pl.col("species").is_not_null())
+    & (pl.col("cell_type") == "Normal cell")
+    & (pl.col("Symbol").is_not_null())
+)
+types_genes = (
+    markers.select(["cell_name", "Symbol"]).group_by("cell_name").agg(pl.col("Symbol"))
+)
+marker_mat = make_marker_df({k: v for k, v in types_genes.iter_rows()})
+corneal_pred = cell_assign_wrapper(corneal_final, marker_mat)
+fig = sc.pl.umap(
+    corneal_final, color=["cell_type", "leiden"], add_outline=True, return_fig=True
+)
+fig.savefig(here(outdir, "corneal_celltypes.png"), bbox_inches="tight", dpi=500)
+
 # * Get colon
 # <2025-02-06 Thu> QC seems fine, no cells being discarded weirdly
 # <2025-02-11 Tue> Very little LGR5 expression
@@ -281,8 +306,6 @@ print(colon)
 colon = colon[(~colon.obs.discard) | (colon.obs["scDblFinder.class"] != "doublet"), :]
 pca_cluster(colon, leiden_pars={"resolution": 1})
 colon_final, clmarkers = get_clusters(colon.copy())
-fig = sc.pl.umap(colon_final, color="leiden", add_outline=True, return_fig=True)
-fig.savefig(here(outdir, "colon_leiden.png"), bbox_inches="tight", dpi=500)
 scib_normalize(
     colon_final,
     clusters=colon_final.obs.leiden,
@@ -294,24 +317,9 @@ print("Colon after")
 print(colon_final)
 
 # ** Cell annotation
-to_celltypist = colon.copy()
-sc.pp.normalize_per_cell(
-    to_celltypist, counts_per_cell_after=10**4
-)  # per cell typist instructions
-sc.pp.log1p(to_celltypist)
-to_celltypist.X = to_celltypist.X.toarray()
-model_file = "9_healthy_reference_AP_large_intestine_finalmodel.pkl"
-li_model = models.Model.load(str(here("analyses", "data", model_file)))
-predictions = celltypist.annotate(
-    to_celltypist, model=li_model, majority_voting=True
-).to_adata()
-
-colon_final.obs["cell_type"] = predictions.obs.loc[
-    colon_final.obs.index, "majority_voting"
-]
-fig = sc.pl.umap(colon_final, color=["cell_type", "leiden"], return_fig=True)
-fig.savefig(here(outdir, "colon_types.png"), bbox_inches="tight", dpi=500)
-
+ct_annotate(
+    colon, colon_final, "colon", "9_healthy_reference_AP_large_intestine_finalmodel.pkl"
+)
 
 # * Integrate
 
@@ -340,7 +348,6 @@ marker_df.write_csv(here(outdir, "marker_counts.csv"))
 # pca_cluster(adata, leiden_pars={"resolution": 1})
 
 # ** scANVI integration
-# Requires cell annotations... <2025-02-11 Tue> just annotate from what the original authors did
 #
 # adata.raw = adata  # keep full dimension safe
 # scvi.model.SCVI.setup_anndata(adata, batch_key="source")
@@ -363,3 +370,9 @@ marker_df.write_csv(here(outdir, "marker_counts.csv"))
 #     frameon=False,
 #     ncols=1,
 # )
+
+
+# #  --- CODE BLOCK ---
+
+
+# #  --- CODE BLOCK ---
