@@ -36,9 +36,6 @@ if (!file.exists(vaf_merged_file)) {
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
   write_tsv(merged, vaf_merged_file)
-} else {
-  merged <- read_tsv(vaf_merged_file) |>
-    mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
 }
 
 multiqc_file <- here(outdir, "vep.txt")
@@ -46,7 +43,6 @@ vep_data_file <- here(outdir, "pdac_vep_data.tsv")
 if (!file.exists(vep_data_file)) {
   py_utils$parse_multiqc_vep(multiqc_file, vep_data_file)
 }
-vep_data <- read_tsv(vep_data_file)
 
 filter_known <- function(tb, dbsnp) {
   if (is.character(dbsnp)) {
@@ -79,3 +75,10 @@ vaf_heatmap <- function(plot) {
       axis.text.x = element_text(angle = 90),
     )
 }
+
+ACCEPTED_CONSEQUENCE <- c(
+  "missense_variant", "frameshift_variant",
+  "downstream_gene_variant", "upstream_gene_variant",
+  "stop_gained", "splice_region_variant", "inframe_deletion",
+  "splice_donor_5th_base_variant"
+)

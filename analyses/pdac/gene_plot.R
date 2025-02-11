@@ -13,6 +13,7 @@ vep_files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv$", recurs
 names <- utils$basename_no_ext(vep_files) |>
   map_chr(\(x) str_extract(x, "8-(P[0-9_]+)-VEP_small", 1))
 
+## --- CODE BLOCK ---
 P <- new.env()
 source(here("src", "R", "plotting.R"), local = P)
 
@@ -22,3 +23,4 @@ P$plot_sample_variants(db, vep_files, "KRAS",
   sample_names = names,
   palette = "vapoRwave::vapoRwave"
 )
+## --- CODE BLOCK ---

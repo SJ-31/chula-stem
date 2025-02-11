@@ -1,6 +1,11 @@
 library(ggpubr)
 source(here::here("analyses", "pdac", "main.R"))
 
+merged <- read_tsv(vaf_merged_file) |>
+  mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
+vep_data <- read_tsv(vep_data_file)
+
+
 ## * Format
 
 mode_and_capitalize <- function(char_vec, ignore = c()) {
@@ -16,12 +21,7 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
     str_to_title() |>
     str_replace_all("_", " ")
 }
-ACCEPTED_CONSEQUENCE <- c(
-  "missense_variant", "frameshift_variant",
-  "downstream_gene_variant", "upstream_gene_variant",
-  "stop_gained", "splice_region_variant", "inframe_deletion",
-  "splice_donor_5th_base_variant"
-)
+
 IGNORED_VARIANTS <- c(
   "non_coding_transcript_variant",
   "non_coding_transcript_exon_variant",
