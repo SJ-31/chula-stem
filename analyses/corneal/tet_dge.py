@@ -48,6 +48,7 @@ def load(f):
     )
     annotate_marker(corneal, MARKERS)
     corneal.write_h5ad(f)
+    return corneal
 
 
 adata = read_existing(corneal_normalized_file, load, ad.read_h5ad)
@@ -82,16 +83,9 @@ class RankInterpreter:
         stat_df: pl.DataFrame = self.__getattribute__(stat)
         results: dict = {"group": self.groups}
         for gene in gene_list:
-            mask: pl.DataFrame = self.names == gene
-            index_expr = [
-                pl.when(pl.col(c)).then(pl.int_range(pl.len())).otherwise(None).alias(c)
-                for c in mask.columns
-            ]
-            with_index = mask.with_columns(index_expr).min()
+            locations = (self.names == gene).select(pl.all().arg_max())
             gene_values = []
-            for indices, stats in zip(
-                with_index.iter_columns(), stat_df.iter_columns()
-            ):
+            for indices, stats in zip(locations.iter_columns(), stat_df.iter_columns()):
                 index = indices.first()
                 if index:
                     gene_values.append(stats[index])
@@ -109,6 +103,8 @@ tet_lfc = ri.gene_stats(MARKERS, "logfoldchanges")
 tet_sig.select(["group", MARKERS[0]]).filter(
     pl.any_horizontal(cs.by_dtype(pl.Float64) > 0.05)
 )
+
+test = (ri.names == "MALAT1").select(pl.all().arg_max())
 # Exclude non statistically significant groups
 
 # High: must have at least 3rd quartile of lfc
