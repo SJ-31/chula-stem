@@ -281,16 +281,29 @@ print(corneal_final)
 
 # ** Cell annotation
 markers = pl.read_csv(here("analyses", "data", "CellMarker2_human.csv"))
+kept_celltypes = [
+    "Fibroblast-like cell",
+    "Red blood cell (erythrocyte)",
+    "Blood cell",
+    "White blood cell",
+    "Immune cell",
+]
 markers = markers.filter(
-    (pl.col("species").is_not_null())
-    & (pl.col("cell_type") == "Normal cell")
-    & (pl.col("Symbol").is_not_null())
+    (
+        (
+            (pl.col("cell_type") == "Normal cell")
+            & (pl.col("cell_name").is_in(kept_celltypes))
+        )
+        | (pl.col("tissue_class") == "Eye")
+    )
+    & ((pl.col("Symbol").is_not_null()) & pl.col("cell_name").is_not_null())
 )
 types_genes = (
     markers.select(["cell_name", "Symbol"]).group_by("cell_name").agg(pl.col("Symbol"))
 )
 marker_mat = make_marker_df({k: v for k, v in types_genes.iter_rows()})
-corneal_pred = cell_assign_wrapper(corneal_final, marker_mat)
+cell_assign_model = here(outdir, "corneal_cellassign")
+corneal_pred = cell_assign_wrapper(corneal_final, marker_mat, cell_assign_model)
 fig = sc.pl.umap(
     corneal_final, color=["cell_type", "leiden"], add_outline=True, return_fig=True
 )
