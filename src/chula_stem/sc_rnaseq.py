@@ -42,16 +42,21 @@ def make_marker_df(data: dict[str, list]) -> pd.DataFrame:
 def cell_assign_wrapper(
     adata: ad.AnnData,
     marker_df: pd.DataFrame,
+    model_path: str,
     type_key: str = "cell_type",
     count_layer="counts",
     size_factor_key="size_factors",
 ) -> pd.DataFrame:
     filtered = adata[:, adata.var.index.isin(marker_df.index)].copy()
-    CellAssign.setup_anndata(
-        filtered, size_factor_key=size_factor_key, layer=count_layer
-    )
-    model = CellAssign(filtered, marker_df)
+    try:
+        model = CellAssign.load(model_path)
+    except:
+        CellAssign.setup_anndata(
+            filtered, size_factor_key=size_factor_key, layer=count_layer
+        )
+        model = CellAssign(filtered, marker_df)
     model.train()
+    model.save(model_path, save_anndata=True, overwrite=True)
     predictions = model.predict()
     adata.obs[type_key] = predictions.idxmax(axis=1).values
     return predictions
