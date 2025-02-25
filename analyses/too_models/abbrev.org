@@ -36,3 +36,5 @@ THCA 	Thyroid carcinoma
 UCS 	Uterine Carcinosarcoma
 UCEC 	Uterine Corpus Endometrial Carcinoma
 UVM 	Uveal Melanoma
+** Custom
+RB - Retinoblastoma

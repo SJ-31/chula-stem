@@ -18,3 +18,15 @@ chula_tpm_file <- here(out, "chula_tpm.rds")
 chula_count_tpm_file <- here(out, "chula_tpm_scaled_count.rds")
 chula_meta_file <- here(out, "chula_metadata.tsv")
 tcga_data <- here(data, "tcga")
+
+replace_ensembl_ids <- function(df, new_id_col) {
+  kept <- colnames(df)
+  merged <- inner_join(df, M$id_mapping, by = join_by(x$gene_id == y$ensembl)) |>
+    dplyr::select(-gene_id) |>
+    rename(c("gene_id" = new_id_col)) |>
+    group_by(gene_id) |>
+    mutate(across(where(is.numeric), mean)) |>
+    ungroup() |>
+    distinct(gene_id, .keep_all = TRUE)
+  merged |> dplyr::select(all_of(kept))
+}
