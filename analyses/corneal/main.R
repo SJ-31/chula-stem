@@ -60,6 +60,7 @@ get_fibro <- function(f) {
   writeH5AD(sce, f)
 }
 
+
 get_corneal <- function(f) {
   read <- function(p) {
     adata <- sc$read_10x_mtx(path = here(M$corneal_dir), prefix = p)
@@ -122,9 +123,9 @@ fibro_file <- here(M$outdir, "fibro.h5ad")
 corneal_file <- here(M$outdir, "corneal.h5ad")
 colon_file <- here(M$outdir, "colon.h5ad")
 
-corneal <- U$read_existing(corneal_file, get_corneal, readH5AD)
-fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
-colon <- U$read_existing(colon_file, get_colon, readH5AD)
+## corneal <- U$read_existing(corneal_file, get_corneal, readH5AD)
+## fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
+## colon <- U$read_existing(colon_file, get_colon, readH5AD)
 
 ## * Get combined file
 
