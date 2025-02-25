@@ -37,3 +37,6 @@ transposed = np.transpose(df)
 # * BPformer
 sample_file = "/home/shannc/Bio_SDD/chula-stem/extras/BPformer/RNAseq/Raw/GEO-RNA-m.pkl"
 sample = pd.read_pickle(sample_file)
+
+sample2_file = "/home/shannc/Bio_SDD/chula-stem/extras/BPformer/data/TCGA-RNA-p-m.pkl"
+s2 = pd.read_pickle(sample2_file)
