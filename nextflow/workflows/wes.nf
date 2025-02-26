@@ -40,9 +40,19 @@ workflow whole_exome {
         tumor: meta.type == "cancer" || meta.type == "tumor"
         normal: meta.type == "normal"
     }
+    def toConcat = { suffix, outdir_name, it ->
+        [it[0] + ["suffix": suffix,
+                  "out": "${params.outdir}/${it[0].id}/${outdir_name}",
+                  "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
+    }
+    def nullIfNotNum = { it.text.isNumber() ? it.text : null }
+    def replaceOut = { [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
+                                 "log": "${params.logdir}/${it[0].id}/metrics"],
+                        it[1], it[2]] }
     /*
      * Preprocessing
      */
+
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
     // After preprocessing, branch data into tumor and normal then pair up by id and join with
     //  index
@@ -68,6 +78,7 @@ workflow whole_exome {
     /*
      * Variant calling
      */
+
     // Structural variants
 
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
@@ -86,16 +97,8 @@ workflow whole_exome {
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
+    // // Combine variants by type
 
-    def toConcat = { suffix, outdir_name, it ->
-        [it[0] + ["suffix": suffix,
-                  "out": "${params.outdir}/${it[0].id}/${outdir_name}",
-                  "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
-    }
-
-
-    // Combine variants by type
-    //
     small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out,
                                            [STRELKA2.out.variants.map({ it.flatten }),
                                             MUSE2.out.variants])
@@ -111,6 +114,7 @@ workflow whole_exome {
     to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,
                                       [OCTOPUS.out.variants,
                                        CLAIRS.out.variants])
+
     CONCAT_SMALL_2(to_concat_small_2, 6)
 
     structural_variants = Utl.joinFirst(MANTA.out.somatic,
@@ -121,9 +125,10 @@ workflow whole_exome {
 
     to_std_small = Utl.joinFirst(CONCAT_SMALL_2.out.vcf,
                                  [branched.normal, branched.tumor])
-    /*
-     * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
-     */
+
+    // /*
+    //  * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
+    //  */
 
     STANDARDIZE_VCF(Utl.addSuffix(to_std_small, "Small_std"), params.ref.genome, 6)
 
@@ -132,13 +137,9 @@ workflow whole_exome {
 
     QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"), params.small_qc, 7)
 
-    /*
-    * Copy number abberation
-    */
-
-    def nullIfNotNum = { it.text.isNumber() ? it.text : null }
-    purity_ploidy = FACETS.out.purity_ploidy
-        .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+    // /*
+    // * Copy number abberation
+    // */
 
     if (!params.ref.cnvkit_reference) {
         collected_normals = normals.map({ it[2] })
@@ -157,6 +158,8 @@ workflow whole_exome {
     }
     FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
     FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
+    purity_ploidy = FACETS.out.purity_ploidy
+        .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
 
     to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
             .join(Utl.getId(QC_SMALL.out.vcf))
@@ -209,13 +212,10 @@ workflow whole_exome {
     /*
      * Metric collection
      */
-    def replaceOut = { [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
-                                 "log": "${params.logdir}/${it[0].id}/metrics"],
-                        it[1], it[2]] }
 
     to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
                                [PREPROCESS_FASTQ.out.bam_index],
-                               on: ["id", "type"]).map(replaceOut)
+                               ["id", "type"]).map(replaceOut)
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,
@@ -224,6 +224,7 @@ workflow whole_exome {
 
     to_bcftools_stats = Utl.addSuffix(small_all, "Bcftools_stats_small")
         .mix(Utl.addSuffix(sv_all, "Bcftools_stats_SV"))
+
     BCFTOOLS_STATS(to_bcftools_stats, params.ref.targets, 8)
 
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(VEP.out.report,
