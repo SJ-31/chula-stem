@@ -98,7 +98,7 @@ workflow whole_exome {
 
     // Combine variants by type
     small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out,
-                                           [STRELKA2.out.variants.map({ it.flatten }),
+                                           [STRELKA2.out.variants.map({ [it[0]] + it[1] }),
                                             MUSE2.out.variants])
         .map({ toConcat("Concat_to_oct", "paired", it) })
     CONCAT_SMALL_1(small_variants_to_geno, 6)
@@ -150,9 +150,11 @@ workflow whole_exome {
     }
 
     FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
-    FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
-    purity_ploidy = FACETS.out.purity_ploidy
-        .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+    // <2025-02-27 Thu> BUG: facets is failing
+    // FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
+    // purity_ploidy = FACETS.out.purity_ploidy
+    //     .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
+    purity_ploidy = FACETS_PILEUP.out.pileup.map({ [it[0].id, null, null] })
 
     to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
             .join(Utl.getId(QC_SMALL.out.vcf))
@@ -160,7 +162,8 @@ workflow whole_exome {
 
     CNVKIT(to_cnvkit, cnvkit_reference, "hybrid", 5)
 
-    CLASSIFY_CNV_FORMAT(CNVKIT.out.cns.mix(FACETS.out.rds), 5)
+    // CLASSIFY_CNV_FORMAT(CNVKIT.out.cns.mix(FACETS.out.rds), 5) <2025-02-27 Thu> uncomment when facets works again
+    CLASSIFY_CNV_FORMAT(CNVKIT.out.cns, 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)
