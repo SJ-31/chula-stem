@@ -1,5 +1,8 @@
 #!/usr/bin/env ipython
+from functools import reduce
+
 import anndata as ad
+import matplotlib.pyplot as plt
 import polars as pl
 import polars.selectors as cs
 import scanpy as sc
@@ -33,9 +36,13 @@ def load(f):
     corneal.obs["MKI67_status"] = corneal.obs["has_MKI67"].replace(
         {True: "MKI67_positive", False: "MKI67_negative"}
     )
+    norm = sc.pp.normalize_total(corneal, inplace=False)
+    corneal.layers["normalized"] = norm["X"]
     pca_to_leiden(
         corneal,
         leiden_pars={"resolution": 1, "flavor": "igraph", "n_iterations": 2},
+        neighbor_pars={"use_rep": "X_pca"},
+        pca_pars={"layer": "normalized"},
     )
     check_cd44 = (
         corneal.obs.groupby("leiden")
@@ -45,7 +52,7 @@ def load(f):
     check_cd44["percent"] = check_cd44["has_CD44"] / check_cd44["cluster_size"]
     check_cd44.to_csv(here(outdir, "cd44_counts.csv"))
 
-    scib_normalize(
+    scib_normalize(  # Library size normalization
         corneal,
         clusters=corneal.obs.leiden,
         precluster=False,
@@ -53,6 +60,8 @@ def load(f):
     )
 
     no_cd44 = corneal[~corneal.obs["has_CD44"], :]
+    fig = sc.pl.umap(corneal, color=["has_MKI67", "leiden"], return_fig=True)
+    fig.savefig(here(outdir, "umap.png"))
 
     for adata, outfile in zip(
         [corneal, no_cd44], [normalized_wcd44_file, normalized_file]
@@ -61,7 +70,7 @@ def load(f):
             adata,
             groupby="MKI67_status",
             pts=True,
-            rest=True,
+            reference="MKI67_positive",
             method="wilcoxon",
         )
         adata.write_h5ad(outfile)
@@ -110,20 +119,40 @@ class RankInterpreter:
         return pl.DataFrame(results)
 
 
+compare = ["TET1", "TET2", "TET3"]
+
 wcd44 = ad.read_h5ad(normalized_wcd44_file)
 no_cd44 = ad.read_h5ad(normalized_file)
-for adata in [no_cd44, wcd44]:
+
+for adata, name in zip([no_cd44, wcd44], ["no_cd44", "w_cd44"]):
     ri = RankInterpreter(adata.uns["rank_genes_groups"])
-    tet_percent = ri.gene_stats(MARKERS, "pts")
-    tet_sig = ri.gene_stats(MARKERS, "pvals")
-    tet_lfc = ri.gene_stats(MARKERS, "logfoldchanges")
+    tet_percent = ri.gene_stats(compare, "pts")
+    tet_sig = ri.gene_stats(compare, "pvals_adj")
+    tet_lfc = ri.gene_stats(compare, "logfoldchanges")
+    to_long = [
+        d.unpivot(index="group", variable_name="gene", value_name=m)
+        .with_columns(group=pl.concat_str(["group", "gene"], separator="-"))
+        .drop("gene")
+        for d, m in zip([tet_percent, tet_sig, tet_lfc], ["percent", "pval_adj", "lfc"])
+    ]
+    # Compared against MKI67 positive group
+    # sc.pl.rank_genes_groups(adata[:, adata.var.index.isin(compare)], show=True)
+    # plt.savefig(here(outdir, f"{name}_tet.png").as_posix())
 
-    tet_sig.select(["group", MARKERS[0]]).filter(
-        pl.any_horizontal(cs.by_dtype(pl.Float64) > 0.05)
+    # sc.pl.rank_genes_groups(adata, show=True)
+    # plt.savefig(here(outdir, f"{name}_top_genes.png").as_posix())
+
+    joined = reduce(lambda x, y: x.join(y, on="group"), to_long)
+
+    check_mki67 = (
+        adata.obs.groupby("leiden")
+        .agg({"has_MKI67": "sum", "leiden": "size"})
+        .rename({"leiden": "cluster_size"}, axis="columns")
     )
+    check_mki67["percent"] = check_mki67["has_MKI67"] / check_mki67["cluster_size"]
+    check_mki67.to_csv(here(outdir, f"{name}_mki67_counts.csv"))
 
-    # test = (ri.names == "MALAT1").select(pl.all().arg_max())
-
+    joined.write_csv(here(outdir, f"{name}_tet_data.csv"))
 
 # Exclude non statistically significant groups
 
