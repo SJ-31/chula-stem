@@ -30,7 +30,7 @@ process MANTA {
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     prefix = Utl.getName(module_number, meta)
-    n = !params.tumor_only ? meta.normal : "none"
+    n = !params.tumor_only ? meta.RGSM_normal : "none"
     normal_flag = !params.tumor_only ? " --normalBam ${normal} " : ""
     args = task.ext.args.join(" ")
     if (check.exists()) {
