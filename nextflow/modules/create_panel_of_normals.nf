@@ -12,12 +12,14 @@ process CREATE_PANEL_OF_NORMALS {
     //
 
     output:
-    tuple val(meta), path(output), emit: pon
+    tuple val(meta), path(output), emit: pon // Empty pon with no sample information
+    tuple val(meta), path(output_ws), emit: pon_ws
     path("*.log")
     //
 
     script:
     output = Utl.getName(module_number, meta, "PON", "vcf.gz")
+    output_ws = Utl.getName(module_number, meta, "PON_ws", "vcf.gz")
     to_sample_spec = vcfs.toList().join("\n")
     to_other_spec = other_vcfs.join("\n")
     check = file("${meta.out}/${output}")
@@ -35,7 +37,8 @@ process CREATE_PANEL_OF_NORMALS {
             -m ${minimum} \\
             -v other.txt \\
             -t ${task.cpus} \\
-            -o ${output}
+            -o ${output} \\
+            -a ${output_ws}
 
         get_nextflow_log.bash create_panel_of_normals.log
         """
