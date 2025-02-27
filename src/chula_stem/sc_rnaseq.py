@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from scipy import sparse
-from scvi.external import CellAssign
 
 from chula_stem import utils as ut
 
@@ -124,7 +123,7 @@ def scib_normalize(
     if precluster:
         # Preliminary clustering for differentiated normalisation
         adata_pp = adata.copy()
-        sc.pp.normalize_per_cell(adata_pp, counts_per_cell_after=1e6, min_counts=1)
+        sc.pp.normalize_total(adata_pp, counts_per_cell_after=1e6, min_counts=1)
         sc.pp.log1p(adata_pp)
         sc.pp.pca(adata_pp, n_comps=15, svd_solver="arpack")
         sc.pp.neighbors(adata_pp)

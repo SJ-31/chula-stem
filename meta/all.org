@@ -1,7 +1,8 @@
 * HPC account
-Have 10TB of shared space in the =/data/project/stemcell= directory
+Have 10TB of shared space in the =/data/project/stemcell= directory, 500 GB of personal space
 + Available QOS
   * interactive-cpu, ngs16, cpu24h, interactive-gpu, gpu5g
++ cpu24h
 * Data
 All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
 ** CRC
