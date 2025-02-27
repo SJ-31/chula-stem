@@ -88,47 +88,39 @@ workflow whole_exome {
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
-
-    to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
+    to_mutect = paired_no_id.map({
+        [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1]
+    })
     MUTECT2_COMPLETE(to_mutect, 5)
-
     to_strelka = Utl.delId(paired.join(MANTA.out.indels))
-
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
-    // // Combine variants by type
-
+    // Combine variants by type
     small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out,
                                            [STRELKA2.out.variants.map({ it.flatten }),
                                             MUSE2.out.variants])
         .map({ toConcat("Concat_to_oct", "paired", it) })
-
     CONCAT_SMALL_1(small_variants_to_geno, 6)
 
     // Octopus and Clairs uses previous variants to aid calling
-    to_geno = Utl.joinFirst(paired, [CONCAT_SMALL_1.out.vcf])
+    to_geno = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
     OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
-
     to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,
                                       [OCTOPUS.out.variants,
                                        CLAIRS.out.variants])
-
     CONCAT_SMALL_2(to_concat_small_2, 6)
-
     structural_variants = Utl.joinFirst(MANTA.out.somatic,
                                         [DELLY_SV.out.variants, GRIDSS.out.variants])
         .map({ toConcat("SV_all", "annotations", it) })
-
     CONCAT_SV(structural_variants, 6)
-
     to_std_small = Utl.joinFirst(CONCAT_SMALL_2.out.vcf,
                                  [branched.normal, branched.tumor])
 
-    // /*
-    //  * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
-    //  */
+    /*
+     * QC, Re-compute AD, DP and VAF for small variants (some callers do not compute this innately)
+     */
 
     STANDARDIZE_VCF(Utl.addSuffix(to_std_small, "Small_std"), params.ref.genome, 6)
 
@@ -137,9 +129,9 @@ workflow whole_exome {
 
     QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"), params.small_qc, 7)
 
-    // /*
-    // * Copy number abberation
-    // */
+    /*
+    * Copy number abberation
+    */
 
     if (!params.ref.cnvkit_reference) {
         collected_normals = normals.map({ it[2] })
@@ -147,7 +139,7 @@ workflow whole_exome {
         CNVKIT_PREP(Channel.of(["filename": cohort_name,
                                 "out": "${params.outdir}/cnvkit_reference",
                                 "log": "${params.outdir}/cnvkit_reference"])
-                                .merge(collected_normals),
+                    .merge(collected_normals) { meta, bams -> tuple(meta, tuple(bams)) },
                     params.ref.genome, params.ref.baits_unzipped,
                     params.ref.genome_blacklist, true, "hybrid", 4)
         cnvkit_reference = CNVKIT_PREP.out.reference.first()
@@ -156,6 +148,7 @@ workflow whole_exome {
         cnvkit_reference = params.ref.cnvkit_reference
         cnvkit_autobin = params.ref.cnvkit_autobin
     }
+
     FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
     FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
     purity_ploidy = FACETS.out.purity_ploidy
