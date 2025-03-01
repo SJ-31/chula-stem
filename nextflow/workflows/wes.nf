@@ -107,9 +107,11 @@ workflow whole_exome {
     to_geno = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
     OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
+
     to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,
                                       [OCTOPUS.out.variants,
                                        CLAIRS.out.variants])
+        .map({[it[0]] + [it[1..-1]]})
     CONCAT_SMALL_2(to_concat_small_2, 6)
     structural_variants = Utl.joinFirst(MANTA.out.somatic,
                                         [DELLY_SV.out.variants, GRIDSS.out.variants])
