@@ -1,3 +1,14 @@
+* MGI_Exome_Capture_V5_lifted.bed
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted.bed=
+*Date added*: <2025-03-03 Mon>
+*Source:* Custom
+MGI_Exome_Capture_V5.bed file with coordinates lifted over from the hg19 assembly to hg38.
+Liftover process carried out with the web interface of UCSC LiftOver with default parameters. Failed regions are in "liftover_failures.bed" in the same directory
+* MGI_Exome_Capture_V5.bed
+*Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/exome_kits/MGI/_V5/MGI_Exome_Capture_V5.bed=
+*Date added*: <2025-03-03 Mon>
+*Source:* [[https://en.mgi-tech.com/Products/reagents_info/id/10][MGIEasy Exome Capture V5 capture bed file]]
+
 * Adult_Human_Skin.pkl
 *Absolute path:* =/home/shannc/Bio_SDD/chula-stem/analyses/data/Adult_Human_Skin.pkl=
 *Date added*: <2025-02-11 Tue>
