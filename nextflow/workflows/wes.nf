@@ -6,6 +6,7 @@ include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
 include { CNVKIT_PREP } from "../modules/cnvkit_prep.nf"
 include { MOSDEPTH } from "../modules/mosdepth.nf"
+include { REPORT } from "../modules/report.nf"
 include { BCFTOOLS_STATS } from "../modules/bcftools_stats.nf"
 include { MULTIQC } from "../modules/multiqc.nf"
 include { DELLY_SV } from "../modules/delly_sv.nf"
@@ -232,5 +233,29 @@ workflow whole_exome {
         .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
                                      "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 8)
+
+    // Combine channels for report
+    vep_grouped = Utl.getId(CALLSET_QC_TSV.out.tsv)
+        .groupTuple(sort: { (it.baseName =~ /VEP_small/) ? 1 : -1 })
+    vep_to_report = vep_grouped
+        .map({ [it[0]] + [vep_small: it[1][1], vep_sv: it[1][0]] })
+
+    others = Utl.joinFirst(SIGPROFILERASSIGNMENT.out.activities,
+                           [CNVKIT.out.cns, CNVKIT.out.cnr,
+                            CROSS_REFERENCE_CNV.out.tsv,
+                            CROSS_REFERENCE_MSI.out.tsv ]).map(
+        { [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
+                   cnvkit_cnr: it[3], classify_cnv: it[4],
+                   msisensor_pro: it[5],
+                   civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
+                   pandrugs2_cache: params.ref.pandrugs2_cache ? params.ref.pandrugs2_cache : "pandrugs2_cache.json",
+                   cosmic_reference: params.ref.cosmic_reference], ]})
+
+    to_report = Utl.modifyMeta(Utl.delId(Utl.getId(others, true).join(vep_to_report))
+                               .map({ [it[0], it[1] + it[2]] }),
+                               [out: { "${params.outdir}/${it.id}" },
+                                log: { "${params.logdir}/${it.id}" }])
+    caches = []
+    REPORT(to_report, caches, "variant_calling", 8)
 
 }
