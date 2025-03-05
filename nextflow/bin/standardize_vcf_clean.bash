@@ -16,7 +16,8 @@ done
 
 clean_vcf () {
     awk 'BEGIN { FS="\t"; OFS="\t" } $5 !~ /\*/ {print}' | \
-    bcftools norm --fasta-ref "${reference}" -O z > "${1}"
+    bcftools norm --fasta-ref "${reference}" \
+        --check-ref w -O z > "${1}"
 }
 
 if [[ -n "${clear_flag}" ]]; then
