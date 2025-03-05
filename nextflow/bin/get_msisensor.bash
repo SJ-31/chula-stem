@@ -1,7 +1,8 @@
-while getopts "i:o:g:" f; do
+while getopts "i:o:g:s:" f; do
     case "$f" in
         i) input=${OPTARG} ;; # Output microsatellite information ("*_unstable") from msisensorpro
         o) output=${OPTARG} ;; # Output file
+        s) summary=${OPTARG} ;;
         g) gff=${OPTARG} ;;
         *) echo "Flag not recognized"
            exit 1 ;;
@@ -35,12 +36,21 @@ awk '{ if ($3 == "transcript") { print }}' "${gff}" | gff2bed | sort - | \
 
 Rscript -e "
 library('tidyverse')
-u <- read_tsv(\"${input}\") |> mutate(stop = nchar(repeat_unit_bases) * repeat_times + location)
-u\$chromosome <- as.character(u\$chromosome)
-o <- read_tsv('overlapping.tsv') |> select(-stop)
-o\$chromosome <- as.character(o\$chromosome)
-o\$location <- as.numeric(o\$location)
-result <- left_join(u, o) |> rename(start = location) |>
-       relocate(all_of(c('stop', 'gene_start', 'gene_stop', 'gene_name')), .after = start)
+u <- read_tsv(\"${input}\")
+summary <- read_tsv(\"${summary}\")
+if (summary\$Number_of_Unstable_Sites > 0) {
+    u <- u |> mutate(stop = nchar(repeat_unit_bases) * repeat_times + location)
+    u\$chromosome <- as.character(u\$chromosome)
+    o <- read_tsv('overlapping.tsv') |> select(-stop)
+    o\$chromosome <- as.character(o\$chromosome)
+    o\$location <- as.numeric(o\$location)
+    result <- left_join(u, o) |> rename(start = location) |>
+           relocate(all_of(c('stop', 'gene_start', 'gene_stop', 'gene_name')), .after = start)
+} else {
+  cn <- c('chromosome', 'start', 'stop', 'gene_start', 'gene_stop', 'gene_name', 'left_flank_bases', 'repeat_times', 'repeat_unit_bases', 'right_flank_bases', 'pro_p', 'pro_q', 'CovReads', 'threshold')
+  empty <- as.list(rep(NA, length(cn)))
+  names(empty) <- cn
+  result <- as_tibble(empty)
+}
 write_tsv(result, \"${output}\")
 "
