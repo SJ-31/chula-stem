@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from pathlib import Path
 
 import click
 import numpy as np
@@ -323,42 +324,62 @@ def qc_main(
     start_col: int = 1,
     end_col: int = 2,
 ) -> None:
-    df: pl.DataFrame = pl.read_csv(
-        input_tsv,
-        separator="\t",
-        infer_schema_length=None,
-        null_values=["NA", "."],
-    ).with_columns()
-    print(f"Original shape: {df.shape}")
-    grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
-    df = standard_filters(
-        df,
-        min_tumor_depth=min_tumor_depth,
-        max_normal_depth=max_normal_depth,
-        min_vaf=min_vaf,
-        accepted_filters=accepted_filters,
-    )
-    print(f"After standard_filters: {df.shape}")
-    df = resolve_transcripts(
-        df,
-        grouping_cols,
-        impact=impact,
-        canonical=canonical,
-        informative=informative,
-    )
-    print(f"After resolve_transcripts: {df.shape}")
-    df = merge_variant_calls(
-        df,
-        grouping_cols,
-        tool_source_tag=tool_source_tag,
-        minimum_callers=min_callers,
-        vaf_adaptive=vaf_adaptive,
-    )
-    print(f"After merge_variant_calls: {df.shape}")
-    if ignore_regions:
-        print(f"Before filtering by regions in {ignore_regions}: {df.shape}")
-        df = region_filter(df, ignore_regions, chr_col, start_col, end_col)
-        print(f"After filtering by regions in {ignore_regions}: {df.shape}")
-    df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
-        empty_string2null
-    ).write_csv(output, separator="\t", null_value="NA")
+    if Path(input_tsv).stat().st_size == 0:
+        print("WARNING: empty input")
+        empty = pl.DataFrame(
+            schema=[
+                "Loc",
+                "Ref",
+                "Alt",
+                tool_source_tag,
+                "FILTER",
+                "VAF",
+                "Allele",
+                "Consequence",
+                "IMPACT",
+                "SYMBOL",
+                "Gene",
+                "Feature_type",
+            ]
+        )
+        empty.write_csv(output, separator="\t", null_value="NA")
+    else:
+        df: pl.DataFrame = pl.read_csv(
+            input_tsv,
+            separator="\t",
+            infer_schema_length=None,
+            null_values=["NA", "."],
+        )
+        print(f"Original shape: {df.shape}")
+        grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
+        df = standard_filters(
+            df,
+            min_tumor_depth=min_tumor_depth,
+            max_normal_depth=max_normal_depth,
+            min_vaf=min_vaf,
+            accepted_filters=accepted_filters,
+        )
+        print(f"After standard_filters: {df.shape}")
+        df = resolve_transcripts(
+            df,
+            grouping_cols,
+            impact=impact,
+            canonical=canonical,
+            informative=informative,
+        )
+        print(f"After resolve_transcripts: {df.shape}")
+        df = merge_variant_calls(
+            df,
+            grouping_cols,
+            tool_source_tag=tool_source_tag,
+            minimum_callers=min_callers,
+            vaf_adaptive=vaf_adaptive,
+        )
+        print(f"After merge_variant_calls: {df.shape}")
+        if ignore_regions:
+            print(f"Before filtering by regions in {ignore_regions}: {df.shape}")
+            df = region_filter(df, ignore_regions, chr_col, start_col, end_col)
+            print(f"After filtering by regions in {ignore_regions}: {df.shape}")
+        df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
+            empty_string2null
+        ).write_csv(output, separator="\t", null_value="NA")
