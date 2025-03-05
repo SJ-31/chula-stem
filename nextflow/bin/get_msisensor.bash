@@ -50,7 +50,7 @@ if (summary\$Number_of_Unstable_Sites > 0) {
   cn <- c('chromosome', 'start', 'stop', 'gene_start', 'gene_stop', 'gene_name', 'left_flank_bases', 'repeat_times', 'repeat_unit_bases', 'right_flank_bases', 'pro_p', 'pro_q', 'CovReads', 'threshold')
   empty <- as.list(rep(NA, length(cn)))
   names(empty) <- cn
-  result <- as_tibble(empty)
+  result <- as_tibble(empty) |> slice(2)
 }
 write_tsv(result, \"${output}\")
 "

@@ -11,6 +11,13 @@ t2tb <- function(x, names = "rowname") {
     as_tibble()
 }
 
+empty_tibble <- function(headers) {
+  tmp <- matrix(NA, nrow = 1, ncol = length(headers))
+  colnames(tmp) <- headers
+  tib <- as_tibble(tmp)
+  dplyr::slice(tib, 2)
+}
+
 ensembl2entrez <- function(df) {
   mart <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
   columns <- colnames(df)

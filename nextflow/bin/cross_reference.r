@@ -1,7 +1,10 @@
 #!/usr/bin/env Rscript
-
-library(tidyverse)
-library(GenomicRanges)
+suppressMessages({
+  library(tidyverse)
+  library(GenomicRanges)
+  R_SRC <- Sys.getenv("R_SRC")
+  source(paste0(R_SRC, "/", "utils.R"))
+})
 
 ##' Identify overlapping genomic ranges stored in tibbles x and y,
 ##'   for a specific chromosome and that are above a specific cutoff
@@ -44,8 +47,21 @@ overlapping_join <- function(
 }
 
 cross_reference_cnv <- function(input, reference, clingen, wc) {
-  data <- read_tsv(input) |>
-    filter(!is.na(Start) & !is.na(End))
+  headers <- c(
+    "VariantID", "Chromosome", "Type",
+    "Classification", "Known or predicted dosage-sensitive genes",
+    "All protein coding genes",
+    "accession", "source", "ClinGen_report", "Start", "End", "Total", "score",
+    "1A-B", "2A", "2B", "2C", "2D", "2E",
+    "2F", "2G", "2H", "2I", "2J", "2K", "2L", "3",
+    "4A", "4B", "4C", "4D", "4E", "4F-H", "4I", "4J", "4K",
+    "4L", "4M", "4N", "4O", "5A", "5B", "5C", "5D", "5E", "5F", "5G", "5H", "p_overlap"
+  )
+  data <- read_tsv(input)
+  if (nrow(data) == 0) {
+    return(empty_tibble(headers))
+  }
+  data <- data |> filter(!is.na(Start) & !is.na(End))
   ref <- read_tsv(reference) |>
     filter(!is.na(start) & !is.na(end)) |>
     mutate(id = row_number())
@@ -72,8 +88,20 @@ cross_reference_cnv <- function(input, reference, clingen, wc) {
   result
 }
 
+
 cross_reference_msi <- function(input, reference, clingen, wc) {
-  data <- read_tsv(input) |>
+  headers <- c(
+    "VariantID", "chromosome", "gene_name",
+    "left_flank_bases", "repeat_unit_bases", "right_flank_bases",
+    "accession", "source", "ClinGen_report", "Start", "End",
+    "gene_start", "gene_stop", "repeat_times", "difference",
+    "P_value", "FDR", "rank", "p_overlap"
+  )
+  data <- read_tsv(input)
+  if (nrow(data) == 0) {
+    return(empty_tibble(headers))
+  }
+  data <- data |>
     filter(!is.na(start) & !is.na(end)) |>
     mutate(VariantID = row_number()) |>
     dplyr::rename(Start = "start", End = "stop")
@@ -112,6 +140,9 @@ cross_reference <- function(input, reference, type, clingen) {
     result <- cross_reference_cnv(input, reference, clingen, wanted_cols)
   } else if (str_to_lower(type) == "msi") {
     result <- cross_reference_msi(input, reference, clingen, wanted_cols)
+  }
+  if (nrow(result) == 0) {
+    return(result)
   }
   if (!missing(clingen)) {
     result <- dplyr::rename(result, ClinGen_report = "ONLINE REPORT")
