@@ -44,7 +44,10 @@ prepare_counts <- function(dge, type) {
   } else if (type == "log2_scaled") {
     cur_counts <- scale(log2(dge$counts + 1), center = TRUE, scale = TRUE)
   } else if (str_detect(type, "tpm")) {
-    cur_counts <- DGEobj.utils::convertCounts(dge$counts, unit = "TPM", geneLength = gene_lengths, log = log)
+    cur_counts <- DGEobj.utils::convertCounts(dge$counts,
+      unit = "TPM", geneLength = gene_lengths,
+      log = log, prior.count = 1
+    )
   } else if (type == "scaled") {
     cur_counts <- scale(dge$counts, center = TRUE, scale = TRUE)
   } else if (type == "log2") {
@@ -59,17 +62,6 @@ prepare_counts <- function(dge, type) {
     as_tibble()
 }
 
-replace_ensembl_ids <- function(df, new_id_col) {
-  kept <- colnames(df)
-  merged <- inner_join(df, M$id_mapping, by = join_by(x$gene_id == y$ensembl)) |>
-    select(-gene_id) |>
-    rename(c("gene_id" = new_id_col)) |>
-    group_by(gene_id) |>
-    mutate(across(where(is.numeric), mean)) |>
-    ungroup() |>
-    distinct(gene_id, .keep_all = TRUE)
-  merged |> select(all_of(kept))
-}
 
 QUANT_TYPES <- c(
   ## "edgeR_normalized_cpm",
@@ -87,9 +79,9 @@ NAMING_SCHEMES <- list(
   ensembl = \(x) x,
   tulip = \(x) {
     tb <- x |>
-      select(gene_id, where(is.numeric)) |>
+      dplyr::select(gene_id, where(is.numeric)) |>
       left_join(M$id_mapping, by = join_by(x$gene_id == y$ensembl)) |>
-      select(-entrez) |>
+      dplyr::select(-entrez) |>
       relocate(gene_name, .after = gene_id)
     tb
   },
@@ -119,7 +111,7 @@ main_writer <- function(dge, meta, outdir, quant_types, prefix, filter = TRUE,
         # Separates dataset into tumor types before normalization (relevant to advanced
         # normalization e.g. edgeR)
         t <- unique_tumor_types[i]
-        cur_type <- meta |> filter(tumor_type == t)
+        cur_type <- meta |> dplyr::filter(tumor_type == t)
         if (filter) {
           cur <- dge[, cur_type$cases] |> filter_fn()
         } else {
@@ -129,14 +121,18 @@ main_writer <- function(dge, meta, outdir, quant_types, prefix, filter = TRUE,
         all[[t]] <- cur_counts
         tumor_type <- c(tumor_type, rep(t, ncol(cur_counts)))
       }
-      all_samples <- reduce(all, \(x, y) left_join(x, y, by = join_by(gene_id)))
-      to_write <- NAMING_SCHEMES[[n]](all_samples)
+      all_samples <- purrr::reduce(all, \(x, y) left_join(x, y, by = join_by(gene_id)))
+      to_write <- NULL
+      try(to_write <- NAMING_SCHEMES[[n]](all_samples), silent = TRUE)
       outfile <- here(outdir, q, glue("{prefix}-{q}-{n}.csv"))
-      if (transpose) {
-        transposed <- U$transpose(to_write, "gene_id") |> cbind(tumor_type)
-        write.csv(transposed, outfile)
-      } else {
-        write_csv(to_write, outfile)
+      if (!is.null(to_write)) {
+        warning(glue("Attempt to write {outfile} failed!"))
+        if (transpose) {
+          transposed <- U$transpose(to_write, "gene_id") |> cbind(tumor_type)
+          write.csv(transposed, outfile)
+        } else {
+          write_csv(to_write, outfile)
+        }
       }
     }
   }
@@ -144,7 +140,7 @@ main_writer <- function(dge, meta, outdir, quant_types, prefix, filter = TRUE,
 
 ## chula_tpm <- read_rds(M$chula_tpm_file) |>
 ##   DGEList(samples = chula_meta, group = chula_meta$tumor_type)
-## main_writer(chula_tpm, chula_meta, here(M$out, "kallisto_tpm"), "log2", "chula")
+## main_writer(chula_tpm, chula_meta, M$out, "log2", "chula_tpm")
 
 ## chula_tpm_counts <- read_rds(M$chula_count_tpm_file) |>
 ##   DGEList(samples = chula_meta, group = chula_meta$tumor_type)
@@ -152,20 +148,28 @@ main_writer <- function(dge, meta, outdir, quant_types, prefix, filter = TRUE,
 
 ## main_writer(chula_counts, chula_meta, M$out, c("log2_fpkm", "fpkm"), "chula")
 
-main_writer(tcga_counts, tcga_meta, M$out, c(
-  "log2_scaled",
-  "scaled",
-  "log2_tpm",
-  "tpm",
-  "log2_fpkm"
-), "tcga")
+## main_writer(tcga_counts, tcga_meta, M$out, c(
+##   "log2_scaled",
+##   "scaled",
+##   "log2_tpm"
+##   ## "tpm",
+##   ## "log2_fpkm"
+## ), "tcga")
+
+firehose_counts <- readRDS(here(M$out, "firehose_counts.rds"))
+firehose_meta <- as_tibble(firehose_counts$samples)
+main_writer(firehose_counts, firehose_meta, M$out, c("log2", "tpm", "log2_fpkm", "log2_tpm"), "firehose")
+
+public_counts <- readRDS(here(M$out, "public_counts.rds"))
+public_meta <- as_tibble(public_counts$samples)
+main_writer(public_counts, public_meta, M$out, c("log2_tpm", "tpm", "log2_fpkm"), "public")
 
 ## main_writer(tcga_counts, tcga_meta, M$out, "fpkm_uq", "tcga", name_as = "tulip", transpose = FALSE)
 
 # <2025-02-04 Tue> Try to quantile-normalize the tcga data, because this appears to be
 # what Firehose does
 # See https://broadinstitute.atlassian.net/wiki/spaces/GDAC/pages/844334346/Documentation
-## qn_tcga <- qn_counts(tcga_counts)
-## main_writer(qn_tcga, tcga_meta, M$out, c(
-##   "log2_scaled", "scaled"
-## ), "qn-tcga", filter = FALSE)
+qn_tcga <- qn_counts(tcga_counts)
+main_writer(qn_tcga, tcga_meta, M$out, c(
+  "log2_scaled", "scaled"
+), "qn-tcga", filter = FALSE)
