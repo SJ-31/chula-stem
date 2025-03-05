@@ -28,9 +28,11 @@ process CONCAT_VCF {
         i=0
         for v in *.vcf.gz; do
             name="\${i}.bcf.gz"
-            bcftools annotate -x 'INFO/HOMLEN,INFO/SVLEN,FORMAT/SR' "\${v}" -O b > "\${name}"
-            bcftools index "\${name}"
-            i=\$((i+1))
+            if [[ -s "\${v}" ]]; then
+                bcftools annotate -x 'INFO/HOMLEN,INFO/SVLEN,FORMAT/SR' "\${v}" -O b > "\${name}"
+                bcftools index "\${name}"
+                i=\$((i+1))
+             fi
         done
 
         bcftools concat -a *.bcf.gz -O z -o ${output}
