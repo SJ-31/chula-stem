@@ -1,6 +1,7 @@
 process GRIDSS {
     ext version: "2.13.2"
 
+    label "big_mem"
     publishDir "$meta.out", mode:"copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
