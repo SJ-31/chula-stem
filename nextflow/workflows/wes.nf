@@ -170,10 +170,8 @@ workflow whole_exome {
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)
         .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
-        [["filename": id,
-          "out": "${params.outdir}/${id}/annotations",
-          "log": "${params.logdir}/${id}/annotations"], it]
-        })
+              [["filename": id, "id": id], it]
+            }).map({ newOutPath(it, "annotations") })
 
     /*
      * Variant annotation
@@ -182,6 +180,7 @@ workflow whole_exome {
                                   ["suffix": "VEP_small",
                                    "variant_class": "small",
                                    "qc": params.small_qc])
+        .map({ newOutPath(it, "annotations") })
     to_vep_sv = Utl.modifyMeta(sv_all,
                                ["suffix": "VEP_SV", "variant_class": "sv",
                                 "qc": params.sv_qc])
@@ -201,10 +200,9 @@ workflow whole_exome {
     CROSS_REFERENCE_CNV(Utl.addSuffix(CLASSIFY_CNV.out.tsv, "CR_CNV"),
                         "CNV", params.ref.clingen_dosage,
                         params.ref.cnv_reference, 8)
-    to_cr_msi = Utl.modifyMeta(MSISENSORPRO.out.tsv,
-                               [suffix: "CR_MSI",
-                                out: { "${params.outdir}/${it.id}/annotations" },
-                                log: { "${params.logdir}/${it.id}/annotations" } ])
+
+    to_cr_msi = Utl.modifyMeta(MSISENSORPRO.out.tsv, [suffix: "CR_MSI"])
+        .map({ newOutPath(it, "annotations") })
     CROSS_REFERENCE_MSI(to_cr_msi, "MSI", params.ref.clingen_gene,
                         params.ref.msi_reference, 8)
 
@@ -249,12 +247,11 @@ workflow whole_exome {
                    msisensor_pro: it[5],
                    civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
                    pandrugs2_cache: params.ref.pandrugs2_cache ? params.ref.pandrugs2_cache : "pandrugs2_cache.json",
-                   cosmic_reference: params.ref.cosmic_reference], ]})
+                   cosmic_reference: params.ref.cosmic_reference]]})
 
-    to_report = Utl.modifyMeta(Utl.delId(Utl.getId(others, true).join(vep_to_report))
-                               .map({ [it[0], it[1] + it[2]] }),
-                               [out: { "${params.outdir}/${it.id}" },
-                                log: { "${params.logdir}/${it.id}" }])
+    to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report))
+        .map({ [it[0], it[1] + it[2]] }).map({ newOutPath(it, "") })
+
     caches = []
     REPORT(to_report, caches, "variant_calling", 8)
 
