@@ -47,9 +47,9 @@ workflow whole_exome {
                   "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
     }
     def nullIfNotNum = { it.text.isNumber() ? it.text : null }
-    def replaceOut = { [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
-                                 "log": "${params.logdir}/${it[0].id}/metrics"],
-                        it[1], it[2]] }
+    def newOutPath = { ch, path ->
+        [ch[0] + ["out": "${params.outdir}/${ch[0].id}/${path}",
+                   "log": "${params.logdir}/${ch[0].id}/${path}"]] + ch[1..-1] }
     /*
      * Preprocessing
      */
@@ -58,15 +58,14 @@ workflow whole_exome {
     // After preprocessing, branch data into tumor and normal then pair up by id and join with
     //  index
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
-    normals = branched.normal.map { [it[0].id,
-                                        ["type": "paired",
-                                        "id": it[0].id,
-                                        "out": "${params.outdir}/${it[0].id}/paired",
-                                        "RGSM_normal": it[0].RGSM,
-                                        "filename": it[0].id,
-                                        "log": "${params.logdir}/${it[0].id}/paired"],
-                                        it[1]] }
-    tumors = branched.tumor.map { [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
+    normals = Utl.getId(branched.normal
+                        .map({ [["type": "paired",
+                                 "id": it[0].id,
+                                 "RGSM_normal": it[0].RGSM,
+                                 "filename": it[0].id],
+                                it[1]] })
+                        .map({newOutPath(it, "paired")}), true)
+    tumors = branched.tumor.map({ [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] })
     indices = Utl.getId(PREPROCESS_FASTQ.out.bam_index).groupTuple()
     paired = normals.join(tumors)
         .map({ [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] }) // Merge the maps
@@ -180,7 +179,8 @@ workflow whole_exome {
      * Variant annotation
      */
     to_vep_small = Utl.modifyMeta(small_all,
-                                  ["suffix": "VEP_small", "variant_class": "small",
+                                  ["suffix": "VEP_small",
+                                   "variant_class": "small",
                                    "qc": params.small_qc])
     to_vep_sv = Utl.modifyMeta(sv_all,
                                ["suffix": "VEP_SV", "variant_class": "sv",
@@ -214,7 +214,7 @@ workflow whole_exome {
 
     to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
                                [PREPROCESS_FASTQ.out.bam_index],
-                               ["id", "type"]).map(replaceOut)
+                               ["id", "type"]).map({ newOutPath(it, "metrics") })
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,

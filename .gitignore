@@ -152,3 +152,5 @@ docs
 /tests/test.vcf
 /tests/report_params_no_therapy.json
 /extras/
+/nextflow/bin/Rscript
+/nextflow/.swp
