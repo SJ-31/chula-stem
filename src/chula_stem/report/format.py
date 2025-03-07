@@ -396,7 +396,10 @@ def therapy_fmt(
     dfs: list = []
     for v in variant_spec:
         gene_col: str = v["gene_col"]
-        current: pl.DataFrame = v["df"].select(gene_col)
+        current: pl.DataFrame = v["df"]
+        if current.is_empty():
+            continue
+        current = current.select(gene_col)
         if v.get("is_list"):
             current = (
                 current.with_columns(pl.col(gene_col).str.split(v["separator"]))

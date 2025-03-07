@@ -165,8 +165,6 @@ class VariantCallingReport(ResultsReport):
             "repeat": repeat_style(),
             "sv": sv_style(),
         }
-        if plot:
-            self.plot_cnvkit(cnvkit_cnr, cnvkit_cns)
 
         gene_spec = [
             {"file": vep_small, "column": "SYMBOL"},
@@ -469,18 +467,18 @@ class VariantCallingReport(ResultsReport):
             onFirstPage=decorator,
         )
 
-    @staticmethod
-    def plot_cnvkit(cnr: str, cns: str) -> None:
-        sizes = {"ncol": 3, "height": 30, "dpi": 200, "width": 20}
-        file = "cnvkit.png"
-        # TODO: <2025-01-16 Thu> replace this with better fn
-        plot_cnvkit(cnr, cns, None, sizes, file)
-        doc: Document = pymupdf.open()
-        page = doc.new_page()
-        with open(file, "rb") as pic:
-            img = pic.read()
-            page.insert_image(page.rect, stream=img)
-        doc.save("cnvkit.pdf")
+    # @staticmethod
+    # def plot_cnvkit(cnr: str, cns: str) -> None:
+    #     sizes = {"ncol": 3, "height": 30, "dpi": 200, "width": 20}
+    #     file = "cnvkit.png"
+    #     # TODO: <2025-01-16 Thu> replace this with better fn
+    #     plot_cnvkit(cnr, cns, None, sizes, file)
+    #     doc: Document = pymupdf.open()
+    #     page = doc.new_page()
+    #     with open(file, "rb") as pic:
+    #         img = pic.read()
+    #         page.insert_image(page.rect, stream=img)
+    #     doc.save("cnvkit.pdf")
 
     def build(self) -> None:
         """Create pdf files for all report elements individually, concatenate them
