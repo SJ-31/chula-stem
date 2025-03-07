@@ -122,7 +122,7 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
         msisensor_path, separator="\t", null_values="NA", infer_schema_length=None
     )
     if df.is_empty():
-        return tuple([empty_table(Rename.repeat)] * 3)
+        return tuple([empty_table(Rename.repeat.values())] * 3)
     df = (
         add_loc(df, start_col="Start", end_col="End")
         .with_columns(
@@ -238,7 +238,18 @@ def vep_fmt(
     """
     df: pl.DataFrame = pl.read_csv(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
-    ).with_columns(
+    )
+    if variant_class == "sv":
+        rename: dict = Rename.sv
+        try:
+            df = df.drop("VAF")
+        except:
+            pass
+    else:
+        rename: dict = Rename.snp
+    if df.is_empty():
+        return tuple([empty_table(rename.values())] * 3)
+    df = df.with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
     )
     if existing_variants:
@@ -249,14 +260,6 @@ def vep_fmt(
             .len()
             >= 1
         )
-    if variant_class == "sv":
-        rename: dict = Rename.sv
-        try:
-            df = df.drop("VAF")
-        except:
-            pass
-    else:
-        rename: dict = Rename.snp
     clinsig: str = Rename.snp["CLIN_SIG"]
     wanted_cols: list = list(rename.values())
     df = df.drop("Gene").rename(rename)
