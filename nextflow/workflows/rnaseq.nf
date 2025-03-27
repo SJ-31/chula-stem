@@ -4,6 +4,8 @@ include { STAR_FUSION } from "../modules/star_fusion.nf"
 include { MULTIQC } from "../modules/multiqc.nf"
 include { DUPRADAR } from "../modules/dupradar.nf"
 include { PICARD } from "../modules/picard.nf"
+include { HTSEQ_COUNT } from "../modules/htseq_count.nf"
+include { SALMON } from "../modules/salmon.nf"
 include { COMBINE_COUNTS } from "../modules/combine_counts.nf"
 
 workflow rnaseq {
@@ -16,9 +18,18 @@ workflow rnaseq {
     // params.strandedness is forward|reverse|unstranded
     KALLISTO(PREPROCESS_FASTQ.out.trimmed, params.ref.kallisto_index,
              params.strandedness, 2)
+    HTSEQ_COUNT(PREPROCESS_FASTQ.out.bam, params.ref.genome_gff, "pos",
+                params.strandedness, 2)
+
+    // params.relative_orientation is inward|outward|matching
+    SALMON(PREPROCESS_FASTQ.out.trimmed, params.ref.salmon_index, "",
+           params.genome_gff, params.strandedness, params.relative_orientation, 2)
+
     if (params.detect_fusion) {
         STAR_FUSION(PREPROCESS_FASTQ.out.chimeric, params.ref.star_lib, 2)
     }
+
+
     to_combine = PREPROCESS_FASTQ.out.counts.map({ ["sample": it[0].id,
                                                     "type": it[0].type,
                                                     "file": it[1]] })

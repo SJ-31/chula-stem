@@ -6,7 +6,7 @@ process HTSEQ_COUNT {
 
     input:
     tuple val(meta), path(alignments)
-    val(reference)
+    val(reference) // Wants genome reference as gtf
     val(sort_order) // pos (position) or name
     val(strandedness)
     val(module_number)
