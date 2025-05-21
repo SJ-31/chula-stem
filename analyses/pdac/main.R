@@ -80,5 +80,5 @@ ACCEPTED_CONSEQUENCE <- c(
   "missense_variant", "frameshift_variant",
   "downstream_gene_variant", "upstream_gene_variant",
   "stop_gained", "splice_region_variant", "inframe_deletion",
-  "splice_donor_5th_base_variant"
+  "splice_donor_5th_base_variant", "NMD_transcript_variant"
 )

@@ -25,7 +25,9 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
 IGNORED_VARIANTS <- c(
   "non_coding_transcript_variant",
   "non_coding_transcript_exon_variant",
-  "incomplete_terminal_codon_variant"
+  "incomplete_terminal_codon_variant",
+  "intron_variant",
+  "3_prime_UTR_variant"
 )
 
 recode_var_types <- function(types) {
@@ -44,7 +46,6 @@ recode_var_types <- function(types) {
 }
 
 tmb_merged <- vep_data |>
-  filter(!key %in% IGNORED_VARIANTS) |>
   filter(key %in% ACCEPTED_CONSEQUENCE) |>
   mutate(
     sample = str_extract(sample, "P[0-9_]+"),
@@ -143,7 +144,7 @@ sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
 target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
 
-replicate_figure <- merged |>
+genes_filtered <- merged |>
   dplyr::filter(SYMBOL %in% target_genes)
 n_samples <- sbs$sample |>
   unique() |>
@@ -151,32 +152,30 @@ n_samples <- sbs$sample |>
 
 ## *** Add filter
 ## --- CODE BLOCK ---
-filter_version <- "CONSEQUENCE"
+filter_version <- "CLIN_SIG"
 if (filter_version == "CLIN_SIG") {
   accepted_clinsig <- c(
     "pathogenic", "likely_pathogenic", "association"
   )
-  replicate_figure <- replicate_figure |>
+  replicate_figure <- genes_filtered |>
     filter(map_lgl(CLIN_SIG, \(x) length(intersect(x, accepted_clinsig)) > 0))
 } else if (filter_version == "CONSEQUENCE") {
-  replicate_figure <- filter_known(replicate_figure, dbsnp_file)
+  replicate_figure <- filter_known(genes_filtered, dbsnp_file)
   replicate_figure <- mutate(replicate_figure,
     Consequence = lapply(Consequence, \(x) intersect(x, ACCEPTED_CONSEQUENCE))
   ) |>
     filter(map_lgl(Consequence, \(x) length(x) > 0))
 } else if (filter_version == "KNOWN") {
-  replicate_figure <- filter_known(replicate_figure, dbsnp_file)
+  replicate_figure <- filter_known(genes_filtered, dbsnp_file)
   print("Filtering by known variants")
 } else if (filter_version == "MUTECT") {
-  replicate_figure <- replicate_figure |> filter(grepl("mutect2", SOURCE))
+  replicate_figure <- genes_filtered |> filter(grepl("mutect2", SOURCE))
 }
 order <- replicate_figure$SYMBOL |>
   table() |>
   sort(decreasing = TRUE) |>
   names()
 replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
-
-## --- CODE BLOCK ---
 
 sample_freq <- replicate_figure |>
   distinct(SYMBOL, sample, .keep_all = TRUE) |>
@@ -276,10 +275,6 @@ type_legend <- ggpubr::get_legend(tmb_plot)
 ## vaf_legend <- ggpubr::get_legend(r1)
 tmb_plot <- tmb_plot + guides(fill = "none")
 
-## legends <- ggarrange(ggdraw(type_legend), NULL, ggdraw(vaf_legend),
-##   nrow = 1, widths = c(0.5, -0.3, 0.5)
-## )
-
 r1 <- r1 + guides(alpha = "none")
 
 replicate_plot <- ggarrange(
@@ -319,3 +314,49 @@ metric_plot <- replicate_figure |>
   ylab("Log Alternate allele depth") +
   xlab("Gene")
 save_fn(metric_plot, "gene_metrics.png")
+
+
+## * Oncoprint
+
+library(ComplexHeatmap)
+
+oncoprint_allowed <- c(
+  "missense_variant" = "blue",
+  "frameshift_variant" = "red",
+  "downstream_gene_variant" = "green",
+  "upstream_gene_variant" = "brown",
+  "stop_gained" = "yellow",
+  "splice_region_variant" = "#8839ef",
+  "inframe_deletion" = "#e64553"
+)
+
+to_oncoprint <- replicate_figure |>
+  select(sample, SYMBOL, Consequence) |>
+  mutate(Consequence = lapply(Consequence, \(x) intersect(x, names(oncoprint_allowed)))) |>
+  group_by(SYMBOL, sample) |>
+  pivot_wider(
+    names_from = sample, values_from = Consequence,
+    values_fn = \(x) paste0(unique(x[[1]]), collapse = ";")
+  ) |>
+  mutate(across(where(is.character), \(x) replace(x, is.na(x), ""))) |>
+  column_to_rownames(var = "SYMBOL") |>
+  as.matrix()
+
+
+offset <- 1 / length(oncoprint_allowed) / length(oncoprint_allowed)
+alter_fun <- sapply(names(oncoprint_allowed), \(var) {
+  \(x, y, w, h) {
+    grid.rect(
+      x = x,
+      y = y, width = w, height = h / length(oncoprint_allowed),
+      gp = gpar(fill = oncoprint_allowed[var])
+    )
+  }
+}, simplify = FALSE, USE.NAMES = TRUE)
+oncoPrint(to_oncoprint,
+  get_type = \(x) str_split_1(x, ";"),
+  alter_fun = alter_fun, show_column_names = TRUE,
+  col = oncoprint_allowed
+)
+
+## --- CODE BLOCK ---
