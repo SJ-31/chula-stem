@@ -5,6 +5,10 @@ merged <- read_tsv(vaf_merged_file) |>
   mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
 vep_data <- read_tsv(vep_data_file)
 
+var2cons <- read_tsv(vaf_merged_file) |>
+  select(Existing_variation, Consequence, CLIN_SIG) |>
+  separate_longer_delim(Existing_variation, ";") |>
+  distinct(Existing_variation, .keep_all = TRUE)
 
 ## * Format
 
@@ -315,6 +319,41 @@ metric_plot <- replicate_figure |>
   xlab("Gene")
 save_fn(metric_plot, "gene_metrics.png")
 
+## * Summary of known variants
+
+source(here("src", "R", "utils.R"))
+
+clinsig_hierarchy <- c("not_provided" = 0, "pathogenic" = 3, "association" = 1, "likely_pathogenic" = 2)
+
+get_existing_var <- function(tb, symbols) {
+  filter(tb, SYMBOL %in% symbols) |>
+    separate_longer_delim(Existing_variation, ";") |>
+    select(-Consequence, -CLIN_SIG) |>
+    inner_join(var2cons) |>
+    mutate(
+      clinsig = map_chr(CLIN_SIG, \(chars) {
+        splits <- str_split_1(chars, ";")
+        sorted <- clinsig_hierarchy[splits] |> sort(decreasing = TRUE)
+        names(sorted[1])
+      }),
+      Consequence = map_chr(Consequence, \(vec) flatten_by(vec, unique = TRUE, collapse = TRUE))
+    )
+}
+
+targets <- get_existing_var(replicate_figure, target_genes) |>
+  select(-Feature, -where(is.numeric), -CLIN_SIG) |>
+  mutate(SYMBOL = as.character(SYMBOL))
+
+lapply(unique(targets$SYMBOL), \(x) {
+  current <- filter(targets, SYMBOL == x)
+  table(current$Existing_variation) |>
+    as.data.frame() |>
+    write_tsv(here(outdir, glue("{x}_existing_vars.tsv")))
+})
+
+
+# bcftoo
+# TODO: lookup these existing variants
 
 ## * Oncoprint
 
@@ -353,10 +392,10 @@ alter_fun <- sapply(names(oncoprint_allowed), \(var) {
     )
   }
 }, simplify = FALSE, USE.NAMES = TRUE)
-oncoPrint(to_oncoprint,
-  get_type = \(x) str_split_1(x, ";"),
-  alter_fun = alter_fun, show_column_names = TRUE,
-  col = oncoprint_allowed
-)
+## oncoPrint(to_oncoprint,
+##   get_type = \(x) str_split_1(x, ";"),
+##   alter_fun = alter_fun, show_column_names = TRUE,
+##   col = oncoprint_allowed
+## )
 
 ## --- CODE BLOCK ---

@@ -5,6 +5,11 @@ library(glue)
 library(here)
 library(reticulate)
 library(cowplot)
+if (path.expand("~") == "/home/shannc") {
+  use_condaenv("stem-base")
+} else {
+  use_condaenv("base")
+}
 
 utils <- new.env()
 source(here("src", "R", "utils.R"), local = utils)
