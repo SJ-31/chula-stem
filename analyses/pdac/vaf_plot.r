@@ -198,9 +198,9 @@ if (filter_version == "CLIN_SIG") {
     filter(apply(tmp, 1, \(row) {
       symbol <- row["SYMBOL"]
       to_pass <- CURATED_VARIANTS[[symbol]]
-      hgsvp <- row["HGSVp"]
-      hgsvsg <- row["HGVSg"]
-      (hgsvp %in% to_pass) | (hgsvsg %in% to_pass)
+      hgvsp <- row["HGVSp"]
+      hgvsg <- row["HGVSg"]
+      (hgvsp %in% to_pass) | (hgvsg %in% to_pass)
     })) |>
     group_by(subject, SYMBOL) |>
     summarise(
@@ -240,7 +240,6 @@ if (filter_version == "CLIN_SIG") {
     ) |>
     dplyr::rename(sample = subject)
 }
-
 
 order <- replicate_figure$SYMBOL |>
   table() |>
@@ -450,9 +449,13 @@ get_existing_var <- function(tb, symbols) {
     inner_join(var2cons) |>
     mutate(
       clinsig = map_chr(CLIN_SIG, \(chars) {
-        splits <- str_split_1(chars, ";")
-        sorted <- clinsig_hierarchy[splits] |> sort(decreasing = TRUE)
-        names(sorted[1])
+        if (!is.na(chars)) {
+          splits <- str_split_1(chars, ";")
+          sorted <- clinsig_hierarchy[splits] |> sort(decreasing = TRUE)
+          names(sorted[1])
+        } else {
+          ""
+        }
       }),
       Consequence = map_chr(
         Consequence,
@@ -525,9 +528,12 @@ alter_fun <- sapply(
   simplify = FALSE,
   USE.NAMES = TRUE
 )
-## oncoPrint(to_oncoprint,
+
+## oncoPrint(
+##   to_oncoprint,
 ##   get_type = \(x) str_split_1(x, ";"),
-##   alter_fun = alter_fun, show_column_names = TRUE,
+##   alter_fun = alter_fun,
+##   show_column_names = TRUE,
 ##   col = oncoprint_allowed
 ## )
 
