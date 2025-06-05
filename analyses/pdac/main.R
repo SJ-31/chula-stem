@@ -30,13 +30,25 @@ ref_path <- here("analyses", "data_all", "reference")
 dbsnp_file <- here("analyses", "data", "dbSNP_somatic.csv")
 
 if (!file.exists(vaf_merged_file)) {
-  files <- list.files(data_path, pattern = "8-P[0-9_]+-VEP_small.tsv$", recursive = TRUE, full.names = TRUE)
+  files <- list.files(
+    data_path,
+    pattern = "8-P[0-9_]+-VEP_small.tsv$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
   tsvs <- lapply(files, \(x) {
-    tb <- utils$read_with_filename(x, "sample") |> select(
-      sample, Alt_depth,
-      VAF, Feature, SYMBOL, Existing_variation,
-      CLIN_SIG, Consequence, SOURCE
-    )
+    tb <- utils$read_with_filename(x, "sample") |>
+      select(
+        sample,
+        Alt_depth,
+        VAF,
+        Feature,
+        SYMBOL,
+        Existing_variation,
+        CLIN_SIG,
+        Consequence,
+        SOURCE
+      )
     tb
   })
   merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
@@ -62,7 +74,10 @@ filter_known <- function(tb, dbsnp) {
     str_split_1(x, ";")
   })
   in_dbsnp <- tb |>
-    filter(map_lgl(Existing_variation, \(x) length(intersect(x, dbsnp$ID)) > 0)) |>
+    filter(map_lgl(
+      Existing_variation,
+      \(x) length(intersect(x, dbsnp$ID)) > 0
+    )) |>
     select(-Existing_variation)
   bind_rows(in_dbsnp, cosmic) |> distinct()
 }
@@ -70,7 +85,8 @@ filter_known <- function(tb, dbsnp) {
 vaf_heatmap <- function(plot) {
   plot +
     geom_tile(width = 0.95, height = 0.95) +
-    xlab("Sample") + ylab("Gene") +
+    xlab("Sample") +
+    ylab("Gene") +
     theme_grey() +
     theme(
       plot.background = element_blank(),
@@ -82,8 +98,42 @@ vaf_heatmap <- function(plot) {
 }
 
 ACCEPTED_CONSEQUENCE <- c(
-  "missense_variant", "frameshift_variant",
-  "downstream_gene_variant", "upstream_gene_variant",
-  "stop_gained", "splice_region_variant", "inframe_deletion",
-  "splice_donor_5th_base_variant", "NMD_transcript_variant"
+  "missense_variant",
+  "frameshift_variant",
+  "downstream_gene_variant",
+  "upstream_gene_variant",
+  "intron_variant",
+  "3_prime_UTR_variant",
+  "stop_gained",
+  "splice_region_variant",
+  "inframe_deletion",
+  "splice_donor_5th_base_variant",
+  "NMD_transcript_variant"
+)
+
+CURATED_VARIANTS <- list(
+  KRAS = c(
+    "ENSP00000256078.5:p.Gly12Asp",
+    "ENSP00000256078.5:p.Gly12Cys",
+    "ENSP00000256078.5:p.Gly12Val",
+    "12:g.25209283A>G"
+  ),
+  TP53 = c(
+    "ENSP00000269305.4:p.Arg248Gln",
+    "ENSP00000269305.4:p.Gly199Val",
+    "ENSP00000269305.4:p.Arg175His",
+    "ENSP00000269305.4:p.His193Arg",
+    "ENSP00000269305.4:p.Cys275Phe",
+    "ENSP00000269305.4:p.Gly244Asp",
+    "ENSP00000269305.4:p.Gly245Asp",
+    "17:g.7674797T>C"
+    ## "ENSP00000269305.4:p.Pro72Arg" # Cancer association is unclear
+  ),
+  CDKN2A = c(
+    "ENSP00000307101.5:p.His83Arg",
+    "ENSP00000307101.5:p.Gly35Arg",
+    "9:g.21968200C>G"
+  ),
+  SMAD4 = c("ENSP00000341551.3:p.Tyr260Ter", "18:g.51051412G>C"),
+  KMT2C = c("ENSP00000262189.6:p.Lys2797ArgfsTer26")
 )

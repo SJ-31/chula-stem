@@ -64,13 +64,18 @@ TYPE_ORDER <- tmb_merged |>
   arrange(mean) |>
   pluck("key")
 
-prettify <- function(tb) {
-  tb |> mutate(
-    type = map_chr(Consequence, \(x) mode_and_capitalize(x, IGNORED_VARIANTS)),
-    clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
-    clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar)
-    ## type = factor(recode_var_types(type), levels = TYPE_ORDER)
-  )
+prettify <- function(tb, filter_version = "") {
+  if (filter_version != "CURATED") to_ignore <- IGNORED_VARIANTS else
+    to_ignore <- c()
+  tb |>
+    mutate(
+      type = map_chr(
+        Consequence,
+        \(x) mode_and_capitalize(x, to_ignore)
+      ),
+      clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
+      clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar)
+    )
 }
 
 merged <- merged |>
@@ -114,7 +119,8 @@ custom_filtered <- merged |>
 vaf_heatmap <- function(plot) {
   plot +
     geom_tile(width = 0.95, height = 0.95) +
-    xlab("Sample") + ylab("Gene") +
+    xlab("Sample") +
+    ylab("Gene") +
     theme_grey() +
     theme(
       plot.background = element_blank(),
@@ -146,7 +152,16 @@ blank <- custom_filtered |>
 # --- CODE BLOCK ---
 sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
-target_genes <- c("KRAS", "TP53", "MUC5B", "KMT2C", "ARID1A", "SMAD4", "GLI3", "CDKN2A")
+target_genes <- c(
+  "KRAS",
+  "TP53",
+  "MUC5B",
+  "KMT2C",
+  "ARID1A",
+  "SMAD4",
+  "GLI3",
+  "CDKN2A"
+)
 
 genes_filtered <- merged |>
   dplyr::filter(SYMBOL %in% target_genes)
@@ -156,16 +171,19 @@ n_samples <- sbs$sample |>
 
 ## *** Add filter
 ## --- CODE BLOCK ---
-filter_version <- "CLIN_SIG"
+filter_version <- "CURATED"
 if (filter_version == "CLIN_SIG") {
   accepted_clinsig <- c(
-    "pathogenic", "likely_pathogenic", "association"
+    "pathogenic",
+    "likely_pathogenic",
+    "association"
   )
   replicate_figure <- genes_filtered |>
     filter(map_lgl(CLIN_SIG, \(x) length(intersect(x, accepted_clinsig)) > 0))
 } else if (filter_version == "CONSEQUENCE") {
   replicate_figure <- filter_known(genes_filtered, dbsnp_file)
-  replicate_figure <- mutate(replicate_figure,
+  replicate_figure <- mutate(
+    replicate_figure,
     Consequence = lapply(Consequence, \(x) intersect(x, ACCEPTED_CONSEQUENCE))
   ) |>
     filter(map_lgl(Consequence, \(x) length(x) > 0))
@@ -174,7 +192,56 @@ if (filter_version == "CLIN_SIG") {
   print("Filtering by known variants")
 } else if (filter_version == "MUTECT") {
   replicate_figure <- genes_filtered |> filter(grepl("mutect2", SOURCE))
+} else if (filter_version == "CURATED") {
+  tmp <- read_csv(here(outdir, "select_genes_VEP.csv"))
+  replicate_figure <- tmp |>
+    filter(apply(tmp, 1, \(row) {
+      symbol <- row["SYMBOL"]
+      to_pass <- CURATED_VARIANTS[[symbol]]
+      hgsvp <- row["HGSVp"]
+      hgsvsg <- row["HGVSg"]
+      (hgsvp %in% to_pass) | (hgsvsg %in% to_pass)
+    })) |>
+    group_by(subject, SYMBOL) |>
+    summarise(
+      Consequence = list(unique(unlist(lapply(
+        Consequence,
+        \(s) {
+          if (!is.na(s)) {
+            str_split_1(s, "&")
+          } else {
+            ""
+          }
+        }
+      )))),
+      CLIN_SIG = list(unique(unlist(lapply(
+        CLIN_SIG,
+        \(s) {
+          if (!is.na(s)) {
+            str_split_1(s, "&")
+          } else {
+            ""
+          }
+        }
+      )))),
+      Existing_variation = map_chr(
+        Existing_variation,
+        \(x) str_replace_all(x, "&", ";")
+      ),
+      VAF = mean(AF),
+      Alt_depth = mean(map_dbl(AD, \(x) {
+        if (x == ".") {
+          NA
+        } else {
+          splits <- str_split_1(x, ",")
+          as.numeric(splits[length(splits)])
+        }
+      }))
+    ) |>
+    dplyr::rename(sample = subject)
 }
+
+
 order <- replicate_figure$SYMBOL |>
   table() |>
   sort(decreasing = TRUE) |>
@@ -182,11 +249,18 @@ order <- replicate_figure$SYMBOL |>
 replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
 
 sample_freq <- replicate_figure |>
-  distinct(SYMBOL, sample, .keep_all = TRUE) |>
+  distinct(SYMBOL, sample) |>
   group_by(SYMBOL) |>
-  summarise(freq = (round(n() / n_samples, 2) * 100) |> as.character() %>% paste0(., " %"))
+  summarise(
+    freq_raw = (round(n() / n_samples, 2) * 100),
+    freq = freq_raw |>
+      as.character() %>%
+      paste0(., " %")
+  ) |>
+  arrange(desc(freq_raw))
 
-sbs_plot <- sbs |> ggplot(aes(x = sample, y = count, fill = type)) +
+sbs_plot <- sbs |>
+  ggplot(aes(x = sample, y = count, fill = type)) +
   geom_bar(position = "fill", stat = "identity") +
   guides(fill = guide_legend(title = element_blank())) +
   theme_void() +
@@ -204,7 +278,8 @@ tmb_max <- group_by(tmb_merged, sample) |>
 
 tmb_plot <- tmb_merged |>
   ggplot(aes(
-    x = sample, y = value,
+    x = sample,
+    y = value,
     fill = factor(key, levels = TYPE_ORDER)
   )) +
   geom_bar(position = "stack", stat = "identity") +
@@ -213,34 +288,44 @@ tmb_plot <- tmb_merged |>
   theme(
     axis.title.x = element_blank(),
     axis.title.y = element_text(
-      angle = 90, face = "italic", size = axis_title_size,
+      angle = 90,
+      face = "italic",
+      size = axis_title_size,
       margin = margin(1, 0.5, 0, 0, unit = "cm")
     ),
     axis.ticks.length.y.left = unit(5, "points"),
     axis.line.y = element_line(),
-    axis.ticks.y = element_line(), axis.text.y = element_text()
+    axis.ticks.y = element_line(),
+    axis.text.y = element_text()
   ) +
   guides(fill = guide_legend(title = element_blank(), position = "bottom")) +
   scale_fill_paletteer_d(rep_theme, drop = FALSE) +
-  scale_y_continuous(limits = c(0, tmb_max), expand = c(0, 0), breaks = c(0, tmb_max))
+  scale_y_continuous(
+    limits = c(0, tmb_max),
+    expand = c(0, 0),
+    breaks = c(0, tmb_max)
+  )
 
 ## *** Counts plot
 counts_plot <- replicate_figure |>
   distinct(sample, SYMBOL, .keep_all = TRUE) |>
-  prettify() |>
+  prettify(filter_version) |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER))) +
   geom_bar() +
-  scale_y_discrete(limits = rev) +
+  scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
   theme_void() +
   theme(
     axis.text.x = element_text(),
     axis.title.x = element_text(face = "italic", size = axis_title_size),
-    axis.line.x = element_line(), axis.ticks.x = element_line(),
+    axis.line.x = element_line(),
+    axis.ticks.x = element_line(),
     axis.ticks.length.x = unit(5, "points")
   ) +
   scale_x_continuous(
-    position = "top", limits = c(0, n_samples),
-    breaks = c(0, n_samples), expand = c(0, 0)
+    position = "top",
+    limits = c(0, n_samples),
+    breaks = c(0, n_samples),
+    expand = c(0, 0)
   ) +
   xlab("Number of samples") +
   guides(fill = "none") +
@@ -248,13 +333,14 @@ counts_plot <- replicate_figure |>
 
 ## *** Heatmap
 r1 <- replicate_figure |>
-  prettify() |>
+  prettify(filter_version) |>
   ggplot(aes(
-    x = sample, y = SYMBOL, # turned off alpha, was confusing
+    x = sample,
+    y = SYMBOL, # turned off alpha, was confusing
     fill = factor(type, levels = TYPE_ORDER)
   )) |>
   vaf_heatmap() +
-  scale_y_discrete(limits = rev) +
+  scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
   scale_fill_paletteer_d(rep_theme, drop = FALSE) +
   guides(fill = "none") +
   theme(
@@ -263,11 +349,15 @@ r1 <- replicate_figure |>
     axis.title.y = element_text(size = axis_title_size, face = "italic")
   )
 
-r2 <- r1 + scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
-  guides(fill = "none") + theme(axis.ticks.y = element_blank())
+r2 <- r1 +
+  scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
+  guides(fill = "none") +
+  theme(axis.ticks.y = element_blank())
 
 freq_plot <- ggdraw(get_y_axis(r2))
-r3 <- ggdraw(insert_yaxis_grob(r1, get_y_axis(r2),
+r3 <- ggdraw(insert_yaxis_grob(
+  r1,
+  get_y_axis(r2),
   position = "right",
   width = unit(0.03, "null")
 ))
@@ -282,15 +372,35 @@ tmb_plot <- tmb_plot + guides(fill = "none")
 r1 <- r1 + guides(alpha = "none")
 
 replicate_plot <- ggarrange(
-  tmb_plot, NULL, NULL, NULL,
-  NULL, NULL, NULL, NULL,
-  r1, NULL, freq_plot, counts_plot,
-  sbs_plot, NULL, NULL, NULL,
-  ncol = 4, nrow = 4, align = "hv",
-  widths = c(0.7, 0.01, -0.06, 0.3), heights = c(0.2, -0.08, 0.6, 0.2)
+  tmb_plot,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  r1,
+  NULL,
+  freq_plot,
+  counts_plot,
+  sbs_plot,
+  NULL,
+  NULL,
+  NULL,
+  ncol = 4,
+  nrow = 4,
+  align = "hv",
+  widths = c(0.7, 0.01, -0.06, 0.3),
+  heights = c(0.2, -0.08, 0.6, 0.2)
 )
 
-final_rep <- ggarrange(replicate_plot, type_legend, ncol = 1, heights = c(0.9, 0.1))
+final_rep <- ggarrange(
+  replicate_plot,
+  type_legend,
+  ncol = 1,
+  heights = c(0.9, 0.1)
+)
 final_rep
 
 save_fn(final_rep, "pdac_vaf_replicate.png")
@@ -299,7 +409,9 @@ save_fn(final_rep, "pdac_vaf_replicate.png")
 smm <- replicate_figure |>
   group_by(SYMBOL) |>
   summarise(
-    median = median(Alt_depth), max = max(Alt_depth), min = min(Alt_depth),
+    median = median(Alt_depth),
+    max = max(Alt_depth),
+    min = min(Alt_depth),
     mean_vaf = median(VAF)
   )
 
@@ -309,7 +421,8 @@ metric_plot <- replicate_figure |>
   ggplot(aes(x = SYMBOL, y = log(Alt_depth))) +
   geom_boxplot(aes(fill = mean_vaf)) +
   geom_label(
-    data = smm, aes(x = SYMBOL, y = log(median), label = median),
+    data = smm,
+    aes(x = SYMBOL, y = log(median), label = median),
   ) +
   geom_label(data = smm, aes(x = SYMBOL, y = log(min), label = min)) +
   geom_label(data = smm, aes(x = SYMBOL, y = log(max), label = max)) +
@@ -323,7 +436,12 @@ save_fn(metric_plot, "gene_metrics.png")
 
 source(here("src", "R", "utils.R"))
 
-clinsig_hierarchy <- c("not_provided" = 0, "pathogenic" = 3, "association" = 1, "likely_pathogenic" = 2)
+clinsig_hierarchy <- c(
+  "not_provided" = 0,
+  "pathogenic" = 3,
+  "association" = 1,
+  "likely_pathogenic" = 2
+)
 
 get_existing_var <- function(tb, symbols) {
   filter(tb, SYMBOL %in% symbols) |>
@@ -336,7 +454,10 @@ get_existing_var <- function(tb, symbols) {
         sorted <- clinsig_hierarchy[splits] |> sort(decreasing = TRUE)
         names(sorted[1])
       }),
-      Consequence = map_chr(Consequence, \(vec) flatten_by(vec, unique = TRUE, collapse = TRUE))
+      Consequence = map_chr(
+        Consequence,
+        \(vec) flatten_by(vec, unique = TRUE, collapse = TRUE)
+      )
     )
 }
 
@@ -344,13 +465,12 @@ targets <- get_existing_var(replicate_figure, target_genes) |>
   select(-Feature, -where(is.numeric), -CLIN_SIG) |>
   mutate(SYMBOL = as.character(SYMBOL))
 
-lapply(unique(targets$SYMBOL), \(x) {
-  current <- filter(targets, SYMBOL == x)
-  table(current$Existing_variation) |>
-    as.data.frame() |>
-    write_tsv(here(outdir, glue("{x}_existing_vars.tsv")))
-})
-
+## lapply(unique(targets$SYMBOL), \(x) {
+##   current <- filter(targets, SYMBOL == x)
+##   table(current$Existing_variation) |>
+##     as.data.frame() |>
+##     write_tsv(here(outdir, glue("{x}_existing_vars.tsv")))
+## })
 
 # bcftoo
 # TODO: lookup these existing variants
@@ -371,10 +491,16 @@ oncoprint_allowed <- c(
 
 to_oncoprint <- replicate_figure |>
   select(sample, SYMBOL, Consequence) |>
-  mutate(Consequence = lapply(Consequence, \(x) intersect(x, names(oncoprint_allowed)))) |>
+  mutate(
+    Consequence = lapply(
+      Consequence,
+      \(x) intersect(x, names(oncoprint_allowed))
+    )
+  ) |>
   group_by(SYMBOL, sample) |>
   pivot_wider(
-    names_from = sample, values_from = Consequence,
+    names_from = sample,
+    values_from = Consequence,
     values_fn = \(x) paste0(unique(x[[1]]), collapse = ";")
   ) |>
   mutate(across(where(is.character), \(x) replace(x, is.na(x), ""))) |>
@@ -383,15 +509,22 @@ to_oncoprint <- replicate_figure |>
 
 
 offset <- 1 / length(oncoprint_allowed) / length(oncoprint_allowed)
-alter_fun <- sapply(names(oncoprint_allowed), \(var) {
-  \(x, y, w, h) {
-    grid.rect(
-      x = x,
-      y = y, width = w, height = h / length(oncoprint_allowed),
-      gp = gpar(fill = oncoprint_allowed[var])
-    )
-  }
-}, simplify = FALSE, USE.NAMES = TRUE)
+alter_fun <- sapply(
+  names(oncoprint_allowed),
+  \(var) {
+    \(x, y, w, h) {
+      grid.rect(
+        x = x,
+        y = y,
+        width = w,
+        height = h / length(oncoprint_allowed),
+        gp = gpar(fill = oncoprint_allowed[var])
+      )
+    }
+  },
+  simplify = FALSE,
+  USE.NAMES = TRUE
+)
 ## oncoPrint(to_oncoprint,
 ##   get_type = \(x) str_split_1(x, ";"),
 ##   alter_fun = alter_fun, show_column_names = TRUE,
