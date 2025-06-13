@@ -238,7 +238,9 @@ if (filter_version == "CLIN_SIG") {
         }
       }))
     ) |>
-    dplyr::rename(sample = subject)
+    dplyr::rename(sample = subject) |>
+    distinct() |>
+    filter(Alt_depth >= 10)
 }
 
 order <- replicate_figure$SYMBOL |>
@@ -361,6 +363,31 @@ r3 <- ggdraw(insert_yaxis_grob(
   width = unit(0.03, "null")
 ))
 
+## **** for each variant type
+
+heatmap_helper <- function(tb) {
+  tb |>
+    unnest(cols = c(Consequence)) |>
+    prettify(filter_version) |>
+    ggplot(aes(
+      x = sample,
+      y = SYMBOL,
+      fill = VAF,
+    )) |>
+    vaf_heatmap() +
+    scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
+    scale_fill_paletteer_c("ggthemes::Blue") +
+    theme(
+      axis.title.x = element_blank(),
+      axis.text.x = element_text(size = axis_title_size),
+      axis.title.y = element_text(size = axis_title_size, face = "italic")
+    ) +
+    facet_wrap(~Consequence)
+}
+
+with_separate_cons <- heatmap_helper(replicate_figure)
+save_fn(with_separate_cons, "pdac_manual_review_separate.png")
+
 ## ** Arranging
 
 # Get and remove legends
@@ -465,7 +492,7 @@ get_existing_var <- function(tb, symbols) {
 }
 
 targets <- get_existing_var(replicate_figure, target_genes) |>
-  select(-Feature, -where(is.numeric), -CLIN_SIG) |>
+  select(-where(is.numeric), -CLIN_SIG) |>
   mutate(SYMBOL = as.character(SYMBOL))
 
 ## lapply(unique(targets$SYMBOL), \(x) {
@@ -477,6 +504,77 @@ targets <- get_existing_var(replicate_figure, target_genes) |>
 
 # bcftoo
 # TODO: lookup these existing variants
+
+## * Variant tables
+
+table_outdir <- here(outdir, "vtables")
+to_tables <- tmp |>
+  filter(apply(tmp, 1, \(row) {
+    symbol <- row["SYMBOL"]
+    to_pass <- CURATED_VARIANTS[[symbol]]
+    hgvsp <- row["HGVSp"]
+    hgvsg <- row["HGVSg"]
+    (hgvsp %in% to_pass) | (hgvsg %in% to_pass)
+  })) |>
+  mutate(id = case_when(is.na(HGVSp) ~ HGVSg, .default = HGVSp)) |>
+  select(subject, id, SYMBOL, AF, AD) |>
+  separate_wider_delim(
+    cols = AD,
+    delim = ",",
+    names = c("Ref_depth", "Alt_depth")
+  ) |>
+  group_by(subject, SYMBOL, id) |>
+  summarize(
+    id = first(id),
+    AF = mean(AF),
+    Ref_depth = mean(as.numeric(Ref_depth)),
+    Alt_depth = mean(as.numeric(Alt_depth))
+  ) |>
+  mutate(value = paste0(Ref_depth, ",", Alt_depth, " (", round(AF, 2), ")"))
+
+for (sym in unique(to_tables$SYMBOL)) {
+  to_tables |>
+    filter(SYMBOL == sym) |>
+    select(-SYMBOL) |>
+    pivot_wider(
+      names_from = subject,
+      id_cols = id,
+      values_from = value,
+      values_fill = "-"
+    ) |>
+    mutate(across(where(is.double), \(x) round(x, 2))) |>
+    write_tsv(here(table_outdir, glue("{sym}.tsv")))
+}
+
+## * Caller inconsistencies
+
+tmp |>
+  mutate(AD2 = AD) |>
+  separate_wider_delim(
+    cols = AD2,
+    delim = ",",
+    names = c("Ref_depth", "Alt_depth"),
+    too_few = "align_end",
+    too_many = "drop"
+  ) |>
+  mutate(
+    Ref_depth = as.numeric(Ref_depth),
+    Alt_depth = as.numeric(Alt_depth)
+  ) |>
+  filter(AF != 1 & Ref_depth == 0) |>
+  select(
+    subject,
+    INFO_SOURCE,
+    SYMBOL,
+    HGVSg,
+    HGVSp,
+    Consequence,
+    GT,
+    AD,
+    AF,
+    Existing_variation
+  ) |>
+  write_tsv(here(outdir, "inconsistent_gt_ad.tsv"))
 
 ## * Oncoprint
 

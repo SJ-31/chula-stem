@@ -8,6 +8,13 @@ vep_vcfs <- list.files(
   recursive = TRUE,
   full.names = TRUE
 )
+mutect_vcfs <- list.files(
+  data_path,
+  pattern = "5-P[0-9_]+-Mutect2_filtered.vcf.gz",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
 bams <- list.files(
   data_path,
   pattern = "4-P[0-9_]+_tumor-recal.bam$",
@@ -26,22 +33,56 @@ wanted <- c(
   CDKN2A = "9:21967752-21995301"
 )
 target_file <- here("analyses", "pdac", "target_gene_regions.txt")
+query_str <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/SOURCE"
 
-get_wanted_genes <- function(file) {
+get_wanted_genes_mutect <- function(file) {
+  args <- c("view", glue("--targets-file {target_file}"), file)
+  pref <- utils$basename_no_ext(file) |> str_remove(".vcf")
+  outfile <- glue("{pref}.tsv")
+  cur_outdir <- here(outdir, "mutect_tsv")
+  filtered <- here(cur_outdir, outfile)
+  mutect_calls <- system2("bcftools", args, stdout = TRUE)
+  system2(
+    "bcftools",
+    args = c("query", glue("-f '%CHROM\t%POS\t%REF\t%ALT\t{query_str}'")),
+    input = mutect_calls,
+    stdout = here(cur_outdir, "temp.tsv")
+  )
+  read_tsv(
+    here(cur_outdir, "temp.tsv"),
+    col_names = c(
+      "CHROM",
+      "POS",
+      "REF",
+      "ALT",
+      "AD",
+      "AF",
+      "GT",
+      "PS",
+      "INFO_DP",
+      "SOURCE"
+    )
+  ) |>
+    select(-SOURCE) |>
+    write_tsv(filtered)
+}
+
+get_wanted_genes <- function(file, vep = TRUE) {
   args <- c("view", glue("--targets-file {target_file}"), file)
   pref <- utils$basename_no_ext(file) |> str_remove(".vcf")
   outfile <- glue("{pref}.vcf")
   filtered <- here(outdir, "vcfs", outfile)
   system2("bcftools", args, stdout = filtered)
 
-  query_str <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/SOURCE"
   final_file <- here(outdir, "vcfs", glue("{pref}.tsv"))
   args2 <- c(
     glue("-i {filtered}"),
     glue("-o {final_file}"),
     glue("-q '{query_str}'")
   )
-  system2(here("src", "bash", "get_vep_anno.bash"), args = args2)
+  if (vep) {
+    system2(here("src", "bash", "get_vep_anno.bash"), args = args2)
+  }
 }
 
 get_wanted_bam <- function(file) {
@@ -52,9 +93,33 @@ get_wanted_bam <- function(file) {
 }
 
 if (path.expand("~") != "/home/shannc") {
-  tmp <- lapply(vep_vcfs, get_wanted_genes)
+  ## tmp <- lapply(vep_vcfs, get_wanted_genes)
+  ## tmp <- lapply(mutect_vcfs, get_wanted_genes_mutect)
   ## tmp <- lapply(bams, get_wanted_bam)
 }
+
+get_mutect_inconsistent <- function(file) {
+  cur_outdir <- here(outdir, "mutect_tsv")
+  files <- list.files(cur_outdir)
+  subjects <- str_extract(files, "5-(P[0-9_]+)-.*", group = 1)
+  lapply(files, \(x) {
+    read_tsv(here(cur_outdir, x)) |> mutate(AF = as.double(AF))
+  }) |>
+    `names<-`(subjects) |>
+    list_rbind(names_to = "subject") |>
+    filter(grepl("^0,", AD) & AF != 1) |>
+    write_tsv(file)
+}
+
+mutect_inconsistent <- read_existing(
+  here(
+    outdir,
+    "mutect2_inconsistent_gt_ad.tsv"
+  ),
+  get_mutect_inconsistent,
+  read_tsv
+)
+
 
 all_vcfs <- list.files(
   here(outdir, "vcfs"),
@@ -137,8 +202,9 @@ combined_anno |>
   geom_tile()
 
 
-cur_symbol <- "KMT2C"
+cur_symbol <- "KRAS"
 current <- combined_anno %>%
+
   filter(SYMBOL == cur_symbol) %>%
   distinct(subject, HGVSc, .keep_all = TRUE) |>
   group_by(HGVSc) |>
@@ -168,4 +234,3 @@ current <- combined_anno %>%
       unlist()
   ) |>
   arrange(desc(n_subjects))
-current
