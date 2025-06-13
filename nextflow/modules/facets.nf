@@ -30,6 +30,7 @@ process FACETS {
     } else {
         size_flag = ""
     }
+    size_flag = ""
     args = task.ext.args.join(" ")
 
     if (check.exists() && check2.exists()) {
@@ -40,10 +41,6 @@ process FACETS {
         """
     } else {
         """
-        if [[ -e ${cnvkit_autobin} ]];
-
-        fi
-
         run-facets-wrapper.R \\
             --counts-file ${counts_file} \\
             --sample-id ${prefix} \\
@@ -61,3 +58,10 @@ process FACETS {
     }
     //
 }
+// <2025-02-27 Thu> There's a bug in the "calculate_ntai" function of copy_number_scores.R
+// This is being
+// It's happening in this snippet:
+//  # Check relative position to centromere
+// if(chrom_segs$AI[1] == 2 & nrow(chrom_segs) != 1 & chrom_segs$end[1] < (sample_chrom_info$centromere[chr])){
+//     segs$AI[which(segs$chrom == chr)][1] = 1 # if the first segment of chromosome is AI and does not extend to centromere --> telomeric AI
+// }

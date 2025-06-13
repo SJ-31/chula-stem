@@ -22,8 +22,9 @@ workflow rnaseq {
                 params.strandedness, 2)
 
     // params.relative_orientation is inward|outward|matching
-    SALMON(PREPROCESS_FASTQ.out.trimmed, params.ref.salmon_index, "",
-           params.genome_gff, params.strandedness, params.relative_orientation, 2)
+    // SALMON(PREPROCESS_FASTQ.out.trimmed, params.ref.salmon_index, "",
+    //        params.genome_gff, params.strandedness, params.relative_orientation, 2)
+    //        BUG: salmon does not recognize files
 
     if (params.detect_fusion) {
         STAR_FUSION(PREPROCESS_FASTQ.out.chimeric, params.ref.star_lib, 2)

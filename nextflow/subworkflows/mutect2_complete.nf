@@ -6,6 +6,7 @@ include { FILTER_MUTECT_CALLS } from "../modules/filter_mutect_calls.nf"
 
 // Subworkflow for somatic variant calling with Gatk's mutect2 and filtering its output
 // according to best practices
+// See https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2
 workflow MUTECT2_COMPLETE {
     take:
     meta_and_bam

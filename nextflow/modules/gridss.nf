@@ -1,5 +1,7 @@
 process GRIDSS {
     ext version: "2.13.2"
+    errorStrategy "ignore" // <2025-03-05 Wed> bug: gridss wasn't formatting
+    // the vcf file correctly
 
     label "big_mem"
     publishDir "$meta.out", mode:"copy", saveAs: params.saveFn

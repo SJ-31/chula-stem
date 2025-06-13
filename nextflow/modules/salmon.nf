@@ -8,6 +8,7 @@ process SALMON {
     tuple val(meta), val(reads_or_bam)
     val(index) // Salmon index
     val(reference) // Must be a reference transcriptome that reads were aligned to
+    // ignored if using reads mode
     val(gene_map) // GTF/GFF file mapping transcripts to genes
     val(strandedness) // foward, reverse or null
     val(relative_orientation) // inward,outward or matching
@@ -56,7 +57,8 @@ process SALMON {
             -i ${index} \\
             -l ${libtype} \\
             -1 ${reads_or_bam[0]} -2 ${reads_or_bam[1]} \\
-            -g ${gene_map}
+            -g ${gene_map} \\
+            -o salmon_quant
 
         mv salmon_quant/quant.sf ${sf}
         mv salmon_quant/quant.genes.sf ${sf}
@@ -68,7 +70,8 @@ process SALMON {
             ${args} \\
             -a ${reads_or_bam} \\
             -t ${reference}  \\
-            -g ${gene_map}
+            -g ${gene_map} \\
+            -o salmon_quant
 
         mv salmon_quant/quant.sf ${sf}
         mv salmon_quant/quant.genes.sf ${sf}
