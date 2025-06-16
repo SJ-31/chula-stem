@@ -1,0 +1,4 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+P82,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC82/PDAC82_1.fastq.gz,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC82/PDAC82_2.fastq.gz,tumor,1,ILLUMINA,D-P82-C,P82_tumor
+P24,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC24/PDAC24_1.fastq.gz,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC24/PDAC24_2.fastq.gz,tumor,1,ILLUMINA,D-P24-C,P24_tumor
+P3,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC3/PDAC3_1.fastq.gz,/data/project/stemcell/PDAC/Exome_PDAC_HN00215149/PDAC3/PDAC3_2.fastq.gz,tumor,1,ILLUMINA,D-P3-C,P3_tumor

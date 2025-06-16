@@ -1,0 +1,3 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+PHcase_1,/data/project/stemcell/shannc/PDAC_PHcase_1/725-71_PHcase1_from_PBMC_DNA_10GB/725-71_PHcase1_from_PBMC_DNA_10GB_1.fq.gz,/data/project/stemcell/shannc/PDAC_PHcase_1/725-71_PHcase1_from_PBMC_DNA_10GB/725-71_PHcase1_from_PBMC_DNA_10GB_2.fq.gz,normal,1,ILLUMINA,PHcase_1-normal,PHcase_1-normal
+PHcase_1,/data/project/stemcell/shannc/PDAC_PHcase_1/725-69_PDAC_organoid_PHcase1_DNA_10GB/725-69_PDAC_organoid_PHcase1_DNA_10GB_1.fq.gz,/data/project/stemcell/shannc/PDAC_PHcase_1/725-69_PDAC_organoid_PHcase1_DNA_10GB/725-69_PDAC_organoid_PHcase1_DNA_10GB_2.fq.gz,tumor,1,ILLUMINA,PHCase_1-tumor,PHCase_1-tumor

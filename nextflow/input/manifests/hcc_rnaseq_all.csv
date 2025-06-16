@@ -1,0 +1,13 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name,batch,tumor_type
+P13,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R13CH_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R13CH_2.fastq.gz,tumor,1,ILLUMINA,D-P13-C,P13_tumor,hepatocyte_media,HCC
+P17,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R17CH_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R17CH_2.fastq.gz,tumor,1,ILLUMINA,D-P17-C,P17_tumor,hepatocyte_media,HCC
+P19,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R19CH_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R19CH_2.fastq.gz,tumor,1,ILLUMINA,D-P19-C,P19_tumor,hepatocyte_media,HCC
+P1,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R1CH_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R1CH_2.fastq.gz,tumor,1,ILLUMINA,D-P1-C,P1_tumor,hepatocyte_media,HCC
+P3,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R3C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R3C_2.fastq.gz,tumor,1,ILLUMINA,D-P3-C,P3_tumor,default,CCA&HCC
+P5C3D,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R5C3D_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R5C3D_2.fastq.gz,tumor,1,ILLUMINA,D-P5C3D-C,P5C3D_tumor,default,HCC
+P8,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R8C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R8C_2.fastq.gz,tumor,1,ILLUMINA,D-P8-C,P8_tumor,default,HCC
+P9,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R9C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R9C_2.fastq.gz,tumor,1,ILLUMINA,D-P9-C,P9_tumor,default,CCA&HCC
+P22,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R_22_C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/HCC_R_22_C_2.fastq.gz,tumor,1,ILLUMINA,D-P22-C,P22_tumor,hepatocyte_media,HCC
+P14,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_14_C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_14_C_2.fastq.gz,tumor,1,ILLUMINA,D-P14-C,P14_tumor,hepatocyte_media,HCC
+P34,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_34_C_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_34_C_2.fastq.gz,tumor,1,ILLUMINA,D-P34-C,P34_tumor,hepatocyte_media,HCC
+P3Cyts,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_3_Cyts_1.fastq.gz,/data/project/stemcell/shannc/HCC/RNASeq/R_HCC_3_Cyts_2.fastq.gz,tumor,1,ILLUMINA,D-P3Cyts-C,P3Cyts_tumor,default,CCA

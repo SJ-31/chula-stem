@@ -1,0 +1,2 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+P17,/data/project/stemcell/HCC/HCC_R17CH/Exome/D_HCC_17_C_1.fastq.gz,/data/project/stemcell/HCC/HCC_R17CH/Exome/D_HCC_17_C_2.fastq.gz,tumor,1,ILLUMINA,D-P17-C,P17_tumor

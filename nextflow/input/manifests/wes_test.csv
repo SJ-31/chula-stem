@@ -1,0 +1,3 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+P1,/data/project/stemcell/CCA/Exome/D-CCA-N22-B_1.trim.fastq.gz,/data/project/stemcell/CCA/Exome/D-CCA-N22-B_2.trim.fastq.gz,normal,1,ILLUMINA,P1-test-normal,P1-normal
+P1,/data/project/stemcell/CCA/Exome/D-CCA-N22-C_1.trim.fastq.gz,/data/project/stemcell/CCA/Exome/D-CCA-N22-C_2.trim.fastq.gz,tumor,1,ILLUMINA,P1-test-tumor,P1-tumor

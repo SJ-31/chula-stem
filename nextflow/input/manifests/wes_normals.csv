@@ -1,0 +1,7 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+HCC_34,/data/project/stemcell/HCC/Exome/D_HCC_34_B_1.fastq.gz,/data/project/stemcell/HCC/Exome/D_HCC_34_B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_34-C,HCC_34_normal
+HCC_22,/data/project/stemcell/HCC/Exome/D-HCC-N22-B_1.fastq.gz,/data/project/stemcell/HCC/Exome/D-HCC-N22-B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_22-C,HCC_22_normal
+HCC_19,/data/project/stemcell/HCC/Exome/HCC_D19B_1.fastq.gz,/data/project/stemcell/HCC/Exome/HCC_D19B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_19-C,HCC_19_normal
+HCC_5,/data/project/stemcell/HCC/Exome/HCC_D5B_1.fastq.gz,/data/project/stemcell/HCC/Exome/HCC_D5B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_5-C,HCC_5_normal
+HCC_8,/data/project/stemcell/HCC/Exome/HCC_D8B_1.fastq.gz,/data/project/stemcell/HCC/Exome/HCC_D8B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_8-C,HCC_8_normal
+HCC_9,/data/project/stemcell/HCC/Exome/HCC_D9B_1.fastq.gz,/data/project/stemcell/HCC/Exome/HCC_D9B_2.fastq.gz,normal,1,ILLUMINA,D-HCC_9-C,HCC_9_normal
