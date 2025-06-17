@@ -17,12 +17,18 @@ class SubjectResults:
         outdir: Path,
         sample_type: str = "tumor",
         up_to: tuple | None = None,
+        make_fastq: bool = True,
     ) -> None:
         self.subject: str = subject
         self.stype: str = sample_type
         self.outdir: Path = outdir.joinpath(self.subject)
         if not self.outdir.exists():
             self.outdir.mkdir()
+        if make_fastq:
+            fastq = self.outdir.joinpath("fastq")
+            fastq.mkdir(exist_ok=True)
+            for i in ("1", "2"):
+                fastq.joinpath(f"{self.subject}_{i}.fastq.gz").write_text("EMPTY")
         self.up_to: tuple | None = (
             up_to  # Tuple indicating to only fill results up to this file e.g.
             # (4, "-recal.bam") to stop making empty files
@@ -209,7 +215,6 @@ class SubjectResults:
                 file.write_text("EMPTY")
             return module_number, suffix
 
-        print(contents)
         filled = {touch_empty(suffix, is_dir) for suffix, is_dir in contents}
         return filled
 
@@ -221,7 +226,7 @@ class SubjectLog(SubjectResults):
         outdir: Path,
         sample_type: str = "tumor",
     ) -> None:
-        super().__init__(subject, outdir, sample_type, up_to=None)
+        super().__init__(subject, outdir, sample_type, up_to=None, make_fastq=False)
 
     @override
     def _fill(self, dir: str, spec: tuple) -> Path | None:
