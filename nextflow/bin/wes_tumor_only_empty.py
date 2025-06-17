@@ -77,7 +77,7 @@ class SubjectResults:
                         (f"_{self.stype}-fastp.json", False),
                         ("_1.fastp.fastq.gz", False),
                         ("_2.fastp.fastq.gz", False),
-                        (f"_{self.stype}-fastp.html"),
+                        (f"_{self.stype}-fastp.html", False),
                     ),
                 ),
                 (
@@ -94,11 +94,11 @@ class SubjectResults:
                 (
                     4,
                     (
-                        (f"{self.stype}-AnalyzeCovariates.pdf", False),
-                        (f"{self.stype}-recal.bam.bai", False),
-                        (f"{self.stype}-recal.bam_1.empty", False),
-                        (f"{self.stype}-recal_1.empty", False),
-                        (f"{self.stype}-recal.bam", False),
+                        (f"_{self.stype}-AnalyzeCovariates.pdf", False),
+                        (f"_{self.stype}-recal.bam.bai", False),
+                        (f"_{self.stype}-recal.bam_1.empty", False),
+                        (f"_{self.stype}-recal_1.empty", False),
+                        (f"_{self.stype}-recal.bam", False),
                     ),
                 ),
             ),
@@ -140,17 +140,17 @@ class SubjectResults:
                 (
                     8,
                     (
-                        (f"{self.stype}-Mosdepth.mosdepth.global.dist.txt", False),
-                        (f"{self.stype}-Mosdepth.mosdepth.region.dist.txt", False),
-                        (f"{self.stype}-Mosdepth.mosdepth.summary.txt", False),
-                        (f"{self.stype}-Mosdepth.per-base.bed.gz", False),
-                        (f"{self.stype}-Mosdepth.per-base.bed.gz.csi", False),
-                        (f"{self.stype}-Mosdepth.regions.bed.gz", False),
-                        (f"{self.stype}-Mosdepth.regions.bed.gz.csi", False),
-                        (f"{self.stype}-Picard_alignment_metrics.txt", False),
-                        (f"{self.stype}-Picard_hs_metrics.txt", False),
+                        (f"_{self.stype}-Mosdepth.mosdepth.global.dist.txt", False),
+                        (f"_{self.stype}-Mosdepth.mosdepth.region.dist.txt", False),
+                        (f"_{self.stype}-Mosdepth.mosdepth.summary.txt", False),
+                        (f"_{self.stype}-Mosdepth.per-base.bed.gz", False),
+                        (f"_{self.stype}-Mosdepth.per-base.bed.gz.csi", False),
+                        (f"_{self.stype}-Mosdepth.regions.bed.gz", False),
+                        (f"_{self.stype}-Mosdepth.regions.bed.gz.csi", False),
+                        (f"_{self.stype}-Picard_alignment_metrics.txt", False),
+                        (f"_{self.stype}-Picard_hs_metrics.txt", False),
                     ),
-                )
+                ),
             ),
         )
 
@@ -209,6 +209,7 @@ class SubjectResults:
                 file.write_text("EMPTY")
             return module_number, suffix
 
+        print(contents)
         filled = {touch_empty(suffix, is_dir) for suffix, is_dir in contents}
         return filled
 
