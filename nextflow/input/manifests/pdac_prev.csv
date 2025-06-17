@@ -1,0 +1,8 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+N45_2,/data/project/stemcell/shannc/output/PDAC/N45_2/fastq/N45_2_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N45_2/fastq/N45_2_2.fastq.gz,tumor,N45_2_C,illumina,lib_N45_2_C,PDAC_N45_2_C
+N51_2,/data/project/stemcell/shannc/output/PDAC/N51_2/fastq/N51_2_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N51_2/fastq/N51_2_2.fastq.gz,tumor,N51_2_C,illumina,lib_N51_2_C,PDAC_N51_2_C
+N56_2,/data/project/stemcell/shannc/output/PDAC/N56_2/fastq/N56_2_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N56_2/fastq/N56_2_2.fastq.gz,tumor,N56_2_C,illumina,lib_N56_2_C,PDAC_N56_2_C
+N59_2,/data/project/stemcell/shannc/output/PDAC/N59_2/fastq/N59_2_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N59_2/fastq/N59_2_2.fastq.gz,tumor,N59_2_C,illumina,lib_N59_2_C,PDAC_N59_2_C
+N68_2,/data/project/stemcell/shannc/output/PDAC/N68_2/fastq/N68_2_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N68_2/fastq/N68_2_2.fastq.gz,tumor,N68_2_B,illumina,lib_N68_2_B,PDAC_N68_2_C
+N76_1,/data/project/stemcell/shannc/output/PDAC/N76_1/fastq/N76_1_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N76_1/fastq/N76_1_2.fastq.gz,tumor,N76_1_C,illumina,lib_N76_1_C,PDAC_N76_1_C
+N80_1,/data/project/stemcell/shannc/output/PDAC/N80_1/fastq/N80_1_1.fastq.gz,/data/project/stemcell/shannc/output/PDAC/N80_1/fastq/N80_1_2.fastq.gz,tumor,N80_1_C,illumina,lib_N80_1_C,PDAC_N80_1_C
