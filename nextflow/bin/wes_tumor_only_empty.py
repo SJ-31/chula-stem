@@ -94,7 +94,7 @@ class SubjectResults:
                     3,
                     (
                         (f"_{self.stype}-dedup.bam", False),
-                        (f"_{self.stype}-dedup_metrics.bam", False),
+                        (f"_{self.stype}-dedup_metrics.txt", False),
                     ),
                 ),
                 (
