@@ -1,4 +1,4 @@
-#!/usr/bin/env ipython
+#!/usr/bin/env python
 
 from collections.abc import Sequence
 from pathlib import Path
@@ -204,8 +204,9 @@ class SubjectResults:
                 print(f"File {file} exists already, skipping...")
             elif dir:
                 file.mkdir()
+                file.joinpath("EMPTY.txt").touch()
             else:
-                file.touch()
+                file.write_text("EMPTY")
             return module_number, suffix
 
         filled = {touch_empty(suffix, is_dir) for suffix, is_dir in contents}
@@ -227,7 +228,7 @@ class SubjectLog(SubjectResults):
         for to_create in spec:
             file = outdir.joinpath(f"{to_create}.log")
             if not file.exists():
-                file.touch()
+                file.write_text("EMPTY")
         return outdir
 
     @override
