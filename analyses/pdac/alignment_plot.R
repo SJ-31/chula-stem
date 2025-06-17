@@ -90,32 +90,23 @@ plot_alignment_as_msa <- function(
     consensus_views = !is.null(ref_str),
     position_highlight = position_highlight,
     ...
-  ) +
-    ggplot2::scale_x_continuous(
-      label = seq(start, end),
-      breaks = seq(1, end - start + 1)
-    ) +
-    ggplot2::theme(
-      axis.text.y = ggplot2::element_blank(),
-      axis.text.x = ggplot2::element_text(angle = -90, hjust = 1, size = 12)
-    )
+  )
 }
 
 
 chrom <- "chr12"
 from <- 25245345
 to <- from + 10
-highlight <- 25245350
+highlight <- c(25245349, 25245350, 25245351)
 
 
-plot_helper <- function(bam_file) {
+plot_helper <- function(bam_file, extract = "4-(P[0-9_]+_tumor)-.*") {
   subject <- basename(bam_file) |>
-    str_extract("4-(P[0-9_]+_tumor)-.*", group = 1)
+    str_extract(extract, group = 1)
   bam <- GenomicAlignments::readGAlignments(
     bam_file,
     param = ScanBamParam(what = c("seq", "flag", "qual"))
   )
-  seqlevels(bam) <- paste0("chr", seqlevels(bam))
   bam <- bam[seqnames(bam) == "chr12", ]
   msa <- plot_alignment_as_msa(
     bam,
@@ -138,5 +129,7 @@ plot_helper <- function(bam_file) {
   )
 }
 
-bams <- list.files(bamdir, pattern = ".bam", full.names = TRUE)
+bams <- list.files(bamdir, pattern = "4-*.bam$", full.names = TRUE)
+bams_old <- list.files(bamdir, pattern = "^N.*.bam$", full.names = TRUE)
 tmp <- lapply(bams, plot_helper)
+tmp <- lapply(bams_old, \(x) plot_helper(x, extract = "(N[0-9_BC]+).bam"))
