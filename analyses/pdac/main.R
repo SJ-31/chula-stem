@@ -116,16 +116,20 @@ CURATED_VARIANTS <- list(
     "ENSP00000256078.5:p.Gly12Asp",
     "ENSP00000256078.5:p.Gly12Cys",
     "ENSP00000256078.5:p.Gly12Val",
+    "ENSP00000256078.5:p.Gly12Arg",
     "12:g.25209283A>G"
   ),
   TP53 = c(
+    # DBD mutations
     "ENSP00000269305.4:p.Arg248Gln",
-    "ENSP00000269305.4:p.Gly199Val",
     "ENSP00000269305.4:p.Arg175His",
+    ## Below unvalidated
+    "ENSP00000269305.4:p.Gly199Val",
     "ENSP00000269305.4:p.His193Arg",
     "ENSP00000269305.4:p.Cys275Phe",
     "ENSP00000269305.4:p.Gly244Asp",
     "ENSP00000269305.4:p.Gly245Asp",
+    #
     "17:g.7674797T>C"
     ## "ENSP00000269305.4:p.Pro72Arg" # Cancer association is unclear
   ),
@@ -134,6 +138,10 @@ CURATED_VARIANTS <- list(
     "ENSP00000307101.5:p.Gly35Arg",
     "9:g.21968200C>G"
   ),
-  SMAD4 = c("ENSP00000341551.3:p.Tyr260Ter", "18:g.51051412G>C"),
+  SMAD4 = c(
+    "ENSP00000341551.3:p.Tyr260Ter",
+    "18:g.51051412G>C",
+    "ENSP00000341551.3:p.Tyr430Ter"
+  ),
   KMT2C = c("ENSP00000262189.6:p.Lys2797ArgfsTer26")
 )

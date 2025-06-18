@@ -448,11 +448,9 @@ def do_call(fn, pars: dict | None):
         return fn(**pars)
 
 
-def read_existing[T](
-    filename: Path,
-    expr: Callable[[Path], T],
-    read_fn: Callable[[Path], T] | None = None,
-) -> T | None:
+def read_existing(
+    filename: Path, expr: Callable, read_fn: Callable | None = None
+) -> None:
     if filename.exists() and read_fn is not None:
         return read_fn(filename)
     elif filename.exists():

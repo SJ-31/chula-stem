@@ -20,6 +20,12 @@ links:
 # * Misc.
 rename:
   remove_chr: "/data/project/stemcell/shannc/reference/rename/remove_chr.tsv"
-  grch38_nums: "/data/project/stemcell/shannc/reference/rename/GRCh38.p14_rename.tsv" # Format is NC_0000001.11 1
+  # chr1 -> 1
+  add_chr: "/data/project/stemcell/shannc/reference/rename/with_chr_rename.tsv"
+  # 1 -> chr1
+  grch38_nums: "/data/project/stemcell/shannc/reference/rename/GRCh38.p14_rename.tsv"
+  # NC_0000001.11 -> 1
+  grch38_chr: "/data/project/stemcell/shannc/reference/rename/GRCh38.p14_rename_chr.tsv"
+  # NC_0000001.11 -> chr1
 
 mutect2_out: "/data/project/stemcell/shannc/tests/wes_test/mutect2/temp.vcf.gz"

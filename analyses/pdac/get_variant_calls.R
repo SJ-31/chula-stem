@@ -1,6 +1,7 @@
 library(tidyverse)
 library(here)
 library(glue)
+source(here("src", "R", "utils.R"))
 source(here("analyses", "pdac", "main.R"))
 vep_vcfs <- list.files(
   data_path,
@@ -18,6 +19,13 @@ mutect_vcfs <- list.files(
 bams <- list.files(
   data_path,
   pattern = "4-P[0-9_]+_tumor-recal.bam$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+pink_bams <- list.files(
+  "/data/project/sirasris_shared",
+  pattern = "recal_data.*.bam$",
   recursive = TRUE,
   full.names = TRUE
 )
@@ -85,17 +93,32 @@ get_wanted_genes <- function(file, vep = TRUE) {
   }
 }
 
-get_wanted_bam <- function(file) {
+get_wanted_bam <- function(
+  file,
+  name_fn = utils$basename_no_ext,
+  target_file = target_file
+) {
   args <- c("view", "-b", "-h", glue("-L {target_file}"), file)
-  pref <- utils$basename_no_ext(file)
+  pref <- name_fn(file)
   bam_out <- here(outdir, "bams", glue("{pref}.bam"))
   system2("samtools", args, stdout = bam_out)
 }
+
 
 if (path.expand("~") != "/home/shannc") {
   ## tmp <- lapply(vep_vcfs, get_wanted_genes)
   ## tmp <- lapply(mutect_vcfs, get_wanted_genes_mutect)
   ## tmp <- lapply(bams, get_wanted_bam)
+  tmp <- lapply(
+    pink_bams,
+    \(f) {
+      get_wanted_bam(
+        f,
+        name_fn = \(x) str_remove(utils$basename_no_ext(x), "recal_data_PDAC_"),
+        target_file = here("analyses", "pdac", "target_kras.txt")
+      )
+    }
+  )
 }
 
 get_mutect_inconsistent <- function(file) {

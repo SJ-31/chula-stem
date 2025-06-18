@@ -5,7 +5,7 @@ Have 10TB of shared space in the =/data/project/stemcell= directory, 500 GB of p
 + cpu24h
 * Data
 All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
-** CRC
+** CRC (Colorectal cancer) COAD-READ
 *** Exome
 + Sequencing platform: NovaSeq 6000
 + Capture kit: SureSelect Human All Exon V6
@@ -47,7 +47,7 @@ The sequences were processed and analyzed by GENEWIZ.
 + *Misc:*
   * Files containing N-W-GF are normal with growth factor
   * Files with the -2 suffix are post-treatment
-** PDAC (Pancreatic ductal adenocarcinoma)
+** PDAC (Pancreatic ductal adenocarcinoma)  PAAD
 *** Exome
 + Sequencing platform:
 + Capture kit: SureSelect Human All Exon V6
@@ -55,7 +55,7 @@ The sequences were processed and analyzed by GENEWIZ.
 + Sequencing platform: [[https://en.mgi-tech.com/products/instruments_info/2/][DNBSEQ-G400]]
 + Capture kit: [[https://en.mgi-tech.com/products/reagents_info/10/][MGIEasy Exome Capture V5]] (made for hg19)
   * <2025-03-03 Mon> The file "MGI_Exome_Capture_V5.bed" in the link above is the *target regions* according to this [[https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=map&hgta_track=exomeProbesets&hgta_table=xGen_Research_Probes_V2&hgta_doSchema=describe+table+schema][UCSC]] document. A bed file for the probe regions doesn't seem to be available
-** HCC (Hepatocellular carcinoma)
+** HCC (Hepatocellular carcinoma) LHC
 + [[+ https://drive.google.com/drive/folders/1-7pRRFO_zJWeztu1Yl_bp5_pKFYWbDOh][Link]]
 *** RNASeq
 - Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])
@@ -68,7 +68,7 @@ The sequences were processed and analyzed by GENEWIZ.
 *** Exome
   * Capture kit: SureSelect Human All Exon V6
   * Sequencing platform: NovaSeq 6000
-** CCA (Cholangiocarcinoma)
+** CCA (Cholangiocarcinoma) CHOL
 *** RNASeq
 TODO: check the library prep
 - Library: TruSeq stranded mRNA (see [[https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/samplepreps_truseq/truseq-stranded-mrna-workflow/truseq-stranded-mrna-workflow-reference-1000000040498-00.pdf][TruSeq Stranded mRNA Reference Guide (Illumina)]])

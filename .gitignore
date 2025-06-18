@@ -13,7 +13,10 @@ analyses/data_all
 analyses/*.pdf
 /nextflow/.nf-test*
 resources/*json
+*.pdf
 *.sif
+*png
+*txt
 *slurm-*.out
 *.vcf.gz*
 *.tsv
