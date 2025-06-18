@@ -28,25 +28,22 @@ params.report_text = ["front_page_details": "${projectDir}/reports/wes_front_pag
                       "disclaimer": "${projectDir}/reports/wes_disclaimer.txt",
                       "front_page_note": "${projectDir}/reports/wes_front_page_note.txt"]
 
-genome_chr = "${refdir}/prev_assembly/" // TODO: wait for Aj to send it
+genome_chr = "${refdir}/prev_assembly/Homo_sapiens_assembly38.fasta"
 targets_chr = "${kitdir}/S07604514_Regions_1.bed.gz"
 baits_chr = "${kitdir}/S07604514_Covered_1.bed.gz"
 baits_chr_unzipped = "${kitdir}/S07604514_Covered.bed"
 genome_gff_chr = "${refdir}/prev_assembly/hg38.ensGene.gtf"
 
-// TODO: gatk BedToIntervalList needs sequence dictionary, which you need to make
-// from genome_chr
-targets_il_chr = "${kitdir}/TODO"
-baits_il_chr = "${kitdir}/TODO"
+targets_il_chr = "${kitdir}/Regions_chr.interval_list"
+baits_il_chr = "${kitdir}/Covered_chr.interval_list"
 
-// TODO: write the file to make this in ~/Bio_SDD/chula-stem/resources/wes_format_variants_chr.bash
-dbsnp_chr = "${refdir}/"//
-gnomad_subset_chr = "${refdir}"
-gnomad_subset_biallelic_chr = "${refdir}"
-homopolymers_microsatellites_chr = "${refdir}"
+dbsnp_chr = "${refdir}/variants/dbSNP_renamed_germline_chr.vcf.gz"
+gnomad_subset_chr = "${refdir}/variants/gnomADv4.1.0_Exomes/random/gnomADv4.1_subset_chr.vcf.gz"
+gnomad_subset_biallelic_chr = "${refdir}/variants/gnomADv4.1.0_Exomes/biallelic/all_chr.vcf.gz"
+homopolymers_microsatellites_chr = "${refdir}/tool_specific/msihomopoly-Homo_sapiens_assembly38.tsv"
 
 params.ref = ["genome": genome_chr,
-              "homopolymers_microsatellites": homopolymers_microsatellites,
+              "homopolymers_microsatellites": homopolymers_microsatellites_chr,
               "targets": targets_chr,
               "baits": baits_chr,
               "baits_il": baits_il_chr,
@@ -83,34 +80,25 @@ process {
         ext.misc = ["plot": false, "show_therapies": true]
         ext.extra_paths = ["therapy_data_cache": "/data/home/shannc/.cache/2025-01-13_therapy_data.parquet"]
     }
+
+    withName: "VEP" {
+        container = "/data/home/shannc/tools/vep.sif" // Was installed with singularity
+        ext.species = "homo_sapiens"
+        ext.cache = "/data/home/shannc/.cache/vep"
+        ext.args = ["--clin_sig_allele 0", // Reports alleles with known clinical significance
+                    "--synonyms /data/project/stemcell/shannc/reference/rename/vep_chr_synonyms.tsv", // NOTE: [2025-06-18 Wed] required for compatibility with previous PDAC variant calls
+                    // in CLIN_SIG field
+                    "--check_existing",// Check for existence of known variants co-located
+                    "--pubmed", // Report pubmed ids for known variants
+                    "--overlaps", // Report proportion and length of transcript overlapped
+                    // by SV
+                    "--exclude_predicted",
+                    "--gene_phenotype", // Indicate if gene is associated with phenotype
+                    "--regulatory", // Look for overlaps with regulatory regions
+                    "--canonical", // Indicates if transcript is canonical for the gene
+                    "--offline"
+                    // "--plugin StructuralVariantOverlap,file=???" // Retrieve information from
+                    // overlapping user-specified structural variants
+                    ]
+    }
 }
-
-// * Misc
-// Add gnomad subsets to known_variants
-gnomad_subsets = [
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr10.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr11.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr12.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr13.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr14.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr15.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr16.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr17.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr18.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr19.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr1.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr20.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr21.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr22.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr2.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr3.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr4.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr5.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr6.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr7.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr8.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chr9.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chrX.vcf.bgz",
-    "$refdir/variants/gnomADv4.1.0_Exomes/random/chrY.vcf.bgz",
-]
-
