@@ -5,4 +5,5 @@ record_type="${2}" # The two-letter header record type, beginning each header li
 # and starting with @
 tag="${3}" # The two-character string whose value we want
 samtools head "${1}" | grep "@${record_type}" | \
-    sed -E "s/.*$tag:([-A-Za-z0-9_,]+).*/\1/"
+    sed -E "s/.*$tag:([-A-Za-z0-9_,]+).*/\1/" | \
+    uniq
