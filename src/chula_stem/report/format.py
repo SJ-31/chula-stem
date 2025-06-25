@@ -28,6 +28,8 @@ TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
 def get_genes(file_spec: list[dict]) -> list:
     unique_genes: set = set()
     for spec in file_spec:
+        if spec["file"] is None:
+            continue
         df = pl.read_csv(
             spec["file"],
             separator=spec.get("separator", "\t"),
