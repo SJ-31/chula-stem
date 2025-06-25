@@ -1,6 +1,7 @@
 process CLAIRS_TO {
     ext version: "0.3.1"
 
+    label "big_mem"
     publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
