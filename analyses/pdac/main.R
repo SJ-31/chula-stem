@@ -32,12 +32,16 @@ dbsnp_file <- here("analyses", "data", "dbSNP_somatic.csv")
 if (!file.exists(vaf_merged_file)) {
   files <- list.files(
     data_path,
-    pattern = "8-P[0-9_]+-VEP_small.tsv$",
+    pattern = "8-[PN][0-9_]+-VEP_small.tsv$",
     recursive = TRUE,
     full.names = TRUE
   )
   tsvs <- lapply(files, \(x) {
-    tb <- utils$read_with_filename(x, "sample") |>
+    tb <- utils$read_with_filename(x, "sample")
+    if ("TOOL_SOURCE" %in% colnames(tb)) {
+      tb <- dplyr::rename(tb, SOURCE = TOOL_SOURCE)
+    }
+    tb |>
       select(
         sample,
         Alt_depth,
@@ -51,7 +55,8 @@ if (!file.exists(vaf_merged_file)) {
       )
     tb
   })
-  merged <- bind_rows(tsvs) |> mutate(sample = str_extract(sample, "P[0-9_]+"))
+  merged <- bind_rows(tsvs) |>
+    mutate(sample = str_extract(sample, "[NP][0-9_]+"))
   write_tsv(merged, vaf_merged_file)
 }
 

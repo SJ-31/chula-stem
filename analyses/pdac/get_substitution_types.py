@@ -66,11 +66,11 @@ dfs: list[pl.DataFrame] = []
 dfs2: list[pl.DataFrame] = []
 cwd = os.getcwd()
 if data.exists():
-    files = list(data.rglob("7-P*-Small_high_conf.vcf.gz"))
+    files = list(data.rglob("7-*-Small_high_conf.vcf.gz"))
     with TemporaryDirectory() as tmpdir:
         os.chdir(tmpdir)
         for f in files:
-            sample_name = re.findall(r"-(P[0-9_]+)-", f.stem)[0]
+            sample_name = re.findall(r"-([NP][0-9_]+)-", f.stem)[0]
             bcftools_stats(f, "tmp_stats.txt")
             df = get_substitution_types("tmp_stats.txt").with_columns(
                 sample=pl.lit(sample_name)

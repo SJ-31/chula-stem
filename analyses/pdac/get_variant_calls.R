@@ -5,20 +5,20 @@ source(here("src", "R", "utils.R"))
 source(here("analyses", "pdac", "main.R"))
 vep_vcfs <- list.files(
   data_path,
-  pattern = "7-P[0-9_]+-VEP_small.vcf.gz$",
+  pattern = "7-[NP][0-9_]+-VEP_small.vcf.gz$",
   recursive = TRUE,
   full.names = TRUE
 )
 mutect_vcfs <- list.files(
   data_path,
-  pattern = "5-P[0-9_]+-Mutect2_filtered.vcf.gz",
+  pattern = "5-[NP][0-9_]+-Mutect2_filtered.vcf.gz",
   recursive = TRUE,
   full.names = TRUE
 )
 
 bams <- list.files(
   data_path,
-  pattern = "4-P[0-9_]+_tumor-recal.bam$",
+  pattern = "4-[NP][0-9_]+_tumor-recal.bam$",
   recursive = TRUE,
   full.names = TRUE
 )
@@ -42,6 +42,7 @@ wanted <- c(
 )
 target_file <- here("analyses", "pdac", "target_gene_regions.txt")
 query_str <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/SOURCE"
+query_str_n <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/TOOL_SOURCE"
 
 get_wanted_genes_mutect <- function(file) {
   args <- c("view", glue("--targets-file {target_file}"), file)
@@ -83,10 +84,15 @@ get_wanted_genes <- function(file, vep = TRUE) {
   system2("bcftools", args, stdout = filtered)
 
   final_file <- here(outdir, "vcfs", glue("{pref}.tsv"))
+  if (str_detect(file, "7-N[0-9_]+")) {
+    query <- query_str_n
+  } else {
+    query <- query_str
+  }
   args2 <- c(
     glue("-i {filtered}"),
     glue("-o {final_file}"),
-    glue("-q '{query_str}'")
+    glue("-q '{query}'")
   )
   if (vep) {
     system2(here("src", "bash", "get_vep_anno.bash"), args = args2)
@@ -96,37 +102,40 @@ get_wanted_genes <- function(file, vep = TRUE) {
 get_wanted_bam <- function(
   file,
   name_fn = utils$basename_no_ext,
-  target_file = target_file
+  target = target_file
 ) {
-  args <- c("view", "-b", "-h", glue("-L {target_file}"), file)
+  args <- c("view", "-b", "-h", glue("-L {target}"), file)
   pref <- name_fn(file)
   bam_out <- here(outdir, "bams", glue("{pref}.bam"))
-  system2("samtools", args, stdout = bam_out)
+  if (!file.exists(bam_out)) {
+    system2("samtools", args, stdout = bam_out)
+  }
 }
 
 
 if (path.expand("~") != "/home/shannc") {
-  ## tmp <- lapply(vep_vcfs, get_wanted_genes)
+  tmp <- lapply(vep_vcfs, get_wanted_genes)
   ## tmp <- lapply(mutect_vcfs, get_wanted_genes_mutect)
   ## tmp <- lapply(bams, get_wanted_bam)
-  tmp <- lapply(
-    pink_bams,
-    \(f) {
-      get_wanted_bam(
-        f,
-        name_fn = \(x) str_remove(utils$basename_no_ext(x), "recal_data_PDAC_"),
-        target_file = here("analyses", "pdac", "target_kras.txt")
-      )
-    }
-  )
+  ## tmp <- lapply(
+  ##   pink_bams,
+  ##   \(f) {
+  ##     get_wanted_bam(
+  ##       f,
+  ##       name_fn = \(x) str_remove(utils$basename_no_ext(x), "recal_data_PDAC_"),
+  ##       target = here("analyses", "pdac", "target_kras.txt")
+  ##     )
+  ##   }
+  ## )
 }
 
 get_mutect_inconsistent <- function(file) {
   cur_outdir <- here(outdir, "mutect_tsv")
   files <- list.files(cur_outdir)
-  subjects <- str_extract(files, "5-(P[0-9_]+)-.*", group = 1)
+  subjects <- str_extract(files, "5-([NP][0-9_]+)-.*", group = 1)
   lapply(files, \(x) {
-    read_tsv(here(cur_outdir, x)) |> mutate(AF = as.double(AF))
+    read_tsv(here(cur_outdir, x)) |>
+      mutate(AF = as.double(AF))
   }) |>
     `names<-`(subjects) |>
     list_rbind(names_to = "subject") |>
@@ -150,7 +159,7 @@ all_vcfs <- list.files(
   full.names = TRUE
 )
 subjects <- utils$basename_no_ext(all_vcfs) |>
-  str_extract("-(P.*)-VEP_small.*", group = 1)
+  str_extract("-([NP].*)-VEP_small.*", group = 1)
 
 cosmic_all <- read_tsv(here(outdir, "cosmic_metadata.tsv"))
 
