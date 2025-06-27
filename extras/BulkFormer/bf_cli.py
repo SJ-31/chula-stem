@@ -192,18 +192,28 @@ def demo():
     print(result.shape)
 
 
+def log_tpm(adata: ad.AnnData) -> np.ndarray:
+    expr = adata.X if not sparse.issparse(adata.X) else adata.X.toarray() + 1
+    lengths = adata.var["SEQLENGTH"]
+    numer = np.log(expr) - np.reshape(np.log(lengths), (1, -1))
+    denom = np.log(np.nansum(np.exp(numer), axis=1)).reshape(-1, 1)
+    tpm = np.exp(numer - denom + np.log(1e6))
+    tpm = np.nan_to_num(tpm, neginf=0)
+    return tpm
+
+
 def extract_helper(
     adata: ad.AnnData,
     feature_type: Literal["transcriptome_level", "gene_level"] = "transcriptome_level",
     aggregate_type: Literal["max", "mean", "median", "all"] = "max",
 ):
-    expr = adata.X if not sparse.issparse(adata.X) else adata.X.toarray()
+    expr = log_tpm(adata)
     df = pd.DataFrame(expr, columns=adata.var["GENEID"])
     input_df, _, var = main_gene_selection(X_df=df, gene_list=GENE_LIST)
     var.reset_index(inplace=True)
     valid_gene_idx = list(var[var["mask"] == 0].index)
     result: np.ndarray = extract_feature(
-        expr_array=input_df,
+        expr_array=input_df.values,
         high_var_gene_idx=HIGH_VAR_GENE_IDX,
         feature_type=feature_type,
         aggregate_type=aggregate_type,
