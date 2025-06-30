@@ -204,7 +204,9 @@ def log_tpm(adata: ad.AnnData) -> np.ndarray:
 
 def extract_helper(
     adata: ad.AnnData,
-    feature_type: Literal["transcriptome_level", "gene_level"] = "transcriptome_level",
+    feature_type: Literal[
+        "transcriptome_level", "gene_level", "expression_level"
+    ] = "transcriptome_level",
     aggregate_type: Literal["max", "mean", "median", "all"] = "max",
 ):
     expr = log_tpm(adata)
@@ -212,6 +214,10 @@ def extract_helper(
     input_df, _, var = main_gene_selection(X_df=df, gene_list=GENE_LIST)
     var.reset_index(inplace=True)
     valid_gene_idx = list(var[var["mask"] == 0].index)
+    extract_expr: bool = feature_type == "expression_level"
+    feature_type = (
+        feature_type if feature_type != "expression_level" else "transcriptome_level"
+    )
     result: np.ndarray = extract_feature(
         expr_array=input_df.values,
         high_var_gene_idx=HIGH_VAR_GENE_IDX,
@@ -219,7 +225,7 @@ def extract_helper(
         aggregate_type=aggregate_type,
         device=DEVICE,
         batch_size=4,
-        return_expr_value=False,
+        return_expr_value=extract_expr,
         esm2_emb=MODEL_PARAMS["gene_emb"],
         valid_gene_idx=valid_gene_idx,
     )
