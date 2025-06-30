@@ -225,9 +225,12 @@ def extract_helper(
     )
     if isinstance(result, torch.Tensor):
         result = result.detach().numpy()
-    var = pd.DataFrame({"GENEID": GENE_LIST})
-    filtered = adata.var.loc[adata.var["GENEID"].isin(GENE_LIST), :]
-    var = var.merge(filtered, how="left", on="GENEID")
+    if feature_type != "transcriptome_level":
+        var = pd.DataFrame({"GENEID": GENE_LIST})
+        filtered = adata.var.loc[adata.var["GENEID"].isin(GENE_LIST), :]
+        var = var.merge(filtered, how="left", on="GENEID")
+    else:
+        var = None
     new = ad.AnnData(X=sparse.csc_array(result), obs=adata.obs, var=var)
     return new
 
