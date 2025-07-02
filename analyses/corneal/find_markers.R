@@ -342,10 +342,10 @@ p_conserved <- FindConservedMarkers(
   grouping.var = "confluency_passage"
 )
 # TODO: review these results
-
 # Double-check results of FindAllMarkers with edgeR pseudo-bulking
 
-with_edger <- function(f) {
+## ** Get fit
+edgeR_fit <- function(f) {
   agg <- AggregateExpression(
     integrated,
     group.by = c("leiden_post", "geo"),
@@ -364,19 +364,32 @@ with_edger <- function(f) {
     counts = as.matrix(LayerData(agg, "counts")),
     samples = agg[[]]
   )
-  dge <- normLibSizes(dge)
   mm <- model.matrix(~ leiden_post + donor_passage, data = dge$samples)
+  dge <- normLibSizes(dge)
   dge <- estimateDisp(dge, design = mm, robust = TRUE)
   fit <- glmQLFit(dge, mm, robust = TRUE)
+  fit$mm <- mm
+  saveRDS(fit, f)
+  fit
+}
 
+fit <- U$read_existing(
+  here(M$outdir, "corneal_edgeR_fit.rds"),
+  edgeR_fit,
+  readRDS
+)
+mm <- fit$mm
+
+## ** Run comparisons
+edgeR_test <- function(f, ref_cluster) {
   # Use pairwise comparisons rather than average
   other_clusters <- colnames(mm) |>
     keep(\(x) {
-      str_detect(x, "leiden_post") && !str_detect(x, p_clust)
+      str_detect(x, "leiden_post") && !str_detect(x, ref_cluster)
     })
 
   contrasts <- paste0(
-    glue("leiden_post{p_clust}"),
+    glue("leiden_post{ref_cluster}"),
     "-",
     other_clusters
   )
@@ -396,10 +409,9 @@ with_edger <- function(f) {
 
 test <- read_existing(
   here(M$outdir, "corneal_proliferative_edgeR_test.csv"),
-  with_edger,
+  \(x) edgeR_test(x, ref_cluster = p_clust),
   read_csv
 )
-
 
 sig <- topTags(test) |>
   as.data.frame() |>
@@ -417,6 +429,8 @@ write_csv(upregulated, here(M$outdir, "corneal_proliferative_edgeR_upreg.csv"))
 #
 # [2025-07-02 Wed] Original markers were found here, which is promising
 new_markers <- upregulated$gene[!upregulated$gene %in% markers$proliferative]
+
+## ** Plot new markers
 
 U$read_existing(here(figdir, "new_markers.png"), \(x) {
   plot <- DotPlot(
