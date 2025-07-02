@@ -159,3 +159,5 @@ docs
 /8-P1-Report.pdf
 /analyses/h1_hmg_intensity/h1_hmgb_intensity.csv
 /analyses/pdac/target_gene_regions.txt
+/analyses/corneal/metadata.csv
+/analyses/pdac/signatures_plot.R
