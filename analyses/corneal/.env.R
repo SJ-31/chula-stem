@@ -1,9 +1,9 @@
 library(tidyverse)
-library(ggpubr)
 library(here)
 library(reticulate)
 library(ensembldb)
 library(scDblFinder)
+library(scRNAseq)
 library(glue)
 library(zellkonverter)
 library(sva)
@@ -13,6 +13,16 @@ workflow_output <- here(remote, "output", "HCC", "RNASEQ")
 outdir <- here("analyses", "output", "corneal")
 hg38 <- here(local, "Homo_sapiens.GRCh38.113.sqlite")
 hg37 <- here(local, "Homo_sapiens.GRCh37.87.sqlite")
-colon_dir <- here(remote, "public_data", "GEO_GSE116222-human_colon")
-fibro_dir <- here(remote, "public_data", "GEO_GSE195452-human_skin_fibroblast")
-corneal_dir <- here(remote, "public_data", "GEO_GSE227942-human_corneal_endothelial")
+colon_dir <- here(remote, "public_data", "GEO", "GSE116222-human_colon")
+fibro_dir <- here(
+  remote,
+  "public_data",
+  "GEO",
+  "GSE195452-human_skin_fibroblast"
+)
+corneal_dir <- here(
+  remote,
+  "public_data",
+  "GEO",
+  "GSE227942-human_corneal_endothelial"
+)

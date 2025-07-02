@@ -149,7 +149,8 @@ blank <- custom_filtered |>
   vaf_heatmap()
 
 ## ** replicate plot
-# --- CODE BLOCK ---
+# %%
+
 sbs <- read_tsv(sbs_merged_file)
 # replicate the figure provided
 target_genes <- c(
@@ -537,8 +538,8 @@ for (sym in unique(to_tables$SYMBOL)) {
     filter(SYMBOL == sym) |>
     select(-SYMBOL) |>
     pivot_wider(
-      names_from = subject,
-      id_cols = id,
+      names_from = id,
+      id_cols = subject,
       values_from = value,
       values_fill = "-"
     ) |>

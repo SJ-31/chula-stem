@@ -77,6 +77,7 @@ wanted <- old_calls |>
     Hugo_Symbol,
     Start_Position,
     End_Position,
+    Genome_Change,
     cDNA_Change,
     Codon_Change,
     Protein_Change,
@@ -86,6 +87,7 @@ wanted <- old_calls |>
     AF,
     DP,
   )
+
 
 table_outdir <- here(outdir, "vtables")
 
@@ -110,3 +112,114 @@ for (sym in unique(wanted$Hugo_Symbol)) {
       write_tsv(here(table_outdir, glue("{sym}_old.tsv")))
   }
 }
+
+convert_protein_change <- function(protein_change) {
+  # One-letter to three-letter amino acid code map
+  aa_map <- c(
+    A = "Ala",
+    R = "Arg",
+    N = "Asn",
+    D = "Asp",
+    C = "Cys",
+    Q = "Gln",
+    E = "Glu",
+    G = "Gly",
+    H = "His",
+    I = "Ile",
+    L = "Leu",
+    K = "Lys",
+    M = "Met",
+    F = "Phe",
+    P = "Pro",
+    S = "Ser",
+    T = "Thr",
+    W = "Trp",
+    Y = "Tyr",
+    V = "Val",
+    "*" = "Ter",
+    X = "Xaa"
+  )
+  if (is.na(protein_change)) {
+    return("NA")
+  }
+
+  # Extract parts using regular expression
+  match <- regexec("^p\\.([A-Z*X])([0-9]+)([A-Z*X])$", protein_change)
+  parts <- regmatches(protein_change, match)[[1]]
+
+  if (length(parts) != 4) {
+    print(protein_change)
+    stop("Input must be in the form 'p.XnnnY', e.g. 'p.R71L'")
+  }
+
+  ref <- aa_map[parts[2]]
+  pos <- parts[3]
+  alt <- aa_map[parts[4]]
+
+  if (is.na(ref) || is.na(alt)) {
+    stop("Unknown amino acid code in input.")
+  }
+
+  paste0("p.", ref, pos, alt)
+}
+# %%
+
+old <- wanted |>
+  mutate(
+    HGVSp = map_chr(Protein_Change, convert_protein_change),
+    variant = paste0(Genome_Change, " (", HGVSp, ")"),
+    symbol = Hugo_Symbol
+  ) |>
+  distinct(subject, variant, .keep_all = TRUE)
+# Oddly there are duplicate calls for each subject...
+
+new <- read_csv(here(outdir, "select_genes_VEP.csv")) |>
+  filter(subject %in% wanted$subject) |>
+  select(-INFO_TOOL_SOURCE) |>
+  distinct(subject, HGVSg, .keep_all = TRUE) |> # Discard duplicates from multiple callers
+  mutate(
+    Genome_Change = paste0("g.", str_replace(HGVSg, ":g.", ":")),
+    HGVSp = map_chr(HGVSp, \(x) {
+      if (is.na(x)) {
+        "NA"
+      } else {
+        str_remove(x, ".*:")
+      }
+    }),
+    variant = paste0(Genome_Change, " (", HGVSp, ")"),
+    found_in = case_when(variant %in% old$variant ~ "both", .default = "new"),
+    symbol = SYMBOL,
+  )
+old$found_in <- case_when(!old$variant %in% new$variant ~ "prev")
+
+compare_dir <- here(outdir, "compare_prev_new")
+
+together <- full_join(
+  select(old, subject, variant, found_in, symbol),
+  select(new, subject, variant, found_in, symbol),
+  by = join_by(subject, variant)
+) |>
+  mutate(
+    found_in = coalesce(found_in.x, found_in.y),
+    symbol = coalesce(symbol.x, symbol.y)
+  )
+
+for (sym in unique(new$symbol)) {
+  filtered <- together |> filter(symbol == sym)
+  filtered |>
+    pivot_wider(
+      names_from = subject,
+      id_cols = variant,
+      values_from = found_in,
+      values_fill = "-"
+    ) |>
+    write_tsv(here(compare_dir, glue("{sym}_compare.tsv")))
+  if (!all(filtered$found_in == "new")) {
+    plot <- filtered |>
+      ggplot(aes(x = subject, y = variant, fill = found_in)) +
+      geom_tile()
+    ggsave(filename = here(compare_dir, glue("{sym}_compare.png")), plot = plot)
+  }
+}
+
+# %%
