@@ -7,8 +7,10 @@ source(paste0(R_SRC, "/", "utils.R"), local = U)
 source(paste0(R_SRC, "/", "sc_rnaseq.R"), local = S)
 source(paste0(R_SRC, "/", "plotting.R"), local = P)
 source(here::here("analyses", "corneal", ".env.R"), local = M)
+figdir <- here(M$outdir, "corneal_figures")
 
 library(edgeR)
+library(tidyverse)
 library(Seurat)
 options(Seurat.object.assay.version = "v5")
 
@@ -84,17 +86,6 @@ qc_helper <- function(adata, db, name = NULL, is_adata = TRUE) {
 }
 
 
-get_fibro <- function(f) {
-  adata <- sc$read_10x_mtx(path = here(M$fibro_dir, "Healthy"))
-  adata$obs$source <- "fibroblast"
-  adata$obs$sample <- "fibroblast_unknown"
-
-  hg37_db <- EnsDb(M$hg37)
-  sce <- qc_helper(adata, hg37_db, "fibro")
-  writeH5AD(sce, f)
-}
-
-
 get_corneal <- function(f) {
   # ";" is the separating character for multiplexed samples
   read <- function(row) {
@@ -122,72 +113,14 @@ get_corneal <- function(f) {
   saveRDS(obj, f)
 }
 
-get_colon <- function(f) {
-  healthy <- c("-A1", "-C1", "-B1")
-  ## df <- read_tsv(here("test.tsv"), col_names = FALSE) |> column_to_rownames("X1")
-  df <- read_tsv(
-    here(M$colon_dir, "GSE116222_Expression_matrix.txt"),
-    col_names = FALSE
-  ) |>
-    column_to_rownames("X1")
 
-  colnames(df) <- df[1, ]
-  df <- df[-1, ]
-  wanted_cols <- grepl(paste(healthy, collapse = "|"), colnames(df))
-  df <- df[, wanted_cols]
-  df <- df |>
-    mutate(across(everything(), as.numeric)) |>
-    as.matrix()
-
-  sce <- SingleCellExperiment::SingleCellExperiment(list(X = df))
-  colData(sce)$source <- "colon"
-  colData(sce)$sample <- str_remove(colnames(sce), ".*-")
-  sce <- qc_helper(sce, EnsDb(M$hg37), "colon", FALSE)
-
-  ## assay(sce, "X") |>
-  ##   as.matrix() |>
-  ##   Matrix::Matrix(sparse = TRUE)
-
-  writeH5AD(sce, f)
-}
-
-
-get_combined <- function(outfile) {
-  py$combined <- ad$concat(
-    c(fibro, corneal, colon),
-    merge = "same",
-    join = "outer"
-  )
-  n_mito <- py$combined$var$is_mito |> sum()
-
-  sc_pp$pca(py$combined)
-  sc$external$pp$scanorama_integrate(py$combined, "source")
-
-  sce <- AnnData2SCE(py$combined)
-  sce <- scuttle::addPerCellQC(
-    sce,
-    subsets = list(mito = rowData(sce)$is_mito),
-    assay.type = "X"
-  ) |>
-    U$x2counts()
-
-  writeH5AD(sce, outfile)
-  sce
-}
-
-# Perform QC individually for each file
-fibro_file <- here(M$outdir, "fibro.h5ad")
 corneal_file <- here(M$outdir, "corneal.rds")
-colon_file <- here(M$outdir, "colon.h5ad")
 
 corneal <- U$read_existing(corneal_file, get_corneal, readRDS)
-## fibro <- U$read_existing(fibro_file, get_fibro, readH5AD)
-## colon <- U$read_existing(colon_file, get_colon, readH5AD)
 
-## * Further analysis for corneal
+## * Analyses
 
-figdir <- here(M$outdir, "corneal_figures")
-
+## ** Integrate
 corneal_integrate <- function(obj) {
   # Get unintegrated clusters for comparison
 
@@ -200,7 +133,10 @@ corneal_integrate <- function(obj) {
     FindClusters(algorithm = 1, cluster.name = "clusters_pre") |>
     RunUMAP(dims = 1:30, reduction = "pca", reduction.name = "umap_pre")
 
-  obj <- IntegrateLayers(obj, method = HarmonyIntegration) |>
+  obj <- IntegrateLayers(
+    obj,
+    method = HarmonyIntegration
+  ) |>
     FindNeighbors(reduction = "harmony") |>
     FindClusters(algorithm = 1, cluster.name = "clusters_post") |> # 1 is Louvain
     RunUMAP(dims = 1:30, reduction = "harmony", reduction.name = "umap_post")
@@ -221,6 +157,15 @@ integrated <- U$read_existing(
   },
   readRDS
 )
+integrated[[]]$seurat_clusters <- NULL
+integrated[[]]$cluster_confluence <- paste0(
+  integrated[[]]$clusters_post,
+  "_passage_",
+  integrated[[]]$confluency_passage
+)
+integrated <- integrated[, !integrated[[]]$library %in% paste0("G", 1:4)]
+# NOTE: the above is temporary, discarding the multiplexed samples until you can annotate them
+rm(corneal)
 
 markers_v1 <- U$read_existing(
   here(M$outdir, "corneal_markers.csv"),
@@ -238,33 +183,35 @@ markers_v1 <- U$read_existing(
 try_demux <- function(obj, libraries) {
   subset <- obj[, obj[[]]$library %in% libraries]
   subset <- normalize_to_pca(subset)
-  obj <- FindNeighbors(obj, reduction = "pca") |>
+  subset <- FindNeighbors(subset, reduction = "pca") |>
     FindClusters(algorithm = 1, cluster.name = "batched_clusters") |>
     RunUMAP(dims = 1:30, reduction = "pca", reduction.name = "umap")
   name <- paste0(libraries, collapse = "_")
   dimplot_wrapper(
-    obj,
-    file = here(outdir, "corneal_demux", glue("{name}_pca.png")),
+    subset,
+    file = here(M$outdir, "corneal_demux", glue("{name}_pca.png")),
     reduction = "pca",
     group.by = c("batched_clusters", "donor")
   )
   dimplot_wrapper(
-    obj,
-    file = here(outdir, "corneal_demux", glue("{name}_umap.png")),
+    subset,
+    file = here(M$outdir, "corneal_demux", glue("{name}_umap.png")),
     reduction = "umap",
     group.by = c("batched_clusters", "donor", "library")
   )
-  meta <- rownames_to_column(obj[[]], var = "cell") |>
+  meta <- rownames_to_column(subset[[]], var = "cell") |>
     as_tibble() |>
     dplyr::select(cell, batched_clusters)
-  write_csv(meta, file = here(outdir, "corneal_demux", glue("{name}.csv")))
+  write_csv(meta, file = here(M$outdir, "corneal_demux", glue("{name}.csv")))
 }
 
-try_demux(integrated, c("G1", "G8", "G9"))
-try_demux(integrated, c("G2", "G8", "G9"))
-try_demux(integrated, c("G3", "G5", "G6", "G7"))
-try_demux(integrated, c("G4", "G8", "G9"))
-
+do_demux <- FALSE
+if (path.expand("~") != "/home/shannc" && do_demux) {
+  try_demux(corneal, c("G1", "G8", "G9"))
+  try_demux(corneal, c("G2", "G8", "G9"))
+  try_demux(corneal, c("G3", "G5", "G6", "G7"))
+  try_demux(corneal, c("G4", "G8", "G9"))
+}
 
 ## ** DE analysis
 
@@ -275,7 +222,7 @@ agg <- AggregateExpression(
 )
 agg[[]] <- left_join(
   agg[[]],
-  select(mutate(CORNEAL_META, geo = str_remove(prefix, "_.*")), -prefix),
+  dplyr::select(mutate(CORNEAL_META, geo = str_remove(prefix, "_.*")), -prefix),
   by = join_by(geo)
 )
 
@@ -287,16 +234,113 @@ dge <- DGEList(
 
 ## ** Plots
 
-dimplot_wrapper(
-  integrated,
-  file = here(figdir, "umap_pre.png"),
-  reduction = "umap_pre",
-  group.by = c("clusters_pre", "donor", "confluency_passage")
+U$read_existing(here(figdir, "umap_pre.png"), \(f) {
+  dimplot_wrapper(
+    integrated,
+    file = f,
+    reduction = "umap_pre",
+    group.by = c("clusters_pre", "donor", "confluency_passage")
+  )
+})
+
+U$read_existing(here(figdir, "umap_post.png"), \(f) {
+  dimplot_wrapper(
+    integrated,
+    file = f,
+    reduction = "umap_post",
+    group.by = c("clusters_pre", "clusters_post", "donor")
+  )
+})
+
+
+## *** Original markers
+
+markers <- list(
+  proliferative = c("CENPF", "PTTG1", "MKI67", "PCNA", "TOP2A"),
+  senescent = c("MT2A", "CDKN2A", "TAGLN"),
+  fibrotic = c("ACTA2", "CD44", "COL6A1", "COL6A3"),
+  cec_phenotype = c("COL4A3", "CDH2", "ALCAM", "SLC4A11"),
+  ecm_activity = c("COL4A1", "COL4A2", "COL5A1", "FBLN5")
 )
 
-dimplot_wrapper(
+
+U$read_existing(here(figdir, "original_markers_cluster_confluency.png"), \(f) {
+  plot <- DotPlot(
+    integrated,
+    markers,
+    group.by = "cluster_confluence",
+    cols = c("lightgrey", "blue")
+  ) +
+    ylab("Cluster, Confluency Passage")
+  ggsave(f, plot, width = 20, height = 15, dpi = 500)
+})
+
+U$read_existing(here(figdir, "original_markers_cluster.png"), \(f) {
+  plot <- DotPlot(
+    integrated,
+    markers,
+    cols = c("lightgrey", "blue")
+  ) +
+    ylab("Cluster")
+  ggsave(f, plot, width = 20, height = 15, dpi = 500)
+})
+
+# [2025-07-02 Wed]
+# WARNING: the dotplot is misleading: the representation of cluster 12
+# for genes PTTG1, CENPF being highly expressed is false
+# you confirmed this with the violin plot, average expression and FindAllMarkers results
+
+gene2class <- tibble(gene = markers, class = names(markers)) |>
+  unnest(cols = c(gene))
+average_expr <- AggregateExpression(
   integrated,
-  file = here(figdir, "umap_post.png"),
-  reduction = "umap_post",
-  group.by = c("clusters_pre", "clusters_post", "donor")
+  features = unlist(markers)
+)$RNA |>
+  as.data.frame() |>
+  rownames_to_column(var = "gene") |>
+  as_tibble() |>
+  left_join(gene2class, by = join_by(gene))
+
+U$read_existing(here(figdir, "original_markers_violin.png"), \(f) {
+  plot <- VlnPlot(
+    integrated,
+    c(markers$proliferative, markers$senescent),
+    group.by = "clusters_post",
+  )
+  ggsave(f, plot, width = 15, height = 15, dpi = 500)
+})
+
+## * Proliferative markers
+p_clust <- 11 # [2025-07-02 Wed] Cluster containing proliferative cells
+
+# top markers from FindAllMarkers
+up_fam <- markers_v1 |>
+  dplyr::filter(cluster == p_clust) |>
+  arrange(desc(avg_log2FC)) |>
+  slice_head(n = 5) |>
+  pluck("gene")
+
+VlnPlot(integrated, features = up_fam)
+
+
+p_conserved <- FindConservedMarkers(
+  # Markers conserved across all passages
+  integrated,
+  11,
+  grouping.var = "confluency_passage"
 )
+clusters <- integrated[[]]$clusters_post
+
+dge <- normLibSizes(dge)
+mm <- model.matrix(~ clusters_post + confluency_passage, data = colData(dge))
+dge <- estimateDisp(dge, design = mm, robust = TRUE)
+fit <- glmQLFit(dge, mm, robust = TRUE)
+mean_val <- 1 / (length(clusters) - 1)
+mean_others <- paste0(
+  mean_val,
+  "*",
+  clusters[clusters != p_clust],
+  collapse = "+"
+)
+contrast_str <- paste0(clusters, "-", "(", mean_others, ")")
+test <- glmQLFTest(fit, contrast = )
