@@ -258,6 +258,7 @@ U$read_existing(here(figdir, "umap_post.png"), \(f) {
   )
 })
 
+
 U$read_existing(here(figdir, "umap_comparison.png"), \(f) {
   dimplot_wrapper(
     integrated,
@@ -286,7 +287,7 @@ U$read_existing(here(figdir, "original_markers_cluster_confluency.png"), \(f) {
     cols = c("lightgrey", "blue")
   ) +
     ylab("Cluster, Confluency Passage")
-  ggsave(f, plot, width = 20, height = 15, dpi = 500)
+  ggsave(f, plot, width = 18, height = 10, dpi = 500)
 })
 
 U$read_existing(here(figdir, "original_markers_cluster.png"), \(f) {
@@ -296,7 +297,7 @@ U$read_existing(here(figdir, "original_markers_cluster.png"), \(f) {
     cols = c("lightgrey", "blue")
   ) +
     ylab("Cluster")
-  ggsave(f, plot, width = 20, height = 15, dpi = 500)
+  ggsave(f, plot, width = 18, height = 10, dpi = 500)
 })
 
 gene2class <- tibble(gene = markers, class = names(markers)) |>
@@ -316,8 +317,31 @@ U$read_existing(here(figdir, "original_markers_violin.png"), \(f) {
     c(markers$proliferative, markers$senescent),
     group.by = "leiden_post",
   )
-  ggsave(f, plot, width = 15, height = 15, dpi = 500)
+  ggsave(f, plot, width = 13, height = 10, dpi = 500)
 })
+
+# Recreate figure 3b
+U$read_existing(
+  here(figdir, "figure3b_recreation.png"),
+  \(f) {
+    plot <- VlnPlot(
+      integrated,
+      c(
+        "SLC4A11",
+        "ALCAM",
+        "ATP1A1",
+        "MKI67",
+        "CDKN2A",
+        "TAGLN",
+        "CD44",
+        "ACTA2",
+        "COL4A2"
+      ),
+      group.by = "leiden_post"
+    )
+    ggsave(f, plot, width = 12, height = 10, dpi = 500)
+  },
+)
 
 ## * Proliferative markers
 p_clust <- "g11" # [2025-07-02 Wed] Cluster containing proliferative cells
@@ -439,6 +463,12 @@ U$read_existing(here(figdir, "new_markers.png"), \(x) {
   )
   ggsave(x, plot, width = 12, height = 10, dpi = 500)
 })
+
+## VlnPlot(
+##   integrated,
+##   c("SAPCD2", "KIF18B", "KIF20A", "TOP2A", "TICRR"),
+##   group.by = "leiden_post"
+## )
 
 U$read_existing(here(figdir, "new_markers_confluency.png"), \(x) {
   plot <- DotPlot(
