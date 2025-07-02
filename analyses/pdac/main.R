@@ -150,3 +150,17 @@ CURATED_VARIANTS <- list(
   ),
   KMT2C = c("ENSP00000262189.6:p.Lys2797ArgfsTer26")
 )
+CURATED_VARIANTS_RENAMED <- sapply(
+  CURATED_VARIANTS,
+  \(vec) {
+    map_chr(vec, \(x) {
+      if (str_detect(x, "p")) {
+        str_remove(x, ".*:")
+      } else {
+        paste0("g.", str_replace(x, ":g.", ":"))
+      }
+    })
+  },
+  simplify = FALSE,
+  USE.NAMES = TRUE
+)

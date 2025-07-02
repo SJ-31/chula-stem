@@ -28,7 +28,7 @@ params.report_text = ["front_page_details": "${projectDir}/reports/wes_front_pag
                       "disclaimer": "${projectDir}/reports/wes_disclaimer.txt",
                       "front_page_note": "${projectDir}/reports/wes_front_page_note.txt"]
 
-genome_chr = "${refdir}/prev_assembly/Homo_sapiens_assembly38.fasta"
+genome_chr = "${refdir}/genomes/prev_assembly/Homo_sapiens_assembly38.fasta"
 targets_chr = "${kitdir}/S07604514_Regions_1.bed.gz"
 baits_chr = "${kitdir}/S07604514_Covered_1.bed.gz"
 baits_chr_unzipped = "${kitdir}/S07604514_Covered.bed"

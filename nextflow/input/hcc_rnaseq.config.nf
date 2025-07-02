@@ -5,7 +5,7 @@ params.outdir = "/data/project/stemcell/shannc/output/HCC/RNASEQ"
 if (params.debug) {
     params.input = "$projectDir/input/manifests/hcc_rnaseq_DEBUG.csv"
 } else {
-    params.input = "$projectDir/input/manifests/hcc_rnaseq.csv"
+    params.input = "$projectDir/input/manifests/hcc_rnaseq_all.csv"
 }
 params.strandedness = "reverse" // From TruSeq's documentation, first read maps to antisense strand
 params.relative_orientation = "inward"
