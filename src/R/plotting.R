@@ -4,11 +4,8 @@ library(grid)
 library(ggplot2)
 R_SRC <- Sys.getenv("R_SRC")
 source(paste0(R_SRC, "/", "utils.R"))
-
 PY_SRC <- Sys.getenv("PY_SRC")
-pyplt <- new.env()
-reticulate::source_python(paste0(PY_SRC, "/", "plotting.py"), envir = pyplt)
-pg <- import("pygenomeviz")
+
 
 #' Returns "default" if the value of "key" in "list" is NULL
 #'
@@ -223,7 +220,20 @@ add_var_exon_track <- function(gv, gene, exons, variants, cmap, track_name = NUL
     } else {
       vn <- first(var_names)
     }
-    color <- cmap[[first(v$consequence)]]
+    color <- tryCatch(
+      expr = {
+        cmap[[first(v$consequence)]]
+      },
+      error = \(cnd){
+        print("WARNING, failed to get color for v")
+        print(cmap)
+        print(v)
+        NULL
+      }
+    )
+    if (is.null(color)) {
+      next
+    }
     label <- glue("{v$ref}>{v$alt} {vn}")
     track$add_text(
       x = loc, text = label, fontname = "monospace", backgroundcolor = color,
@@ -249,6 +259,9 @@ plot_sample_variants <- function(ensdb, vep_files,
                                  ),
                                  palette = "") {
   library(ensembldb)
+  pyplt <- new.env()
+  reticulate::source_python(paste0(PY_SRC, "/", "plotting.py"), envir = pyplt)
+  pg <- reticulate::import("pygenomeviz")
 
   transcripts <- exonsBy(ensdb, "tx", filter = GeneNameFilter(gene_name))
   gene <- genes(db, filter = ~ symbol == gene_name)

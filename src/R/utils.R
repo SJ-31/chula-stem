@@ -24,8 +24,11 @@ ensembl2entrez <- function(df) {
   genes <- rownames(df)
   query <- biomaRt::getBM(
     attributes = c(
-      "entrezgene_id", "ensembl_gene_id"
-    ), filters = "ensembl_gene_id", values = genes,
+      "entrezgene_id",
+      "ensembl_gene_id"
+    ),
+    filters = "ensembl_gene_id",
+    values = genes,
     mart = mart
   )
   merged <- base::merge(df, query, by.x = 0, by.y = "ensembl_gene_id")
@@ -51,14 +54,20 @@ basename_no_ext <- function(file) {
 
 #' Flatten the character vector `char_vec` by `separator`, then
 #'  get unique values
-flatten_by <- function(char_vec, separator = ";", collapse = TRUE, unique = FALSE) {
+flatten_by <- function(
+  char_vec,
+  separator = ";",
+  collapse = TRUE,
+  unique = FALSE
+) {
   helper <- function(str) {
     if (is.na(str)) {
       return(NA)
     }
     lapply(str, \(x) {
       str_split_1(x, pattern = separator)
-    }) |> unlist()
+    }) |>
+      unlist()
   }
 
   applied <- lapply(char_vec, helper) |> unlist()
@@ -106,7 +115,7 @@ to <- function(obj, x, val) {
 }
 
 
-read_existing <- function(filename, expr, read_fn = identity()) {
+read_existing <- function(filename, expr, read_fn = identity) {
   if (file.exists(filename)) {
     read_fn(filename)
   } else {
@@ -142,14 +151,23 @@ get_legend <- function(myggplot) {
 #' sample names
 #' @param id_mapping a two-column tb or df where the first column is the old ids and
 #'    the second column is the new
-get_rnaseq_counts <- function(metadata_tb, id_mapping = NULL, sample_col = "cases",
-                              file_col = "files", gene_col = 1, count_col = 2,
-                              read_fn = \(x) read_tsv(x, col_names = FALSE)) {
+get_rnaseq_counts <- function(
+  metadata_tb,
+  id_mapping = NULL,
+  sample_col = "cases",
+  file_col = "files",
+  gene_col = 1,
+  count_col = 2,
+  read_fn = \(x) read_tsv(x, col_names = FALSE)
+) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
     scol <- cols[2]
-    summed <- filter(tb, !is.na(!!as.symbol(gcol)) & !is.na(!!as.symbol(scol))) |>
+    summed <- filter(
+      tb,
+      !is.na(!!as.symbol(gcol)) & !is.na(!!as.symbol(scol))
+    ) |>
       group_by(!!as.symbol(gcol)) |>
       summarise(!!as.symbol(scol) := sum(!!as.symbol(scol)))
     summed
@@ -234,8 +252,11 @@ dgelist_random <- function(dge, n, samples_col = NULL, value = NULL) {
 #' Parse a vcf location string of chr:start-end  in a tibble
 #'
 parse_loc <- function(tb, loc_col = "Loc", alt_col = "Alt", ref_col = "Ref") {
-  separated <- separate_wider_delim(tb, all_of(loc_col),
-    delim = ":", names = c("chromosome", "start")
+  separated <- separate_wider_delim(
+    tb,
+    all_of(loc_col),
+    delim = ":",
+    names = c("chromosome", "start")
   )
   if (!str_detect(separated$chromosome[1], "chr")) {
     separated$chromosome <- paste0("chr", separated$chromosome)
@@ -253,17 +274,29 @@ shift_stranded <- function(x, shift = 0L, ...) {
   GenomicRanges::shift(x, shift = shift * ifelse("-" == strand(x), -1, 1), ...)
 }
 
-into_granges <- function(vep_file,
-                         allowed_consequences = c(
-                           "missense_variant", "frameshift_variant",
-                           "downstream_gene_variant", "upstream_gene_variant",
-                           "stop_gained", "splice_region_variant", "inframe_deletion",
-                           "splice_donor_5th_base_variant"
-                         ),
-                         wanted_cols = c(
-                           "ref", "alt", "vaf", "alt_depth", "gene_biotype", "symbol",
-                           "consequence", "existing_variation"
-                         )) {
+into_granges <- function(
+  vep_file,
+  allowed_consequences = c(
+    "missense_variant",
+    "frameshift_variant",
+    "downstream_gene_variant",
+    "upstream_gene_variant",
+    "stop_gained",
+    "splice_region_variant",
+    "inframe_deletion",
+    "splice_donor_5th_base_variant"
+  ),
+  wanted_cols = c(
+    "ref",
+    "alt",
+    "vaf",
+    "alt_depth",
+    "gene_biotype",
+    "symbol",
+    "consequence",
+    "existing_variation"
+  )
+) {
   library(GenomicRanges)
   if (is.character(vep_file)) {
     tb <- read_tsv(vep_file)
@@ -273,19 +306,21 @@ into_granges <- function(vep_file,
 
   tb <- tb |>
     separate_longer_delim(STRAND, ";") |>
-    mutate(Consequence = lapply(Consequence, \(x) intersect(str_split_1(x, ";"), allowed_consequences))) |>
+    mutate(
+      Consequence = lapply(
+        Consequence,
+        \(x) intersect(str_split_1(x, ";"), allowed_consequences)
+      )
+    ) |>
     dplyr::filter(map_lgl(Consequence, \(x) length(x) > 0)) |>
     rename_with(str_to_lower) |>
     dplyr::rename(gene_biotype = "biotype") |>
-    mutate(strand = case_match(strand,
-      "-1" ~ "-",
-      "1" ~ "+",
-      .default = "*"
-    ))
+    mutate(strand = case_match(strand, "-1" ~ "-", "1" ~ "+", .default = "*"))
   loc <- utils$parse_loc(tb, "loc", "alt", "ref")[, 1:3]
 
   gr <- GRanges(
-    seqnames = loc$chromosome, ranges = IRanges(loc$start, loc$end),
+    seqnames = loc$chromosome,
+    ranges = IRanges(loc$start, loc$end),
     strand = Rle(tb$strand)
   )
   for (col in wanted_cols) {
