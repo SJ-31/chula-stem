@@ -303,7 +303,7 @@ U$read_existing(here(figdir, "original_markers_cluster.png"), \(f) {
 gene2class <- tibble(gene = markers, class = names(markers)) |>
   unnest(cols = c(gene))
 average_expr <- AggregateExpression(
-  inegrated,
+  integrated,
   features = unlist(markers)
 )$RNA |>
   as.data.frame() |>
@@ -437,20 +437,26 @@ test <- read_existing(
   read_csv
 )
 
-sig <- topTags(test) |>
-  as.data.frame() |>
-  rownames_to_column(var = "gene") |>
-  as_tibble() |>
-  dplyr::filter(PValue <= 0.01)
+upregulated <- U$read_existing(
+  here(M$outdir, "corneal_proliferative_edgeR_upreg.csv"),
+  \(f) {
+    sig <- topTags(test) |>
+      as.data.frame() |>
+      rownames_to_column(var = "gene") |>
+      as_tibble() |>
+      dplyr::filter(PValue <= 0.01)
+    upregulated <- sig |>
+      dplyr::filter(if_all(starts_with("logFC"), ~ . > 0)) %>%
+      mutate(
+        avgLFC = rowMeans(dplyr::select(., contains("logFC"))),
+        sdLFC = apply(dplyr::select(., contains("logFC")), 1, sd),
+      )
+    write_csv(upregulated, f)
+    upregulated
+  },
+  read_csv
+)
 
-upregulated <- sig |>
-  dplyr::filter(if_all(starts_with("logFC"), ~ . > 0)) %>%
-  mutate(
-    avgLFC = rowMeans(dplyr::select(., contains("logFC"))),
-    sdLFC = apply(dplyr::select(., contains("logFC")), 1, sd),
-  )
-write_csv(upregulated, here(M$outdir, "corneal_proliferative_edgeR_upreg.csv"))
-#
 # [2025-07-02 Wed] Original markers were found here, which is promising
 new_markers <- upregulated$gene[!upregulated$gene %in% markers$proliferative]
 
@@ -464,11 +470,6 @@ U$read_existing(here(figdir, "new_markers.png"), \(x) {
   ggsave(x, plot, width = 12, height = 10, dpi = 500)
 })
 
-## VlnPlot(
-##   integrated,
-##   c("SAPCD2", "KIF18B", "KIF20A", "TOP2A", "TICRR"),
-##   group.by = "leiden_post"
-## )
 
 U$read_existing(here(figdir, "new_markers_confluency.png"), \(x) {
   plot <- DotPlot(
@@ -486,4 +487,57 @@ U$read_existing(here(figdir, "new_markers_violin.png"), \(f) {
     group.by = "leiden_post",
   )
   ggsave(f, plot, width = 12, height = 10, dpi = 500)
+})
+
+## *** With FindAllMarkers
+
+# Top 10 from FindAllMarkers
+fam_top <- markers_v1 |>
+  dplyr::filter(cluster == 11) |>
+  arrange(desc(avg_log2FC)) |>
+  slice_head(n = 50) |>
+  pluck("gene") |>
+  discard(\(x) x %in% upregulated$gene)
+
+fam_false_positives <- c(
+  "KIF18B",
+  "KNL1",
+  "IQGAP3",
+  "APOBEC3B",
+  "SAPCD2",
+  "CDCA7",
+  "TCF19",
+  "EVI2B",
+  "RECQL4",
+  "E2F7",
+  "KIF20A",
+  "DTL",
+  "WDR62"
+)
+
+potential <- c("CEP55", "DEPDC1", "GTSE1", "ASPM", "NUF2", "HMMR", "CLSPN")
+
+U$read_existing(here(figdir, "new_markers_2.png"), \(x) {
+  plot <- DotPlot(
+    integrated,
+    features = potential
+  )
+  ggsave(x, plot, width = 12, height = 10, dpi = 500)
+})
+
+U$read_existing(here(figdir, "new_markers_2_confluency.png"), \(x) {
+  plot <- DotPlot(
+    integrated,
+    features = potential,
+    group.by = "cluster_confluence"
+  )
+  ggsave(x, plot, width = 12, height = 10, dpi = 500)
+})
+
+U$read_existing(here(figdir, "new_markers_2_vln.png"), \(x) {
+  plot <- VlnPlot(
+    integrated,
+    features = potential
+  )
+  ggsave(x, plot, width = 12, height = 10, dpi = 500)
 })
