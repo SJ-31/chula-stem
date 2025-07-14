@@ -16,9 +16,15 @@ gnomad_subset_biallelic="$refdir/variants/gnomADv4.1.0_Exomes/biallelic/all.vcf.
 dbsnp="$refdir/variants/dbSNP_renamed_germline.vcf.gz"
 
 rename () {
+    echo "${1}"
     bcftools annotate --rename-chrs "${rename}" -O z "${1}" > "${2}"
-    gatk IndexFeatureFile -I "${2}"
-    tabix "${2}"
+    if [[ -e "${2}" ]]; then
+        gatk IndexFeatureFile -I "${2}"
+        tabix "${2}"
+    else
+        echo "Bcftools failed to produce ${2}!"
+        exit 1
+    fi
 }
 
 gnomad_subset_chr="$refdir/variants/gnomADv4.1.0_Exomes/random/gnomADv4.1_subset_chr.vcf.gz"

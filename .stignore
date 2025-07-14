@@ -1,2 +1,4 @@
 analyses/data_all
+extras/BulkFormer/data
+extras/BulkFormer/model
 .venv

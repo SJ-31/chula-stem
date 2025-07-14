@@ -1,0 +1,25 @@
+* Data sources
+Sequencing platforms are the same
+WARNING: because the cell types are confounded with the batch (i.e. different studies) we can't be sure that differences are due to cell type and not batch effect
+
+** Corneal
++ Original study: [[https://www.nature.com/articles/s41598-023-36567-6#data-availability][A single-cell RNA-seq analysis unravels the heterogeneity of primary cultured human corneal endothelial cells]]
++ Data prep: 10x Chromium, following standard =10 × Genomics 3′ V3.1= chemistry protocol, NovaSeq 6000, aligned to GRCh38
++ Source: research-grade human donor corneas, corneal endothelial cells from "endothelial–Descemet’s corneal layer "
++ Cells were obtained from culture, so shouldn't expect high heterogeneity
++ Annotated with =CellAssign=
+  * Marker gene information were obtained from CellMarker2 and filtered for cell types based on [[https://pmc.ncbi.nlm.nih.gov/articles/PMC8343164/#sec7][A single cell atlas of human cornea that defines its development, limbal progenitor cells and their interactions with the immune cells]]
+** Fibroblast
++ Data prep: 10x Chromium, NovaSeq 6000, aligned to GRCh37
++ Cells extracted from tissue sample
+  * Original authors "identified immune cells, stromal cells, and doublets contamination"
+    * Used known markers for identification
+      #+begin_quote
+We identified immune or stromal cells using straightforward analysis of known cell type markers (e.g., COL1A2 – fibroblast cells, TRAC – T cells, C1QA - macrophages, S100A8 - monocytes, and more), and cross-validation with the existing data from previous works
+      #+end_quote
++ Annotated with CellTypist, with reference =Adult_Human_Skin=
+
+** Colon
++ Data prep: 10x Chromium, NovaSeq 6000, aligned to GRCh37
++ Source: "(healthy) volunteers attending endoscopy for routine colonoscopic screening"
+  + Annotated with CellTypist, with reference [[https://www.nature.com/articles/s41586-021-03852-1#data-availability][Cells of the human intestinal tract mapped across space and time]]

@@ -11,6 +11,8 @@ package-lock.json
 analyses/data
 analyses/data_all
 analyses/*.pdf
+*.vcf.gz
+*.html
 /nextflow/.nf-test*
 resources/*json
 *.pdf

@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "Test Process salmon"
+    script "modules/salmon.nf"
+    process "SALMON"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                load("$baseDir/tests/rnaseq_paths.yaml")
+            }
+            process {
+                """
+                reads = ["/data/project/stemcell/shannc/output/HCC/RNASEQ/P1/tumor/1-HCC_R1CH_1.fastp.fastq.gz",
+                    "/data/project/stemcell/shannc/output/HCC/RNASEQ/P1/tumor/2-HCC_R1CH_2.fastp.fastq.gz"]
+                index = "/data/project/stemcell/shannc/reference/tool_specific/salmon_index"
+                input[0] = [["out": "$params.out/salmon",
+                    "log": "${params.out}/salmon", "filename": "P17_tumor"],
+                    reads]
+                input[1] = index
+                input[2] = ""
+                input[3] = params.genome_gtf
+                input[4] = "reverse"
+                input[5] = "outward"
+                input[6] = 7
+                """
+            }
+        }
+
+        then {
+            assert process.success
+        }
+
+    }
+
+}

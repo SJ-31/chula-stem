@@ -9,8 +9,9 @@ process GET_THERAPY_CACHE {
     //
 
     output:
-    path(civic), emit: civic
-    path(pandrugs2), emit: pandrugs2
+    path("therapy_cache/${civic}"), emit: civic
+    path("therapy_cache/${pandrugs2}"), emit: pandrugs2
+    path(not_in)
     path("*.log")
     //
 
@@ -18,22 +19,22 @@ process GET_THERAPY_CACHE {
     civic = "civic_cache.json"
     pandrugs2 = "pandrugs2_cache.json"
     not_in = "not_in_databases.txt"
-    check1 = file("${meta.out}/${civic}")
-    check2 = file("${meta.out}/${pandrugs2}")
-    if (check1.exists() && check2.exists()) {
+    check = file("${meta.out}/therapy_cache")
+    if (check) {
         """
-        ln -sr ${check1} .
-        ln -sr ${check2} .
-        ln -sr ${meta.out}/${not_in} .
+        cp -r ${check} .
         ln -sr ${meta.log}/therapy_cache.log .
         """
     } else {
         """
+        mkdir therapy_cache
+
         get_therapy_cache -i . \\
-            --filter_confident \\
-            --not_in_db ${not_in} \\
-            --civic_cache ${civic} \\
-            --pandrugs2_cache ${pandrugs2}
+            --filter-confident \\
+            --not-in-db therapy_cache/${not_in} \\
+            --civic-cache therapy_cache/${civic} \\
+            --pandrugs2-cache therapy_cache/${pandrugs2} \\
+            --gene-col SYMBOL
 
         get_nextflow_log.bash therapy_cache.log
         """

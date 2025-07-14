@@ -1,5 +1,7 @@
 process CNVKIT {
     ext version: "0.9.11"
+    errorStrategy "ignore" // [2025-06-24 Tue] Temporary incompatibility with cnvkit
+    // and the pdac reference file
 
     publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"

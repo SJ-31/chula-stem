@@ -118,3 +118,9 @@ process STAR_SOLO {
     }
     //
 }
+
+// Quality control features
+// As of Version: 2.7.11b, STARsolo provides some options for cell calling (distinguishing "real" cells from empty droplets)
+// - TopCells
+// - CellRanger2.2 (default)
+// - EmptyDrops
