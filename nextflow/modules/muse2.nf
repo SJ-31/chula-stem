@@ -3,6 +3,7 @@ process MUSE2 {
 
     publishDir "$meta.out", mode:"copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    label "mid_mem"
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
