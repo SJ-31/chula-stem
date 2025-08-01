@@ -4,7 +4,7 @@ process {
     withName: "VEP" {
         container = "/data/home/shannc/tools/vep.sif" // Was installed with singularity
         ext.species = "homo_sapiens"
-        ext.cache = "/data/home/shannc/.cache/vep"
+        ext.cache = "/data/project/stemcell/shannc/.cache/vep"
         ext.args = ["--clin_sig_allele 0", // Reports alleles with known clinical significance
                     // in CLIN_SIG field
                     "--check_existing",// Check for existence of known variants co-located
@@ -35,6 +35,10 @@ process {
         container = "/data/home/shannc/tools/MuSE.sif"
         ext.cores = 8
         cpus = 8
+    }
+
+    withName: "BWA" {
+        cpus = 4
     }
 
     withName: "OCTOPUS" {

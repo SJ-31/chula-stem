@@ -84,7 +84,7 @@ process {
     withName: "VEP" {
         container = "/data/home/shannc/tools/vep.sif" // Was installed with singularity
         ext.species = "homo_sapiens"
-        ext.cache = "/data/home/shannc/.cache/vep"
+        ext.cache = "/data/project/stemcell/shannc/.cache/vep"
         ext.args = ["--clin_sig_allele 0", // Reports alleles with known clinical significance
                     "--synonyms /data/project/stemcell/shannc/reference/rename/vep_chr_synonyms.tsv", // NOTE: [2025-06-18 Wed] required for compatibility with previous PDAC variant calls
                     // in CLIN_SIG field
