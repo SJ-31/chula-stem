@@ -50,7 +50,7 @@ rule get_sbs:
     params:
         data_path=data_path,
     output:
-        f"{outdir}/sbs.csv",
+        f"{outdir}/sbs.tsv",
     script:
         "get_sbs.py"
 
@@ -75,3 +75,5 @@ rule vaf_plot:
         gene_metrics=rules.all.input.gene_metrics,
         vaf_separate=rules.all.input.vaf_separate,
         vaf=rules.all.input.vaf,
+    script:
+        "vaf_plot.R"

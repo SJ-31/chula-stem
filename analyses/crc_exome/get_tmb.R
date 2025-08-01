@@ -16,9 +16,6 @@ if (is.null(accepted_consequence)) {
 
 df |>
   filter(key %in% accepted_consequence) |>
-  mutate(
-    sample = str_extract(sample, "[87]-(.*)-VEP_small"),
-    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " "))
-  ) |>
+  mutate(sample = str_extract(sample, "[87]-(.*)-VEP_small")) |>
   filter(category == "Consequences (all)") |>
   write_tsv(outfile)
