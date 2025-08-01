@@ -1,0 +1,70 @@
+library(tidyverse)
+library(here)
+library(glue)
+source(here("src", "R", "utils.R"))
+rlang::global_entrace(enable = TRUE)
+
+data_path <- snakemake@params$data_path
+cases <- snakemake@params$cases
+OUTDIR <- snakemake@params$outdir
+TARGET_FILE <- glue("{snakemake@scriptdir}/target_genes.tsv")
+
+
+vcfs <- sapply(
+  cases,
+  \(x) {
+    glue("{data_path}/{x}/annotations/7-{x}-VEP_small.vcf.gz")
+  },
+  simplify = FALSE,
+  USE.NAMES = TRUE
+)
+
+
+gene_tb <- unlist(snakemake@params$genes, use.names = FALSE) |>
+  lapply(\(x) {
+    splits <- str_split_1(x, ":")
+    chrom <- splits[1]
+    start_end <- str_split_1(splits[2], "-")
+    tibble(chrom = chrom, start = start_end[1], end = start_end[2])
+  }) |>
+  bind_rows()
+write_tsv(gene_tb, TARGET_FILE, col_names = FALSE)
+
+get_wanted_genes <- function(name, file, vep = TRUE) {
+  args <- c("view", glue("--targets-file {TARGET_FILE}"), file)
+
+  tmp <- glue("{OUTDIR}/{name}.vcf")
+
+  system2("bcftools", args, stdout = tmp)
+
+  outfile <- glue("{OUTDIR}/{name}.tsv")
+  query <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/TOOL_SOURCE"
+  args2 <- c(
+    glue("-i {tmp}"),
+    glue("-o {outfile}"),
+    glue("-q '{query}'")
+  )
+  if (vep) {
+    system2(here("src", "bash", "get_vep_anno.bash"), args = args2)
+  }
+  read_tsv(outfile)
+}
+
+vep_vcfs <- lapply(names(vcfs), \(x) {
+  get_wanted_genes(name = x, file = vcfs[[x]], vep = TRUE)
+}) |>
+  `names<-`(names(vcfs))
+
+combined_anno <- lapply(
+  vep_vcfs,
+  mutate(
+    AF = as.double(AF),
+    PS = as.double(PS),
+    INFO_DP = as.double(INFO_DP)
+  )
+) |>
+  list_rbind(names_to = "subject")
+
+write_tsv(combined_anno, snakemake@output$combined)
+
+unlink(TARGET_FILE)
