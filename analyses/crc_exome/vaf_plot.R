@@ -1,14 +1,41 @@
 library(ggpubr)
-source(here::here("analyses", "pdac", "main.R"))
+library(cowplot)
+library(glue)
+library(ggplot2)
+library(tidyverse)
+library(paletteer)
+library(here)
+utils <- new.env()
+source(here("src", "R", "utils.R"), local = utils)
 
-merged <- read_tsv(vaf_merged_file) |>
-  mutate(across(c(Consequence, CLIN_SIG), utils$into_char_list))
-vep_data <- read_tsv(vep_data_file)
+if (exists("snakemake")) {
+  tmb_merged <- read_tsv(snakemake@input$tmb)
+  sbs <- read_tsv(snakemake@input$sbs)
+  target_genes <- snakemake@params$wanted_genes
+  combined_vep <- read_tsv(snakemake@input$combined_vep)
+  config <- snakemake@config
+} else {
+  config <- yaml::read_yaml(here("analyses", "crc_exome", "config.yaml"))
+  outdir <- here("analyses", "output", "crc_exome")
+  combined_vep <- read_tsv(here(outdir, "vcfs", "combined.tsv"))
+  sbs <- read_tsv(here(outdir, "sbs.tsv"))
+  tmb_merged <- read_tsv(here(outdir, "tumor_mutational_burden.tsv"))
+}
 
-var2cons <- read_tsv(vaf_merged_file) |>
-  select(Existing_variation, Consequence, CLIN_SIG) |>
-  separate_longer_delim(Existing_variation, ";") |>
-  distinct(Existing_variation, .keep_all = TRUE)
+accepted_consequence <- config$accepted_consequence
+min_alt_depth <- config$variant_calling$min_alt_depth
+CURATED_VARIANTS <- config$allowed_variants
+ONLY_CURATED <- config$only_curated
+
+save_plot_smk_params <- function(plot, filename) {
+  ggsave(
+    filename,
+    plot = plot,
+    dpi = snakemake@config$plot$dpi,
+    width = snakemake@config$plot$width,
+    height = snakemake@config$plot$height
+  )
+}
 
 ## * Format
 
@@ -26,14 +53,6 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
     str_replace_all("_", " ")
 }
 
-IGNORED_VARIANTS <- c(
-  "non_coding_transcript_variant",
-  "non_coding_transcript_exon_variant",
-  "incomplete_terminal_codon_variant",
-  "intron_variant",
-  "3_prime_UTR_variant"
-)
-
 recode_var_types <- function(types) {
   case_when(
     grepl("utr variant", types) ~ "UTR variant",
@@ -49,72 +68,18 @@ recode_var_types <- function(types) {
   )
 }
 
-tmb_merged <- vep_data |>
-  filter(key %in% ACCEPTED_CONSEQUENCE) |>
-  mutate(
-    sample = str_extract(sample, "P[0-9_]+"),
-    key = map_chr(key, \(x) str_replace_all(str_to_title(x), "_", " "))
-    ## key = recode_var_types(key)
-  ) |>
-  dplyr::filter(category == "Consequences (all)")
 
-TYPE_ORDER <- tmb_merged |>
-  group_by(key) |>
-  summarise(mean = mean(value)) |>
-  arrange(mean) |>
-  pluck("key")
-
-prettify <- function(tb, filter_version = "") {
-  if (filter_version != "CURATED") {
-    to_ignore <- IGNORED_VARIANTS
-  } else {
-    to_ignore <- c()
-  }
+prettify <- function(tb) {
   tb |>
     mutate(
       type = map_chr(
         Consequence,
-        \(x) mode_and_capitalize(x, to_ignore)
+        \(x) mode_and_capitalize(x)
       ),
       clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
       clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar)
     )
 }
-
-merged <- merged |>
-  group_by(SYMBOL) |>
-  mutate(sum_VAF = sum(VAF), mean_VAF = mean(VAF)) |>
-  ungroup()
-
-sum_vafs <- select(merged, SYMBOL, sum_VAF) |>
-  distinct() |>
-  utils$tb2map("SYMBOL", "sum_VAF", FALSE) |>
-  sort(decreasing = TRUE) # Sort order by the summed VAF
-
-by_frequency <- select(merged, SYMBOL, sample) |>
-  distinct() |>
-  group_by(SYMBOL) |>
-  summarise(count = n()) |>
-  utils$tb2map("SYMBOL", "count", FALSE) |>
-  sort(decreasing = TRUE)
-
-## merged$SYMBOL <- factor(merged$SYMBOL, levels = names(sum_vafs))
-merged$SYMBOL <- factor(merged$SYMBOL, levels = names(by_frequency))
-
-min_samples <- 16 # genes must be found in this number of samples
-
-custom_filtered <- merged |>
-  dplyr::filter(
-    !is.na(SYMBOL) &
-      VAF >= 0.3 &
-      !is.na(CLIN_SIG) &
-      !is.na(Consequence) &
-      map_lgl(Consequence, \(x) "missense_variant" %in% x) &
-      map_lgl(CLIN_SIG, \(x) "pathogenic" %in% x)
-  ) |>
-  group_by(SYMBOL) |>
-  dplyr::filter(n() >= min_samples) |>
-  ungroup()
 
 
 ## * Plot
@@ -129,58 +94,26 @@ vaf_heatmap <- function(plot) {
       plot.background = element_blank(),
       panel.border = element_blank(),
       panel.grid.major.x = element_blank(),
-      axis.ticks = element_line(size = 0.5),
+      axis.ticks = element_line(linewidth = 0.5),
       axis.text.x = element_text(angle = 90),
     )
 }
 
-## ** custom filters
-
-with_consequence <- custom_filtered |>
-  prettify() |>
-  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = type)) |>
-  vaf_heatmap()
-
-with_clinsig <- custom_filtered |>
-  prettify() |>
-  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF, fill = clinvar)) |>
-  vaf_heatmap()
-
-blank <- custom_filtered |>
-  prettify() |>
-  ggplot(aes(x = sample, y = SYMBOL, alpha = VAF)) |>
-  vaf_heatmap()
-
-## ** replicate plot
-# %%
-
-sbs <- read_tsv(sbs_merged_file)
-# replicate the figure provided
-target_genes <- c(
-  "KRAS",
-  "TP53",
-  "MUC5B",
-  "KMT2C",
-  "ARID1A",
-  "SMAD4",
-  "GLI3",
-  "CDKN2A"
-)
-
-genes_filtered <- merged |>
-  dplyr::filter(SYMBOL %in% target_genes)
 n_samples <- sbs$sample |>
   unique() |>
   length()
 
-tmp <- read_csv(here(outdir, "select_genes_VEP.csv"))
-replicate_figure <- tmp |>
-  filter(apply(tmp, 1, \(row) {
-    symbol <- row["SYMBOL"]
-    to_pass <- CURATED_VARIANTS[[symbol]]
-    hgvsp <- row["HGVSp"]
-    hgvsg <- row["HGVSg"]
-    (hgvsp %in% to_pass) | (hgvsg %in% to_pass)
+replicate_figure <- combined_vep |>
+  filter(apply(combined_vep, 1, \(row) {
+    if (ONLY_CURATED) {
+      symbol <- row["SYMBOL"]
+      to_pass <- CURATED_VARIANTS[[symbol]]
+      hgvsp <- row["HGVSp"]
+      hgvsg <- row["HGVSg"]
+      (hgvsp %in% to_pass) | (hgvsg %in% to_pass)
+    } else {
+      TRUE
+    }
   })) |>
   group_by(subject, SYMBOL) |>
   summarise(
@@ -209,18 +142,40 @@ replicate_figure <- tmp |>
       \(x) str_replace_all(x, "&", ";")
     ),
     VAF = mean(AF),
-    Alt_depth = mean(map_dbl(AD, \(x) {
-      if (x == ".") {
-        NA
-      } else {
-        splits <- str_split_1(x, ",")
-        as.numeric(splits[length(splits)])
-      }
-    }))
+    Alt_depth = mean(
+      map_dbl(AD, \(x) {
+        if (x == ".") {
+          NA
+        } else {
+          splits <- str_split_1(x, ",")
+          as.numeric(splits[length(splits)])
+        }
+      }),
+      na.rm = TRUE
+    )
   ) |>
   dplyr::rename(sample = subject) |>
   distinct() |>
-  filter(Alt_depth >= 10)
+  filter(Alt_depth >= min_alt_depth)
+
+if (!ONLY_CURATED) {
+  replicate_figure <- mutate(
+    replicate_figure,
+    Consequence = lapply(
+      Consequence,
+      \(csqs) keep(csqs, \(x) x %in% accepted_consequence)
+    )
+  ) |>
+    filter(unlist(lapply(Consequence, length)) >= 1)
+  tmb_merged <- filter(tmb_merged, key %in% accepted_consequence)
+}
+
+TYPE_ORDER <- tmb_merged |>
+  group_by(key) |>
+  summarise(mean = mean(value)) |>
+  arrange(mean) |>
+  pluck("key")
+TYPE_ORDER_TITLE <- str_to_title(TYPE_ORDER) |> str_replace_all("_", " ")
 
 order <- replicate_figure$SYMBOL |>
   table() |>
@@ -289,8 +244,8 @@ tmb_plot <- tmb_merged |>
 ## *** Counts plot
 counts_plot <- replicate_figure |>
   distinct(sample, SYMBOL, .keep_all = TRUE) |>
-  prettify(filter_version) |>
-  ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER))) +
+  prettify() |>
+  ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
   scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
   theme_void() +
@@ -313,11 +268,11 @@ counts_plot <- replicate_figure |>
 
 ## *** Heatmap
 r1 <- replicate_figure |>
-  prettify(filter_version) |>
+  prettify() |>
   ggplot(aes(
     x = sample,
-    y = SYMBOL, # turned off alpha, was confusing
-    fill = factor(type, levels = TYPE_ORDER)
+    y = SYMBOL,
+    fill = factor(type, levels = TYPE_ORDER_TITLE)
   )) |>
   vaf_heatmap() +
   scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
@@ -347,7 +302,7 @@ r3 <- ggdraw(insert_yaxis_grob(
 heatmap_helper <- function(tb) {
   tb |>
     unnest(cols = c(Consequence)) |>
-    prettify(filter_version) |>
+    prettify() |>
     ggplot(aes(
       x = sample,
       y = SYMBOL,
@@ -365,7 +320,6 @@ heatmap_helper <- function(tb) {
 }
 
 with_separate_cons <- heatmap_helper(replicate_figure)
-save_fn(with_separate_cons, "pdac_manual_review_separate.png")
 
 ## ** Arranging
 
@@ -406,10 +360,7 @@ final_rep <- ggarrange(
   ncol = 1,
   heights = c(0.9, 0.1)
 )
-final_rep
 
-save_fn(final_rep, "pdac_vaf_replicate.png")
-# --- CODE BLOCK ---
 ## * Plot metrics
 smm <- replicate_figure |>
   group_by(SYMBOL) |>
@@ -435,183 +386,10 @@ metric_plot <- replicate_figure |>
   guides(fill = guide_legend(title = "Mean VAF")) +
   ylab("Log Alternate allele depth") +
   xlab("Gene")
-save_fn(metric_plot, "gene_metrics.png")
 
-## * Summary of known variants
 
-source(here("src", "R", "utils.R"))
-
-clinsig_hierarchy <- c(
-  "not_provided" = 0,
-  "pathogenic" = 3,
-  "association" = 1,
-  "likely_pathogenic" = 2
-)
-
-get_existing_var <- function(tb, symbols) {
-  filter(tb, SYMBOL %in% symbols) |>
-    separate_longer_delim(Existing_variation, ";") |>
-    select(-Consequence, -CLIN_SIG) |>
-    inner_join(var2cons) |>
-    mutate(
-      clinsig = map_chr(CLIN_SIG, \(chars) {
-        if (!is.na(chars)) {
-          splits <- str_split_1(chars, ";")
-          sorted <- clinsig_hierarchy[splits] |> sort(decreasing = TRUE)
-          names(sorted[1])
-        } else {
-          ""
-        }
-      }),
-      Consequence = map_chr(
-        Consequence,
-        \(vec) flatten_by(vec, unique = TRUE, collapse = TRUE)
-      )
-    )
+if (exists("snakemake")) {
+  save_plot_smk_params(with_separate_cons, snakemake@output$vaf_separate)
+  save_plot_smk_params(final_rep, snakemake@output$vaf)
+  save_plot_smk_params(metric_plot, snakemake@output$gene_metrics)
 }
-
-targets <- get_existing_var(replicate_figure, target_genes) |>
-  select(-where(is.numeric), -CLIN_SIG) |>
-  mutate(SYMBOL = as.character(SYMBOL))
-
-## lapply(unique(targets$SYMBOL), \(x) {
-##   current <- filter(targets, SYMBOL == x)
-##   table(current$Existing_variation) |>
-##     as.data.frame() |>
-##     write_tsv(here(outdir, glue("{x}_existing_vars.tsv")))
-## })
-
-# bcftoo
-# TODO: lookup these existing variants
-
-## * Variant tables
-
-table_outdir <- here(outdir, "vtables")
-to_tables <- tmp |>
-  filter(apply(tmp, 1, \(row) {
-    symbol <- row["SYMBOL"]
-    to_pass <- CURATED_VARIANTS[[symbol]]
-    hgvsp <- row["HGVSp"]
-    hgvsg <- row["HGVSg"]
-    (hgvsp %in% to_pass) | (hgvsg %in% to_pass)
-  })) |>
-  mutate(id = case_when(is.na(HGVSp) ~ HGVSg, .default = HGVSp)) |>
-  select(subject, id, SYMBOL, AF, AD) |>
-  separate_wider_delim(
-    cols = AD,
-    delim = ",",
-    names = c("Ref_depth", "Alt_depth")
-  ) |>
-  group_by(subject, SYMBOL, id) |>
-  summarize(
-    id = first(id),
-    AF = mean(AF),
-    Ref_depth = mean(as.numeric(Ref_depth)),
-    Alt_depth = mean(as.numeric(Alt_depth))
-  ) |>
-  mutate(value = paste0(Ref_depth, ",", Alt_depth, " (", round(AF, 2), ")"))
-
-for (sym in unique(to_tables$SYMBOL)) {
-  to_tables |>
-    filter(SYMBOL == sym) |>
-    select(-SYMBOL) |>
-    pivot_wider(
-      names_from = id,
-      id_cols = subject,
-      values_from = value,
-      values_fill = "-"
-    ) |>
-    mutate(across(where(is.double), \(x) round(x, 2))) |>
-    write_tsv(here(table_outdir, glue("{sym}.tsv")))
-}
-
-## * Caller inconsistencies
-
-tmp |>
-  mutate(AD2 = AD) |>
-  separate_wider_delim(
-    cols = AD2,
-    delim = ",",
-    names = c("Ref_depth", "Alt_depth"),
-    too_few = "align_end",
-    too_many = "drop"
-  ) |>
-  mutate(
-    Ref_depth = as.numeric(Ref_depth),
-    Alt_depth = as.numeric(Alt_depth)
-  ) |>
-  filter(AF != 1 & Ref_depth == 0) |>
-  select(
-    subject,
-    INFO_SOURCE,
-    SYMBOL,
-    HGVSg,
-    HGVSp,
-    Consequence,
-    GT,
-    AD,
-    AF,
-    Existing_variation
-  ) |>
-  write_tsv(here(outdir, "inconsistent_gt_ad.tsv"))
-
-## * Oncoprint
-
-library(ComplexHeatmap)
-
-oncoprint_allowed <- c(
-  "missense_variant" = "blue",
-  "frameshift_variant" = "red",
-  "downstream_gene_variant" = "green",
-  "upstream_gene_variant" = "brown",
-  "stop_gained" = "yellow",
-  "splice_region_variant" = "#8839ef",
-  "inframe_deletion" = "#e64553"
-)
-
-to_oncoprint <- replicate_figure |>
-  select(sample, SYMBOL, Consequence) |>
-  mutate(
-    Consequence = lapply(
-      Consequence,
-      \(x) intersect(x, names(oncoprint_allowed))
-    )
-  ) |>
-  group_by(SYMBOL, sample) |>
-  pivot_wider(
-    names_from = sample,
-    values_from = Consequence,
-    values_fn = \(x) paste0(unique(x[[1]]), collapse = ";")
-  ) |>
-  mutate(across(where(is.character), \(x) replace(x, is.na(x), ""))) |>
-  column_to_rownames(var = "SYMBOL") |>
-  as.matrix()
-
-
-offset <- 1 / length(oncoprint_allowed) / length(oncoprint_allowed)
-alter_fun <- sapply(
-  names(oncoprint_allowed),
-  \(var) {
-    \(x, y, w, h) {
-      grid.rect(
-        x = x,
-        y = y,
-        width = w,
-        height = h / length(oncoprint_allowed),
-        gp = gpar(fill = oncoprint_allowed[var])
-      )
-    }
-  },
-  simplify = FALSE,
-  USE.NAMES = TRUE
-)
-
-## oncoPrint(
-##   to_oncoprint,
-##   get_type = \(x) str_split_1(x, ";"),
-##   alter_fun = alter_fun,
-##   show_column_names = TRUE,
-##   col = oncoprint_allowed
-## )
-
-## --- CODE BLOCK ---
