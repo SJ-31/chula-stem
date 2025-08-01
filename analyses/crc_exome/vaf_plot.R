@@ -31,9 +31,9 @@ save_plot_smk_params <- function(plot, filename) {
   ggsave(
     filename,
     plot = plot,
-    dpi = snakemake@config$plot$dpi,
-    width = snakemake@config$plot$width,
-    height = snakemake@config$plot$height
+    dpi = config$plot$dpi,
+    width = config$plot$width,
+    height = config$plot$height
   )
 }
 
@@ -51,21 +51,6 @@ mode_and_capitalize <- function(char_vec, ignore = c()) {
   val |>
     str_to_title() |>
     str_replace_all("_", " ")
-}
-
-recode_var_types <- function(types) {
-  case_when(
-    grepl("utr variant", types) ~ "UTR variant",
-    grepl("Splice", types) ~ "Splice variant",
-    grepl("Regulatory", types) ~ "Regulatory variant",
-    grepl("Inframe", types) ~ "Inframe deletion/insertion",
-    grepl("Downstream|Upstream|Intergenic", types) ~ "Intergenic variant",
-    grepl("Nmd", types) ~ "NMD transcript variant",
-    grepl("mirna|Start|Stop", types) ~ "Other",
-    types == "Protein altering variant" ~ "Missense variant",
-    types == "Coding sequence variant" ~ "Other",
-    .default = types
-  )
 }
 
 

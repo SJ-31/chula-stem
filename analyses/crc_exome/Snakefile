@@ -7,12 +7,18 @@ include: "../common.smk"
 
 import pandas as pd
 
+"""
+Generate VAF figures from the results of the wes/wes_tumor_only pipeline
+
+See config.yaml for what to specify
+"""
+
 
 outdir = f"{config['out']['root']}/crc_exome"
-store = f"{config['out']['repos']}/crc_exome"
 data_path = f"{config['out']['nf']}/CRC/EXOME-PAIRED"
 sample_sheet = pd.read_csv(f"{config['nf_input']}/crc_exome_paired.csv")
-cohort = config["cohort"]
+
+cohort = config.get("cohort", "cohort")
 
 
 cases = set(sample_sheet["patient"])
@@ -32,7 +38,7 @@ rule all:
         vaf=f"{outdir}/{DATE}/vaf.png",
 
 
-rule get_vep:
+rule get_vep:  # Retrieve vep results for select genes
     output:
         tsvs=expand("{s}/vcfs/{sample}.tsv", s=outdir, sample=cases),
         vcfs=[temp(f) for f in expand("{s}/vcfs/{sample}.vcf", s=outdir, sample=cases)],
@@ -46,7 +52,7 @@ rule get_vep:
         "select_genes.R"
 
 
-rule get_sbs:
+rule get_sbs:  # Get single-base-substitution statistics
     params:
         data_path=data_path,
     output:
@@ -55,7 +61,7 @@ rule get_sbs:
         "get_sbs.py"
 
 
-rule get_tmb:
+rule get_tmb:  # Retrieve tumor mutational burden counts
     input:
         f"{data_path}/{cohort}-MultiQC_data/vep.txt",
     output:
@@ -64,7 +70,7 @@ rule get_tmb:
         "get_tmb.R"
 
 
-rule vaf_plot:
+rule vaf_plot:  # Assemble plot
     input:
         combined_vep=rules.get_vep.output.combined,
         sbs=rules.get_sbs.output,
