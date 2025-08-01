@@ -25,6 +25,13 @@ for c in cases:
 cases = list(cases - to_ignore)
 
 
+rule all:
+    input:
+        gene_metrics=f"{outdir}/{DATE}/gene_metrics.png",
+        vaf_separate=f"{outdir}/{DATE}/vaf_separate.png",
+        vaf=f"{outdir}/{DATE}/vaf.png",
+
+
 rule get_vep:
     output:
         tsvs=expand("{s}/vcfs/{sample}.tsv", s=outdir, sample=cases),
@@ -39,6 +46,15 @@ rule get_vep:
         "select_genes.R"
 
 
+rule get_sbs:
+    params:
+        data_path=data_path,
+    output:
+        f"{outdir}/sbs.csv",
+    script:
+        "get_sbs.py"
+
+
 rule get_tmb:
     input:
         f"{data_path}/{cohort}-MultiQC_data/vep.txt",
@@ -49,14 +65,13 @@ rule get_tmb:
 
 
 rule vaf_plot:
+    input:
+        combined_vep=rules.get_vep.output.combined,
+        sbs=rules.get_sbs.output,
+        tmb=rules.get_tmb.output,
     params:
         wanted_genes=config["wanted_genes"].keys(),
-
-
-# ignore_strs = ["log", "cnvkit_reference", "8-"]
-# rule all:
-#     input:
-#     merged = f"{store}/merged_transcripts.tsv",
-#     output:
-# rule get_merged:
-#     input:
+    output:
+        gene_metrics=rules.all.input.gene_metrics,
+        vaf_separate=rules.all.input.vaf_separate,
+        vaf=rules.all.input.vaf,
