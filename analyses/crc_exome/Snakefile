@@ -1,4 +1,5 @@
 configfile: "../env.yaml"
+configfile: "config.yaml"
 
 
 include: "../common.smk"
@@ -11,34 +12,45 @@ outdir = f"{config['out']['root']}/crc_exome"
 store = f"{config['out']['repos']}/crc_exome"
 data_path = f"{config['out']['nf']}/CRC/EXOME-PAIRED"
 sample_sheet = pd.read_csv(f"{config['nf_input']}/crc_exome_paired.csv")
+cohort = config["cohort"]
 
 
-wanted_genes = {
-    "KRAS": "12:25205246-25250936",
-    "TP53": "17:7661779-7687546",
-    "MUC5B": "11:1223066-1262172",
-    "KMT2C": "7:152134922-152436644",
-    "ARID1A": "1:26693236-26782104",
-    "SMAD4": "18:51028528-51085045",
-    "GLI3": "7:41960949-42264100",
-    "CDKN2A": "9:21967752-21995301",
-}
+cases = set(sample_sheet["patient"])
 
-cases = list(sample_sheet["patient"])
+to_ignore = set()
+for c in cases:
+    if not Path(f"{data_path}/{c}/annotations/7-{c}-VEP_small.vcf.gz").exists():
+        to_ignore.add(c)
+
+cases = list(cases - to_ignore)
 
 
 rule get_vep:
     output:
-        tsvs=expand("{s}/vcfs/{sample}-VEP_small.tsv", s=outdir, sample=cases),
+        tsvs=expand("{s}/vcfs/{sample}.tsv", s=outdir, sample=cases),
         vcfs=[temp(f) for f in expand("{s}/vcfs/{sample}.vcf", s=outdir, sample=cases)],
         combined=f"{outdir}/vcfs/combined.tsv",
     params:
         outdir=f"{outdir}/vcfs",
         cases=cases,
         data_path=data_path,
-        genes=wanted_genes,
+        genes=config["wanted_genes"],
     script:
         "select_genes.R"
+
+
+rule get_tmb:
+    input:
+        f"{data_path}/{cohort}-MultiQC_data/vep.txt",
+    output:
+        f"{outdir}/tumor_mutational_burden.tsv",
+    script:
+        "get_tmb.R"
+
+
+rule vaf_plot:
+    params:
+        wanted_genes=config["wanted_genes"].keys(),
 
 
 # ignore_strs = ["log", "cnvkit_reference", "8-"]

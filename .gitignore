@@ -7,6 +7,7 @@ tests/*.pdf
 nf_metrics
 Rplots.pdf
 package.json
+.snakemake
 package-lock.json
 analyses/data
 analyses/data_all
