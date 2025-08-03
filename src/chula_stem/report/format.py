@@ -416,72 +416,84 @@ def therapy_fmt(
         dfs.append(df)
 
     wanted_cols: tuple = TherapyDB.shared_cols + ("type",)
-    therapy_df = (
-        pl.concat(dfs)
-        .select(wanted_cols)
-        .explode("therapies")
-        .explode("disease")
-        .unique()
-        .with_columns(
-            pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
-        )
-        .filter(  # Make sure that the therapies reported are relevant to cancer
-            (pl.col("db") == "PanDrugs2")
-            | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
-        )
-        .with_columns(
-            pl.col("disease")
-            .str.replace_many({"cancer": "", "clinical": ""})
-            .map_elements(str.capitalize, return_dtype=pl.String),
-            pl.struct(["db", "db_link"])
-            .map_elements(
-                lambda x: db_link_fn(x["db"], x["db_link"]),
-                return_dtype=pl.String,
+    final_cols = (
+        "Therapy",
+        "PubChemId",
+        "Evidence category",
+        "Evidence in sample",
+        "Relevant cancers",
+        "Study source",
+        "Database source",
+    )
+    if len(dfs) > 0 and therapy_df.shape[0] > 0:
+        therapy_df = (
+            pl.concat(dfs)
+            .select(wanted_cols)
+            .explode("therapies")
+            .explode("disease")
+            .unique()
+            .with_columns(
+                pl.col("disease").str.to_lowercase().str.replace_all("_", " "),
             )
-            .alias("db_link"),
-        )
-        .pipe(empty_string2null)
-        .group_by("therapies")
-        .agg(pl.all().unique())
-        .with_columns(
-            pl.col("source").map_elements(
-                lambda x: format_therapy_sources(x, source_dict),
-                return_dtype=pl.List(pl.String),
-            ),
-        )
-        .with_columns(
-            pl.col("db_link").list.head(5).list.join(", "),
-            pl.col(["gene", "disease", "type", "source", "db"]).list.join(", "),
-            pl.col("therapies")
-            .str.split(":")
-            .list.to_struct(fields=["therapies", "PubChemId"]),
-        )
-        .unnest("therapies")
-        .filter(pl.col("therapies").str.contains("[A-Za-z]+"))
-        .with_columns(
-            pl.col("PubChemId")
-            .map_elements(
-                lambda x: (
-                    add_link(x, f"{URL.pubchem}/{x}", underline="yes")
-                    if x != "NA"
-                    else x
+            .filter(  # Make sure that the therapies reported are relevant to cancer
+                (pl.col("db") == "PanDrugs2")
+                | pl.col("disease").str.contains_any(TUMOR_KEYWORDS)
+            )
+            .with_columns(
+                pl.col("disease")
+                .str.replace_many({"cancer": "", "clinical": ""})
+                .map_elements(str.capitalize, return_dtype=pl.String),
+                pl.struct(["db", "db_link"])
+                .map_elements(
+                    lambda x: db_link_fn(x["db"], x["db_link"]),
+                    return_dtype=pl.String,
+                )
+                .alias("db_link"),
+            )
+            .pipe(empty_string2null)
+            .group_by("therapies")
+            .agg(pl.all().unique())
+            .with_columns(
+                pl.col("source").map_elements(
+                    lambda x: format_therapy_sources(x, source_dict),
+                    return_dtype=pl.List(pl.String),
                 ),
-                return_dtype=pl.String,
             )
-            .str.replace("NA", "-"),
-            pl.col("therapies")
-            .str.to_lowercase()
-            .map_elements(str.capitalize, return_dtype=pl.String),
+            .with_columns(
+                pl.col("db_link").list.head(5).list.join(", "),
+                pl.col(["gene", "disease", "type", "source", "db"]).list.join(", "),
+                pl.col("therapies")
+                .str.split(":")
+                .list.to_struct(fields=["therapies", "PubChemId"]),
+            )
+            .unnest("therapies")
+            .filter(pl.col("therapies").str.contains("[A-Za-z]+"))
+            .with_columns(
+                pl.col("PubChemId")
+                .map_elements(
+                    lambda x: (
+                        add_link(x, f"{URL.pubchem}/{x}", underline="yes")
+                        if x != "NA"
+                        else x
+                    ),
+                    return_dtype=pl.String,
+                )
+                .str.replace("NA", "-"),
+                pl.col("therapies")
+                .str.to_lowercase()
+                .map_elements(str.capitalize, return_dtype=pl.String),
+            )
+            .rename(Rename.therapy)
+            .select(list((Rename.therapy).values()))
+            .cast(pl.String)
+            .pipe(empty_string2null)
+            .fill_null("-")
         )
-        .rename(Rename.therapy)
-        .select(list((Rename.therapy).values()))
-        .cast(pl.String)
-        .pipe(empty_string2null)
-        .fill_null("-")
-    )
-    therapy_df = therapy_df.with_columns(
-        cs.by_dtype(pl.String).str.replace_all(";", ", ")
-    )
+        therapy_df = therapy_df.with_columns(
+            cs.by_dtype(pl.String).str.replace_all(";", ", ")
+        )
+    else:
+        therapy_df = pl.DataFrame({c: [] for c in final_cols})
     source_df = pl.DataFrame(
         {"Number": source_dict.values(), "Source": source_dict.keys()}
     )
