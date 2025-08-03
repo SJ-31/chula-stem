@@ -1,12 +1,12 @@
 // * Required params
-workDir = "/data/project/stemcell/shannc/output/nf-work/CRC-EXOME-PAIRED"
+workDir = "/data/project/stemcell/shannc/output/nf-work/CRC-EXOME-TUMOR_ONLY"
 includeConfig "$projectDir/input/wes_tools.config.nf"
-params.outdir = "/data/project/stemcell/shannc/output/CRC/EXOME-PAIRED"
-params.logdir = "/data/project/stemcell/shannc/output/CRC/EXOME-PAIRED/log"
-params.input = "$projectDir/input/manifests/crc_exome_paired.csv"
+params.outdir = "/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY"
+params.logdir = "/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/log"
+params.input = "$projectDir/input/manifests/crc_exome_tumor_only.csv"
 params.routine = "wes"
 params.cohort = "CEN2"
-params.tumor_only = false
+params.tumor_only = true
 
 // Map for pipeline resources
 // See routine-specific documentation to see which need to be included

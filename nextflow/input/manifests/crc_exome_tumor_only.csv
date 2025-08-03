@@ -1,0 +1,5 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+CEN2_N27,/data/project/stemcell/shannc/CRC/raw/CEN2_N27_2_C_1.fastq.gz,/data/project/stemcell/shannc/CRC/raw/CEN2_N27_2_C_2.fastq.gz,tumor,1,ILLUMINA,CEN2_N27-tumor,CEN2_N27-tumor
+CEN2_N18,/data/project/stemcell/shannc/CRC/raw/CEN2_N18_C_1.fastq.gz,/data/project/stemcell/shannc/CRC/raw/CEN2_N18_C_2.fastq.gz,tumor,1,ILLUMINA,CEN2_N18-tumor,CEN2_N18-tumor
+D-CEN2-N20,/data/project/stemcell/shannc/CRC/raw/D-CEN2-N20-C_1.trim.fastq.gz,/data/project/stemcell/shannc/CRC/raw/D-CEN2-N20-C_2.trim.fastq.gz,tumor,1,ILLUMINA,D-CEN2-N20-tumor,D-CEN2-N20-tumor
+D-CEN2-N22,/data/project/stemcell/shannc/CRC/raw/D-CEN2-N22-C_1.trim.fastq.gz,/data/project/stemcell/shannc/CRC/raw/D-CEN2-N22-C_2.trim.fastq.gz,tumor,1,ILLUMINA,D-CEN2-N22-tumor,D-CEN2-N22-tumor
