@@ -29,6 +29,7 @@ for c in cases:
         to_ignore.add(c)
 
 cases = list(cases - to_ignore)
+vcf_dir = f"{outdir}/{DATE}/vcfs"
 
 
 rule all:
@@ -40,11 +41,11 @@ rule all:
 
 rule get_vep:  # Retrieve vep results for select genes
     output:
-        tsvs=expand("{s}/vcfs/{sample}.tsv", s=outdir, sample=cases),
-        vcfs=[temp(f) for f in expand("{s}/vcfs/{sample}.vcf", s=outdir, sample=cases)],
-        combined=f"{outdir}/vcfs/combined.tsv",
+        tsvs=expand("{v}/{sample}.tsv", v=vcf_dir, sample=cases),
+        vcfs=[temp(f) for f in expand("{v}/{sample}.vcf", v=vcf_dir, sample=cases)],
+        combined=f"{vcf_dir}/combined.tsv",
     params:
-        outdir=f"{outdir}/vcfs",
+        outdir=vcf_dir,
         cases=cases,
         data_path=data_path,
         genes=config["wanted_genes"],
