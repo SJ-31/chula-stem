@@ -1,6 +1,8 @@
 library(tidyverse)
 library(glue)
-reticulate::use_condaenv(snakemake@config$conda)
+if (!is.null(snakemake@config$conda)) {
+  reticulate::use_condaenv(snakemake@config$conda)
+}
 py_utils <- new.env()
 reticulate::source_python(glue("{snakemake@config$src$py}/utils.py"), py_utils)
 tmp <- snakemake@output$temp

@@ -1,11 +1,11 @@
-configfile: "../env.yaml"
-configfile: "config.yaml"
-
-
-include: "../common.smk"
+configfile: "env.yaml"
 
 
 import pandas as pd
+from datetime import date
+
+TODAY = date.today().isoformat()
+DATE = config.get("date", TODAY)
 
 """
 Generate VAF figures from the results of the wes/wes_tumor_only pipeline
@@ -14,9 +14,9 @@ See config.yaml for what to specify
 """
 
 
-outdir = f"{config['out']['root']}/crc_exome"
-data_path = f"{config['out']['nf']}/CRC/EXOME-PAIRED"
-sample_sheet = pd.read_csv(f"{config['nf_input']}/crc_exome_paired.csv")
+outdir = f"{config['outdir']}/crc_exome"
+data_path = f"{config['root']}/CRC/EXOME-PAIRED"
+sample_sheet = pd.read_csv(f"{config['manifest']}/crc_exome_paired.csv")
 
 cohort = config.get("cohort", "cohort")
 
