@@ -1,4 +1,4 @@
-configfile: "env.yaml"
+configfile: "env.yaml"  # A config file must be provided
 
 
 import pandas as pd
@@ -14,10 +14,9 @@ See config.yaml for what to specify
 """
 
 
-outdir = f"{config['outdir']}/crc_exome"
-data_path = f"{config['root']}/CRC/EXOME-PAIRED"
-sample_sheet = pd.read_csv(f"{config['manifest']}/crc_exome_paired.csv")
-
+outdir = config["outdir"]
+data_path = config["root"]
+sample_sheet = pd.read_csv(config["manifest"])
 cohort = config.get("cohort", "cohort")
 
 
