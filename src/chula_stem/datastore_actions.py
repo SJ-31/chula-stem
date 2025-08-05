@@ -150,9 +150,7 @@ def write_entry_df(root, date, previous_path: str | None, output: str) -> None:
     df.to_csv(output, index=False)
 
 
-def store_away(
-    config_path: str, sink_root, interactive: bool = True, noconfirm: bool = False
-):
+def store_away(config_path: str, sink_root, interactive, noconfirm, output):
     """Store directories into NGS data root by name
 
     Parameters
@@ -194,8 +192,11 @@ def store_away(
     with open(config_path, "r") as y:
         config: dict = yaml.safe_load(y)
 
+    sink_root_path = Path(sink_root)
     store_path: Path = Path(sink_root)
     command_log: dict = {"old": [], "new": []}
+
+    # Create or validate datastore directories to copy/move into
     for subdir_name, default in zip(
         ["modality", "condition", "cohort"], [None, "unknown", "unassigned"]
     ):
@@ -203,28 +204,30 @@ def store_away(
         if not given:
             raise ValueError("Modality must be specified in config!")
         available = get_dirs(store_path)
-        if subdir_name not in available and not Path(store_path).exists():
-            print(f"{subdir_name} {given} not found in {sink_root}")
+        store_path = store_path.joinpath(given)
+        if given not in available and not Path(store_path).exists():
+            print(f"{subdir_name} {given} not found in {store_path.parent}")
             if not interactive and not noconfirm:
                 return
-            if noconfirm or get_confirmation(
-                f"Create directory {sink_root}/{given}? Y/N"
-            ):
+            if noconfirm or get_confirmation(f"Create directory {store_path}? Y/N"):
                 store_path.mkdir()
-        store_path = sink_root.joinpath(subdir_name)
 
     source_root = Path(config["source_root"])
+    if not source_root.exists():
+        raise ValueError("source_root not found")
 
     ignored = config.get("ignored", set())
     do_copy = config.get("copy", False)
     case_regexp = config.get("case_regexp", "")
     store_subdir = config.get("case_store_dir", "processed")
     case_mappings: dict = config.get("case_mappings", {})
+
+    # Copy/move cases into datastore
     for case in get_dirs(source_root):
         if case.stem in ignored:
             continue
         elif case_regexp and not re.match(case_regexp, case.stem):
-            print(f"{case} did not match regexp, ignoring...")
+            print(f"Subdir {case} did not match case regexp, ignoring...\n")
             continue
         case_alias = case_mappings.get(case.stem, case.stem)
         cur_path = store_path.joinpath(case_alias)
@@ -236,6 +239,7 @@ def store_away(
             print(f"WARNING: directory for case {case_alias} does not exist")
             if noconfirm or get_confirmation(f"Create {cur_path}? Y/N"):
                 cur_path.mkdir()
+                print()
             else:
                 continue
         cur_path = cur_path.joinpath(store_subdir)  # e.g. case/raw
@@ -246,15 +250,46 @@ def store_away(
             cur_path = cur_path.joinpath(store_name)
             cur_path.mkdir(exist_ok=True)
         for file in case.iterdir():
-            if not do_copy:
+            rel = file.relative_to(source_root)
+            exists = cur_path.joinpath(file.name).exists()
+            if exists and not interactive and not noconfirm:
+                print(f"WARNING: file {rel} already exists in {cur_path}. Skipping...")
+                continue
+            elif exists and interactive:
+                if not get_confirmation(
+                    f"WARNING: file {rel} already exists in {cur_path}. [s]kip or add with [u]nique name?",
+                    valid_responses=("s", "u"),
+                    mapping={"u": True, "s": False},
+                ):
+                    print()
+                    continue
+            if not do_copy and not exists:
                 shutil.move(file, cur_path)
+            elif not do_copy and exists:
+                shutil.move(file, make_unique_file(file.name, cur_path))
             elif file.is_dir():
-                shutil.copytree(file, cur_path)
+                shutil.copytree(file, cur_path, dirs_exist_ok=True)
             else:
                 shutil.copy(file, cur_path)
         command_log["old"].append(f"{source_root}/{case}")
-        command_log["new"].append(cur_path)
-    return pd.DataFrame(command_log)
+        command_log["new"].append(cur_path.relative_to(sink_root_path))
+    df = pd.DataFrame(command_log)
+    df.to_csv(output, index=False)
+
+
+def make_unique_file(file: str, dir: Path) -> Path:
+    current = dir.joinpath(file)
+    i: int = 1
+    while current.exists():
+        suffixes = current.suffixes
+        if len(suffixes) > 0:
+            base = reduce(lambda x, y: x.replace(y, ""), suffixes, current.name)
+            new_name = "".join([base, f"_{i}"] + suffixes)
+        else:
+            new_name = f"{current.name}_{i}"
+        current = dir.joinpath(new_name)
+        i += 1
+    return current
 
 
 @click.command()
@@ -274,14 +309,15 @@ def store_away(
     "--action",
     required=True,
     help="Action to perform",
-    default="record",
-    type=click.Choice(["record", "store_away"]),
+    default="record_cases",
+    type=click.Choice(["record_cases", "store_away"]),
 )
 @click.option(
     "-i",
     "--interactive",
     required=False,
     help="Whether to operate interactively",
+    is_flag=True,
     default=False,
     type=bool,
 )
@@ -289,12 +325,18 @@ def store_away(
     "-n",
     "--noconfirm",
     required=False,
-    help="Do not require user confirmation for certain actions",
+    help="""
+    Do not require user confirmation for certain actions.
+    Specifically, non-existent directories specified in the store_config will
+    be created automatically, and existing files in the datastore will be overwritten
+    if new versions are present in the source directory
+    """,
+    is_flag=True,
     default=False,
     type=bool,
 )
 @click.option(
-    "-o", "--output", required=True, help="File to write record to", default=None
+    "-o", "--output", required=False, help="File to write record to", default=None
 )
 @click.option(
     "-p",
@@ -306,9 +348,12 @@ def store_away(
 def main(
     date, root, action, previous_record, output, store_config, interactive, noconfirm
 ) -> None:
-    if action == "record":
+    if not output:
+        d = datetime.date.today().isoformat()
+        output = f"{d}-{action}-autogen.csv"
+    if action == "record_cases":
         write_entry_df(
-            root=root, date=date, previous_path=previous_record, output=output
+            root=Path(root), date=date, previous_path=previous_record, output=output
         )
     elif action == "store_away":
         if store_config is None:
@@ -318,6 +363,7 @@ def main(
             sink_root=root,
             interactive=interactive,
             noconfirm=noconfirm,
+            output=output,
         )
 
 
