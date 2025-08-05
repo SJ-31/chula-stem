@@ -19,8 +19,7 @@ data_path = config["root"]
 sample_sheet = pd.read_csv(config["manifest"])
 cohort = config.get("cohort", "cohort")
 
-
-cases = set(sample_sheet["patient"])
+cases = set(list(sample_sheet["patient"]) + config.get("extra_cases", []))
 
 to_ignore = set()
 for c in cases:

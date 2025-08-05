@@ -8,6 +8,9 @@ src: # source directories
 
 cohort: "8-CEN2"
 
+extra_cases: [] # Specify additional cases that may not be on the manifest to include in plot
+# Must symlink/copy these cases' directories into `root` for this to work
+
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
