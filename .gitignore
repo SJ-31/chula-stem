@@ -3,6 +3,7 @@ tests/patient*
 .github
 *.nf.test.snap
 tests/*.pdf
+tests/datastore/*csv
 *.nf-test.log*
 nf_metrics
 Rplots.pdf

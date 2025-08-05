@@ -1,0 +1,16 @@
+source_root: "" # Top-level directory of data to store away. Immediate
+# subdirectories must be case names, with their contents to be moved into the
+# NGS datastore
+copy: False
+
+# Subdirectories
+modality: ""
+condition: "crc"
+cohort: "unassigned"
+
+case_mappings: {}
+case_regexp: ""
+case_store_dir: "processed"
+ignored: []
+store_name: ""
+store_name_is_prefix: False

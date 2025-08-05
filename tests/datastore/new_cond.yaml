@@ -1,0 +1,14 @@
+source_root: "/home/shannc/Bio_SDD/chula-stem/tests/datastore/scrna_seq1"
+copy: False
+
+# Subdirectories
+modality: "scrna_seq"
+condition: "test_condition"
+cohort: "unassigned"
+
+case_mappings: {}
+case_regexp: "CN-.*"
+case_store_dir: "processed"
+ignored: []
+store_name: "test_store"
+store_name_is_prefix: False
