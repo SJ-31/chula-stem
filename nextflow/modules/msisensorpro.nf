@@ -15,6 +15,7 @@ process MSISENSORPRO {
 
     output:
     tuple val(meta), path("${prefix}/${unstable}.tsv"), emit: tsv
+    path("${prefix}/${prefix}_summary.tsv"), emit: summary
     path(prefix)
     path("*.log")
     //
@@ -56,6 +57,36 @@ process MSISENSORPRO {
         mkdir ${prefix}
         mv *tsv ${prefix}
         get_nextflow_log.bash msisensor.log
+        """
+    }
+    //
+}
+
+process MSISENSORPRO_COLLECT {
+
+    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+
+    input:
+    tuple val(meta), path(summaries)
+    val(module_number)
+    //
+
+    output:
+    path(output)
+    //
+
+    script:
+    output = Utl.getName(module_number, meta, "Msisensor_summaries", "tsv")
+    check = file("${meta.out}/${output}")
+    if (check.exists()) {
+        """
+        cp -sr ${check} .
+        """
+    } else {
+        """
+        collect_msi.py -i . \
+            -s Msisensor_summary.tsv \
+            -o ${output}
         """
     }
     //

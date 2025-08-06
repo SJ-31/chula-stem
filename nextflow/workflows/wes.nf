@@ -3,6 +3,7 @@ include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MANTA } from "../modules/manta.nf"
 include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
+include { MSISENSORPRO_COLLECT } from "../modules/msisensorpro.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
 include { CNVKIT_PREP } from "../modules/cnvkit_prep.nf"
 include { MOSDEPTH } from "../modules/mosdepth.nf"
@@ -85,7 +86,11 @@ workflow whole_exome {
     DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude, 5)
     MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
                  params.ref.genome_gff, 5)
-    GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
+
+    msi_to_collect = MSISENSORPRO.out.summary.collect()
+        .map({ [["filename": cohort_name, "out": params.outdir], it ] })
+    MSISENSORPRO_COLLECT(msi_to_collect, 6)
+    // GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
     to_mutect = paired_no_id.map({
@@ -114,7 +119,9 @@ workflow whole_exome {
         .map({[it[0]] + [it[1..-1]]})
     CONCAT_SMALL_2(to_concat_small_2, 6)
     structural_variants = Utl.joinFirst(MANTA.out.somatic,
-                                        [DELLY_SV.out.variants, GRIDSS.out.variants])
+                                        [DELLY_SV.out.variants,
+                                         // GRIDSS.out.variants
+        ])
         .map({ toConcat("SV_all", "annotations", it) })
     CONCAT_SV(structural_variants, 6)
     to_std_small = Utl.joinFirst(CONCAT_SMALL_2.out.vcf,

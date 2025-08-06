@@ -3,6 +3,7 @@ include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
 include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { MANTA } from "../modules/manta.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
+include { MSISENSORPRO_COLLECT } from "../modules/msisensorpro.nf"
 include { EMPTY_FILES as EMPTY_FILES_1 } from "../modules/empty_files.nf"
 include { EMPTY_FILES as EMPTY_FILES_2 } from "../modules/empty_files.nf"
 include { CNVKIT } from "../modules/cnvkit.nf"
@@ -73,6 +74,9 @@ workflow whole_exome_tumor_only {
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
     MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
                  params.ref.genome_gff, 5)
+    msi_to_collect = MSISENSORPRO.out.summary.collect()
+        .map({ [["filename": cohort_name, "out": params.outdir], it ] })
+    MSISENSORPRO_COLLECT(msi_to_collect, 6)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
