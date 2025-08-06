@@ -79,6 +79,7 @@ vaf_heatmap <- function(plot) {
 n_samples <- sbs$sample |>
   unique() |>
   length()
+sample_names <- as.factor(unique(sbs$sample))
 
 replicate_figure <- combined_vep |>
   filter(apply(combined_vep, 1, \(row) {
@@ -135,6 +136,7 @@ replicate_figure <- combined_vep |>
   distinct() |>
   filter(Alt_depth >= min_alt_depth)
 
+
 if (!ONLY_CURATED) {
   replicate_figure <- mutate(
     replicate_figure,
@@ -176,7 +178,8 @@ sbs_plot <- sbs |>
   geom_bar(position = "fill", stat = "identity") +
   guides(fill = guide_legend(title = element_blank())) +
   theme_void() +
-  scale_fill_paletteer_d("ggthemes::excel_Depth")
+  scale_fill_paletteer_d("ggthemes::excel_Depth") +
+  scale_x_discrete(limits = sample_names)
 
 rep_theme <- "tidyquant::tq_light"
 axis_title_size <- 12
@@ -216,7 +219,9 @@ tmb_plot <- tmb_merged |>
     limits = c(0, tmb_max),
     expand = c(0, 0),
     breaks = c(0, tmb_max)
-  )
+  ) +
+  scale_x_discrete(limits = sample_names)
+
 
 ## *** Counts plot
 counts_plot <- replicate_figure |>
@@ -259,7 +264,8 @@ r1 <- replicate_figure |>
     axis.title.x = element_blank(),
     axis.text.x = element_text(size = axis_title_size),
     axis.title.y = element_text(size = axis_title_size, face = "italic")
-  )
+  ) +
+  scale_x_discrete(limits = sample_names)
 
 r2 <- r1 +
   scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
