@@ -1,0 +1,55 @@
+configfile: "env.yaml"  # A config file must be provided
+
+
+import pandas as pd
+from datetime import date
+
+TODAY = date.today().isoformat()
+DATE = config.get("date", TODAY)
+
+outdir = f"{config['outdir']}/{DATE}"
+data_path = config["root"]
+sample_sheet = pd.read_csv(config["manifest"])
+cohort = config.get("cohort", "cohort")
+extra = config.get("extra", {})
+cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
+
+to_ignore = set()
+for c in cases:
+    if not Path(f"{data_path}/{c}/annotations/8-{c}-CR_MSI.tsv").exists():
+        to_ignore.add(c)
+
+cases = list(cases - to_ignore)
+
+
+# rule all:
+#     input:
+#         msi=f"{outdir}/{DATE}/{cohort}_msi.png",
+
+
+rule get_combined:
+    output:
+        csv=f"{outdir}/combined_msi.csv",
+        no_data=f"{outdir}/no_msi_data.txt",
+    run:
+        no_data = []
+        has_data = []
+        for c in cases:
+            df = pd.read_csv(
+                f"{data_path}/{c}/annotations/8-{c}-CR_MSI.tsv", sep="\t"
+            ).assign(sample=c)
+            if df.shape[0] > 0:
+                has_data.append(df)
+            else:
+                no_data.append(c)
+        combined = pd.concat(has_data)
+        combined.to_csv(output["csv"], index=False)
+        with open(output["no_data"], "w") as f:
+            f.write("\n".join(no_data))
+
+
+# rule plot:
+#     input:
+#         rules.get_combined.output,
+#     output:
+#         rules.all.input.msi,

@@ -1,0 +1,34 @@
+root: "" # Root path of wes results
+outdir: "" # Root path for output
+conda: "" # conda environment for reticulate
+manifest: "" # Nextflow manifest file used for WES pipeline
+src: # source directories
+  py: "../../src/chula_stem"
+  r: "../../src/R"
+
+cohort: "CEN2"
+extra:
+  cases: [] # Specify additional cases that may not be on the manifest to include in plot
+# Must symlink/copy these cases' directories into `root` for this to work
+
+plot:
+  dpi: 500
+  width: 15
+  height: 10
+
+only_curated: False # Only allow named variants, regardless of type
+
+wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
+  TP53: "17:7661779-7687546"
+  APC: "5:112707518-112846239"
+  AIM2: "1:159056129-159187843" # may contribute to immune escape
+  PIK3CA: "3:179148114-179240093" # "double somatic" sCRC
+  # MAPK cascade genes
+  KRAS: "12:25205246-25250936"
+  NRAS: "1:114704469-114716771"
+  # MMR-D LS-CRC associated genes
+  MLH1: "3:36993226-37050896"
+  MSH2: "2:47403067-47663146"
+  MSH6: "2:47695530-47810063"
+  PMS2: "7:5970925-6009130"
+  EPCAM: "2:47345158-47387601"
