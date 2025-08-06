@@ -8,19 +8,11 @@ library(here)
 utils <- new.env()
 source(here("src", "R", "utils.R"), local = utils)
 
-if (exists("snakemake")) {
-  tmb_merged <- read_tsv(snakemake@input$tmb)
-  sbs <- read_tsv(snakemake@input$sbs)
-  target_genes <- snakemake@params$wanted_genes
-  combined_vep <- read_tsv(snakemake@input$combined_vep)
-  config <- snakemake@config
-} else {
-  config <- yaml::read_yaml(here("analyses", "crc_exome", "config.yaml"))
-  outdir <- here("analyses", "output", "crc_exome")
-  combined_vep <- read_tsv(here(outdir, "vcfs", "combined.tsv"))
-  sbs <- read_tsv(here(outdir, "sbs.tsv"))
-  tmb_merged <- read_tsv(here(outdir, "tumor_mutational_burden.tsv"))
-}
+tmb_merged <- read_tsv(snakemake@input$tmb)
+sbs <- read_tsv(snakemake@input$sbs)
+target_genes <- snakemake@params$wanted_genes
+combined_vep <- read_tsv(snakemake@input$combined_vep)
+config <- snakemake@config
 
 accepted_consequence <- config$accepted_consequence
 min_alt_depth <- config$variant_calling$min_alt_depth

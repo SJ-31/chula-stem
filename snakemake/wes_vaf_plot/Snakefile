@@ -18,8 +18,9 @@ outdir = f"{config['outdir']}/{DATE}"
 data_path = config["root"]
 sample_sheet = pd.read_csv(config["manifest"])
 cohort = config.get("cohort", "cohort")
+extra = config.get("extra", {})
 
-cases = set(list(sample_sheet["patient"]) + config.get("extra_cases", []))
+cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
 
 to_ignore = set()
 for c in cases:
@@ -61,9 +62,14 @@ rule get_sbs:  # Get single-base-substitution statistics
         "get_sbs.py"
 
 
+multiqc_veps = [f"{data_path}/{cohort}-MultiQC_data/vep.txt"] + extra.get(
+    "multiqc_vep", []
+)
+
+
 rule get_tmb:  # Retrieve tumor mutational burden counts
     input:
-        f"{data_path}/{cohort}-MultiQC_data/vep.txt",
+        multiqc_veps,
     output:
         f"{outdir}/tumor_mutational_burden.tsv",
     script:
