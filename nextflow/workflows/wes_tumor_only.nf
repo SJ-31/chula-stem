@@ -156,7 +156,7 @@ workflow whole_exome_tumor_only {
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
                      keepHeader: true, skip: 1)
-        .map({ def id = (it.baseName =~ /.*-(.*)-.*/)[0][1]
+        .map({ def id = (it.baseName =~ /[0-9]+-(.*)-ClassifyCNV.*/)[0][1]
               [["id": id, "filename": id,
           "out": "${params.outdir}/${id}/annotations",
           "log": "${params.logdir}/${id}/annotations"], it]
