@@ -14,7 +14,7 @@ See config.yaml for what to specify
 """
 
 
-outdir = config["outdir"]
+outdir = f"{config['outdir']}/{DATE}"
 data_path = config["root"]
 sample_sheet = pd.read_csv(config["manifest"])
 cohort = config.get("cohort", "cohort")
@@ -27,14 +27,14 @@ for c in cases:
         to_ignore.add(c)
 
 cases = list(cases - to_ignore)
-vcf_dir = f"{outdir}/{DATE}/vcfs"
+vcf_dir = f"{outdir}/vcfs"
 
 
 rule all:
     input:
-        gene_metrics=f"{outdir}/{DATE}/gene_metrics.png",
-        vaf_separate=f"{outdir}/{DATE}/vaf_separate.png",
-        vaf=f"{outdir}/{DATE}/vaf.png",
+        gene_metrics=f"{outdir}/gene_metrics.png",
+        vaf_separate=f"{outdir}/vaf_separate.png",
+        vaf=f"{outdir}/vaf.png",
 
 
 rule get_vep:  # Retrieve vep results for select genes
@@ -54,6 +54,7 @@ rule get_vep:  # Retrieve vep results for select genes
 rule get_sbs:  # Get single-base-substitution statistics
     params:
         data_path=data_path,
+        cases=cases,
     output:
         f"{outdir}/sbs.tsv",
     script:

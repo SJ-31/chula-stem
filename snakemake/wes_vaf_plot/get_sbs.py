@@ -10,10 +10,6 @@ from tempfile import TemporaryDirectory
 import polars as pl
 from snakemake.script import snakemake as smk
 
-data: Path = Path(smk.params["data_path"])
-
-target = str(smk.output)
-
 
 def bcftools_stats(input, output) -> None:
     command = f"bcftools norm -a --atom-overlaps '*' -d none {input}"
@@ -63,21 +59,29 @@ def get_substitution_types(
     return df
 
 
+data: Path = Path(smk.params["data_path"])
+target = str(smk.output)
+cases = smk.params["cases"]
+
 dfs: list[pl.DataFrame] = []
 cwd = os.getcwd()
-if data.exists():
-    files = [
-        f.resolve().absolute() for f in list(data.rglob("7-*-Small_high_conf.vcf.gz"))
-    ]
-    with TemporaryDirectory() as tmpdir:
-        os.chdir(tmpdir)
-        for f in files:
-            sample_name = re.findall(r"7-(.*)-Small_high_conf.vcf", f.stem)[0]
-            bcftools_stats(f, "tmp_stats.txt")
-            df = get_substitution_types("tmp_stats.txt").with_columns(
-                sample=pl.lit(sample_name)
-            )
-            dfs.append(df)
-    os.chdir(cwd)
-    final = pl.concat(dfs)
-    final.write_csv(target, separator="\t")
+
+found_cases = []
+files = []
+for case in cases:
+    case_dir = data.joinpath(case).resolve().absolute()
+    look_for = next(case_dir.rglob("7-*-Small_high_conf.vcf.gz"), None)
+    if look_for:
+        files.append(look_for)
+        found_cases.append(case)
+
+with TemporaryDirectory() as tmpdir:
+    os.chdir(tmpdir)
+    for f, c in zip(files, cases):
+        # sample_name = re.findall(r"7-(.*)-Small_high_conf.vcf", f.stem)[0]
+        bcftools_stats(f, "tmp_stats.txt")
+        df = get_substitution_types("tmp_stats.txt").with_columns(sample=pl.lit(c))
+        dfs.append(df)
+os.chdir(cwd)
+final = pl.concat(dfs)
+final.write_csv(target, separator="\t")
