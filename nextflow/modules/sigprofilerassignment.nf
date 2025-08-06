@@ -51,3 +51,39 @@ process SIGPROFILERASSIGNMENT {
         """
     }
 }
+
+process SIGPROFILERASSIGNMENT_COLLECT {
+    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+
+    input:
+    tuple val(meta), path(activities, stageAs: "?/*")
+    val(module_number)
+    //
+
+    output:
+    path(output)
+    //
+
+    script:
+    output = Utl.getName(module_number, meta, "SigProfilerAssignment_activities", "tsv")
+    check = file("${meta.out}/${output}")
+    if (check.exists()) {
+        """
+        ln -sr ${check} .
+        """
+    } else {
+        """
+        #!/usr/bin/env Rscript
+
+        library(tidyverse)
+        files <- list.files(pattern = "Assignment_Solution_Activities.txt",
+            recursive = TRUE)
+        combined <- lapply(files, read_tsv) |> bind_rows()
+        combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
+        str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
+        })
+        write_tsv(combined, "${output}")
+        """
+    }
+    //
+}

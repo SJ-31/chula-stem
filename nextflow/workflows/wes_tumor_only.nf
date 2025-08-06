@@ -1,6 +1,7 @@
 include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
 include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
 include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
+include { SIGPROFILERASSIGNMENT_COLLECT } from "../modules/sigprofilerassignment.nf"
 include { MANTA } from "../modules/manta.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
 include { MSISENSORPRO_COLLECT } from "../modules/msisensorpro.nf"
@@ -38,6 +39,9 @@ workflow whole_exome_tumor_only {
 
     main:
     def cohort_name = params.cohort ? params.cohort : "cohort"
+    def cohortTopLevel = { [["out": params.outdir, "log": params.logdir,
+                             "filename": cohort_name], it] }
+
     /*
      * Preprocessing
      */
@@ -74,9 +78,7 @@ workflow whole_exome_tumor_only {
     MANTA(paired_no_id, params.ref.genome, params.ref.targets, 5)
     MSISENSORPRO(paired_no_id, params.ref.homopolymers_microsatellites, "exome",
                  params.ref.genome_gff, 5)
-    msi_to_collect = MSISENSORPRO.out.summary.collect()
-        .map({ [["filename": cohort_name, "out": params.outdir], it ] })
-    MSISENSORPRO_COLLECT(msi_to_collect, 6)
+    MSISENSORPRO_COLLECT(MSISENSORPRO.out.summary.collect().map(cohortTopLevel), 6)
     GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
@@ -187,6 +189,8 @@ workflow whole_exome_tumor_only {
 
     SIGPROFILERASSIGNMENT(Utl.delSuffix(QC_SMALL.out.vcf), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
+    SIGPROFILERASSIGNMENT_COLLECT(SIGPROFILERASSIGNMENT.out.activities.map({ it[1] })
+                                    .collect().map(cohortTopLevel), 8)
     CLASSIFY_CNV(cnv_bed, 7)
 
     // Cross reference regions
@@ -226,8 +230,7 @@ workflow whole_exome_tumor_only {
                                                     MOSDEPTH.out.dist,
                                                     PICARD.out.metrics,
                                                     BCFTOOLS_STATS.out.py)
-        .flatten().collect().map({ [["out": params.outdir, "log": params.logdir,
-                                     "filename": cohort_name], it] })
+        .flatten().collect().map(cohortTopLevel)
     MULTIQC(to_multiqc, 8)
 
     // Combine channels for report
