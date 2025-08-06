@@ -7,6 +7,13 @@ src:
   r: "/data/home/shannc/chula-stem/src/R"
 cohort: "8-CEN2"
 
+extra:
+  cases: ["CEN2_N18", "CEN2_N27", "D-CEN2-N20", "D-CEN2-N22"]
+  multiqc_vep:
+    [
+      "/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
+    ]
+
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
@@ -22,9 +29,9 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
   - "missense_variant"
   - "frameshift_variant"
-  - "downstream_gene_variant"
-  - "upstream_gene_variant"
-  - "intron_variant"
+  # - "downstream_gene_variant"
+  # - "upstream_gene_variant"
+  # - "intron_variant"
   - "3_prime_UTR_variant"
   - "stop_gained"
   - "splice_region_variant"
