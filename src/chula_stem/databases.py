@@ -203,10 +203,13 @@ class TherapyDB(ABC):
         previous, gene_list = self.read_cache(gene_list)  # Get cached results
         # and filter gene list for those that weren't cached
         for g in gene_list:
-            current: pl.DataFrame = self.get_gene(g, confident)
-            if not current.is_empty():
-                results.append(current.with_columns(db=pl.lit(self.name)))
-            sleep(self.api_wait)  # API permits 2 requests per second
+            try:
+                current: pl.DataFrame = self.get_gene(g, confident)
+                if not current.is_empty():
+                    results.append(current.with_columns(db=pl.lit(self.name)))
+                sleep(self.api_wait)  # API permits 2 requests per second
+            except TimeoutError:
+                print(f"WARNING: received timeout error for gene {g}, skipping...")
         if results:
             try:
                 df = pl.concat(results, how="vertical_relaxed")
