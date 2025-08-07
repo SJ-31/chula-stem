@@ -21,7 +21,7 @@ rule dndscv:
         exclmuts=f"{outdir}/exclmuts.tsv",
         exclsamples=f"{outdir}/exclsamples.txt",
         nbreg=f"{outdir}/nbreg.rds",
-        nbregind=f"{outdir}/nbreg.rds",
+        nbregind=f"{outdir}/nbregind.rds",
         poissmodel=f"{outdir}/poissmodel.rds",
         wrongmuts=f"{outdir}/wrongmuts.tsv",
     script:
@@ -42,8 +42,9 @@ with open(config["sample_sheet"], "r") as f:
 rule get_mutations:
     output:
         f"{outdir}/cohort_mutations.tsv",
+        [temp(f) for f in expand("{o}/{name}.tmp", o=outdir, name=samples.keys())],
     run:
-        for name, path in samples:
+        for name, path in samples.items():
             query = f"{name}\t%CHROM\t%POS\t%REF\t%ALT"
             shell(f"bcftools query -f '{query}' {path} > {outdir}/{name}.tmp")
         shell(f"cat {outdir}/*tmp > {output[0]}")

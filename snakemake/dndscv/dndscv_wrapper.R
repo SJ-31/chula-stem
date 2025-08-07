@@ -1,7 +1,10 @@
 library(dndscv)
 library(readr)
 
-tb <- read.table(snakemake@input[[1]])
+tb <- read.table(
+  snakemake@input[[1]],
+  col.names = c("sampleID", "chr", "pos", "ref", "mut")
+)
 
 get <- function(list, val, default) {
   v <- list[[val]]
@@ -52,7 +55,6 @@ tsvs <- c(
   "geneindels",
   "mle_submodel",
   "exclmuts",
-  "exclsamples",
   "wrongmuts"
 )
 
@@ -63,7 +65,11 @@ rds <- c(
 )
 
 for (tsv in tsvs) {
-  write_tsv(result[[tsv]], output[[tsv]])
+  if (!is.null(result[[tsv]])) {
+    write_tsv(result[[tsv]], output[[tsv]])
+  } else {
+    write_file("", output[[tsv]])
+  }
 }
 
 for (obj in rds) {
