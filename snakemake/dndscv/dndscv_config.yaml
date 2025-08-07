@@ -1,0 +1,18 @@
+cohort: ""
+outdir: ""
+sample_sheet: "" # Path to tsv file where first column is sample name, second is vcf file path. If a line only has one column, then the stem of the filename is used as the
+# sample name
+
+# Supported parameters for running dndscv
+refdb: null
+sm: null
+kc: null
+max_muts_per_gene_per_sample: null
+max_coding_muts_per_sample: null
+use_indel_sites: null
+min_indels: null
+maxcovs: null
+constrain_wnon_wspl: null
+numcode: null
+mingenecovs: null
+gene_list: null
