@@ -125,6 +125,8 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
     )
     if df.is_empty():
         return tuple([empty_table(Rename.repeat.values())] * 3)
+    if "repeat_unit_bases" not in df.columns:
+        df = df.with_columns(repeat_unit_bases=pl.lit(None))
     df = (
         add_loc(df, start_col="Start", end_col="End")
         .with_columns(
