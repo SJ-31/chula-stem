@@ -265,6 +265,26 @@ def region_filter(
     return df.select(original_cols)
 
 
+def write_empty(output, tool_source_tag):
+    empty = pl.DataFrame(
+        schema=[
+            "Loc",
+            "Ref",
+            "Alt",
+            tool_source_tag,
+            "FILTER",
+            "VAF",
+            "Allele",
+            "Consequence",
+            "IMPACT",
+            "SYMBOL",
+            "Gene",
+            "Feature_type",
+        ]
+    )
+    empty.write_csv(output, separator="\t", null_value="NA")
+
+
 @click.command()
 @click.option("-o", "--output", required=True, help="Output tsv path")
 @click.option("-i", "--input_tsv", required=True, help="Input tsv path")
@@ -317,23 +337,7 @@ def qc_main(
 ) -> None:
     if Path(input_tsv).stat().st_size == 0:
         print("WARNING: empty input")
-        empty = pl.DataFrame(
-            schema=[
-                "Loc",
-                "Ref",
-                "Alt",
-                tool_source_tag,
-                "FILTER",
-                "VAF",
-                "Allele",
-                "Consequence",
-                "IMPACT",
-                "SYMBOL",
-                "Gene",
-                "Feature_type",
-            ]
-        )
-        empty.write_csv(output, separator="\t", null_value="NA")
+        write_empty(output=output, tool_source_tag=tool_source_tag)
     else:
         df: pl.DataFrame = pl.read_csv(
             input_tsv,
@@ -343,6 +347,10 @@ def qc_main(
         )
         if canonical and "CANONICAL" in df.columns:
             df = df.filter(pl.col("CANONICAL") == "YES")
+            if df.shape[0] <= 0:
+                print("WARNING: no variants with of canonical transcripts found")
+                write_empty(output, tool_source_tag=tool_source_tag)
+                exit(0)
         print(f"Original shape: {df.shape}")
         grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
         df = standard_filters(
