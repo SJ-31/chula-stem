@@ -126,7 +126,6 @@ def resolve_transcripts(
     df: pl.DataFrame,
     grouping_cols: list,
     impact: bool = True,
-    canonical: bool = True,
     informative: bool = True,
 ) -> pl.DataFrame:
     """Choose between transcripts of gene based on...
@@ -144,12 +143,6 @@ def resolve_transcripts(
         )
         return df
 
-    def by_canonical(df: pl.DataFrame) -> pl.DataFrame:
-        filtered = df.filter(pl.col("CANONICAL") == "YES")
-        if filtered.is_empty():
-            return df
-        return filtered
-
     def by_informative(df: pl.DataFrame) -> pl.DataFrame:
         original_cols: list = df.columns
         sum_col: str = "na_count"
@@ -166,8 +159,6 @@ def resolve_transcripts(
     dfs: list[pl.DataFrame] = []
     for _, group in df.group_by(grouping_cols):
         group: pl.DataFrame
-        if canonical and "CANONICAL" in df.columns:
-            group = by_canonical(group)
         if impact:
             group = by_impact(group)
         if informative:
@@ -350,6 +341,8 @@ def qc_main(
             infer_schema_length=None,
             null_values=["NA", "."],
         )
+        if canonical and "CANONICAL" in df.columns:
+            df = df.filter(pl.col("CANONICAL") == "YES")
         print(f"Original shape: {df.shape}")
         grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
         df = standard_filters(
@@ -364,7 +357,6 @@ def qc_main(
             df,
             grouping_cols,
             impact=impact,
-            canonical=canonical,
             informative=informative,
         )
         print(f"After resolve_transcripts: {df.shape}")
