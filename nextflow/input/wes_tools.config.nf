@@ -14,10 +14,13 @@ process {
                     "--exclude_predicted",
                     "--gene_phenotype", // Indicate if gene is associated with phenotype
                     "--regulatory", // Look for overlaps with regulatory regions
-                    "--canonical", // Indicates if transcript is canonical for the gene
-                    "--offline"
+                    "--offline",
                     // "--plugin StructuralVariantOverlap,file=???" // Retrieve information from
                     // overlapping user-specified structural variants
+
+                    // Transcript flags
+                    "--canonical", // Indicates if transcript is canonical for the gene
+                    "--mane", // Indicates if transcript is
                     ]
     }
 

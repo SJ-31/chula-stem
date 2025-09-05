@@ -50,6 +50,7 @@ params.ref = ["genome": genome,
 // ** Quality control filters
 params.small_qc = ["accepted_filters": ["PASS"],
                    "min_tumor_depth": 10,
+                   "canonical": true,
                    "max_normal_depth": 10,
                    "min_vaf": 0.10]
 params.sv_qc = ["accepted_filters": ["PASS"]]

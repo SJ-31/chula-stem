@@ -5,7 +5,7 @@ manifest: "/data/home/shannc/chula-stem/nextflow/input/manifests/crc_exome_paire
 src:
   py: "/data/home/shannc/chula-stem/src/chula_stem"
   r: "/data/home/shannc/chula-stem/src/R"
-cohort: "8-CEN2"
+cohort: "CEN2"
 
 extra:
   cases: ["CEN2_N18", "CEN2_N27", "D-CEN2-N20", "D-CEN2-N22"]
@@ -53,6 +53,10 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   MSH6: "2:47695530-47810063"
   PMS2: "7:5970925-6009130"
   EPCAM: "2:47345158-47387601"
+  # Detected to be positively selected by dndscv [2025-08-07 Thu]
+  PARP4: "13:24420931-24512778"
+  NDUFV2: "18:9102630-9134345"
+  GXYLT1: "12:42081845-42144874"
 
 allowed_variants: # Mapping of gene symbols to a list of specific variants
   # variant identifiers can be in either HGVSp or HGVSg format

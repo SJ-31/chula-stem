@@ -1,12 +1,13 @@
 // * Required params
-workDir = "/data/project/stemcell/shannc/output/nf-work/PHCase1"
+workDir = "/data/project/stemcell/shannc/output/nf-work/PHCase"
 includeConfig "$projectDir/input/wes_tools.config.nf"
-params.outdir = "/data/project/stemcell/shannc/output/PHCase1"
+params.outdir = "/data/project/stemcell/shannc/output/PHCase"
 params.input = "$projectDir/input/manifests/pdac_phcase1.csv"
 params.logdir = "${params.outdir}/log"
 params.routine = "wes"
-params.cohort = "PHcase1"
+params.cohort = "PHcase"
 params.tumor_only = false
+params.source_name = "SOURCE"
 
 realdir = "/data/home/shannc/chula-stem/nextflow/"
 includeConfig "${projectDir}/input/references.config.nf"
@@ -53,18 +54,16 @@ params.ref = ["genome": genome,
 
 // ** Quality control filters
 params.small_qc = ["accepted_filters": ["PASS"],
-                   "min_tumor_depth": 10,
-                   "max_normal_depth": 10,
+                   "min_tumor_depth": 0,
+                   "max_normal_depth": 0,
+                   "canonical": true,
                    "min_vaf": 0.10]
 params.sv_qc = ["accepted_filters": ["PASS"]]
 params.qc = ["accepted_filters": ["PASS"],
-             "min_tumor_depth": 10,
-             "max_normal_depth": 10,
+             "min_tumor_depth": 0,
+             "max_normal_depth": 0,
              "min_vaf": 0.10,
-             "min_callers": 2,
-             "informative": true,
-             "canonical": true,
-             "impact": true]
+             "min_callers": 2]
 
 // * TEMPORARY
 process {
