@@ -6,6 +6,11 @@ rlang::global_entrace(enable = TRUE)
 
 data_path <- snakemake@params$data_path
 cases <- snakemake@params$cases
+
+SOURCE_TAG <- snakemake@config$source_tag
+if (is.null(SOURCE_TAG)) {
+  SOURCE_TAG <- "TOOL_SOURCE"
+}
 OUTDIR <- snakemake@params$outdir
 TARGET_FILE <- glue("{snakemake@scriptdir}/target_genes.tsv")
 
@@ -46,7 +51,7 @@ get_wanted_genes <- function(name, file, is_paired = TRUE, vep = TRUE) {
   system2("bcftools", args, stdout = tmp)
 
   outfile <- glue("{OUTDIR}/{name}.tsv")
-  query <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/TOOL_SOURCE"
+  query <- glue("[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/{SOURCE_TAG}")
   args2 <- c(
     glue("-i {tmp}"),
     glue("-o {outfile}"),

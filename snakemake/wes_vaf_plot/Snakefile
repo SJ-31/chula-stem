@@ -27,6 +27,7 @@ for c in cases:
     if not Path(f"{data_path}/{c}/annotations/7-{c}-VEP_small.vcf.gz").exists():
         to_ignore.add(c)
 
+print("Ignoring cases", to_ignore)
 cases = list(cases - to_ignore)
 vcf_dir = f"{outdir}/vcfs"
 
@@ -62,7 +63,7 @@ rule get_sbs:  # Get single-base-substitution statistics
         "get_sbs.py"
 
 
-multiqc_veps = [f"{data_path}/{cohort}-MultiQC_data/vep.txt"] + extra.get(
+multiqc_veps = [f"{data_path}/8-{cohort}-MultiQC_data/vep.txt"] + extra.get(
     "multiqc_vep", []
 )
 
