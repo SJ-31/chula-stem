@@ -1,0 +1,43 @@
+import yaml
+from pathlib import Path
+
+
+configfile: "env.yaml"
+
+
+TODAY = date.today().isoformat()
+DATE = config.get("date", TODAY)
+
+sample_sheet = pd.read_csv(config["manifest"])
+extra = config.get("extra", {})
+data_path = config["root"]
+outdir = config["outdir"]
+
+cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
+
+sample_maps = {"cnv": {}, "vep": {}, "msi": {}}
+
+for c in cases:
+    case_path = Path(data_path).joinpath(c).joinpath("annotations")
+    vep_path = case_path.joinpath(f"8-{c}-VEP_small.tsv")
+    msi_path = case_path.joinpath(f"8-{c}-CR_MSI.tsv")
+    cnv_path = case_path.joinpath(f"8-{c}-CR_cnv.tsv")
+    for group, f in zip(["cnv", "vep", "msi"], [cnv_path, vep_path, msi_path]):
+        if f.exists():
+            sample_maps[group] = str(f.absolute())
+        else:
+            print(f"WARNING: {group} file {f} does not exist for case {c}!")
+
+
+feature_files = {"protein_features": f"{outdir}/protein_features.tsv"}
+
+
+rule encode_protein_features:
+    output:
+        feature_files["protein_features"],
+    run:
+
+
+
+# TODO: enrichment analyses on drug sensitivity groups
+# TODO: cnv analyses

@@ -1,0 +1,9 @@
+transcript_id2uniprot:
+  file: "/home/shannc/Bio_SDD/chula-stem/analyses/data/2025-09-09_ensembl2uniprot.tsv" # REQUIRED: mapping file path
+  uniprot_colname: "uniprotswissprot"
+  ensembl_id_colname: "ensembl_transcript_id"
+samples: # REQUIRED: map of sample names to vcf paths
+  p1: /my/sample_path
+symbols: ["KRAS", ""] # List of symbols to restrict encoding to
+# leave empty to use all symbols in vcf file
+features:
