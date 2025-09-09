@@ -200,19 +200,28 @@ get_all_features <- function(
 
 add_feature_score <- function(tb, how = "consequence") {
   if (how == "consequence") {
-    tb |>
-      mutate(
-        feature_score = map_dbl(Consequence, \(csq) {
-          if (str_detect(csq, ";")) {
-            consequences <- str_split_1(csq, ";")
-            map_dbl(consequences, \(c) CONSEQUENCE_SCORES[[c]]) |> max()
+    mutate(
+      tb,
+      feature_score = map_dbl(Consequence, \(csq) {
+        if (is.na(csq)) {
+          return(0)
+        }
+        if (str_detect(csq, ";")) {
+          consequences <- str_split_1(csq, ";")
+          map_dbl(consequences, \(c) CONSEQUENCE_SCORES[[c]]) |>
+            max()
+        } else {
+          lookup <- CONSEQUENCE_SCORES[[csq]]
+          if (is.null(lookup)) {
+            0
           } else {
-            CONSEQUENCE_SCORES[[csq]]
+            lookup
           }
-        })
-      )
+        }
+      })
+    )
   } else {
-    tb |> mutate(feature_score = 1)
+    mutate(tb, feature_score = 1)
   }
 }
 
@@ -225,20 +234,32 @@ add_feature_score <- function(tb, how = "consequence") {
 #' @param sample_tb annotated VCF tibble from Ensembl vep
 #' @param only_symbols Only encode the given symbols. By default, tries to encode all
 #' @param how encoding method, see `add_feature_score`
-encode_sample_features <- function(
+encode_w_uniprot <- function(
     sample_tb,
     feature_map,
     how = "consequence") {
+  extra <- list()
   joined <- lapply(unique(sample_tb$SYMBOL), \(sym) {
     sample_filtered <- sample_tb |> filter(SYMBOL == sym)
     ftb_filtered <- feature_map |> filter(symbol == sym)
-    left_join(
+    intersected <- left_join(
       sample_filtered,
       ftb_filtered,
       by = join_by(
         between(x$Protein_position, y_lower = y$start, y_upper = y$end)
       )
     )
+    noncoding <- sample_filtered |>
+      filter(is.na(Protein_position)) |>
+      add_feature_score(how)
+    other <- sample_filtered |>
+      filter(!Loc %in% intersected$Loc & !Loc %in% noncoding$Loc) |>
+      add_feature_score(how)
+    extra[[glue("{sym}.other_protein_coding")]] <<- sum(
+      other$feature_score
+    )
+    extra[[glue("{sym}.noncoding")]] <<- sum(noncoding$feature_score)
+    intersected
   }) |>
     bind_rows() |>
     filter(!is.na(name))
@@ -249,14 +270,30 @@ encode_sample_features <- function(
     group_by(name) |>
     summarise(feature_score = sum(feature_score)) |>
     pivot_wider(names_from = name, values_from = feature_score)
-  encoded
+  bind_cols(as_tibble(extra), encoded)
+}
+
+encode_w_vep <- function(sample_tb, allowed_consequence = NULL) {
+  if (!is.null(allowed_consequence)) {
+    mask <- map_lgl(sample_tb$Consequence, \(c) {
+      if (str_detect(c, ";")) {
+        splits <- str_split_1(c, ";")
+        length(intersect(splits, allowed_consequence)) >= 1
+      } else {
+        c %in% allowed_consequence
+      }
+    })
+    sample_tb <- sample_tb[mask, ]
+  }
 }
 
 encode_multiple_samples <- function(
+    method,
     sample_path_map,
     map_file,
     features = NULL,
     only_symbols = NULL,
+    allowed_consequence = NULL,
     uniprot_colname = "uniprotswissprot",
     ensembl_id_colname = "ensembl_transcript_id") {
   lapply(names(sample_path_map), \(s) {
@@ -265,26 +302,37 @@ encode_multiple_samples <- function(
     if (!is.null(only_symbols)) {
       sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols)
     }
-    cur_fmap <- get_uniprot_ids(
-      filter(sample_tb, !is.na(Protein_position) & !is.na(SYMBOL)),
-      map_file = map_file,
-      uniprot_colname = uniprot_colname,
-      ensembl_id_colname = ensembl_id_colname
-    )
-    FEATURE_MAP <<- bind_rows(
-      list(FEATURE_MAP, get_all_features(cur_fmap, features = features))
-    )
-    encode_sample_features(sample_tb, feature_map = FEATURE_MAP) |>
-      mutate(sample = s)
+    if (method == "uniprot_feature") {
+      cur_fmap <- get_uniprot_ids(
+        filter(sample_tb, !is.na(Protein_position) & !is.na(SYMBOL)),
+        map_file = map_file,
+        uniprot_colname = uniprot_colname,
+        ensembl_id_colname = ensembl_id_colname
+      )
+      FEATURE_MAP <<- bind_rows(
+        list(FEATURE_MAP, get_all_features(cur_fmap, features = features))
+      )
+      encode_w_uniprot(sample_tb, feature_map = FEATURE_MAP) |>
+        mutate(sample = s)
+    } else if (method == "consequence") {
+      encode_w_vep(sample_tb, allowed_consequence = allowed_consequence)
+    } else {
+      stop("Given encoding method not supported!")
+    }
   }) |>
     bind_rows() |>
-    mutate(across(where(is.numeric), \(x) replace_na(x, 0)))
+    mutate(across(where(is.numeric), \(x) replace_na(x, 0))) |>
+    relocate(sample, .before = everything())
 }
 
 ## * Entry point
 
 from_config <- function(config_file, output) {
-  config <- jsonlite::read_json(config_file)
+  if (str_detect(config_file, "\\.yaml$")) {
+    config <- yaml::read_yaml(config_file)
+  } else {
+    config <- jsonlite::read_json(config_file)
+  }
   if (is.null(config$features)) {
     features <- c(
       names(discard_at(SEQUENCE_FEATURES$regions, \(x) x == "ft_compbias")),
@@ -299,14 +347,16 @@ from_config <- function(config_file, output) {
     features <- config$features
   }
   result <- encode_multiple_samples(
+    method = config$encoding_method,
     sample_path_map = config$samples,
     map_file = config$transcript_id2uniprot$file,
     uniprot_colname = config$transcript_id2uniprot$uniprot_colname,
     ensembl_id_colname = config$transcript_id2uniprot$ensembl_id_colname,
+    allowed_consequence = config$allowed_consequence,
     only_symbols = config$symbols,
     features = features
   )
-  write_tsv(output)
+  write_tsv(result, output)
 }
 
 if (sys.nframe() == 0) {
@@ -317,6 +367,13 @@ if (sys.nframe() == 0) {
     c("-i", "--input"),
     type = "character",
     help = "Config file input"
+  )
+  parser <- add_option(
+    parser,
+    c("-e", "--encoding_method"),
+    type = "character",
+    help = "How to encode variants into features. One of 'uniprot_feature', 'vep_consequence'",
+    default = "uniprot_feature"
   )
   parser <- add_option(
     parser,
