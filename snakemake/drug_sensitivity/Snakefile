@@ -29,15 +29,35 @@ for c in cases:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
 
-feature_files = {"protein_features": f"{outdir}/protein_features.tsv"}
+feature_files = {
+    "protein_features": {
+        d: f"{outdir}/{d}_features.tsv" for d in config["per_drug_encoding"].keys()
+    }
+}
 
 
+# TODO: you should also include a variable that captures all non-coding variation, just to be comprehensive
 rule encode_protein_features:
+    """Generate tsv files where samples are"""
     output:
         feature_files["protein_features"],
-    run:
+        temp(f"{outdir}/pfeature_config.yaml"),
+    run:  # TODO: this should probably be specific to each drug
+        for drug, symbols in config["per_drug_encoding"].items():
+            conf_file = f"{outdir}/pfeature_config.yaml"
+            outfile = feature_files["protein_features"][drug]
+            dct = {
+                "transcriptid2uniprot": config["transcriptid2uniprot"],
+                "samples": sample_maps["vep"],
+                "symbols": symbols,
+            }
+            with open(conf_file, "w") as f:
+                json.dump(dct, f)
+            shell(f"Rscript encode_features.R -i {conf_file} -o {outfile}")
 
 
-
+# rule regress_feature_drug_response:
+#     """Fit a model that regresses drug response on variants to specific protein features"""
+#     ...
 # TODO: enrichment analyses on drug sensitivity groups
 # TODO: cnv analyses
