@@ -11,6 +11,7 @@ params.logdir = "/data/project/stemcell/shannc/output/PDAC/log"
 params.routine = "wes"
 params.cohort = "cohort"
 params.tumor_only = true
+params.source_name = "SOURCE"
 
 // Map for pipeline resources
 // See routine-specific documentation to see which need to be included

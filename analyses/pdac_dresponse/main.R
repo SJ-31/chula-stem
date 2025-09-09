@@ -2,6 +2,8 @@ library(tidyverse)
 library(here)
 library(readxl)
 
+# [2025-09-09 Tue] Script for formatting data
+
 dir <- here("analyses", "pdac_dresponse")
 response_file <- here(dir, "1-AUC_PDAC.xlsx")
 

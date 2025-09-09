@@ -10,8 +10,9 @@ if (params.debug) {
 }
 params.logdir = "/data/project/stemcell/shannc/output/PDAC/log"
 params.routine = "wes"
-params.cohort = "cohort"
+params.cohort = "prev_cohort"
 params.tumor_only = true
+params.source_name = "TOOL_SOURCE"
 
 // Map for pipeline resources
 // See routine-specific documentation to see which need to be included
@@ -69,6 +70,7 @@ params.ref = ["genome": genome_chr,
 params.small_qc = ["accepted_filters": ["PASS"],
                    "min_tumor_depth": 10,
                    "max_normal_depth": 10,
+                   "canonical": true,
                    "min_vaf": 0.10]
 params.sv_qc = ["accepted_filters": ["PASS"]]
 

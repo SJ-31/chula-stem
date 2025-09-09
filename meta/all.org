@@ -1,18 +1,28 @@
+CU stem cells [[http://10.128.196.216:5000/?_dc=1750307331882][NAS]]
 * HPC account
-Have 10TB of shared space in the =/data/project/stemcell= directory, 500 GB of personal space
++ Have 10TB of shared space in the =/data/project/stemcell= directory, 500 GB of personal space
 + Available QOS
-  * interactive-cpu, ngs16, cpu24h, interactive-gpu, gpu5g
-+ cpu24h
+  * interactive-cpu, ngs16, cpu24h, interactive-gpu, gpu20gh
+  * *gpu20gh*
+    * Have up to 16 CPU, 65 GB ram and 20 GB vram on gpu20gh
+    * Must specify =--partition gpu= AND =--gres=gpu:3g.20gb:1=
+    * [2025-07-22 Tue] Don't use the =--gpus-per-task= flag because you only have one gpu
+      * Specify memory with =--mem-per-cpu=
++ Running on CentOS Linux 7, Fedora
 * Data
-All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
++ All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
++ *Naming conventions*
+  * Samples suffixed with "-2" or "_2" are post-treatment samples
+  * Samples suffixed with "C_1" are TODO: don't know
+    * TODO: once you find out what this means, add these samples back into the CRC exome manifest sheet
 ** CRC (Colorectal cancer) COAD-READ
 *** Exome
 + Sequencing platform: NovaSeq 6000
 + Capture kit: SureSelect Human All Exon V6
 **** Sample collection
  "Colorectal cancer tissues were obtained from primary rectal cancer patients during Endoscopic procedure. The approval of collecting patient data and tissues in this study was approved by the institutional review board of the Faculty of Medicine of Chulalongkorn University, and informed consent was provided from all patients. IRB No. 021/62.
-For organoid establishment and culture, cancer and normal adjacent tissue biopsies were cut into 1x1 mm pieces and washed 5 times with AdDF+++ (AdvancedDMEM/F12 (Gibco, Thermo sciencetific) supplemented with 1x anti-anti (Gibco, Thermo sciencetific), 1X Glutamax (Gibco, Thermo sciencetific) and 10mM HEPES (Gibco, Thermo sciencetific)). Tissues were incubated with DispaseII (Gibco, Thermo sciencetific) and CollagenaseD (Roche, Sigma Aldrich) for 1 hour at 37°C then vortex at high speed for 5 secs, 3 times. Small clump cells in suspension were collected by centrifugation and washed 5 times with AdDF+++. Cell pellet was resupended in 70% Matrigel (Corning) and dropped on pre-warmed 24 well culture plate. After matrigel solidification, 500 ul of Colorectal organoid culture media (AdvancedDMEM/F12 containing 10% R-Spondin condition media, 10% Wnt3a condition media, 1 mM N-Acetylcysteine, 10 mM Nicotinamide, 1x B27 supplement, 1x N2 supplement, 100 ng/ml Noggin, 1uM Gastrin-I, 50 ng/ml EGF, 50 uM A83-01, 1uM SB202190) was added. Organoids were cultured at 37°C 5% CO2. Media was changed every 4 days and passaged every 1-2 weeks \textbf{y} mechanically dissociated using P1000 pipette tip."
-*** RNASeq
+For organoid establishment and culture, cancer and normal adjacent tissue biopsies were cut into 1x1 mm pieces and washed 5 times with AdDF+++ (AdvancedDMEM/F12 (Gibco, Thermo scientific) supplemented with 1x anti-anti (Gibco, Thermo scientific), 1X Glutamax (Gibco, Thermo scientific) and 10mM HEPES (Gibco, Thermo scientific)). Tissues were incubated with DispaseII (Gibco, Thermo scientific) and CollagenaseD (Roche, Sigma Aldrich) for 1 hour at 37°C then vortex at high speed for 5 secs, 3 times. Small clump cells in suspension were collected by centrifugation and washed 5 times with AdDF+++. Cell pellet was resuspended in 70% Matrigel (Corning) and dropped on pre-warmed 24 well culture plate. After matrigel solidification, 500 ul of Colorectal organoid culture media (AdvancedDMEM/F12 containing 10% R-Spondin condition media, 10% Wnt3a condition media, 1 mM N-Acetylcysteine, 10 mM Nicotinamide, 1x B27 supplement, 1x N2 supplement, 100 ng/ml Noggin, 1uM Gastrin-I, 50 ng/ml EGF, 50 uM A83-01, 1uM SB202190) was added. Organoids were cultured at 37°C 5% CO2. Media was changed every 4 days and passaged every 1-2 weeks \textbf{y} mechanically dissociated using P1000 pipette tip."
+*** RNA-Seq
 + Sequencing platform: Illumina HiSeq
   * Adapter sequences
     * P7 adapter（read1）：AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
@@ -31,7 +41,7 @@ The mRNA fragmentation and priming was performed using First Strand Synthesis Re
 Random Primers. First strand cDNA was synthesized using ProtoScript II Reverse Transcriptase and the
 second-strand cDNA was synthesized using Second Strand Synthesis Enzyme Mix. The purified double-
 stranded cDNA by beads was then treated with End Prep Enzyme Mix to repair both ends and add a dA-
-tailing in one reaction, followed by a T-A ligation to add adaptors to both ends. Size selection of Adaptor-
+tailing in one reaction, followed by a T-A ligation to add adapters to both ends. Size selection of Adapter-
 ligated DNA was then performed using beads, and fragments of ~420 bp (with the approximate insert size
 of 300 bp) were recovered. Each sample was then amplified by PCR for 13 cycles using P5 and P7
 primers, with both primers carrying sequences which can anneal with flow cell to perform bridge PCR
@@ -78,3 +88,8 @@ TODO: check the library prep
 - HTS: NovaSeq6000 150bp PE
 - *Misc:*
   * Files with "LIN28B" are from normal samples with LIN28 overexpression
+    
+* VAR
+# Local Variables:
+# jinx-local-words: "Acetylcysteine AdDF AdvancedDMEM Agilent Aldrich Bioanalyzer Bioptic CentOS Chulalongkorn CollagenaseD DispaseII Exome Fluorometer GAPipeline Gibco Glutamax Invitrogen Matrigel NanoDrop Nicotinamide NovaSeq PHCase Palo ProtoScript Qiagen RNASeq RNeasy Spondin SureSelect TRIzol TruSeq agrose dUTP gpus mem ng vram μg"
+# End:
