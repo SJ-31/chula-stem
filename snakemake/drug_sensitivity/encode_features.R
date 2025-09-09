@@ -282,7 +282,7 @@ encode_multiple_samples <- function(
 ## * Entry point
 
 from_config <- function(config_file, output) {
-  config <- yaml::read_yaml(config_file)
+  config <- jsonlite::read_json(config_file)
   if (is.null(config$features)) {
     features <- c(
       names(discard_at(SEQUENCE_FEATURES$regions, \(x) x == "ft_compbias")),
