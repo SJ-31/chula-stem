@@ -33,7 +33,7 @@ for c in cases:
         else:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
-encoding_styles = ("uniprot", "cnv-msi", "consequence")
+encoding_styles = ("uniprot", "cnv-msi", "consequence", "binary")
 
 feature_dir = f"{outdir}/features"
 
@@ -43,7 +43,7 @@ feature_files = {
             "{o}/{d}_{s}.tsv",
             o=feature_dir,
             d=drug,
-            s=("uniprot_feature", "cnv-msi", "vep_consequence"),
+            s=encoding_styles,
         )
         for d in config["per_drug_encoding"].keys()
     }
@@ -58,12 +58,13 @@ rule encode_features:
     run:
         for drug, symbols in config["per_drug_encoding"].items():
             for style in encoding_styles:
-                conf_file = f"{outdir}/pfeature_config.yaml"
+                conf_file = f"{outdir}/feature_config_{style}.yaml"
                 outfile = f"{feature_dir}/{drug}_{style}.tsv"
+                sym = symbols if limit_symbols.get(style, True) else {}
                 dct = {
                     "transcriptid2uniprot": config["transcriptid2uniprot"],
                     "samples": sample_maps,
-                    "only_symbols": symbols,
+                    "only_symbols": sym,
                     "features": config["uniprot_features"],
                     "encoding_method": style,
                 }

@@ -361,6 +361,40 @@ encode_w_cnv_msi <- function(
   bind_cols(cnv_joined, msi_gene, tibble(intergenic_msi = msi_intergenic))
 }
 
+## ** Binary
+
+encode_w_binary <- function(
+    sample_tb,
+    allowed_consequence = c("missense"),
+    drivers = NULL,
+    only_symbols = NULL) {
+  if (!is.null(only_symbols)) {
+    sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols)
+  }
+  if (!is.null(drivers)) {
+    driver_cols <- lapply(names(drivers), \(d) {
+      tmp <- list()
+      col <- names(drivers[[d]])
+      if (any(sample_tb[[col]] %in% drivers[[d]][[col]])) {
+        tmp[[d]] <- 1
+      } else {
+        tmp[[d]] <- 0
+      }
+      as_tibble(tmp)
+    }) |>
+      bind_cols()
+  } else {
+    driver_cols <- NULL
+  }
+  separate_longer_delim(sample_tb, Consequence, ";") |>
+    filter(Consequence %in% allowed_consequence) |>
+    mutate(value = 1) |>
+    select(SYMBOL, value) |>
+    distinct(SYMBOL, value) |>
+    pivot_wider(names_from = SYMBOL, values_from = value, values_fill = 0) |>
+    bind_cols(driver_cols)
+}
+
 ## ** Wrapper
 
 encode_multiple_samples <- function(

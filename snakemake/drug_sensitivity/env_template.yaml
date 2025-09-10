@@ -53,6 +53,25 @@ transcript_id2uniprot:
 uniprot_features:
 
 # ** Per-drug gene symbols
+
+limit_symbols:
+  cnv-msi: True
+  uniprot_features: True
+  vep_consequence: False
+  binary: False
+
+driver_mutations: # Loc, HGVSg or HGVSp for specific driver mutations to use in the `binary` encoding style. A map of variant name to the identifier column
+  KRAS_Gly12:
+    HGVSp:
+      - "ENSP00000256078.5:p.Gly12Asp"
+      - "ENSP00000256078.5:p.Gly12Cys"
+      - "ENSP00000256078.5:p.Gly12Val"
+      - "ENSP00000256078.5:p.Gly12Arg"
+  TP53_DBD:
+    HGVSp:
+      - "ENSP00000269305.4:p.Arg248Gln"
+      - "ENSP00000269305.4:p.Arg175His"
+
 per_drug_encoding: # Map of drug names to gene symbols to encode as features
   # Examples
   Paclitaxel:
