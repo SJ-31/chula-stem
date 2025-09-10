@@ -1,5 +1,7 @@
 import json
+from datetime import date
 from pathlib import Path
+import pandas as pd
 
 
 configfile: "env.yaml"
@@ -11,7 +13,7 @@ DATE = config.get("date", TODAY)
 sample_sheet = pd.read_csv(config["manifest"])
 extra = config.get("extra", {})
 data_path = config["root"]
-outdir = config["outdir"]
+outdir = f'{config["outdir"]}/{DATE}'
 
 cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
 
@@ -20,10 +22,11 @@ for c in cases:
     case_path = Path(data_path).joinpath(c).joinpath("annotations")
     vep_path = case_path.joinpath(f"8-{c}-VEP_small.tsv")
     msi_path = case_path.joinpath(f"8-{c}-CR_MSI.tsv")
-    cnv_path = case_path.joinpath(f"8-{c}-CR_cnv.tsv")
-    cns_path = Path(data_path).joinpath(
-        f"{c}/variant_calling/5-{c}-Cnvkit/5-{c}-Cnvkit.call.cns"
-    )
+    cnv_path = case_path.joinpath(f"8-{c}-CR_CNV.tsv")
+    cns = f"5-{c}-Cnvkit/5-{c}-Cnvkit.call.cns"
+    cns_path = Path(data_path).joinpath(f"{c}/variant_calling/{cns}")
+    if not cns_path.exists():
+        cns_path = Path(data_path).joinpath(f"{c}/paired/{cns}")
     sample_maps[c] = {}
     for group, f in zip(
         ["cns", "cnv", "vep", "msi"], [cns_path, cnv_path, vep_path, msi_path]
@@ -33,16 +36,16 @@ for c in cases:
         else:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
-encoding_styles = ("uniprot", "cnv-msi", "consequence", "binary")
+encoding_styles = ("uniprot_features", "cnv-msi", "vep_consequence", "binary")
 
 feature_dir = f"{outdir}/features"
 
 feature_files = {
     "protein_features": {
         d: expand(
-            "{o}/{d}_{s}.tsv",
+            "{o}/{drug}_{s}.tsv",
             o=feature_dir,
-            d=drug,
+            drug=d,
             s=encoding_styles,
         )
         for d in config["per_drug_encoding"].keys()
@@ -53,18 +56,27 @@ feature_files = {
 rule encode_features:
     """Generate tsv files where samples are"""
     output:
-        feature_files["protein_features"],
-        temp(f"{outdir}/pfeature_config.yaml"),
+        **feature_files["protein_features"],
+        jsons=[
+            temp(f"{outdir}/feature_config_{style}.json") for style in encoding_styles
+        ],
     run:
-        for drug, symbols in config["per_drug_encoding"].items():
+        for drug, sym in config["per_drug_encoding"].items():
             for style in encoding_styles:
-                conf_file = f"{outdir}/feature_config_{style}.yaml"
+                conf_file = f"{outdir}/feature_config_{style}.json"
                 outfile = f"{feature_dir}/{drug}_{style}.tsv"
-                sym = symbols if limit_symbols.get(style, True) else {}
+                symbols = {}
+                if config["limit_symbols"].get(style, True):
+                    for k, v in sym.items():
+                        if isinstance(v, str):
+                            with open(v, "r") as f:
+                                symbols[k] = f.read().splitlines()
+                        else:
+                            symbols[k] = v
                 dct = {
-                    "transcriptid2uniprot": config["transcriptid2uniprot"],
+                    "transcript_id2uniprot": config["transcript_id2uniprot"],
                     "samples": sample_maps,
-                    "only_symbols": sym,
+                    "only_symbols": symbols,
                     "features": config["uniprot_features"],
                     "encoding_method": style,
                 }
