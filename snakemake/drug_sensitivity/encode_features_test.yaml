@@ -2,20 +2,29 @@ encoding_method: "uniprot_feature" # How to encode variants into features.
 # Options are
 # 1. uniprot_feature: new variables are uniprot protein sequence features
 # 2. vep_consequence: new variables are per-gene VEP consequence, possibly weighted and summed
-# 3. CNV
+# 3. cnv-msi: new variables are per-gene copy number, per-gene total repeat bases and the total number of intergenic repeat bases in the sample
 
 transcript_id2uniprot:
   file: "/home/shannc/Bio_SDD/chula-stem/analyses/data/2025-09-09_ensembl2uniprot.tsv" # REQUIRED: mapping file path
   uniprot_colname: "uniprotswissprot"
   ensembl_id_colname: "ensembl_transcript_id"
-samples: # REQUIRED: map of sample names to vcf paths
-  p36: "/home/shannc/Downloads/8-P36-VEP_small.tsv"
-  p20: "/home/shannc/Downloads/8-P20-VEP_small.tsv"
-  # If using cnv or msi data, this must be a list of [cnv, msi]
+samples: # REQUIRED: map of sample names to a map of result files
   p36:
+    vep: /home/shannc/Downloads/8-P36-VEP_small.tsv
     cns: /home/shannc/Downloads/5-P41-Cnvkit.call.cns
     cnv: /home/shannc/Downloads/8-P41-CR_CNV.tsv
     msi: /home/shannc/Downloads/8-P41-CR_MSI.tsv
-symbols: ["KRAS", "MUC19", "HLA-A", "TTN", "LINC00960", "LILRB1-AS1"] # List of symbols to restrict encoding to
-# leave empty to use all symbols in vcf file
-features:
+  p20:
+    vep: /home/shannc/Downloads/8-P36-VEP_small.tsv
+    cns: /home/shannc/Downloads/5-P41-Cnvkit.call.cns
+    cnv: /home/shannc/Downloads/8-P41-CR_CNV.tsv
+    msi: /home/shannc/Downloads/8-P41-CR_MSI.tsv
+
+only_symbols: # List of symbols to restrict encodings to
+  all: ["KRAS", "MUC19", "HLA-A", "TTN", "LINC00960", "LILRB1-AS1"] # For `uniprot_feature`
+  # and `vep_consequence` encodings
+  # leave empty to use all symbols in vcf file
+  cnv:
+  msi:
+
+features: # Only lookup these protein sequence features (for encoding_method == `uniprot_feature`)

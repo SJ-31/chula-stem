@@ -15,45 +15,61 @@ outdir = config["outdir"]
 
 cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
 
-sample_maps = {"cnv": {}, "vep": {}, "msi": {}}
-
+sample_maps = {}
 for c in cases:
     case_path = Path(data_path).joinpath(c).joinpath("annotations")
     vep_path = case_path.joinpath(f"8-{c}-VEP_small.tsv")
     msi_path = case_path.joinpath(f"8-{c}-CR_MSI.tsv")
     cnv_path = case_path.joinpath(f"8-{c}-CR_cnv.tsv")
-    for group, f in zip(["cnv", "vep", "msi"], [cnv_path, vep_path, msi_path]):
+    cns_path = Path(data_path).joinpath(
+        f"{c}/variant_calling/5-{c}-Cnvkit/5-{c}-Cnvkit.call.cns"
+    )
+    sample_maps[c] = {}
+    for group, f in zip(
+        ["cns", "cnv", "vep", "msi"], [cns_path, cnv_path, vep_path, msi_path]
+    ):
         if f.exists():
-            sample_maps[group] = str(f.absolute())
+            sample_maps[c][group] = str(f.absolute())
         else:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
+encoding_styles = ("uniprot", "cnv-msi", "consequence")
+
+feature_dir = f"{outdir}/features"
 
 feature_files = {
     "protein_features": {
-        d: f"{outdir}/{d}_features.tsv" for d in config["per_drug_encoding"].keys()
+        d: expand(
+            "{o}/{d}_{s}.tsv",
+            o=feature_dir,
+            d=drug,
+            s=("uniprot_feature", "cnv-msi", "vep_consequence"),
+        )
+        for d in config["per_drug_encoding"].keys()
     }
 }
 
 
-# TODO: you should also include a variable that captures all non-coding variation, just to be comprehensive
-rule encode_protein_features:
+rule encode_features:
     """Generate tsv files where samples are"""
     output:
         feature_files["protein_features"],
         temp(f"{outdir}/pfeature_config.yaml"),
-    run:  # TODO: this should probably be specific to each drug
+    run:
         for drug, symbols in config["per_drug_encoding"].items():
-            conf_file = f"{outdir}/pfeature_config.yaml"
-            outfile = feature_files["protein_features"][drug]
-            dct = {
-                "transcriptid2uniprot": config["transcriptid2uniprot"],
-                "samples": sample_maps["vep"],
-                "symbols": symbols,
-            }
-            with open(conf_file, "w") as f:
-                json.dump(dct, f)
-            shell(f"Rscript encode_features.R -i {conf_file} -o {outfile}")
+            for style in encoding_styles:
+                conf_file = f"{outdir}/pfeature_config.yaml"
+                outfile = f"{feature_dir}/{drug}_{style}.tsv"
+                dct = {
+                    "transcriptid2uniprot": config["transcriptid2uniprot"],
+                    "samples": sample_maps,
+                    "only_symbols": symbols,
+                    "features": config["uniprot_features"],
+                    "encoding_method": style,
+                }
+                with open(conf_file, "w") as f:
+                    json.dump(dct, f)
+                shell(f"Rscript encode_features.R -i {conf_file} -o {outfile}")
 
 
 # rule regress_feature_drug_response:

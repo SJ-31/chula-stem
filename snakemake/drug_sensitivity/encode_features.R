@@ -368,17 +368,19 @@ encode_multiple_samples <- function(
     sample_path_map,
     map_file,
     features = NULL,
-    only_symbols = NULL,
+    only_symbols = list(),
     allowed_consequence = NULL,
     uniprot_colname = "uniprotswissprot",
     how_score = "consequence",
     agg_fn = sum,
     ensembl_id_colname = "ensembl_transcript_id") {
   lapply(names(sample_path_map), \(s) {
-    sample_tb <- read_tsv(sample_path_map[[s]]) |>
-      mutate(Protein_position = as.numeric(Protein_position))
-    if (!is.null(only_symbols)) {
-      sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols)
+    if (method != "cnv-msi") {
+      sample_tb <- read_tsv(sample_path_map[[s]]$vep) |>
+        mutate(Protein_position = as.numeric(Protein_position))
+    }
+    if (!is.null(only_symbols$all)) {
+      sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols$all)
     }
     if (method == "uniprot_feature") {
       cur_fmap <- get_uniprot_ids(
@@ -397,12 +399,21 @@ encode_multiple_samples <- function(
         agg_fn = agg_fn
       ) |>
         mutate(sample = s)
-    } else if (method == "consequence") {
+    } else if (method == "vep_consequence") {
       encode_w_vep(
         sample_tb,
         allowed_consequence = allowed_consequence,
         how_score = how_score,
         agg_fn = agg_fn
+      )
+    } else if (method == "cnv-msi") {
+      encode_w_cnv_msi(
+        sample_cns = sample_path_map$cns,
+        sample_cnv = sample_path_map$cnv,
+        sample_msi = sample_path_map$msi,
+        agg_fn = agg_fn,
+        only_symbols_cnv = only_symbols$cnv,
+        only_symbols_msi = only_symbols$msi,
       )
     } else {
       stop("Given encoding method not supported!")
@@ -441,7 +452,7 @@ from_config <- function(config_file, output) {
     uniprot_colname = config$transcript_id2uniprot$uniprot_colname,
     ensembl_id_colname = config$transcript_id2uniprot$ensembl_id_colname,
     allowed_consequence = config$allowed_consequence,
-    only_symbols = config$symbols,
+    only_symbols = config$only_symbols,
     features = features
   )
   write_tsv(result, output)
@@ -455,13 +466,6 @@ if (sys.nframe() == 0) {
     c("-i", "--input"),
     type = "character",
     help = "Config file input"
-  )
-  parser <- add_option(
-    parser,
-    c("-e", "--encoding_method"),
-    type = "character",
-    help = "How to encode variants into features. One of 'uniprot_feature', 'vep_consequence'",
-    default = "uniprot_feature"
   )
   parser <- add_option(
     parser,
