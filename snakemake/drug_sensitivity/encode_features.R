@@ -198,6 +198,10 @@ get_all_features <- function(
 }
 
 
+#' Add a column `feature_score` that assigns a value to the current variant row
+#'
+#' @description
+#'
 add_feature_score <- function(tb, how = "consequence") {
   if (how == "consequence") {
     mutate(
@@ -225,19 +229,21 @@ add_feature_score <- function(tb, how = "consequence") {
   }
 }
 
-## * Main routine
+## * Encoding methods
+
+## ** Protein features (uniprot)
 
 #' Encode gene sequence attributes in `sample_tb` as features, whose values are determined
 #'  by their mutations in the sample
 #'
 #' @description
 #' @param sample_tb annotated VCF tibble from Ensembl vep
-#' @param only_symbols Only encode the given symbols. By default, tries to encode all
 #' @param how encoding method, see `add_feature_score`
 encode_w_uniprot <- function(
     sample_tb,
     feature_map,
-    how = "consequence") {
+    how_score = "consequence",
+    agg_fn = agg_fn) {
   extra <- list()
   joined <- lapply(unique(sample_tb$SYMBOL), \(sym) {
     sample_filtered <- sample_tb |> filter(SYMBOL == sym)
@@ -251,10 +257,10 @@ encode_w_uniprot <- function(
     )
     noncoding <- sample_filtered |>
       filter(is.na(Protein_position)) |>
-      add_feature_score(how)
+      add_feature_score(how_score)
     other <- sample_filtered |>
       filter(!Loc %in% intersected$Loc & !Loc %in% noncoding$Loc) |>
-      add_feature_score(how)
+      add_feature_score(how_score)
     extra[[glue("{sym}.other_protein_coding")]] <<- sum(
       other$feature_score
     )
@@ -265,27 +271,97 @@ encode_w_uniprot <- function(
     filter(!is.na(name))
   encoded <- joined |>
     select(name, Consequence) |>
-    add_feature_score() |>
+    add_feature_score(how_score) |>
     select(-Consequence) |>
     group_by(name) |>
-    summarise(feature_score = sum(feature_score)) |>
+    summarise(feature_score = agg_fn(feature_score)) |>
     pivot_wider(names_from = name, values_from = feature_score)
   bind_cols(as_tibble(extra), encoded)
 }
 
-encode_w_vep <- function(sample_tb, allowed_consequence = NULL) {
+## ** Variant consequences
+
+encode_w_vep <- function(
+    sample_tb,
+    allowed_consequence = NULL,
+    how_score = "consequence",
+    agg_fn = sum) {
+  sample_tb <- sample_tb |> separate_longer_delim(Consequence, ";")
   if (!is.null(allowed_consequence)) {
-    mask <- map_lgl(sample_tb$Consequence, \(c) {
-      if (str_detect(c, ";")) {
-        splits <- str_split_1(c, ";")
-        length(intersect(splits, allowed_consequence)) >= 1
-      } else {
-        c %in% allowed_consequence
-      }
-    })
-    sample_tb <- sample_tb[mask, ]
+    sample_tb <- sample_tb |> filter(Consequence %in% allowed_consequence)
   }
+  add_feature_score(sample_tb, how = how_score) |>
+    group_by(SYMBOL, Consequence) |>
+    summarise(feature_score = sum(feature_score)) |>
+    ungroup() |>
+    mutate(name = paste0(SYMBOL, ".", Consequence)) |>
+    select(name, feature_score) |>
+    pivot_wider(names_from = name, values_from = feature_score, values_fill = 0)
 }
+
+## ** CNV and MSI
+
+encode_w_cnv_msi <- function(
+    sample_cns,
+    sample_cnv,
+    sample_msi,
+    only_symbols_cnv = NULL,
+    only_symbols_msi = NULL,
+    agg_fn = sum) {
+  all_dosage_sensitive <- sample_cnv$`Known or predicted dosage-sensitive genes` |>
+    discard(is.na) |>
+    lapply(\(s) str_split_1(s, ",")) |>
+    unlist() |>
+    map_chr(str_trim) |>
+    unique()
+  cnv_joined <- left_join(
+    sample_cnv,
+    sample_cns,
+    by = join_by(within(x$Start, x$End, y$start, y$end))
+  ) |>
+    select(start, end, contains("genes"), "cn") |>
+    separate_longer_delim(`All protein coding genes`, ",") |>
+    mutate(
+      symbol = str_trim(`All protein coding genes`),
+      symbol = case_when(
+        symbol %in% all_dosage_sensitive ~ paste0(symbol, ".ds"),
+        .default = symbol
+      )
+    ) |>
+    group_by(symbol) |>
+    summarise(cn = max(cn)) |> # BUG: this really shouldn't be needed
+    ungroup()
+  if (!is.null(only_symbols_cnv)) {
+    cnv_joined <- filter(cnv_joined, symbol %in% only_symbols_cnv)
+  }
+  if (!is.null(only_symbols_msi)) {
+    sample_msi <- filter(
+      sample_msi,
+      gene_name %in% only_symbols_msi | is.na(gene_name)
+    )
+  }
+  cnv_joined <- mutate(cnv_joined, symbol = paste0(symbol, ".", "cn")) |>
+    pivot_wider(names_from = symbol, values_from = cn)
+
+  sample_msi <- mutate(
+    sample_msi,
+    rep_unit_len = nchar(repeat_unit_bases),
+    rep_bases = rep_unit_len * repeat_times
+  )
+  msi_intergenic <- filter(sample_msi, is.na(gene_name)) |>
+    pluck("rep_bases") |>
+    agg_fn()
+  msi_gene <- filter(sample_msi, !is.na(gene_name)) |>
+    select(gene_name, rep_bases) |>
+    group_by(gene_name) |>
+    summarise(rep_bases = agg_fn(rep_bases)) |>
+    ungroup() |>
+    mutate(gene_name = paste0(gene_name, ".", "msi")) |>
+    pivot_wider(names_from = gene_name, values_from = rep_bases)
+  bind_cols(cnv_joined, msi_gene, tibble(intergenic_msi = msi_intergenic))
+}
+
+## ** Wrapper
 
 encode_multiple_samples <- function(
     method,
@@ -295,6 +371,8 @@ encode_multiple_samples <- function(
     only_symbols = NULL,
     allowed_consequence = NULL,
     uniprot_colname = "uniprotswissprot",
+    how_score = "consequence",
+    agg_fn = sum,
     ensembl_id_colname = "ensembl_transcript_id") {
   lapply(names(sample_path_map), \(s) {
     sample_tb <- read_tsv(sample_path_map[[s]]) |>
@@ -312,10 +390,20 @@ encode_multiple_samples <- function(
       FEATURE_MAP <<- bind_rows(
         list(FEATURE_MAP, get_all_features(cur_fmap, features = features))
       )
-      encode_w_uniprot(sample_tb, feature_map = FEATURE_MAP) |>
+      encode_w_uniprot(
+        sample_tb,
+        feature_map = FEATURE_MAP,
+        how_score = how_score,
+        agg_fn = agg_fn
+      ) |>
         mutate(sample = s)
     } else if (method == "consequence") {
-      encode_w_vep(sample_tb, allowed_consequence = allowed_consequence)
+      encode_w_vep(
+        sample_tb,
+        allowed_consequence = allowed_consequence,
+        how_score = how_score,
+        agg_fn = agg_fn
+      )
     } else {
       stop("Given encoding method not supported!")
     }

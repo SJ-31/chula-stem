@@ -6,6 +6,15 @@ src: # source directories
   py: "../../src/chula_stem"
   r: "../../src/R"
 
+transcript_id2uniprot:
+  file: "/home/shannc/Bio_SDD/chula-stem/analyses/data/2025-09-09_ensembl2uniprot.tsv" # REQUIRED: mapping file path
+  uniprot_colname: "uniprotswissprot"
+  ensembl_id_colname: "ensembl_transcript_id"
+
+per_drug_encoding: # Map of drug names to gene symbols to encode as features
+  Paclitaxel: [""]
+  Gemcitabine: [""]
+
 response: "" # Drug response data file. Tabular format, rows are samples, columns are
 # drugs
 reference_responses: [] # Optional: reference drug response data
