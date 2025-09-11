@@ -11,6 +11,11 @@ response: "" # Drug response data file. Tabular format, rows are samples, column
 reference_responses: [] # Optional: reference drug response data
 unit: "AUC" # Unit used to quantify drug response
 
+response_groups: # Predicates on quantiles used to define groups
+  sensitive: "<0.25" # Below 0.25 quantile
+  resistant: ">0.75"
+  intermediate: null
+
 extra:
   cases: [] # Specify additional cases that may not be on the manifest to include in plot
   # Must symlink/copy these cases' directories into `root` for this to work
