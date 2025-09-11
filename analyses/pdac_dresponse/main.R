@@ -27,19 +27,16 @@ sensitivity_cutoffs <- function(x) {
 responses <- local({
   r1 <- read_excel(response_file, sheet = 1) |>
     rename_with(\(x) {
-      paste0(
-        "P",
-        str_remove(str_to_lower(str_replace_all(x, "#", "_")), "case *")
-      )
+      str_remove(str_to_lower(str_replace_all(x, "#", "_")), "case *")
     }) |>
-    rename(drug = "P...1") |>
+    rename(drug = "...1") |>
     tb_transpose("sample") |>
     mutate(across(-sample, as.numeric))
   r2 <- read_tsv(here(dir, "2025-9-8_paclitaxel.tsv")) |>
-    mutate(sample = paste0("P", str_replace_all(sample, "\\.", "_"))) |>
+    mutate(sample = str_replace_all(sample, "\\.", "_")) |>
     filter(!sample %in% r1$sample)
   r3 <- read_tsv(here(dir, "2025-9-8_gemcitabine.tsv")) |>
-    mutate(sample = paste0("P", str_replace_all(sample, "\\.", "_"))) |>
+    mutate(sample = str_replace_all(sample, "\\.", "_")) |>
     filter(!sample %in% r1$sample)
   reduce(list(r1, r2, r3), bind_rows) |>
     group_by(sample) |>
@@ -51,9 +48,21 @@ responses <- local({
       too_few = "align_start"
     )
 })
+responses$sample <- paste0(
+  responses$sample,
+  "_",
+  replace_na(as.character(responses$biopsy), "")
+) |>
+  str_remove("_$")
+# Manual naming
 
-# TODO: you need to sort out the biopsy and align the names with the names of the sample
-# names in nextflow
+responses$sample <- case_when(
+  str_detect(responses$sample, "PHcase") ~
+    str_replace(responses$sample, "PHcase", "PHcase_"),
+  str_detect(responses$sample, "^[0-9]+") ~ paste0("P", responses$sample),
+  .default = responses$sample
+)
+
 
 li_data <- read_tsv(here(dir, "li_et_al_organoids.tsv"))
 li_data <- li_data |>
