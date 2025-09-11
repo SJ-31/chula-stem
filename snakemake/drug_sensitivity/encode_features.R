@@ -285,18 +285,33 @@ encode_w_vep <- function(
     sample_tb,
     allowed_consequence = NULL,
     how_score = "consequence",
-    agg_fn = sum) {
+    agg_fn = sum,
+    aggregate_consequence = FALSE) {
   sample_tb <- sample_tb |> separate_longer_delim(Consequence, ";")
   if (!is.null(allowed_consequence)) {
     sample_tb <- sample_tb |> filter(Consequence %in% allowed_consequence)
   }
-  add_feature_score(sample_tb, how = how_score) |>
-    group_by(SYMBOL, Consequence) |>
-    summarise(feature_score = sum(feature_score)) |>
-    ungroup() |>
-    mutate(name = paste0(SYMBOL, ".", Consequence)) |>
+  scored <- add_feature_score(sample_tb, how = how_score)
+  if (!aggregate_consequence) {
+    pivoted <- scored |>
+      group_by(SYMBOL, Consequence) |>
+      summarise(feature_score = agg_fn(feature_score)) |>
+      ungroup() |>
+      mutate(name = paste0(SYMBOL, ".", Consequence))
+  } else {
+    pivoted <- scored |>
+      group_by(SYMBOL) |>
+      summarise(feature_score = agg_fn(feature_score)) |>
+      ungroup() |>
+      rename(name = SYMBOL)
+  }
+  pivoted |>
     select(name, feature_score) |>
-    pivot_wider(names_from = name, values_from = feature_score, values_fill = 0)
+    pivot_wider(
+      names_from = name,
+      values_from = feature_score,
+      values_fill = 0
+    )
 }
 
 ## ** CNV and MSI
@@ -413,7 +428,8 @@ encode_multiple_samples <- function(
   lapply(names(sample_path_map), \(s) {
     if (method != "cnv-msi") {
       sample_tb <- read_tsv(sample_path_map[[s]]$vep) |>
-        mutate(Protein_position = as.numeric(Protein_position))
+        mutate(Protein_position = as.numeric(Protein_position)) |>
+        distinct(Loc, SYMBOL, .keep_all = TRUE)
       if (!is.null(only_symbols$all)) {
         sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols$all)
       }
@@ -441,7 +457,17 @@ encode_multiple_samples <- function(
         sample_tb,
         allowed_consequence = allowed_consequence,
         how_score = how_score,
-        agg_fn = agg_fn
+        agg_fn = agg_fn,
+        aggregate_consequence = FALSE
+      ) |>
+        mutate(sample = s)
+    } else if (method == "vep_consequence_agg") {
+      encode_w_vep(
+        sample_tb,
+        allowed_consequence = allowed_consequence,
+        how_score = how_score,
+        agg_fn = agg_fn,
+        aggregate_consequence = TRUE
       ) |>
         mutate(sample = s)
     } else if (method == "cnv-msi") {
