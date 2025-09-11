@@ -29,6 +29,11 @@ only_symbols: # List of symbols to restrict encodings to
 
 features: # Only lookup these protein sequence features (for encoding_method == `uniprot_feature`)
 
+encoding_styles: # Types of encodings to create
+  - "cnv-msi"
+  - "vep_consequence"
+  - "binary"
+
 driver_mutations: # Loc, HGVSg or HGVSp for specific driver mutations to use in the `binary` encoding style. A map of variant name to the identifier column
   KRAS_Gly12:
     HGVSp:

@@ -36,7 +36,7 @@ for c in cases:
         else:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
-encoding_styles = ("uniprot_features", "cnv-msi", "vep_consequence", "binary")
+encoding_styles = config["encoding_styles"]
 
 feature_dir = f"{outdir}/features"
 
