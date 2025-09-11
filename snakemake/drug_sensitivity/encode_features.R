@@ -345,6 +345,7 @@ encode_w_cnv_msi <- function(
 
   sample_msi <- mutate(
     sample_msi,
+    repeat_times = as.numeric(repeat_times),
     rep_unit_len = nchar(repeat_unit_bases),
     rep_bases = rep_unit_len * repeat_times
   )
@@ -407,15 +408,17 @@ encode_multiple_samples <- function(
     uniprot_colname = "uniprotswissprot",
     how_score = "consequence",
     agg_fn = sum,
+    drivers = NULL,
     ensembl_id_colname = "ensembl_transcript_id") {
   lapply(names(sample_path_map), \(s) {
     if (method != "cnv-msi") {
       sample_tb <- read_tsv(sample_path_map[[s]]$vep) |>
         mutate(Protein_position = as.numeric(Protein_position))
+      if (!is.null(only_symbols$all)) {
+        sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols$all)
+      }
     }
-    if (!is.null(only_symbols$all)) {
-      sample_tb <- filter(sample_tb, SYMBOL %in% only_symbols$all)
-    }
+
     if (method == "uniprot_feature") {
       cur_fmap <- get_uniprot_ids(
         filter(sample_tb, !is.na(Protein_position) & !is.na(SYMBOL)),
@@ -439,18 +442,28 @@ encode_multiple_samples <- function(
         allowed_consequence = allowed_consequence,
         how_score = how_score,
         agg_fn = agg_fn
-      )
+      ) |>
+        mutate(sample = s)
     } else if (method == "cnv-msi") {
       encode_w_cnv_msi(
-        sample_cns = sample_path_map$cns,
-        sample_cnv = sample_path_map$cnv,
-        sample_msi = sample_path_map$msi,
+        sample_cns = read_tsv(sample_path_map[[s]]$cns),
+        sample_cnv = read_tsv(sample_path_map[[s]]$cnv),
+        sample_msi = read_tsv(sample_path_map[[s]]$msi),
         agg_fn = agg_fn,
         only_symbols_cnv = only_symbols$cnv,
-        only_symbols_msi = only_symbols$msi,
-      )
+        only_symbols_msi = only_symbols$msi
+      ) |>
+        mutate(sample = s)
+    } else if (method == "binary") {
+      encode_w_binary(
+        sample_tb = sample_tb,
+        allowed_consequence = allowed_consequence,
+        drivers = drivers,
+        only_symbols = only_symbols$all
+      ) |>
+        mutate(sample = s)
     } else {
-      stop("Given encoding method not supported!")
+      stop(glue("Given encoding method {method} not supported!"))
     }
   }) |>
     bind_rows() |>
@@ -487,6 +500,7 @@ from_config <- function(config_file, output) {
     ensembl_id_colname = config$transcript_id2uniprot$ensembl_id_colname,
     allowed_consequence = config$allowed_consequence,
     only_symbols = config$only_symbols,
+    drivers = config$driver_mutations,
     features = features
   )
   write_tsv(result, output)

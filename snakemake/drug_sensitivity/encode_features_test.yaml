@@ -28,3 +28,15 @@ only_symbols: # List of symbols to restrict encodings to
   msi:
 
 features: # Only lookup these protein sequence features (for encoding_method == `uniprot_feature`)
+
+driver_mutations: # Loc, HGVSg or HGVSp for specific driver mutations to use in the `binary` encoding style. A map of variant name to the identifier column
+  KRAS_Gly12:
+    HGVSp:
+      - "ENSP00000256078.5:p.Gly12Asp"
+      - "ENSP00000256078.5:p.Gly12Cys"
+      - "ENSP00000256078.5:p.Gly12Val"
+      - "ENSP00000256078.5:p.Gly12Arg"
+  TP53_DBD:
+    HGVSp:
+      - "ENSP00000269305.4:p.Arg248Gln"
+      - "ENSP00000269305.4:p.Arg175His"
