@@ -53,6 +53,22 @@ feature_files = {
 }
 
 
+rule all:
+    input:
+        **feature_files["protein_features"],
+        mutation_summary=f"{outdir}/mutation_summary.tsv",
+
+
+rule mutation_summary:
+    output:
+        rules.all.input.mutation_summary,
+        config=temp(f"{outdir}/tmp.json"),
+    run:
+        with open(output.config, "w") as f:
+            json.dump({"samples": sample_maps}, f)
+        shell(f"Rscript encode_features.R -i {output.config} -o {output[0]} -s")
+
+
 rule encode_features:
     """Generate tsv files where samples are"""
     output:

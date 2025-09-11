@@ -229,6 +229,36 @@ add_feature_score <- function(tb, how = "consequence") {
   }
 }
 
+## * Cohort summary
+
+summarize_cohort <- function(config_file, output) {
+  if (str_detect(config_file, "\\.yaml$")) {
+    config <- yaml::read_yaml(config_file)
+  } else {
+    config <- jsonlite::read_json(config_file)
+  }
+  sample_map <- config$samples
+  cohort <- lapply(names(sample_map), \(s) {
+    read_tsv(sample_map[[s]]$vep) |>
+      mutate(sample = s) |>
+      distinct(Loc, SYMBOL, .keep_all = TRUE)
+  }) |>
+    bind_rows()
+  result <- distinct(cohort, sample, Loc, SYMBOL, .keep_all = TRUE) |>
+    select(SYMBOL, Consequence) |>
+    filter(!is.na(SYMBOL)) |>
+    separate_longer_delim(Consequence, ";") |>
+    group_by(SYMBOL, Consequence) |>
+    summarise(count = n()) |>
+    pivot_wider(
+      names_from = Consequence,
+      values_from = count,
+      values_fill = 0
+    ) |>
+    ungroup()
+  write_tsv(result, output)
+}
+
 ## * Encoding methods
 
 ## ** Protein features (uniprot)
@@ -547,6 +577,18 @@ if (sys.nframe() == 0) {
     type = "character",
     help = "Output file name"
   )
+  parser <- add_option(
+    parser,
+    c("-s", "--summary"),
+    type = "logical",
+    action = "store_true",
+    help = "Produce a TSV file summing all the mutations in the cohort, for each VEP consequence",
+    default = FALSE
+  )
   args <- parse_args(parser)
-  from_config(args$input, args$output)
+  if (!args$summary) {
+    from_config(args$input, args$output)
+  } else {
+    summarize_cohort(args$input, args$output)
+  }
 }
