@@ -79,6 +79,7 @@ rule encode_features:
                     "only_symbols": symbols,
                     "features": config["uniprot_features"],
                     "encoding_method": style,
+                    "allowed_consequence": config["allowed_consequence"],
                 }
                 with open(conf_file, "w") as f:
                     json.dump(dct, f)
