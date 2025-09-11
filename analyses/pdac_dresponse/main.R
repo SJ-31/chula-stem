@@ -52,6 +52,9 @@ responses <- local({
     )
 })
 
+# TODO: you need to sort out the biopsy and align the names with the names of the sample
+# names in nextflow
+
 li_data <- read_tsv(here(dir, "li_et_al_organoids.tsv"))
 li_data <- li_data |>
   filter(Drug.Name %in% colnames(responses)) |>
