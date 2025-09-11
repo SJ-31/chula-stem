@@ -55,11 +55,10 @@ basename_no_ext <- function(file) {
 #' Flatten the character vector `char_vec` by `separator`, then
 #'  get unique values
 flatten_by <- function(
-  char_vec,
-  separator = ";",
-  collapse = TRUE,
-  unique = FALSE
-) {
+    char_vec,
+    separator = ";",
+    collapse = TRUE,
+    unique = FALSE) {
   helper <- function(str) {
     if (is.na(str)) {
       return(NA)
@@ -152,14 +151,13 @@ get_legend <- function(myggplot) {
 #' @param id_mapping a two-column tb or df where the first column is the old ids and
 #'    the second column is the new
 get_rnaseq_counts <- function(
-  metadata_tb,
-  id_mapping = NULL,
-  sample_col = "cases",
-  file_col = "files",
-  gene_col = 1,
-  count_col = 2,
-  read_fn = \(x) read_tsv(x, col_names = FALSE)
-) {
+    metadata_tb,
+    id_mapping = NULL,
+    sample_col = "cases",
+    file_col = "files",
+    gene_col = 1,
+    count_col = 2,
+    read_fn = \(x) read_tsv(x, col_names = FALSE)) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -275,28 +273,27 @@ shift_stranded <- function(x, shift = 0L, ...) {
 }
 
 into_granges <- function(
-  vep_file,
-  allowed_consequences = c(
-    "missense_variant",
-    "frameshift_variant",
-    "downstream_gene_variant",
-    "upstream_gene_variant",
-    "stop_gained",
-    "splice_region_variant",
-    "inframe_deletion",
-    "splice_donor_5th_base_variant"
-  ),
-  wanted_cols = c(
-    "ref",
-    "alt",
-    "vaf",
-    "alt_depth",
-    "gene_biotype",
-    "symbol",
-    "consequence",
-    "existing_variation"
-  )
-) {
+    vep_file,
+    allowed_consequences = c(
+      "missense_variant",
+      "frameshift_variant",
+      "downstream_gene_variant",
+      "upstream_gene_variant",
+      "stop_gained",
+      "splice_region_variant",
+      "inframe_deletion",
+      "splice_donor_5th_base_variant"
+    ),
+    wanted_cols = c(
+      "ref",
+      "alt",
+      "vaf",
+      "alt_depth",
+      "gene_biotype",
+      "symbol",
+      "consequence",
+      "existing_variation"
+    )) {
   library(GenomicRanges)
   if (is.character(vep_file)) {
     tb <- read_tsv(vep_file)
@@ -328,3 +325,4 @@ into_granges <- function(
   }
   gr
 }
+

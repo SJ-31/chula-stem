@@ -44,8 +44,11 @@ gene_names <- rownames(expr)
 # --- CODE BLOCK ---
 query <- biomaRt::getBM(
   attributes = c(
-    "entrezgene_id", "ensembl_gene_id"
-  ), filters = "ensembl_gene_id", values = gene_names,
+    "entrezgene_id",
+    "ensembl_gene_id"
+  ),
+  filters = "ensembl_gene_id",
+  values = gene_names,
   mart = mart
 )
 merged <- base::merge(expr, query, by.x = 0, by.y = "ensembl_gene_id")
@@ -71,11 +74,15 @@ seqlevelsStyle(ensdb) <- "UCSC"
 
 ratios <- read_tsv(cnr_file) |> format_chr_data(divide_by = 1)
 cn_calls <- read_tsv(cns_file) |> format_chr_data(divide_by = 1)
-ctb <- read_tsv(classify_cnv) |> rename_with(\(x) str_replace_all(x, "[ -]", "_"))
+ctb <- read_tsv(classify_cnv) |>
+  rename_with(\(x) str_replace_all(x, "[ -]", "_"))
 
 chromosome_from_loc <- function(tb, loc_col = "Loc") {
-  separated <- separate_wider_delim(tb, all_of(loc_col),
-    delim = ":", names = c("chromosome", "start")
+  separated <- separate_wider_delim(
+    tb,
+    all_of(loc_col),
+    delim = ":",
+    names = c("chromosome", "start")
   )
   if (!str_detect(separated$chromosome[1], "chr")) {
     separated$chromosome <- paste0("chr", separated$chromosome)
@@ -101,7 +108,8 @@ vep_small <- read_tsv(vep_small_file, col_types = "c") |> chromosome_from_loc()
 all_vep <- bind_rows(vep_svs, vep_small)
 
 joined <- ratios |>
-  inner_join(cn_calls,
+  inner_join(
+    cn_calls,
     by = join_by(chromosome, between(mid, y$start, y$end)),
     suffix = c("", "_right")
   )
@@ -119,11 +127,16 @@ mcols(cn_granges)$cn <- cn_calls$cn
 genes <- list()
 current_chr <- "chr9"
 types <- c("ds", "all")
-cols <- c("Known_or_predicted_dosage_sensitive_genes", "All_protein_coding_genes")
+cols <- c(
+  "Known_or_predicted_dosage_sensitive_genes",
+  "All_protein_coding_genes"
+)
 for (i in seq(2)) {
   genes[[types[i]]] <- ctb |>
-    dplyr::filter((Chromosome == current_chr) &
-      (!is.na(all_of(cols[i])))) |>
+    dplyr::filter(
+      (Chromosome == current_chr) &
+        (!is.na(all_of(cols[i])))
+    ) |>
     pluck(cols[i]) |>
     flatten_by(separator = ",", collapse = FALSE) |>
     unlist() |>
@@ -138,7 +151,10 @@ all_ctb <- ctb$All_protein_coding_genes |>
   unique()
 
 # Filter genes on the current chromosome and those flagged as dosage-sensitive
-genes_filtered <- genes(ensdb, filter = ~ gene_name %in% genes$all & seq_name == current_chr)
+genes_filtered <- genes(
+  ensdb,
+  filter = ~ gene_name %in% genes$all & seq_name == current_chr
+)
 
 
 ## ** Filter on current gene
@@ -146,14 +162,21 @@ genes_filtered <- genes(ensdb, filter = ~ gene_name %in% genes$all & seq_name ==
 current_gene <- genes_filtered[81, ]
 
 # Get features overlapping with the gene
-gene_data <- getGeneRegionTrackForGviz(ensdb, filter = GRangesFilter(current_gene))
+gene_data <- getGeneRegionTrackForGviz(
+  ensdb,
+  filter = GRangesFilter(current_gene)
+)
 var_filtered <- subsetByOverlaps(var_granges, current_gene)
 cn_filtered <- pintersect(cn_granges, current_gene, drop.nohit.ranges = TRUE)
 # TODO: what is the difference between pintersect and intersect???
 # pintersect performs an
 
 copy_ratios_filtered <- subsetByOverlaps(copy_ratios_granges, current_gene)
-copy_ratios_filtered <- pintersect(copy_ratios_granges, current_gene, drop.nohit.ranges = TRUE)
+copy_ratios_filtered <- pintersect(
+  copy_ratios_granges,
+  current_gene,
+  drop.nohit.ranges = TRUE
+)
 # <2025-01-10 Fri> pintersect is better for this, but why???
 
 # Make tracks
@@ -167,8 +190,10 @@ tracks <- list(gtrack, gene_track, copy_data_track, var_track)
 # and extend using the plot track params
 # Want three tracks: ideaogram, gene models, and cn data
 
-plotTracks(tracks,
-  transcriptAnnotation = "transcript", collapseTranscripts = TRUE,
+plotTracks(
+  tracks,
+  transcriptAnnotation = "transcript",
+  collapseTranscripts = TRUE,
   shape = "arrow"
 )
 
@@ -184,3 +209,4 @@ p <- plot_cnvkit(cns_file, cnr_file, range, list(), test_plotcnvkit)
 s <- 100
 e <- 1200000
 cn_calls |> dplyr::filter(start >= s & end <= e)
+-"intron_variant"
