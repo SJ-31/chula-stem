@@ -455,7 +455,7 @@ encode_multiple_samples <- function(
     agg_fn = sum,
     drivers = NULL,
     ensembl_id_colname = "ensembl_transcript_id") {
-  lapply(names(sample_path_map), \(s) {
+  result <- lapply(names(sample_path_map), \(s) {
     if (method != "cnv-msi") {
       sample_tb <- read_tsv(sample_path_map[[s]]$vep) |>
         mutate(Protein_position = as.numeric(Protein_position)) |>
@@ -523,8 +523,14 @@ encode_multiple_samples <- function(
     }
   }) |>
     bind_rows() |>
-    mutate(across(where(is.numeric), \(x) replace_na(x, 0))) |>
-    relocate(sample, .before = everything())
+    mutate(across(where(is.numeric), \(x) replace_na(x, 0)))
+  samples <- result$sample
+  result |>
+    select(-sample) |>
+    t() |>
+    as.data.frame() |>
+    `colnames<-`(samples) |>
+    rownames_to_column(var = "symbol")
 }
 
 ## * Entry point
