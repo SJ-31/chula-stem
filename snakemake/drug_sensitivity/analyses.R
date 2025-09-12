@@ -32,6 +32,7 @@ add_response_group <- function(
       resistant = ">0.75",
       intermediate = NULL
     ),
+    rename = FALSE,
     col_added = NULL) {
   if (is.null(col_added)) {
     col_added <- glue("{response_col}_group")
@@ -54,7 +55,11 @@ add_response_group <- function(
   new_col <- coalesce(!!!checked)
   new_col <- ifelse(is.na(new_col) & !make_na, fill_group, new_col)
 
-  tb[[col_added]] <- new_col
+  if (rename) {
+    tb[[response_col]] <- new_col
+  } else {
+    tb[[col_added]] <- new_col
+  }
   tb
 }
 
@@ -261,6 +266,7 @@ binary_feature_analysis <- function(
     relocate(p_adjust, .after = p_value)
 }
 
+
 #' Identify pathways that are enriched in mutated genes for each group of
 #' the factor `group_col`
 #'
@@ -306,4 +312,51 @@ response_group_ora <- function(
     mutate(result, !!group_col := g)
   }) |>
     bind_rows()
+}
+
+## * Entry point
+
+# TODO: make the experiment object right at the cli
+main <- function(exp, analysis, config) {
+  data <- read_tsv(assay)
+  response <- read_tsv(samples)
+  exp <- make_exp(assay = data, samples = response)
+  if (analysis == "binary") {
+    ## ** Binary testing
+    ## response <-
+  } else if (analysis == "ora") {
+    ## ** ORA
+    responses <- colnames(colData(exp))
+
+    setAnnotationHubOption("CACHE", config$ah_cache)
+    ah <- AnnotationHub()
+    orgdb <- query(ah, "org.Hs.eg.db")[[1]]
+
+    background <- foo # TODO: get background
+    result <- list()
+
+    for (resp in responses) {
+      tmp <- add_response_group(
+        as_tibble(colData(exp)),
+        response_col = resp,
+        group_spec = config$response_groups,
+        rename = TRUE
+      )
+      colData(exp) <- tmp
+      result[[resp]] <- response_group_ora(
+        exp,
+        group_col = resp,
+        orgdb = orgdb,
+        individual = TRUE,
+        background = background
+      )
+    }
+
+    viz <- report_response_ora(
+      result,
+      exp,
+      individual = TRUE,
+      palette = config$palette_c
+    )
+  }
 }
