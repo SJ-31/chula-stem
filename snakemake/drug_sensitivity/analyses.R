@@ -114,29 +114,26 @@ make_exp <- function(
 #'  see if there is a statistically significant difference in `response`
 #'  between the subgroup of `tb` with and without the feature
 #'
-#' @param tb tibble where samples are rows and ALL features are columns
+#' @param sexp SummarizedExperiment object containing assays and response data
+#'  first assay assumed to be the one of interest
 #' @param response response vector, should be aligned to samples in `tb`
 #' @param test hypothesis testing function with two arguments. First argument is
 #'      the response vector for the feature `present`
 #' @param correction multiple-testing correction function, takes vector of p-values as argument
 binary_feature_analysis <- function(
-    tb,
+    sexp,
     response,
     test = \(x, y) wilcox.test(x, y, alternative = "greater"), # We are interested that the presence of a mutation
     correction = p.adjust) {
-  if (is.character(response) && length(response) == 1) {
-    tmp <- response
-    response <- tb[[response]]
-    tb <- select(tb, -all_of(tmp))
-  }
-  if (length(response) != dim(tb)[1]) {
-    stop("`response` vector and sample `tb` aren't aligned!")
-  }
-  lapply(colnames(tb), \(feature) {
-    mask <- tb[[feature]] > 0
-    present <- response[mask]
-    absent <- response[!mask]
-    result <- list(feature = feature)
+  response_vec <- colData(sexp)[[response]]
+  features <- rownames(rowData(sexp))
+  data <- assay(sexp)
+
+  lapply(features, \(feat) {
+    mask <- data[feat, ] > 0
+    present <- response_vec[mask]
+    absent <- response_vec[!mask]
+    result <- list(feature = feat)
     test <- try_expr(test(present, absent))
     if (is.null(test$value)) {
       result$p_value <- NA
