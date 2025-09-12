@@ -59,6 +59,57 @@ add_response_group <- function(
 
 ## * Functions
 
+#' Helper function for aligning assay data and sample metadata, creating
+#' a summarized experiment object
+#'
+#' @param assay result of assay as a tibble. Columns are expected to be sample names, rows
+#'  are features. One column should contain feature names
+#' @param samples Sample metadata tibble i.e. colData
+#' @param sample_col column in `samples` containing sample names
+#'
+make_exp <- function(
+    assay,
+    samples,
+    join_on,
+    how = "intersect",
+    sample_col = "sample",
+    assay_name = "x",
+    assay_feature_col = "symbol") {
+  row_data <- DataFrame(tibble(
+    !!assay_feature_col := assay[[assay_feature_col]]
+  ))
+  assay_samples <- colnames(assay) |> discard(\(x) x == assay_feature_col)
+  if (how == "intersect") {
+    in_both <- intersect(samples[[sample_col]], colnames(assay))
+    assay <- select(assay, all_of(c(assay_feature_col, in_both)))
+    samples <- samples[samples[[sample_col]] %in% in_both, ]
+  } else if (how == "keep_assay") {
+    not_in <- assay_samples |> discard(\(x) x %in% samples[[sample_col]])
+    samples <- samples[samples[[sample_col]] %in% assay_samples, ]
+    extras <- tibble(!!sample_col := not_in)
+    samples <- bind_rows(samples, extras)
+  } else {
+    stop(
+      "A `how` method must be specified to combine the assay data and colData!"
+    )
+  }
+  # Samples must be in the same order
+  assay <- select(assay, all_of(c(assay_feature_col, samples[[sample_col]])))
+  SummarizedExperiment(
+    assays = `names<-`(
+      list(column_to_rownames(
+        assay,
+        var = assay_feature_col
+      )),
+      assay_name
+    ),
+    colData = column_to_rownames(samples, var = sample_col),
+    rowData = row_data
+  )
+}
+
+# TODO: adjust this to work with SummarizedExperiment
+
 #' For each variable (columns of `tb`), perform pairwise tests to
 #'  see if there is a statistically significant difference in `response`
 #'  between the subgroup of `tb` with and without the feature
