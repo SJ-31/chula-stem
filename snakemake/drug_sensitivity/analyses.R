@@ -108,8 +108,6 @@ make_exp <- function(
   )
 }
 
-# TODO: adjust this to work with SummarizedExperiment
-
 #' For each variable (columns of `tb`), perform pairwise tests to
 #'  see if there is a statistically significant difference in `response`
 #'  between the subgroup of `tb` with and without the feature
@@ -148,4 +146,51 @@ binary_feature_analysis <- function(
     bind_rows() |>
     mutate(p_adjust = correction(p_value)) |>
     relocate(p_adjust, .after = p_value)
+}
+
+#' Identify pathways that are enriched in mutated genes for each group of
+#' the factor `group_col`
+#'
+#' @param group_col Name of a factor column of rowData(sexp) to analyze
+#' @param individual If True, enrich mutated genes for each sample of the subgroup
+#' @param at_least if NOT individual, require this many hits of a gene in across the subgroup
+#'    for the gene to be considered in the enrichment
+response_group_ora <- function(
+    sexp,
+    group_col,
+    orgdb,
+    individual = TRUE,
+    at_least = 1,
+    background = NULL) {
+  library(clusterProfiler)
+
+  enrich_helper <- function(gene_list) {
+    mapped_genes <- mapIds(
+      orgdb,
+      keys = gene_list,
+      column = "ENTREZID",
+      keytype = "SYMBOL"
+    )
+    as_tibble(enrichGO(gene = mapped_genes, orgdb, universe = background))
+  }
+  groupings <- colData(sexp)[[group_col]]
+  lapply(unique(groupings), \(g) {
+    mask <- groupings == g
+    filtered <- sexp[, mask]
+    if (individual) {
+      sample_names <- colnames(filtered)
+      result <- lapply(sample_names, \(x) {
+        cur <- assay(filtered[, x])
+        gene_list <- rownames(cur)[cur > 0]
+        enrich_helper(gene_list) |> mutate(sample = x)
+      }) |>
+        bind_rows()
+    } else {
+      cur <- assay(filtered) |> rowSums()
+      gene_list <- rownames(cur)[cur > 0]
+      result <- enrich_helper(gene_list)
+    }
+    mutate(result, !!group_col := g)
+  }) |>
+    bind_rows()
 }
