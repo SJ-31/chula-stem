@@ -1,5 +1,6 @@
 library(tidyverse)
 library(glue)
+library(paletteer)
 
 ## * Utils
 
@@ -56,6 +57,118 @@ add_response_group <- function(
   tb[[col_added]] <- new_col
   tb
 }
+
+jaccard <- function(x, y) {
+  length(intersect(x, y)) / length(union(x, y))
+}
+
+# Compute pairwise function `fn` between elements of `lst`
+# if `symmetric`, then permutations of the same pair are computed
+do_pairwise <- function(lst, fn, symmetric = FALSE) {
+  tb <- tibble()
+  names <- names(lst)
+  for (j in seq_along(lst)) {
+    for (k in seq_along(lst)) {
+      if (k > j || symmetric) {
+        row <- tibble_row(
+          x = names[k],
+          y = names[j],
+          value = fn(lst[[k]], lst[[j]])
+        )
+        tb <- bind_rows(tb, row)
+      }
+    }
+  }
+  tb
+}
+
+## * Visualization
+
+#' Produce visualizations and summary statistics for the output of
+#' `response_group_ora`
+#'
+#' @param ora_results named list of tibble output from `response_group_ora`.
+#'    names of the list correspond to the specific response `group_col` used in
+#'    `response_group_ora`
+#' @return A list containing...
+#' 1. a list of venn diagrams, one for each response, showing the overlap of enriched
+#'  terms between the labels of that group
+#' 2. a single heatmap showing the Jaccard coefficient of the go terms between
+#'  labels of each response. Specifically, between the groups in `response.label`
+#'  e.g. `Paclitaxel.sensitive`
+#' 3. If `individual`, and the ORA was done per-sample,
+#'  a list of tibbles for each response denoting the percent enrichment
+#'  of the GO term within the label
+report_response_ora <- function(
+    ora_results,
+    sexp,
+    individual = TRUE,
+    palette = "ggthemes::Blue Light") {
+  library(ggplot2)
+  libray(ggVennDiagram)
+
+  result <- list()
+
+  helper <- function(group_col, ora_result) {
+    result[[group_col]] <<- list()
+
+    if (individual) {
+      # Report the percentage of samples (per group label) that
+      # ID was enriched in
+      group_counts <- colData(exp) |>
+        as_tibble() |>
+        group_by(!!as.symbol(group_col)) |>
+        summarise(group_size = n())
+
+      tb <- ora_result |>
+        group_by(ID, !!as.symbol(group_col)) |>
+        summarise(n_samples = n()) |>
+        left_join(group_counts, by = group_col) |>
+        mutate(percentage = 100 * (n / group_size))
+
+      result[[group_col]]$enrich_percent <<- distinct(
+        ora_result,
+        ID,
+        Description
+      ) |>
+        inner_join(tb, by = join_by(ID))
+    }
+
+    grouped <- res |>
+      group_by(!!as.symbol(group_col)) |>
+      summarise(ID = list(ID))
+
+    result[[group_col]]$venn <<- setNames(grouped$ID, grouped[[group_col]]) |>
+      ggVennDiagram() +
+      scale_fill_paletteer_c(palette)
+  }
+
+  all_responses <- lapply(names(ora_results), \(name) {
+    helper(name, ora_results[[name]])
+    ora_results[[name]] |>
+      mutate(response_group = name) |>
+      rename(label = name)
+  }) |>
+    bind_rows() |>
+    mutate(new_lab = paste0(response_group, ".", label)) |>
+    group_by(new_lab) |>
+    summarise(ID = list(ID))
+
+  response_list <- setNames(all_responses$ID, all_responses$new_lab)
+  similarity <- do_pairwise(response_list, fn = jaccard, symmetric = FALSE)
+
+  plot <- ggplot(similarity, aes(x = y, y = x, fill = value)) +
+    geom_tile() +
+    scale_x_discrete(position = "top") +
+    xlab("ID") +
+    ylab("ID") +
+    scale_fill_manual(fill = "Jaccard") +
+    scale_fill_paletteer_c(palette)
+  result$jaccard <- plot
+
+  result
+}
+
 
 ## * Functions
 
