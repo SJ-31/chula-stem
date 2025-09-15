@@ -1,6 +1,7 @@
 library(tidyverse)
 library(glue)
 library(paletteer)
+library(SummarizedExperiment)
 
 ## * Utils
 
@@ -188,7 +189,6 @@ report_response_ora <- function(
 make_exp <- function(
     assay,
     samples,
-    join_on,
     how = "intersect",
     sample_col = "sample",
     assay_name = "x",
@@ -316,14 +316,16 @@ response_group_ora <- function(
 
 ## * Entry point
 
-# TODO: make the experiment object right at the cli
-main <- function(exp, analysis, config) {
-  data <- read_tsv(assay)
-  response <- read_tsv(samples)
-  exp <- make_exp(assay = data, samples = response)
+#' Main entry point for script
+#' This function automatically writes results to `outdir` given on the cli
+main <- function(exp, analysis, outdir, config) {
   if (analysis == "binary") {
     ## ** Binary testing
-    ## response <-
+    responses <- config$response_cols
+    for (resp in responses) {
+      result <- binary_feature_analysis(exp, resp) |> arrange(p_adjust)
+      write_tsv(result, glue("{outdir}/{resp}.tsv"))
+    }
   } else if (analysis == "ora") {
     ## ** ORA
     responses <- colnames(colData(exp))
@@ -359,4 +361,51 @@ main <- function(exp, analysis, config) {
       palette = config$palette_c
     )
   }
+}
+
+## * CLI
+
+if (sys.nframe() == 0) {
+  library(optparse)
+  parser <- OptionParser()
+  parser <- add_option(
+    parser,
+    c("-a", "--assay"),
+    type = "character",
+    help = "TSV file containing assay data. Columns are samples,
+rows are features to associate with response"
+  )
+  parser <- add_option(
+    parser,
+    c("-r", "--analysis_routine"),
+    type = "character",
+    help = "Which analysis routine to run",
+    default = NULL
+  )
+  parser <- add_option(
+    parser,
+    c("-c", "--config"),
+    type = "character",
+    help = "Config file",
+    default = NULL
+  )
+  parser <- add_option(
+    parser,
+    c("-o", "--outdir"),
+    type = "character",
+    help = "Results output directory",
+    default = NULL
+  )
+  args <- parse_args(parser)
+  config <- jsonlite::read_json(args$config)
+  exp <- make_exp(
+    assay = dplyr::filter(read_tsv(args$assay), !is.na(symbol)),
+    samples = read_tsv(config$response_data),
+  )
+  main(
+    exp = exp,
+    analysis = args$analysis_routine,
+    config = config,
+    outdir = args$outdir
+  )
 }
