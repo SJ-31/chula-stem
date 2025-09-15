@@ -3,10 +3,8 @@ from datetime import date
 from pathlib import Path
 import pandas as pd
 
-main_config = "env.yaml"
 
-
-configfile: main_config
+configfile: "env.yaml"
 
 
 TODAY = date.today().isoformat()
@@ -42,6 +40,8 @@ d_encoding_styles = config["per_drug_encoding_styles"]
 
 feature_dir = f"{outdir}/features"
 
+# * Output
+
 feature_files = {
     "per_drug": {  # For using a drug-specific feature list
         d: expand(
@@ -58,6 +58,21 @@ feature_files = {
     },
 }
 
+analysis_results = {
+    "binary": {
+        resp: f"{outdir}/binary_tests/{resp}.tsv" for resp in config["response_cols"]
+    },
+    "ora": [dir(f"{outdir}/enrichment_analyses/{d}") for d in config["response_cols"]],
+}
+
+
+# * Helper functions
+
+
+def copy_config(out):
+    with open(out, "w") as f:
+        json.dump(config, f)
+
 
 def write_encoding_config(out, **kwargs):
     dct = {
@@ -71,10 +86,12 @@ def write_encoding_config(out, **kwargs):
         json.dump(dct, f)
 
 
+# * Rules
+
+
 rule all:
     input:
-        **feature_files["per_drug"],
-        **feature_files["all"],
+        *analysis_results["binary"].values(),
         mutation_summary=f"{outdir}/mutation_summary.tsv",
 
 
