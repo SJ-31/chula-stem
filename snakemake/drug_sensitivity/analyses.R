@@ -39,8 +39,16 @@ add_response_group <- function(
     col_added <- glue("{response_col}_group")
   }
   response <- tb[[response_col]]
-  cdf <- ecdf(response)
+  cdf <- NULL
+  try(cdf <- ecdf(response[!is.na(response)]))
+  if (is.null(cdf)) {
+    warning(glue(
+      "Not enough data to add response group for '{response_col}'\nReturning original argument..."
+    ))
+    return(list(tb = tb, status = "NO_DATA"))
+  }
   make_na <- is.na(response)
+  warning(glue("{sum(make_na)} NA values for response {response_col}!"))
   to_check <- discard(group_spec, is.null)
   fill_group <- names(keep(group_spec, is.null))[1]
 
@@ -61,7 +69,7 @@ add_response_group <- function(
   } else {
     tb[[col_added]] <- new_col
   }
-  tb
+  list(tb = tb, status = "SUCCESS")
 }
 
 jaccard <- function(x, y) {
@@ -111,7 +119,7 @@ report_response_ora <- function(
     individual = TRUE,
     palette = "ggthemes::Blue Light") {
   library(ggplot2)
-  libray(ggVennDiagram)
+  library(ggVennDiagram)
 
   result <- list()
 
@@ -147,6 +155,9 @@ report_response_ora <- function(
     result[[group_col]]$venn <<- setNames(grouped$ID, grouped[[group_col]]) |>
       ggVennDiagram() +
       scale_fill_paletteer_c(palette)
+  }
+  if (length(ora_results) < 2) {
+    return(result)
   }
 
   all_responses <- lapply(names(ora_results), \(name) {
@@ -293,8 +304,9 @@ response_group_ora <- function(
     as_tibble(enrichGO(gene = mapped_genes, orgdb, universe = background))
   }
   groupings <- colData(sexp)[[group_col]]
-  lapply(unique(groupings), \(g) {
+  tb <- lapply(unique(groupings), \(g) {
     mask <- groupings == g
+    mask <- replace_na(mask, FALSE)
     filtered <- sexp[, mask]
     if (individual) {
       sample_names <- colnames(filtered)
@@ -312,6 +324,11 @@ response_group_ora <- function(
     mutate(result, !!group_col := g)
   }) |>
     bind_rows()
+  if (nrow(tb) == 0) {
+    list(tb = tb, status = "NO_SIG")
+  } else {
+    list(tb = tb, status = "SUCCESS")
+  }
 }
 
 ## * Entry point
@@ -328,30 +345,48 @@ main <- function(exp, analysis, outdir, config) {
     }
   } else if (analysis == "ora") {
     ## ** ORA
-    responses <- colnames(colData(exp))
+    library(AnnotationHub)
+
+    responses <- config$response_cols
 
     setAnnotationHubOption("CACHE", config$ah_cache)
     ah <- AnnotationHub()
     orgdb <- query(ah, "org.Hs.eg.db")[[1]]
 
-    background <- foo # TODO: get background
+    background <- NULL # TODO: get background
     result <- list()
 
-    for (resp in responses) {
+    for (response in responses) {
       tmp <- add_response_group(
         as_tibble(colData(exp)),
-        response_col = resp,
+        response_col = response,
         group_spec = config$response_groups,
         rename = TRUE
       )
-      colData(exp) <- tmp
-      result[[resp]] <- response_group_ora(
-        exp,
-        group_col = resp,
-        orgdb = orgdb,
-        individual = TRUE,
-        background = background
-      )
+      colData(exp) <- DataFrame(tmp$tb)
+      if (tmp$status != "SUCCESS") {
+        write_lines(
+          tmp$status,
+          glue("{outdir}/{response}_result_raw_FAILED.txt")
+        )
+      } else {
+        res <- response_group_ora(
+          exp,
+          group_col = response,
+          orgdb = orgdb,
+          individual = TRUE,
+          background = background
+        )
+        if (res$status != "SUCCESS") {
+          write_lines(
+            res$status,
+            glue("{outdir}/{response}_result_{res$status}.txt")
+          )
+        } else {
+          write_tsv(res, glue("{outdir}/{response}_result_raw.tsv"))
+          result[[response]] <- res
+        }
+      }
     }
 
     viz <- report_response_ora(
@@ -360,6 +395,20 @@ main <- function(exp, analysis, outdir, config) {
       individual = TRUE,
       palette = config$palette_c
     )
+    for (g in names(viz)) {
+      if (g != "jaccard") {
+        if (!is.null(viz[[g]]$enrich_percent)) {
+          write_tsv(
+            viz[[g]]$enrich_percent,
+            glue("{outdir}/{g}_enrich_percent.tsv")
+          )
+        }
+        ggsave(glue("{outdir}/{g}_venn.png"), viz[[g]]$venn)
+      }
+    }
+    if (!is.null(viz$jaccard)) {
+      ggsave(glue("{outdir}/enriched_go_jaccard_similarity.png"), viz$jaccard)
+    }
   }
 }
 
