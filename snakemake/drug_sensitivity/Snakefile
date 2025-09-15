@@ -62,7 +62,7 @@ analysis_results = {
     "binary": {
         resp: f"{outdir}/binary_tests/{resp}.tsv" for resp in config["response_cols"]
     },
-    "ora": [dir(f"{outdir}/enrichment_analyses/{d}") for d in config["response_cols"]],
+    "ora": f"{outdir}/ora",
 }
 
 
@@ -92,6 +92,7 @@ def write_encoding_config(out, **kwargs):
 rule all:
     input:
         *analysis_results["binary"].values(),
+        analysis_results["ora"],
         mutation_summary=f"{outdir}/mutation_summary.tsv",
 
 
@@ -144,7 +145,6 @@ rule binary_testing:
         **analysis_results["binary"],
     params:
         outdir=f"{outdir}/binary_tests",
-        resp=config["response_data"],
         conf=f"{outdir}/binary_tmp.json",
     run:
         copy_config(f"{outdir}/binary_tmp.json")
@@ -152,8 +152,26 @@ rule binary_testing:
             "Rscript analyses.R -c {params.conf} -o {params.outdir} -r binary -a {input[0]}"
         )
 
+
+rule enrichment_analysis:
+    input:
+        rules.encode_features.output.binary,
+    params:
+        outdir=f"{outdir}/ora",
+        conf=f"{outdir}/ora_tmp.json",
+    output:
+        temp(f"{outdir}/ora_tmp.json"),
+        directory(f"{outdir}/ora"),
+    run:
+        copy_config(f"{outdir}/ora_tmp.json")
+        Path(params.outdir).mkdir(exist_ok=True)
+        shell(
+            "Rscript analyses.R  -o {params.outdir} -c {params.conf} -r ora -a {input[0]}"
+        )
+
+
 # rule regress_feature_drug_response:
-#     """Fit a model that regresses drug response on variants to specific protein features"""
-#     ...
-# TODO: enrichment analyses on drug sensitivity groups
-# TODO: cnv analyses
+# #     """Fit a model that regresses drug response on variants to specific protein features"""
+# #     ...
+#
+# # TODO: cnv analyses
