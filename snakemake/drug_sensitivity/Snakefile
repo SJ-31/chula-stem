@@ -136,6 +136,22 @@ rule encode_features:
                 shell(f"Rscript encode_features.R -i {conf_file} -o {outfile}")
 
 
+rule binary_testing:
+    input:
+        rules.encode_features.output.binary,
+    output:
+        temp(f"{outdir}/binary_tmp.json"),
+        **analysis_results["binary"],
+    params:
+        outdir=f"{outdir}/binary_tests",
+        resp=config["response_data"],
+        conf=f"{outdir}/binary_tmp.json",
+    run:
+        copy_config(f"{outdir}/binary_tmp.json")
+        shell(
+            "Rscript analyses.R -c {params.conf} -o {params.outdir} -r binary -a {input[0]}"
+        )
+
 # rule regress_feature_drug_response:
 #     """Fit a model that regresses drug response on variants to specific protein features"""
 #     ...
