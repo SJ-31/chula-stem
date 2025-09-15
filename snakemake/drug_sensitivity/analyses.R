@@ -40,11 +40,16 @@ add_response_group <- function(
   }
   response <- tb[[response_col]]
   cdf <- NULL
-  try(cdf <- ecdf(response[!is.na(response)]))
+  try(cdf <- ecdf(response))
   if (is.null(cdf)) {
     warning(glue(
       "Not enough data to add response group for '{response_col}'\nReturning original argument..."
     ))
+    if (rename) {
+      tb[[response_col]] <- NA_character_
+    } else {
+      tb[[col_added]] <- NA_character_
+    }
     return(list(tb = tb, status = "NO_DATA"))
   }
   make_na <- is.na(response)
@@ -129,7 +134,7 @@ report_response_ora <- function(
     if (individual) {
       # Report the percentage of samples (per group label) that
       # ID was enriched in
-      group_counts <- colData(exp) |>
+      group_counts <- colData(sexp) |>
         as_tibble() |>
         group_by(!!as.symbol(group_col)) |>
         summarise(group_size = n())
@@ -138,17 +143,18 @@ report_response_ora <- function(
         group_by(ID, !!as.symbol(group_col)) |>
         summarise(n_samples = n()) |>
         left_join(group_counts, by = group_col) |>
-        mutate(percentage = 100 * (n / group_size))
+        mutate(percentage = 100 * (n_samples / group_size))
 
       result[[group_col]]$enrich_percent <<- distinct(
         ora_result,
         ID,
-        Description
+        Description,
+        .keep_all = TRUE
       ) |>
         inner_join(tb, by = join_by(ID))
     }
 
-    grouped <- res |>
+    grouped <- ora_result |>
       group_by(!!as.symbol(group_col)) |>
       summarise(ID = list(ID))
 
@@ -156,16 +162,20 @@ report_response_ora <- function(
       ggVennDiagram() +
       scale_fill_paletteer_c(palette)
   }
-  if (length(ora_results) < 2) {
-    return(result)
-  }
 
   all_responses <- lapply(names(ora_results), \(name) {
     helper(name, ora_results[[name]])
     ora_results[[name]] |>
       mutate(response_group = name) |>
       rename(label = name)
-  }) |>
+  })
+
+  if (length(ora_results) < 2) {
+    return(result)
+  }
+
+  # Compare similarity between set of enriched terms between response variables
+  all_responses <- all_responses |>
     bind_rows() |>
     mutate(new_lab = paste0(response_group, ".", label)) |>
     group_by(new_lab) |>
@@ -179,7 +189,7 @@ report_response_ora <- function(
     scale_x_discrete(position = "top") +
     xlab("ID") +
     ylab("ID") +
-    scale_fill_manual(fill = "Jaccard") +
+    guides(fill = guide_legend(title = "Jaccard Distance")) +
     scale_fill_paletteer_c(palette)
   result$jaccard <- plot
 
@@ -295,21 +305,21 @@ response_group_ora <- function(
   library(clusterProfiler)
 
   enrich_helper <- function(gene_list) {
-    mapped_genes <- mapIds(
+    mapped_genes <- suppressMessages(mapIds(
       orgdb,
       keys = gene_list,
       column = "ENTREZID",
       keytype = "SYMBOL"
-    )
+    ))
     as_tibble(enrichGO(gene = mapped_genes, orgdb, universe = background))
   }
   groupings <- colData(sexp)[[group_col]]
   tb <- lapply(unique(groupings), \(g) {
     mask <- groupings == g
-    mask <- replace_na(mask, FALSE)
+    mask[is.na(mask)] <- FALSE
     filtered <- sexp[, mask]
     if (individual) {
-      sample_names <- colnames(filtered)
+      sample_names <- rownames(colData(filtered))
       result <- lapply(sample_names, \(x) {
         cur <- assay(filtered[, x])
         gene_list <- rownames(cur)[cur > 0]
@@ -346,7 +356,6 @@ main <- function(exp, analysis, outdir, config) {
   } else if (analysis == "ora") {
     ## ** ORA
     library(AnnotationHub)
-
     responses <- config$response_cols
 
     setAnnotationHubOption("CACHE", config$ah_cache)
@@ -358,12 +367,12 @@ main <- function(exp, analysis, outdir, config) {
 
     for (response in responses) {
       tmp <- add_response_group(
-        as_tibble(colData(exp)),
+        as_tibble(rownames_to_column(as.data.frame(colData(exp)))),
         response_col = response,
         group_spec = config$response_groups,
         rename = TRUE
       )
-      colData(exp) <- DataFrame(tmp$tb)
+      colData(exp) <- DataFrame(column_to_rownames(tmp$tb))
       if (tmp$status != "SUCCESS") {
         write_lines(
           tmp$status,
@@ -383,8 +392,8 @@ main <- function(exp, analysis, outdir, config) {
             glue("{outdir}/{response}_result_{res$status}.txt")
           )
         } else {
-          write_tsv(res, glue("{outdir}/{response}_result_raw.tsv"))
-          result[[response]] <- res
+          write_tsv(res$tb, glue("{outdir}/{response}_result_raw.tsv"))
+          result[[response]] <- res$tb
         }
       }
     }
