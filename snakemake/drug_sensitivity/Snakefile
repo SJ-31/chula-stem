@@ -3,8 +3,10 @@ from datetime import date
 from pathlib import Path
 import pandas as pd
 
+main_config = "env.yaml"
 
-configfile: "env.yaml"
+
+configfile: main_config
 
 
 TODAY = date.today().isoformat()
@@ -36,26 +38,43 @@ for c in cases:
         else:
             print(f"WARNING: {group} file {f} does not exist for case {c}!")
 
-encoding_styles = config["encoding_styles"]
+d_encoding_styles = config["per_drug_encoding_styles"]
 
 feature_dir = f"{outdir}/features"
 
 feature_files = {
-    "protein_features": {
+    "per_drug": {  # For using a drug-specific feature list
         d: expand(
             "{o}/{drug}_{s}.tsv",
             o=feature_dir,
             drug=d,
-            s=encoding_styles,
+            s=d_encoding_styles,
         )
         for d in config["per_drug_encoding"].keys()
-    }
+    },
+    "all": {
+        "binary": f"{feature_dir}/binary.tsv",
+        "vep_consequence": f"{feature_dir}/vep_consequence.tsv",
+    },
 }
+
+
+def write_encoding_config(out, **kwargs):
+    dct = {
+        "transcript_id2uniprot": config["transcript_id2uniprot"],
+        "samples": sample_maps,
+        "features": config["uniprot_features"],
+        "allowed_consequence": config["allowed_consequence"],
+    }
+    dct.update(kwargs)
+    with open(out, "w") as f:
+        json.dump(dct, f)
 
 
 rule all:
     input:
-        **feature_files["protein_features"],
+        **feature_files["per_drug"],
+        **feature_files["all"],
         mutation_summary=f"{outdir}/mutation_summary.tsv",
 
 
@@ -72,33 +91,31 @@ rule mutation_summary:
 rule encode_features:
     """Generate tsv files where samples are"""
     output:
-        **feature_files["protein_features"],
+        **feature_files["per_drug"],
+        **feature_files["all"],
         jsons=[
-            temp(f"{outdir}/feature_config_{style}.json") for style in encoding_styles
+            temp(f"{outdir}/feature_config_{style}.json")
+            for style in d_encoding_styles
         ],
     run:
+        for encoding, f in feature_files["all"].items():
+            conf_file = f"{outdir}/feature_config_{encoding}.json"
+            write_encoding_config(out=conf_file, encoding_method=encoding)
+            shell(f"Rscript encode_features.R -i {conf_file} -o {f}")
         for drug, sym in config["per_drug_encoding"].items():
-            for style in encoding_styles:
+            for style in d_encoding_styles:
                 conf_file = f"{outdir}/feature_config_{style}.json"
                 outfile = f"{feature_dir}/{drug}_{style}.tsv"
                 symbols = {}
-                if config["limit_symbols"].get(style, True):
-                    for k, v in sym.items():
-                        if isinstance(v, str):
-                            with open(v, "r") as f:
-                                symbols[k] = f.read().splitlines()
-                        else:
-                            symbols[k] = v
-                dct = {
-                    "transcript_id2uniprot": config["transcript_id2uniprot"],
-                    "samples": sample_maps,
-                    "only_symbols": symbols,
-                    "features": config["uniprot_features"],
-                    "encoding_method": style,
-                    "allowed_consequence": config["allowed_consequence"],
-                }
-                with open(conf_file, "w") as f:
-                    json.dump(dct, f)
+                for k, v in sym.items():
+                    if isinstance(v, str):
+                        with open(v, "r") as f:
+                            symbols[k] = f.read().splitlines()
+                    else:
+                        symbols[k] = v
+                dct = write_encoding_config(
+                    out=conf_file, only_symbols=symbols, encoding_method=style
+                )
                 shell(f"Rscript encode_features.R -i {conf_file} -o {outfile}")
 
 
