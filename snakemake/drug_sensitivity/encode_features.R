@@ -327,7 +327,7 @@ encode_w_vep <- function(
       group_by(SYMBOL, Consequence) |>
       summarise(feature_score = agg_fn(feature_score)) |>
       ungroup() |>
-      mutate(name = paste0(SYMBOL, ".", Consequence))
+      mutate(name = paste0(SYMBOL, "__", Consequence))
   } else {
     pivoted <- scored |>
       group_by(SYMBOL) |>
@@ -385,7 +385,7 @@ encode_w_cnv_msi <- function(
       gene_name %in% only_symbols_msi | is.na(gene_name)
     )
   }
-  cnv_joined <- mutate(cnv_joined, symbol = paste0(symbol, ".", "cn")) |>
+  cnv_joined <- mutate(cnv_joined, symbol = paste0(symbol, "__", "cn")) |>
     pivot_wider(names_from = symbol, values_from = cn)
 
   sample_msi <- mutate(
@@ -402,7 +402,7 @@ encode_w_cnv_msi <- function(
     group_by(gene_name) |>
     summarise(rep_bases = agg_fn(rep_bases)) |>
     ungroup() |>
-    mutate(gene_name = paste0(gene_name, ".", "msi")) |>
+    mutate(gene_name = paste0(gene_name, "__", "msi")) |>
     pivot_wider(names_from = gene_name, values_from = rep_bases)
   bind_cols(cnv_joined, msi_gene, tibble(intergenic_msi = msi_intergenic))
 }
