@@ -1,0 +1,28 @@
+cwl:tool: rhapsody
+
+Reads:
+  - class: File
+    location: "/data/project/stemcell/shannc/PDAC/raw/TCR_2025-09-23/TCRindexPCRno2_1.fastq.gz"
+  - class: File
+    location: "/data/project/stemcell/shannc/PDAC/raw/TCR_2025-09-23/TCRindexPCRno2_2.fastq.gz"
+  - class: File
+    location: "/data/project/stemcell/shannc/PDAC/raw/TCR_2025-09-23/SampleTAGindex2_1.fastq.gz"
+  - class: File
+    location: "/data/project/stemcell/shannc/PDAC/raw/TCR_2025-09-23/SampleTAGindex2_2.fastq.gz"
+
+Targeted_Reference:
+  - class: File
+    location: "./BD_Rhapsody_Hs_T_Cell_Expression_FASTA.fasta"
+
+Sample_Tags_Version: human
+
+Tag_Names: [10-PDAC82, 11-PDAC83, 12-PHcase3]
+
+VDJ_Version: human
+
+Run_Name: TCR1
+
+Generate_Bam: true
+
+## Maximum_Threads (integer, optional, default: [use all cores of CPU]) - Set the maximum number of threads to use in the read processing steps of the pipeline:  QualCLAlign, AlignmentAnalysis, VDJ assembly
+Maximum_Threads: 8
