@@ -1,3 +1,14 @@
+* vdjdb.h5ad
+*Relative Path:* =analyses/data/vdjdb.h5ad=
+*Date Added:* <2025-09-26 Fri>
+*Source:* [[https://scirpy.scverse.org/en/latest/generated/scirpy.datasets.vdjdb.html#scirpy.datasets.vdjdb][scirpy.datasets.vdjdb — scirpy]]
+Complete VDJdb database (see [[https://vdjdb.cdr3.net/][the homepage here]]), last updated 30 July, 2025
+* McPAS-TCR.csv
+*Relative Path:* =analyses/data/McPAS-TCR.csv=
+*Date Added:* <2025-09-26 Fri>
+*Source:* [[https://friedmanlab.weizmann.ac.il/McPAS-TCR/][Download page]]
+Complete [[https://friedmanlab.weizmann.ac.il/McPAS-TCR/][McPAS-TCR database]] (last updated September 10, 2022).
+"McPAS-TCR is a manually curated catalogue of T cell receptor (TCR) sequences that were found in T cells associated with various pathological conditions in humans and in mice. It is meant to link TCR sequences to their antigen target or to the pathology and organ with which they are associated"
 * MGI_Exome_Capture_V5_lifted.bed
 
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted.bed=
@@ -91,7 +102,7 @@ Ensembl's primary assembly of the GRCh38 genome, added into the directory on 202
 *Source:* [[https://earray.chem.agilent.com/suredesign][Agilent SureDesign]]
 Download package for the SureSelectHumanAllExon V6 Hg38 capture kit.
 The *_Covered.bed file are taken to be baits, *_Regions.bed to be targets
-
+From [[https://gatk.broadinstitute.org/hc/en-us/community/posts/360057855032-Broad-hg38-ICE-interval-list][this]] thread
 * GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz
 *Absolute path:* =/ssh:shannc@161.200.107.77:/data/project/stemcell/shannc/reference/GRCh38_gencode_v44_CTAT_lib_Oct292023.plug-n-play.tar.gz=
 *Date added*: <2025-01-01 Wed>
@@ -386,3 +397,7 @@ Contains curated assignments of dosage sensitivity to genes and regions
 #+begin_src text
 "GENE/REGION","HGNC/ISCA","GRCh37","GRCh38","HAPLOINSUFFICIENCY","TRIPLOSENSITIVITY","ONLINE REPORT","DATE"
 #+end_src
+
+# Local Variables:
+# jinx-local-words: "SureSelectHumanAllExon"
+# End:
