@@ -48,12 +48,14 @@ responses <- local({
       too_few = "align_start"
     )
 })
+
 responses$sample <- paste0(
   responses$sample,
   "_",
   replace_na(as.character(responses$biopsy), "")
 ) |>
   str_remove("_$")
+
 # Manual naming
 
 responses$sample <- case_when(
@@ -70,4 +72,4 @@ li_data <- li_data |>
   tb_transpose("sample") |>
   mutate(across(-sample, as.numeric))
 write_tsv(li_data, here(dir, "li_et_al_filtered.tsv"))
-write_tsv(responses, here(dir, "all_responses.tsv"))
+write_tsv(select(responses, -biopsy), here(dir, "all_responses.tsv"))

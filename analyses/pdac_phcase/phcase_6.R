@@ -26,6 +26,7 @@ if (!file.exists(vep_file)) {
 wanted_symbols <- c("ARID1A", "BRAF", "TET2", "MAP2K4", "TP53")
 
 # TODO: need a way to choose a single transcript only, to make reporting easier
+#
 
 # Agreement with liquid biopsy variants
 # ARID1A: Yes
@@ -35,11 +36,4 @@ wanted_symbols <- c("ARID1A", "BRAF", "TET2", "MAP2K4", "TP53")
 # TET2: not found
 
 filtered <- vep |>
-  filter(SYMBOL %in% wanted_symbols) |>
-  mutate(change = )
-
-filtered |> ggplot(aes(x = SYMBOL, y = VAF)) +
-  geom_boxplot()
-
-# Multiple primary transcripts
-filtered <- separate_longer_delim(HGVSp, delim = ";")
+  filter(SYMBOL %in% wanted_symbols)
