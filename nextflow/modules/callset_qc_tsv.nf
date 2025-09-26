@@ -35,12 +35,15 @@ process CALLSET_QC_TSV {
 
     output:
     tuple val(meta), path(output), emit: tsv
+    tuple val(meta), path(minimal)
     path("*.log")
     //
 
     script:
     output = Utl.getName(module_number, meta, "QC", "tsv")
+    minimal = "${output.replace(".tsv", "")}_minimal.tsv"
     check = file("${meta.out}/${output}")
+    check2 = file("${meta.out}/${minimal}")
     args = task.ext.args.join(" ")
     outlog = "${output}_qc_tsv.log"
 
@@ -63,9 +66,10 @@ process CALLSET_QC_TSV {
         }
     }).join(" ")
 
-    if (check.exists()) {
+    if (check.exists() && check2.exists()) {
         """
         ln -sr ${check} .
+        ln -sr ${check2} .
         ln -sr ${meta.log}/${outlog} .
         """
     } else {
@@ -74,6 +78,7 @@ process CALLSET_QC_TSV {
             ${ignore_flag} \\
             --tool_source_tag "${params.source_name}" \\
             -o ${output} \\
+            -m ${minimal} \\
             ${args} \\
             ${filter_flag} \\
             ${all}

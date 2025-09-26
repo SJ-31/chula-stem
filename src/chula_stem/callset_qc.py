@@ -287,6 +287,7 @@ def write_empty(output, tool_source_tag):
 
 @click.command()
 @click.option("-o", "--output", required=True, help="Output tsv path")
+@click.option("-m", "--minimal_output", required=True, help="Output tsv path (minimal)")
 @click.option("-i", "--input_tsv", required=True, help="Input tsv path")
 @click.option("--min_tumor_depth", required=False, default=0)
 @click.option("--max_normal_depth", required=False, default=50)
@@ -329,6 +330,7 @@ def qc_main(
     informative: bool,
     min_callers: bool,
     vaf_adaptive: bool,
+    minimal_output: str | None = None,
     tool_source_tag: str = "TOOL_SOURCE",
     ignore_regions: str = "",
     chr_col: int = 0,
@@ -338,6 +340,8 @@ def qc_main(
     if Path(input_tsv).stat().st_size == 0:
         print("WARNING: empty input")
         write_empty(output=output, tool_source_tag=tool_source_tag)
+        if minimal_output is not None:
+            Path(minimal_output).touch()
     else:
         df: pl.DataFrame = pl.read_csv(
             input_tsv,
@@ -350,6 +354,8 @@ def qc_main(
             if df.shape[0] <= 0:
                 print("WARNING: no variants with of canonical transcripts found")
                 write_empty(output, tool_source_tag=tool_source_tag)
+                if minimal_output is not None:
+                    Path(minimal_output).touch()
                 exit(0)
         print(f"Original shape: {df.shape}")
         grouping_cols: list = ["Loc", "Ref", "Alt", "SYMBOL"]
@@ -380,6 +386,30 @@ def qc_main(
             print(f"Before filtering by regions in {ignore_regions}: {df.shape}")
             df = region_filter(df, ignore_regions, chr_col, start_col, end_col)
             print(f"After filtering by regions in {ignore_regions}: {df.shape}")
-        df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
+        df = df.unique(["Loc", "Feature"], keep="first", maintain_order=True).pipe(
             empty_string2null
-        ).write_csv(output, separator="\t", null_value="NA")
+        )
+        df.write_csv(output, separator="\t", null_value="NA")
+
+        # Write minimal output
+        if minimal_output is not None:
+            var_cols = ["HGVSp", "HGVSc", "HGVSg"]
+            summary_cols = ["SYMBOL", *var_cols, "Consequence"]
+            to_rename = {"SYMBOL": "Gene"}
+            if "VAF" in df.columns:
+                summary_cols.insert(1, "VAF")
+                to_rename["VAF"] = "Allele Frequency"
+            minimal = (
+                df.select(summary_cols)
+                .with_columns(
+                    HGVSg=pl.struct("HGVSg", "Consequence").map_elements(
+                        lambda x: f"{x['HGVSg']} ({x['Consequence'].replace("_", " ").title()})",
+                        return_dtype=str,
+                    ),
+                    Change=pl.coalesce(var_cols).str.replace(".*:", ""),
+                )
+                .rename(to_rename)
+                .drop(var_cols + ["Consequence"])
+                .filter(pl.col("Gene").is_not_null())
+            )
+            minimal.write_csv(minimal_output, separator="\t", null_value="NA")
