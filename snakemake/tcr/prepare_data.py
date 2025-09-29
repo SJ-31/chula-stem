@@ -1,19 +1,31 @@
 #!/usr/bin/env ipython
-from collections.abc import Sequence
 from functools import reduce
 from pathlib import Path
-from typing import Literal
 
 import anndata as ad
 import awkward as ak
-import matplotlib.pyplot as plt
 import polars as pl
 import scirpy as ir
-import seaborn as sns
-from matplotlib.figure import Figure
 from snakemake.script import snakemake as smk
 
 # * Helper functions
+
+
+def mark_public_clones(
+    adata: ad.AnnData, clone_col: str = "clone_id", sample_col: str = "Sample_Name"
+) -> None:
+    public_clones = (
+        pl.from_pandas(adata.obs)
+        .filter(
+            ~pl.col(sample_col).is_in(["Multiplet", "Undetermined"])
+            & pl.col(clone_col).is_not_null()
+        )
+        .group_by(clone_col)
+        .agg(pl.col(sample_col).unique().len().alias("count"))
+        .filter(pl.col("count") > 1)["clone_id"]
+        .to_list()
+    )
+    adata.obs.loc[:, "public_clonotype"] = adata.obs[clone_col].isin(public_clones)
 
 
 def format_mcpas(path) -> ad.AnnData:
@@ -67,33 +79,6 @@ def format_mcpas(path) -> ad.AnnData:
     return mcpas
 
 
-def plot_obs(
-    adata: ad.AnnData,
-    mode: Literal["tSNE", "UMAP"],
-    hues: Sequence,
-    from_bd_pipeline: bool = True,
-    **kwargs,
-) -> Figure:
-    fig, ax = plt.subplots(1, len(hues))
-    if mode == "tSNE" and from_bd_pipeline:
-        x = "tSNE_1"
-        y = "tSNE_2"
-    elif mode == "UMAP" and from_bd_pipeline:
-        x = "UMAP_1"
-        y = "UMAP_2"
-    else:
-        raise NotImplementedError()
-    for i, hue in enumerate(hues):
-        sns.scatterplot(data=adata.obs, x=x, y=y, hue=hue, ax=ax[i], **kwargs)
-        ax[i].set_ylabel(x.replace("_", ""))
-        ax[i].set_xlabel(y.replace("_", ""))
-        ax[i].get_yaxis().set_ticks([])
-        ax[i].get_xaxis().set_ticks([])
-        if i > 0:
-            ax[i].set_ylabel(None)
-    return fig
-
-
 # * Load data from Rhapsody and save to a single h5ad object
 if smk.rule == "load_runs":
     tag_mapping: dict = {
@@ -144,10 +129,6 @@ if smk.rule == "load_runs":
         ir.pp.index_chains(adata)
         ir.tl.chain_qc(adata)
 
-        # Plot on per-run basis
-        tsne_fig = plot_obs(adata, "tSNE", hues=to_plot)
-        umap_fig = plot_obs(adata, "UMAP", hues=to_plot)
-
         adatas.append(adata)
 
     combined: ad.AnnData = ad.concat(adatas)
@@ -167,6 +148,10 @@ if smk.rule == "load_runs":
     )
 
     combined.obs_names_make_unique()
+    mark_public_clones(combined)
+    # combined.write_h5ad(smk.output)
+
+
 elif smk.rule == "prepare_references":
     mcpas_cells = []
     for k, v in smk.params["refs_to_get"].items():
