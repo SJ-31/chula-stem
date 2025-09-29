@@ -1,0 +1,47 @@
+import json
+from datetime import date
+from pathlib import Path
+
+
+configfile: "env.yaml"
+
+
+TODAY = date.today().isoformat()
+DATE = config.get("date", TODAY)
+
+OUT = config.get("output")
+
+runs = config["bd_results"]
+
+
+refs_to_get = {}
+for ref, p in config["reference_files"].items():
+    path = Path(p)
+    adata_file = path.parent.joinpath(f"{path.stem}.h5ad")
+    if not adata_file.exists():
+        refs_to_get[ref] = adata_file
+
+
+rule all:
+    input:
+        **refs_to_get,
+        combined_adata=f"{OUT}/combined.h5ad",
+
+
+rule prepare_references:
+    params:
+        refs_to_get=refs_to_get,
+    output:
+        refs_to_get.values(),
+    script:
+        "prepare_data.py"
+
+
+rule load_runs:
+    output:
+        f"{OUT}/combined.h5ad",
+    script:
+        "prepare_data.py"
+
+
+# rule make_plots
