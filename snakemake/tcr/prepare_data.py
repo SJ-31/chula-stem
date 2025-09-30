@@ -96,8 +96,7 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
     return mdata
 
 
-# * Load data from Rhapsody and save to a single h5ad object
-# TODO: need to include the expression data from cellismo
+# * Load data from Rhapsody and save to a single mudata object
 if smk.rule == "load_runs":
     tag_mapping: dict = {
         f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
@@ -130,11 +129,10 @@ if smk.rule == "load_runs":
         combined, expanded_in="Sample_Name", **smk.config["clonal_expansion"]
     )
 
-    combined.obs_names_make_unique()
     mark_public_clones(combined)
-    # combined.write_h5ad(smk.output)
+    combined.write_h5mu(smk.output)
 
-
+# * Prepare reference files
 elif smk.rule == "prepare_references":
     mcpas_cells = []
     for k, v in smk.params["refs_to_get"].items():
@@ -145,3 +143,35 @@ elif smk.rule == "prepare_references":
             _ = ir.datasets.vdjdb(cached=True, cache_path=v)
         elif k == "iedb":
             _ = ir.datasets.iedb(cached=True, cache_path=v)
+
+# * Custom annotation with CellAssign
+elif smk.rule == "annotate_cells":
+    import numpy as np
+    import pandas as pd
+    from scvi.external import CellAssign
+
+    config = smk.config[smk.rule]["cellassign"]
+    mdata: md.MuData = md.read_h5mu(smk.input[0])
+
+    markers: pd.DataFrame = pd.read_csv(config["marker_file"]).set_index(
+        config["symbol_col"]
+    )
+
+    lib_size = mdata["rna"].X.sum(1)
+    mdata["rna"].obs["size_factor"] = lib_size / np.mean(lib_size)
+    filtered = mdata["rna"][:, mdata["rna"].var.index.isin(markers.index)].copy()
+    CellAssign.setup_anndata(filtered, size_factor_key="size_factor")
+
+    model = CellAssign(filtered, markers)
+    model.train(**config.get("train_kws", {}))
+
+    predictions = model.predict()
+    elbo_plot = model.history["elbo_validation"].plot()
+
+    predictions.index = mdata.obs.index
+    predictions.reset_index().to_csv(smk.output["predictions_raw"], index=False)
+    elbo_plot.figure.savefig(smk.output["elbo_plot"])  # TODO:
+    result = pl.DataFrame(
+        {"index": filtered.obs.index, "prediction": predictions.idxmax(axis=1).values}
+    )
+    result.write_csv(smk.output["predictions"])

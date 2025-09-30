@@ -21,10 +21,21 @@ for ref, p in config["reference_files"].items():
     if not adata_file.exists():
         refs_to_get[ref] = adata_file
 
+cell_annotation_results = {}
+if config["annotate_cells"]["cellassign"]:
+    cell_annotation_results.update(
+        {
+            "elbo_validation": f"{OUT}/cellassign/elbo_validation.png",
+            "predictions_raw": f"{OUT}/cellassign/predictions_raw.csv",
+            "predictions": f"{OUT}/cellassign/predictions.csv",
+        }
+    )
+
 
 rule all:
     input:
         **refs_to_get,
+        **cell_annotation_results,
         combined_adata=f"{OUT}/combined.h5ad",
 
 
@@ -39,7 +50,16 @@ rule prepare_references:
 
 rule load_runs:
     output:
-        f"{OUT}/combined.h5ad",
+        f"{OUT}/combined.h5mu",
+    script:
+        "prepare_data.py"
+
+
+rule annotate_cells:
+    output:
+        **cell_annotation_results,
+    input:
+        rules.load_runs.output,
     script:
         "prepare_data.py"
 
