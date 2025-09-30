@@ -1,12 +1,16 @@
 #!/usr/bin/env ipython
-from functools import reduce
 from pathlib import Path
 
 import anndata as ad
-import awkward as ak
+import mudata as md
 import polars as pl
 import scirpy as ir
-from snakemake.script import snakemake as smk
+
+try:
+    from snakemake.script import snakemake as smk
+except ImportError:
+    smk = type("snakemake", (), {"rule": None})
+md.set_options(pull_on_update=False)
 
 # * Helper functions
 
@@ -79,7 +83,21 @@ def format_mcpas(path) -> ad.AnnData:
     return mcpas
 
 
+def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData:
+    airr: ad.AnnData = ir.io.read_airr(
+        path.joinpath(f"{run_name}_VDJ_Dominant_Contigs_AIRR.tsv")
+    )
+    rna: ad.AnnData = md.read_h5mu(path.joinpath(f"{run_name}.cellismo")).mod["rna"]
+    rna.obs = rna.obs.assign(
+        Sample_Name=rna.obs["Sample_Name"].cat.rename_categories(tag_mapping)
+    )
+    mdata: md.MuData = md.MuData({"rna": rna, "airr": airr})
+    mdata.pull_obs(mods="rna", prefix_unique=False, drop=True)
+    return mdata
+
+
 # * Load data from Rhapsody and save to a single h5ad object
+# TODO: need to include the expression data from cellismo
 if smk.rule == "load_runs":
     tag_mapping: dict = {
         f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
@@ -87,51 +105,16 @@ if smk.rule == "load_runs":
     to_plot = smk.config["to_plot"]
     ct_col = "cell_type_experimental"
 
-    adatas = []
+    mdatas = []
     for run_name, dir in smk.config["bd_results"].items():
         run: Path = Path(dir)
-        adata = ir.io.read_airr(
-            run.joinpath(f"{run_name}_VDJ_Dominant_Contigs_AIRR.tsv")
-        )
-        dfs = []
-        # TODO: this should be optional if samples were not multiplexed
-        sample_df: dict = pl.read_csv(
-            run.joinpath(f"{run_name}_Sample_Tag_Calls.csv"), comment_prefix="#"
-        ).with_columns(pl.col("Sample_Name").replace(tag_mapping))
-        dfs.append(sample_df)
+        mdata = load_rhapsody_run(run, run_name, tag_mapping=tag_mapping)
+        mdata.obs_names = [f"{x}_{run_name}" for x in mdata.obs_names]
+        ir.pp.index_chains(mdata)
+        ir.tl.chain_qc(mdata)
+        mdatas.append(mdata)
 
-        for dimr in ["tSNE", "UMAP"]:
-            dimr_file = run.joinpath(f"{run_name}_{dimr}_coordinates.csv")
-            if dimr_file.exists():
-                dfs.append(pl.read_csv(dimr_file))
-
-        if len(dfs) > 1:
-            obs: pl.DataFrame = reduce(
-                lambda x, y: x.join(y, on="Cell_Index", how="left"), dfs
-            )
-        else:
-            obs = sample_df
-        obs = (
-            obs.with_columns(pl.col("Cell_Index").cast(pl.String))
-            .filter(pl.col("Cell_Index").is_in(adata.obs.index))
-            .with_columns(
-                pl.lit(run_name).alias("run"),
-                pl.Series(ak.to_list(adata.obsm["airr"][ct_col][:, 0])).alias(ct_col),
-            )
-        )
-        adata.obs = adata.obs.merge(
-            obs.to_pandas(),
-            left_index=True,
-            right_on="Cell_Index",
-            how="left",
-        ).set_index("Cell_Index", drop=False)
-
-        ir.pp.index_chains(adata)
-        ir.tl.chain_qc(adata)
-
-        adatas.append(adata)
-
-    combined: ad.AnnData = ad.concat(adatas)
+    combined: md.MuData = md.concat([mdatas], index_unique=True)
 
     # ** Call clonotypes
     # TODO: verify that you can do this with multiple samples
@@ -156,8 +139,8 @@ elif smk.rule == "prepare_references":
     mcpas_cells = []
     for k, v in smk.params["refs_to_get"].items():
         if k == "mcpas":
-            adata = format_mcpas(path=v.parent.joinpath(f"{v.stem}.csv"))
-            adata.write_h5ad(v)
+            mdata = format_mcpas(path=v.parent.joinpath(f"{v.stem}.csv"))
+            mdata.write_h5ad(v)
         elif k == "vdjdb":
             _ = ir.datasets.vdjdb(cached=True, cache_path=v)
         elif k == "iedb":
