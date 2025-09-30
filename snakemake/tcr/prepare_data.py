@@ -19,16 +19,19 @@ def alpha_richness(
     groupby: str,
     airr_mod: str = "airr",
     target_col: str = "clone_id",
+    normalize: bool = True,
 ) -> None:
     if isinstance(data, md.MuData):
         data = data[airr_mod]
-    richness_map = (
-        data.obs.groupby(groupby, observed=True)
-        .agg({target_col: pd.Series.nunique})[target_col]
-        .to_dict()
-    )
+    richness_map = data.obs.groupby(groupby, observed=True).agg(
+        {target_col: pd.Series.nunique}
+    )[target_col]
+    if normalize:
+        richness_map = richness_map / richness_map.sum()
     data.obs = data.obs.assign(
-        richness_clone_id=data.obs[groupby].cat.rename_categories(richness_map)
+        richness_clone_id=data.obs[groupby].cat.rename_categories(
+            richness_map.to_dict()
+        )
     )
 
 
