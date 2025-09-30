@@ -167,3 +167,5 @@ docs
 /analyses/pdac/signatures_plot.R
 /analyses/pdac_dresponse/.~lock.1-AUC_PDAC.xlsx#
 /analyses/pdac_dresponse/1-AUC_PDAC.xlsx
+/analyses/pdac_tcr/cellassign_markers.csv
+/analyses/pdac_tcr/cellassign_markers_meta.csv
