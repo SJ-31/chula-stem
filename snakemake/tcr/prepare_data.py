@@ -12,7 +12,24 @@ except ImportError:
     smk = type("snakemake", (), {"rule": None})
 md.set_options(pull_on_update=False)
 
+
 # * Helper functions
+def alpha_richness(
+    data: ad.AnnData | md.MuData,
+    groupby: str,
+    airr_mod: str = "airr",
+    target_col: str = "clone_id",
+) -> None:
+    if isinstance(data, md.MuData):
+        data = data[airr_mod]
+    richness_map = (
+        data.obs.groupby(groupby, observed=True)
+        .agg({target_col: pd.Series.nunique})[target_col]
+        .to_dict()
+    )
+    data.obs = data.obs.assign(
+        richness_clone_id=data.obs[groupby].cat.rename_categories(richness_map)
+    )
 
 
 def mark_public_clones(
@@ -93,6 +110,7 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
     )
     mdata: md.MuData = md.MuData({"rna": rna, "airr": airr})
     mdata.pull_obs(mods="rna", prefix_unique=False, drop=True)
+    mdata.push_obs("Sample_Name", mods="airr")
     return mdata
 
 
@@ -102,7 +120,8 @@ if smk.rule == "load_runs":
         f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
     }
     to_plot = smk.config["to_plot"]
-    ct_col = "cell_type_experimental"
+    ct_col = smk.config["cell_type_col"]
+    scol = "Sample_Name"
 
     mdatas = []
     for run_name, dir in smk.config["bd_results"].items():
@@ -124,12 +143,16 @@ if smk.rule == "load_runs":
     ir.tl.define_clonotype_clusters(
         combined, key_added="cc", **calling_config["define_clonotype_clusters"]
     )
-
-    ir.tl.clonal_expansion(
-        combined, expanded_in="Sample_Name", **smk.config["clonal_expansion"]
-    )
-
+    ir.tl.clonal_expansion(combined, expanded_in=scol, **smk.config["clonal_expansion"])
     mark_public_clones(combined)
+
+    # ** Diversity
+    for alpha in smk.config["alpha_metrics"]:
+        if alpha == "richness":
+            alpha_richness(mdata, groupby=scol)
+        else:
+            ir.tl.alpha_diversity(mdata, groupby=scol, metric=alpha)
+
     combined.write_h5mu(smk.output)
 
 # * Prepare reference files
