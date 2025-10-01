@@ -54,6 +54,7 @@ def mark_public_clones(
 
 def format_mcpas(path) -> ad.AnnData:
     tmp = pl.read_csv(path, infer_schema_length=None)
+    mcpas_cells: list = []
     for i, row in enumerate(tmp.iter_rows(named=True)):
         cell = ir.io.AirrCell(cell_id=i)
         alpha_chain = ir.io.AirrCell.empty_chain_dict()
@@ -118,12 +119,10 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
 
 
 # * Load data from Rhapsody and save to a single mudata object
-if smk.rule == "load_runs":
+def load_runs():
     tag_mapping: dict = {
         f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
     }
-    to_plot = smk.config["to_plot"]
-    ct_col = smk.config["cell_type_col"]
     scol = "Sample_Name"
 
     mdatas = []
@@ -152,26 +151,46 @@ if smk.rule == "load_runs":
     # ** Diversity
     for alpha in smk.config["alpha_metrics"]:
         if alpha == "richness":
-            alpha_richness(mdata, groupby=scol)
+            alpha_richness(combined, groupby=scol)
         else:
-            ir.tl.alpha_diversity(mdata, groupby=scol, metric=alpha)
+            ir.tl.alpha_diversity(combined, groupby=scol, metric=alpha)
 
     combined.write_h5mu(smk.output)
 
+
 # * Prepare reference files
-elif smk.rule == "prepare_references":
-    mcpas_cells = []
+def prepare_references():
+    from datetime import date
+
+    import pandas as pd
+
+    adatas = []
+    obs = []
     for k, v in smk.params["refs_to_get"].items():
         if k == "mcpas":
-            mdata = format_mcpas(path=v.parent.joinpath(f"{v.stem}.csv"))
-            mdata.write_h5ad(v)
+            if Path(v.exists()):
+                adata = ad.read_h5ad(v)
+            else:
+                adata = format_mcpas(path=v.parent.joinpath(f"{v.stem}.csv"))
+                adata.write_h5ad(v)
         elif k == "vdjdb":
-            _ = ir.datasets.vdjdb(cached=True, cache_path=v)
+            adata = ir.datasets.vdjdb(cached=True, cache_path=v)
         elif k == "iedb":
-            _ = ir.datasets.iedb(cached=True, cache_path=v)
+            adata = ir.datasets.iedb(cached=True, cache_path=v)
+        else:
+            raise ValueError("database key not supported!")
+        adata.obs_names = adata.obs_names + f"_{k}"
+        adata.obs = adata.obs.rename(columns=lambda x: f"{k}_{x}").assign(source=k)
+        obs.append(adata.obs)
+        adata.append(adata)
+    combined: ad.AnnData = ad.concat(adatas, merge="unique", uns_merge="unique")
+    combined.obs = pd.concat(obs)
+    combined.uns["DB"] = {"name": "custom", "date_created": date.today().isoformat()}
+    combined.write_h5ad(smk.output)
+
 
 # * Custom annotation with CellAssign
-elif smk.rule == "annotate_cells":
+def annotate_cells():
     import numpy as np
     import pandas as pd
     from scvi.external import CellAssign
@@ -201,3 +220,13 @@ elif smk.rule == "annotate_cells":
         {"index": filtered.obs.index, "prediction": predictions.idxmax(axis=1).values}
     )
     result.write_csv(smk.output["predictions"])
+
+
+# * Entry point
+
+if smk.rule == "load_runs":
+    load_runs()
+elif smk.rule == "annotate_cells":
+    annotate_cells()
+elif smk.rule == "prepare_references":
+    prepare_references()
