@@ -3,6 +3,7 @@ from pathlib import Path
 
 import anndata as ad
 import mudata as md
+import pandas as pd
 import polars as pl
 import scirpy as ir
 
@@ -126,7 +127,7 @@ def load_runs():
     scol = "Sample_Name"
 
     mdatas = []
-    for run_name, dir in smk.config["bd_results"].items():
+    for run_name, dir in smk.params["runs"].items():
         run: Path = Path(dir)
         mdata = load_rhapsody_run(run, run_name, tag_mapping=tag_mapping)
         mdata.obs_names = [f"{x}_{run_name}" for x in mdata.obs_names]
@@ -134,59 +135,58 @@ def load_runs():
         ir.tl.chain_qc(mdata)
         mdatas.append(mdata)
 
-    combined: md.MuData = md.concat([mdatas], index_unique=True)
+    if len(mdatas) > 1:
+        combined: md.MuData = md.concat([mdatas])
+    else:
+        combined = mdatas[0]
 
     # ** Call clonotypes
     # TODO: verify that you can do this with multiple samples
     calling_config = smk.config["clonotype_calling"]
 
+    ir.tl.define_clonotypes(combined)
+    shared_kws = {
+        k: v
+        for k, v in calling_config["define_clonotype_clusters"].items()
+        if k in {"metric", "sequence"}
+    }
+    calling_config["ir_dist"].update(shared_kws)
     ir.pp.ir_dist(combined, **calling_config["ir_dist"])
-    ir.tl.define_clonotypes(combined, **calling_config["define_clonotypes"])
     ir.tl.define_clonotype_clusters(
-        combined, key_added="cc", **calling_config["define_clonotype_clusters"]
+        combined, **calling_config["define_clonotype_clusters"]
     )
     ir.tl.clonal_expansion(combined, expanded_in=scol, **smk.config["clonal_expansion"])
-    mark_public_clones(combined)
+    mark_public_clones(combined["airr"])
 
     # ** Diversity
     for alpha in smk.config["alpha_metrics"]:
         if alpha == "richness":
-            alpha_richness(combined, groupby=scol)
+            alpha_richness(combined["airr"], groupby=scol, target_col="clone_id")
         else:
             ir.tl.alpha_diversity(combined, groupby=scol, metric=alpha)
 
-    combined.write_h5mu(smk.output)
+    combined.write_h5mu(smk.output[0])
 
 
 # * Prepare reference files
 def prepare_references():
-    from datetime import date
-
-    import pandas as pd
-
-    adatas = []
-    obs = []
     for k, v in smk.params["refs_to_get"].items():
+        path = Path(v)
+        as_adata = path.with_suffix(".h5ad")
         if k == "mcpas":
-            if Path(v.exists()):
-                adata = ad.read_h5ad(v)
+            if as_adata.exists():
+                adata = ad.read_h5ad(as_adata)
             else:
-                adata = format_mcpas(path=v.parent.joinpath(f"{v.stem}.csv"))
+                adata = format_mcpas(path=path.with_suffix(".csv"))
                 adata.write_h5ad(v)
         elif k == "vdjdb":
-            adata = ir.datasets.vdjdb(cached=True, cache_path=v)
+            adata = ir.datasets.vdjdb(cached=True, cache_path=as_adata)
         elif k == "iedb":
-            adata = ir.datasets.iedb(cached=True, cache_path=v)
-        else:
-            raise ValueError("database key not supported!")
-        adata.obs_names = adata.obs_names + f"_{k}"
-        adata.obs = adata.obs.rename(columns=lambda x: f"{k}_{x}").assign(source=k)
-        obs.append(adata.obs)
-        adata.append(adata)
-    combined: ad.AnnData = ad.concat(adatas, merge="unique", uns_merge="unique")
-    combined.obs = pd.concat(obs)
-    combined.uns["DB"] = {"name": "custom", "date_created": date.today().isoformat()}
-    combined.write_h5ad(smk.output)
+            adata = ir.datasets.iedb(cached=True, cache_path=as_adata)
+        elif as_adata.exists():
+            continue
+        else:  # Read in an aribtary airr-formatted tsv file
+            raise NotImplementedError("")
 
 
 # * Custom annotation with CellAssign

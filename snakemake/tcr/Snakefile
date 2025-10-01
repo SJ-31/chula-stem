@@ -6,24 +6,31 @@ from pathlib import Path
 configfile: "env.yaml"
 
 
+def add_root(file):
+    root = config.get("root")
+    if root:
+        return f"{root}/{file}"
+    return file
+
+
 TODAY = date.today().isoformat()
 DATE = config.get("date", TODAY)
 
-OUT = config.get("output")
+OUT = add_root(config.get("output"))
 
-runs = config["bd_results"]
+runs = {k: add_root(v) for k, v in config["bd_results"].items()}
 
 
 refs_to_get, references = {}, {}
 for ref, p in config["reference_files"].items():
-    path = Path(p)
+    path = Path(add_root(p))
     adata_file = path.with_suffix(".h5ad")
     if not adata_file.exists():
         refs_to_get[ref] = adata_file
     references[ref] = adata_file
 
 cell_annotation_results = {}
-if config["annotate_cells"]["cellassign"]:
+if config["annotate_cells"]["cellassign"]["run"]:
     cell_annotation_results.update(
         {
             "elbo_validation": f"{OUT}/cellassign/elbo_validation.png",
@@ -37,7 +44,7 @@ rule all:
     input:
         **refs_to_get,
         **cell_annotation_results,
-        combined_adata=f"{OUT}/combined.h5ad",
+        combined=f"{OUT}/combined.h5mu",
 
 
 rule prepare_references:
@@ -52,6 +59,8 @@ rule prepare_references:
 rule load_runs:
     output:
         f"{OUT}/combined.h5mu",
+    params:
+        runs=runs,
     script:
         "prepare_data.py"
 
@@ -79,4 +88,17 @@ rule scirpy_query:
         "analyses.py"
 
 
-# rule make_plots
+rule make_reports:
+    input:
+        rules.load_runs.output,
+    params:
+        plotdir=f"{OUT}/plots",
+        outdir=f"{OUT}",
+    output:
+        alpha_diversity=f"{OUT}/plots/alpha_diversity.png",
+        public_private=f"{OUT}/plots/public_private.png",
+        top_clones=f"{OUT}/top_clones.csv",
+        expansion=directory(f"{OUT}/plots/clone_expansion"),
+        ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),
+    script:
+        "plotting.py"
