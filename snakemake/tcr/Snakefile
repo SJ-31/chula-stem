@@ -14,12 +14,13 @@ OUT = config.get("output")
 runs = config["bd_results"]
 
 
-refs_to_get = {}
+refs_to_get, references = {}, {}
 for ref, p in config["reference_files"].items():
     path = Path(p)
-    adata_file = path.parent.joinpath(f"{path.stem}.h5ad")
+    adata_file = path.with_suffix(".h5ad")
     if not adata_file.exists():
         refs_to_get[ref] = adata_file
+    references[ref] = adata_file
 
 cell_annotation_results = {}
 if config["annotate_cells"]["cellassign"]:
@@ -62,6 +63,20 @@ rule annotate_cells:
         rules.load_runs.output,
     script:
         "prepare_data.py"
+
+
+rule scirpy_query:
+    input:
+        rules.load_runs.output,
+        refs_to_get.values(),
+    params:
+        references=references,
+        outdir=f"{OUT}/reference_comparison/scirpy",
+    output:
+        expand("{o}/reference_comparison/scirpy/{r}.h5ad", o=OUT, r=references.keys()),
+        expand("{o}/reference_comparison/scirpy/{r}.csv", o=OUT, r=references.keys()),
+    script:
+        "analyses.py"
 
 
 # rule make_plots
