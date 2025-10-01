@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import mudata as md
 import pandas as pd
 import plotnine as gg
+import scirpy as ir
 import seaborn as sns
 from matplotlib.figure import Figure
 from plotnine.ggplot import ggplot
-from pynndescent.sparse import diversify
 
 try:
     from snakemake.script import snakemake as smk
@@ -66,12 +66,16 @@ def plot_group_abundance(
     if ignore_nan:
         mask = filtered[fill].isna() | filtered[x].isna()
         filtered = filtered.loc[~mask, :]
+    if ":" in x:
+        filtered = filtered.rename({x: x.replace(":", "_")}, axis=1)
+        x = x.replace(":", "_")
+    position = "fill" if normalize else "stack"
     plot = (
         gg.ggplot(
             filtered,
             gg.aes(x=f"reorder({x}, {x}, len)", fill=fill),
         )
-        + gg.geom_bar()
+        + gg.geom_bar(position=position)
         + gg.ylab(ylab)
         + gg.xlab(xlab)
     )
@@ -105,6 +109,28 @@ def plot_obs(
     return fig
 
 
+def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
+    """Return a dataframe containing the V, D, J gene calls for
+        the most abundant clonotypes
+
+    Parameters
+    ----------
+    k : int
+        Return results for the top k clonotypes
+    adata : ad.AnnData
+        AnnData object with IR
+    """
+    cols = ["c_call", "d_call", "j_call", "v_call"]
+    with ir.get.airr_context(adata, cols) as m:
+        top = adata.obs["clone_id"].value_counts()[:k]
+        call_cols = [col for col in m.obs.columns if "_call" in col]
+        filtered = m.obs.loc[m.obs["clone_id"].isin(top.index), :].loc[
+            :, ["clone_id"] + call_cols
+        ]
+        df = top.reset_index().merge(filtered, on="clone_id").drop_duplicates()
+    return df
+
+
 # * Generate plots
 if smk.rule == "make_plots":
     mdata: md.MuData = md.read_h5mu(smk.input[0])
@@ -117,10 +143,13 @@ if smk.rule == "make_plots":
     # TODO: Plot on per-run basis
     # tsne_fig = plot_obs(adata, "tSNE", hues=to_plot)
     # umap_fig = plot_obs(adata, "UMAP", hues=to_plot)
+    clone_calls = []
 
     for sample, cur in airrs.items():
         clone_expansion_plot = (
-            plot_group_abundance(cur, x=ct_col, fill="airr:clonal_expansion")
+            plot_group_abundance(
+                cur, x=ct_col, fill="airr:clonal_expansion", max_cols=30
+            )
             + gg.theme_classic()
             + gg.guides(fill=gg.guide_legend(title="Clone Size", reverse=True))
         )
@@ -130,12 +159,17 @@ if smk.rule == "make_plots":
             cur, x="airr:clone_id", fill=ct_col, max_cols=20
         ) + gg.xlab("Clone ID")
         ct_plot.save()  # TODO:
+        clone_calls.append(
+            top_clone_calls(cur["airr"], k=10).assign(Sample_Name=sample)
+        )
 
     dplot = plot_alpha_diversity(
-        mdata, smk.config["alpha_metrics"], groupby="Sample_Name"
+        mdata["airr"], smk.config["alpha_metrics"], groupby="Sample_Name"
     )
     dplot.save()
     public_private_plot = plot_group_abundance(
         mdata, x="airr:clone_id", fill="Sample_Name", max_cols=20
     )
     public_private_plot.save()  # TODO:
+    top_clones = pd.concat(clone_calls)
+    top_clones.to_csv(..., index=False)  # TODO
