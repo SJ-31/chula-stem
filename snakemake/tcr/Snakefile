@@ -13,10 +13,9 @@ def add_root(file):
     return file
 
 
-TODAY = date.today().isoformat()
-DATE = config.get("date", TODAY)
+DATE = config.get("date", "no_date")
 
-OUT = add_root(config.get("output"))
+OUT = add_root(f"{config.get('output')}/{DATE}")
 
 runs = {k: add_root(v) for k, v in config["bd_results"].items()}
 
@@ -40,10 +39,20 @@ if config["annotate_cells"]["cellassign"]["run"]:
     )
 
 
+plots = {
+    "alpha_diversity": f"{OUT}/plots/alpha_diversity.png",
+    "public_private": f"{OUT}/plots/public_private.png",
+    "top_clones": f"{OUT}/top_clones.csv",
+    "expansion": f"{OUT}/plots/clone_expansion",
+    "ct_abundance": f"{OUT}/plots/cell_type_abundance",
+}
+
+
 rule all:
     input:
         **refs_to_get,
         **cell_annotation_results,
+        **plots,
         combined=f"{OUT}/combined.h5mu",
 
 

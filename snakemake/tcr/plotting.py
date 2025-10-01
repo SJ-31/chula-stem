@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 import anndata as ad
@@ -12,6 +13,8 @@ import scirpy as ir
 import seaborn as sns
 from matplotlib.figure import Figure
 from plotnine.ggplot import ggplot
+
+md.set_options(pull_on_update=False)
 
 try:
     from snakemake.script import snakemake as smk
@@ -132,9 +135,11 @@ def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
 
 
 # * Generate plots
-if smk.rule == "make_plots":
+if smk.rule == "make_reports":
     mdata: md.MuData = md.read_h5mu(smk.input[0])
-    ct_col = smk.config["ct_col"]
+    if to_ignore := smk.config.get("ignore_samples"):
+        mdata = mdata[~mdata.obs["Sample_Name"].isin(to_ignore), :]
+    ct_col = smk.config["cell_type_col"]
     airrs = {
         s: mdata[mdata.obs["Sample_Name"] == s, :]
         for s in mdata.obs["Sample_Name"].unique()
@@ -144,32 +149,40 @@ if smk.rule == "make_plots":
     # tsne_fig = plot_obs(adata, "tSNE", hues=to_plot)
     # umap_fig = plot_obs(adata, "UMAP", hues=to_plot)
     clone_calls = []
+    for p in ["expansion", "ct_abundance"]:
+        if not (check_path := Path(smk.output[p])).exists():
+            check_path.mkdir(parents=True)
 
     for sample, cur in airrs.items():
         clone_expansion_plot = (
             plot_group_abundance(
                 cur, x=ct_col, fill="airr:clonal_expansion", max_cols=30
             )
-            + gg.theme_classic()
             + gg.guides(fill=gg.guide_legend(title="Clone Size", reverse=True))
+            + gg.theme(axis_text_x=gg.element_text(rotation=45, hjust=1))
+            + gg.ggtitle(sample)
         )
-        clone_expansion_plot.save()  # TODO:
+        clone_expansion_plot.save(
+            f"{smk.output['expansion']}/{sample}.png", width=10, height=10
+        )
 
-        ct_plot = plot_group_abundance(
-            cur, x="airr:clone_id", fill=ct_col, max_cols=20
-        ) + gg.xlab("Clone ID")
-        ct_plot.save()  # TODO:
+        ct_plot = (
+            plot_group_abundance(cur, x="airr:clone_id", fill=ct_col, max_cols=20)
+            + gg.xlab("Clone ID")
+            + gg.ggtitle(sample)
+        )
+        ct_plot.save(f"{smk.output['ct_abundance']}/{sample}.png", width=10, height=10)
         clone_calls.append(
             top_clone_calls(cur["airr"], k=10).assign(Sample_Name=sample)
         )
 
     dplot = plot_alpha_diversity(
         mdata["airr"], smk.config["alpha_metrics"], groupby="Sample_Name"
-    )
-    dplot.save()
+    ) + gg.xlab("Sample")
+    dplot.save(smk.output["alpha_diversity"])
     public_private_plot = plot_group_abundance(
-        mdata, x="airr:clone_id", fill="Sample_Name", max_cols=20
-    )
-    public_private_plot.save()  # TODO:
+        mdata["airr"], x="clone_id", fill="Sample_Name", max_cols=30
+    ) + gg.xlab("CLone ID")
+    public_private_plot.save(smk.output["public_private"], width=15, height=8)
     top_clones = pd.concat(clone_calls)
-    top_clones.to_csv(..., index=False)  # TODO
+    top_clones.to_csv(smk.output["top_clones"], index=False)  # TODO
