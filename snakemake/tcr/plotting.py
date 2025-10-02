@@ -60,54 +60,50 @@ def plot_clone_ranking(
 
     """
     to_select = [target_col] if not expanded_in else [target_col, expanded_in]
-    df = from_pandas_categorical(mdata[airr_mod].obs.loc[:, to_select]).filter(
-        pl.col(target_col) != "nan"
-    )
-    if expanded_in:
-        top_clones = (
-            df.group_by(expanded_in)
-            .agg(pl.col(target_col).value_counts())
-            .explode(target_col)
-            .unnest(target_col)
-            .group_by(expanded_in)
-            .agg(pl.col(target_col).sort_by("count", descending=True).head(k))
-            .with_columns(
-                pl.col(target_col)
-                .map_elements(
-                    lambda x: [str(i + 1) for i in range(len(x))],
-                    return_dtype=pl.List(pl.String),
-                )
-                .alias("rank")
-            )
-            .explode([target_col, "rank"])
-        )
-    else:
-        top_clones = (
-            df[target_col]
+    df = from_pandas_categorical(mdata[airr_mod].obs.loc[:, to_select])
+    top_clones = pl.concat(
+        [
+            d[1][target_col]
             .value_counts()
-            .sort("count", descending=True)
-            .head(k)
             .with_columns(
-                pl.col("count")
-                .rank(descending=True)
-                .round()
-                .cast(pl.String)
+                pl.col("count").rank("dense", descending=True).alias("rank"),
+                (pl.col("count") / pl.col("count").sum()).alias("prop"),
+            )
+            .with_columns(
+                pl.when(pl.col("rank") > k)
+                .then(pl.lit("other"))
+                .otherwise("rank")
                 .alias("rank")
             )
-        )
-    joined = df.join(top_clones, on=to_select, how="left").with_columns(
-        pl.col("rank").fill_null("other"), pl.lit("Repertoire").alias("x")
+            .group_by("rank")
+            .agg(
+                pl.col("prop").sum(),
+                pl.len().alias("rank_count"),
+                pl.col("count").sum(),
+            )
+            .sort("rank")
+            .with_columns(pl.lit(d[0][0]).alias(expanded_in))
+            for d in df.group_by(expanded_in)
+        ]
+    ).with_columns(
+        pl.when(pl.col("rank_count") == 1)
+        .then(pl.lit(None))
+        .otherwise("rank_count")
+        .cast(pl.String)
+        .alias("rank_count")
     )
-    kws = {"fill": "rank", "x": "x"}
-    if expanded_in:
-        kws["x"] = expanded_in
+    kws = {"fill": "rank", "x": expanded_in, "y": "prop", "label": "rank_count"}
     plot = (
-        gg.ggplot(joined, gg.aes(**kws))
-        + gg.geom_bar(position="fill")
+        gg.ggplot(top_clones, gg.aes(**kws))
+        + gg.geom_bar(position="stack", stat="identity")
+        + gg.geom_text(position=gg.position_fill(vjust=0.5))
         + gg.labs(fill="Clone Rank")
         + gg.ylab("Proportion")
+        + gg.ggtitle(
+            title=f"Proportion of top {k} clones",
+            subtitle="Numbers within bars are the count of unique clones in each rank",
+        )
     )
-    # TODO: add counts of unique clones
     return plot
 
 
