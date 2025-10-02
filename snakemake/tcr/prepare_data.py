@@ -14,6 +14,21 @@ except ImportError:
 md.set_options(pull_on_update=False)
 
 
+def check_consistent_ids(mdata: md.MuData, verbose: bool = False):
+    if verbose:
+        print("DEBUG")
+    whole = pd.crosstab(mdata.obs["Sample_Name"], mdata.obs["airr:clone_id"])
+    airr = pd.crosstab(mdata["airr"].obs["Sample_Name"], mdata["airr"].obs["clone_id"])
+    if verbose:
+        print("------------")
+        print("With entire mdata")
+        print(whole)
+        print("airr only")
+        print(airr)
+        print("-----------")
+    assert all(whole.loc[:, "1"] == airr.loc[:, "1"])
+
+
 # * Helper functions
 def alpha_richness(
     data: ad.AnnData | md.MuData,
@@ -114,8 +129,6 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
         Sample_Name=rna.obs["Sample_Name"].cat.rename_categories(tag_mapping)
     )
     mdata: md.MuData = md.MuData({"rna": rna, "airr": airr})
-    mdata.pull_obs(mods="rna", prefix_unique=False, drop=True)
-    mdata.push_obs("Sample_Name", mods="airr")
     return mdata
 
 
@@ -130,7 +143,11 @@ def load_runs():
     for run_name, dir in smk.params["runs"].items():
         run: Path = Path(dir)
         mdata = load_rhapsody_run(run, run_name, tag_mapping=tag_mapping)
-        mdata.obs_names = [f"{x}_{run_name}" for x in mdata.obs_names]
+        mdata["airr"].obs_names = [f"{x}_{run_name}" for x in mdata["airr"].obs_names]
+        mdata["rna"].obs_names = [f"{x}_{run_name}" for x in mdata["rna"].obs_names]
+        mdata.update_obs()
+        mdata.pull_obs(mods="rna", prefix_unique=False)
+        mdata.push_obs("Sample_Name", mods="airr")
         ir.pp.index_chains(mdata)
         ir.tl.chain_qc(mdata)
         mdatas.append(mdata)
@@ -143,13 +160,14 @@ def load_runs():
     # ** Call clonotypes
     # TODO: verify that you can do this with multiple samples
     calling_config = smk.config["clonotype_calling"]
-
     ir.tl.define_clonotypes(combined)
     shared_kws = {
         k: v
         for k, v in calling_config["define_clonotype_clusters"].items()
         if k in {"metric", "sequence"}
     }
+    check_consistent_ids(combined)
+
     calling_config["ir_dist"].update(shared_kws)
     ir.pp.ir_dist(combined, **calling_config["ir_dist"])
     ir.tl.define_clonotype_clusters(
