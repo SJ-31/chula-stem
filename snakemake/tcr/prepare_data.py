@@ -208,9 +208,9 @@ def load_runs():
     calling_config["ir_dist"].update(shared_kws)
     ir.pp.ir_dist(combined, **calling_config["ir_dist"])
     ir.tl.define_clonotype_clusters(
-        combined, **calling_config["define_clonotype_clusters"]
+        combined, key_added="cc_id", **calling_config["define_clonotype_clusters"]
     )
-    # assign_ranks(combined, within="Sample_Name", target_col="cc_id")
+    assign_ranks(combined, within="Sample_Name", target_col="cc_id")
     ir.tl.clonal_expansion(combined, expanded_in=scol, **smk.config["clonal_expansion"])
     mark_public_clones(combined["airr"])
 
