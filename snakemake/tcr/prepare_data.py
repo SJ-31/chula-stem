@@ -44,10 +44,46 @@ def alpha_richness(
     )[target_col]
     if normalize:
         richness_map = richness_map / richness_map.sum()
-    data.obs = data.obs.assign(
-        richness_clone_id=data.obs[groupby].cat.rename_categories(
-            richness_map.to_dict()
-        )
+    group_type = data.obs.dtypes.loc[groupby]
+    if isinstance(group_type, pd.CategoricalDtype):
+        richness_id = data.obs[groupby].cat.rename_categories(richness_map.to_dict())
+    else:
+        richness_id = data.obs[groupby].replace(richness_map.to_dict())
+    data.obs = data.obs.assign(richness_clone_id=richness_id)
+
+
+def assign_ranks(
+    mdata: md.MuData,
+    within,
+    target_col: str = "clone_id",
+    key_added: str | None = None,
+    airr_mod: str = "airr",
+    rank_method: str = "dense",
+) -> None:
+    """
+    Assign ranks to clones based on their size within a specific grouping e.g. samples
+    The largest clone within a group has rank 1
+    """
+    key_added = key_added or f"{target_col}_{within}_rank"
+    to_select = [target_col, within]
+    df = pl.from_pandas(mdata[airr_mod].obs.loc[:, to_select])
+    ranked = pl.concat(
+        [
+            df.filter(pl.col(within) == s)[target_col]
+            .value_counts()
+            .with_columns(
+                pl.col("count").rank(rank_method, descending=True).alias(key_added),
+                pl.lit(s).alias(within),
+            )
+            .drop("count")
+            for s in df[within].unique()
+        ]
+    ).to_pandas()
+    mdata[airr_mod].obs = (
+        mdata[airr_mod]
+        .obs.reset_index()
+        .merge(ranked, on=to_select, how="left")
+        .set_index("index")
     )
 
 
@@ -166,6 +202,7 @@ def load_runs():
         for k, v in calling_config["define_clonotype_clusters"].items()
         if k in {"metric", "sequence"}
     }
+    assign_ranks(combined, within="Sample_Name", target_col="clone_id")
     check_consistent_ids(combined)
 
     calling_config["ir_dist"].update(shared_kws)
@@ -173,6 +210,7 @@ def load_runs():
     ir.tl.define_clonotype_clusters(
         combined, **calling_config["define_clonotype_clusters"]
     )
+    # assign_ranks(combined, within="Sample_Name", target_col="cc_id")
     ir.tl.clonal_expansion(combined, expanded_in=scol, **smk.config["clonal_expansion"])
     mark_public_clones(combined["airr"])
 
