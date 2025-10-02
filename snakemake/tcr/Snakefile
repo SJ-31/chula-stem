@@ -40,12 +40,15 @@ if config["annotate_cells"]["cellassign"]["run"]:
 
 
 plots = {
-    "alpha_diversity": f"{OUT}/plots/alpha_diversity.png",
-    "public_private": f"{OUT}/plots/public_private.png",
     "top_clones": f"{OUT}/top_clones.csv",
     "expansion": f"{OUT}/plots/clone_expansion",
     "ct_abundance": f"{OUT}/plots/cell_type_abundance",
 }
+cohort_plots = {
+    k: f"{OUT}/plots/{k}.png"
+    for k in ["alpha_diversity", "public_private", "clone_ranks", "clone_cluster_ranks"]
+}
+plots.update(cohort_plots)
 
 
 rule all:
@@ -104,8 +107,7 @@ rule make_reports:
         plotdir=f"{OUT}/plots",
         outdir=f"{OUT}",
     output:
-        alpha_diversity=f"{OUT}/plots/alpha_diversity.png",
-        public_private=f"{OUT}/plots/public_private.png",
+        **cohort_plots,
         top_clones=f"{OUT}/top_clones.csv",
         expansion=directory(f"{OUT}/plots/clone_expansion"),
         ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),

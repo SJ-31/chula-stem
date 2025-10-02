@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import mudata as md
 import pandas as pd
 import plotnine as gg
+import polars as pl
 import scirpy as ir
 import seaborn as sns
 from matplotlib.figure import Figure
@@ -20,6 +21,94 @@ try:
     from snakemake.script import snakemake as smk
 except ImportError:
     smk = type("snakemake", (), {"rule": None})
+
+
+def from_pandas_categorical(
+    df: pd.DataFrame, mapping: dict | None = None, make_categorical: bool = True
+) -> pl.DataFrame:
+    "Convert a pandas df to to polars df while handling categorical types"
+    mapping = mapping or {}
+    type_series = df.dtypes
+    categoricals = type_series[
+        [isinstance(x, pd.CategoricalDtype) for x in type_series]
+    ].index
+    type_mapping = {k: mapping.get(k, "str") for k in categoricals}
+    converted = pl.from_pandas(df.astype(type_mapping))
+    if not make_categorical:
+        return converted
+    return converted.cast(
+        {k: pl.Categorical for k in type_mapping.keys() if k not in mapping}
+    )
+
+
+def plot_clone_ranking(
+    mdata: md.MuData,
+    k: int = 5,
+    expanded_in: str | None = None,
+    target_col: str = "clone_id",
+    airr_mod: str = "airr",
+) -> ggplot:
+    """Plot the proportion of cells made up by the top k clones in the repertoire
+
+    Parameters
+    ----------
+    expanded_in : str | None
+        Calculate clone ranks with respect to this column e.g. specify samples to
+        show top clones for each sample
+    k : int
+        Top k clones to include in the plot
+
+    """
+    to_select = [target_col] if not expanded_in else [target_col, expanded_in]
+    df = from_pandas_categorical(mdata[airr_mod].obs.loc[:, to_select]).filter(
+        pl.col(target_col) != "nan"
+    )
+    if expanded_in:
+        top_clones = (
+            df.group_by(expanded_in)
+            .agg(pl.col(target_col).value_counts())
+            .explode(target_col)
+            .unnest(target_col)
+            .group_by(expanded_in)
+            .agg(pl.col(target_col).sort_by("count", descending=True).head(k))
+            .with_columns(
+                pl.col(target_col)
+                .map_elements(
+                    lambda x: [str(i + 1) for i in range(len(x))],
+                    return_dtype=pl.List(pl.String),
+                )
+                .alias("rank")
+            )
+            .explode([target_col, "rank"])
+        )
+    else:
+        top_clones = (
+            df[target_col]
+            .value_counts()
+            .sort("count", descending=True)
+            .head(k)
+            .with_columns(
+                pl.col("count")
+                .rank(descending=True)
+                .round()
+                .cast(pl.String)
+                .alias("rank")
+            )
+        )
+    joined = df.join(top_clones, on=to_select, how="left").with_columns(
+        pl.col("rank").fill_null("other"), pl.lit("Repertoire").alias("x")
+    )
+    kws = {"fill": "rank", "x": "x"}
+    if expanded_in:
+        kws["x"] = expanded_in
+    plot = (
+        gg.ggplot(joined, gg.aes(**kws))
+        + gg.geom_bar(position="fill")
+        + gg.labs(fill="Clone Rank")
+        + gg.ylab("Proportion")
+    )
+    # TODO: add counts of unique clones
+    return plot
 
 
 def plot_alpha_diversity(
@@ -163,7 +252,10 @@ if smk.rule == "make_reports":
             + gg.ggtitle(sample)
         )
         clone_expansion_plot.save(
-            f"{smk.output['expansion']}/{sample}.png", width=10, height=10
+            f"{smk.output['expansion']}/{sample}.png",
+            width=10,
+            height=10,
+            verbose=False,
         )
 
         ct_plot = (
@@ -171,18 +263,35 @@ if smk.rule == "make_reports":
             + gg.xlab("Clone ID")
             + gg.ggtitle(sample)
         )
-        ct_plot.save(f"{smk.output['ct_abundance']}/{sample}.png", width=10, height=10)
+        ct_plot.save(
+            f"{smk.output['ct_abundance']}/{sample}.png",
+            width=10,
+            height=10,
+            verbose=False,
+        )
         clone_calls.append(
             top_clone_calls(cur["airr"], k=10).assign(Sample_Name=sample)
         )
 
+    c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in="Sample_Name")
+    c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
+
+    c_rank_plot = plot_clone_ranking(
+        mdata, k=6, expanded_in="Sample_Name", target_col="cc_id"
+    ) + gg.labs(fill="Clone Cluster Rank")
+    c_rank_plot.save(
+        smk.output["clone_cluster_ranks"], width=10, height=8, verbose=False
+    )
+
     dplot = plot_alpha_diversity(
         mdata["airr"], smk.config["alpha_metrics"], groupby="Sample_Name"
     ) + gg.xlab("Sample")
-    dplot.save(smk.output["alpha_diversity"])
+    dplot.save(smk.output["alpha_diversity"], verbose=False)
     public_private_plot = plot_group_abundance(
         mdata["airr"], x="clone_id", fill="Sample_Name", max_cols=30
     ) + gg.xlab("CLone ID")
-    public_private_plot.save(smk.output["public_private"], width=15, height=8)
+    public_private_plot.save(
+        smk.output["public_private"], width=15, height=8, verbose=False
+    )
     top_clones = pd.concat(clone_calls)
     top_clones.to_csv(smk.output["top_clones"], index=False)  # TODO
