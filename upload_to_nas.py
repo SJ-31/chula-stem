@@ -75,12 +75,12 @@ def validate_config(config: dict) -> None:
     }
     for k, v in required_keys.items():
         if not (table := config.get(k)):
-            raise ValueError(f"The table {k} is required in the config!")
+            raise ValueError(f"The table {k} is required in the config")
         for req in v:
             if req not in table:
-                raise ValueError(f"The key {req} is required in table {k}!")
+                raise ValueError(f"The key {req} is required in table {k}")
             if not table[req]:
-                raise ValueError(f"The value to key {req} musn't be null!")
+                raise ValueError(f"The value to key {req} musn't be null")
 
 
 def upload_summaries(
@@ -202,12 +202,13 @@ if __name__ == "__main__":
     paths, names = config["paths"], config["names"]
     rname: str = names["results"]
     source: Path = Path(paths["results"])
-    cohort_dir: Path = Path(
-        paths["cancer_ngs"]
-        / names["data_modality"]
-        / names["cancer_type"]
-        / names["cohort"]
-    )
+    if not source.exists():
+        raise ValueError(f"The results source {source} doesn't exist")
+    cohort_dir: Path = Path(paths["cancer_ngs"])
+    for key in ["data_modality", "cancer_type", "cohort"]:
+        if not (try_path := cohort_dir.joinpath(names[key])).exists():
+            raise ValueError(f"The path {try_path} given by key {key} doesn't exist")
+        cohort_dir = try_path
     samples: list = config.get("samples", [])
     on_exists: ON_EXISTS = config.get("on_exists")
     summaries_tracker = [
@@ -235,3 +236,4 @@ if __name__ == "__main__":
         writer = csv.DictWriter(logfile, fieldnames=fields)
         writer.writeheader()
         writer.writerows(summaries_tracker)
+        writer.writerows(samples_tracker)
