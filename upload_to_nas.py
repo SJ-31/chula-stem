@@ -1,4 +1,4 @@
-#!/usr/bin/env ipython
+#!/usr/bin/env python
 
 import argparse
 import csv
@@ -197,11 +197,12 @@ def upload_samples(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config", required=True)
+    parser.add_argument("config")
     parser.add_argument(
         "-l", "--log", required=False, default=f"upload_record-{TODAY}.csv"
     )
-    config_file = parser.config
+    args = parser.parse_args()
+    config_file = args.config
     with open(config_file, "rb") as f:
         config: dict = tomllib.load(f)
     validate_config(config)
@@ -235,10 +236,9 @@ if __name__ == "__main__":
         cohort_dir=cohort_dir,
         on_exists=on_exists,
         on_missing=config.get("on_missing"),
-        sample_mapping=config.get("sample_mapping", {}),
     )
 
-    with open(parser.log, "w") as logfile:
+    with open(args.log, "w") as logfile:
         fields = ["sample", "old", "new", "status", "override"]
         writer = csv.DictWriter(logfile, fieldnames=fields)
         writer.writeheader()
