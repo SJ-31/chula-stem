@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 
 import argparse
+import csv
 import shutil
 from datetime import date
 from pathlib import Path
@@ -84,8 +85,9 @@ def validate_config(config: dict) -> None:
 
 def upload_summaries(
     on_exists: ON_EXISTS, target: Path, source: Path, rname: str, samples: list
-) -> None:
+) -> list[dict]:
     summary_dir = target / "summary" / rname
+    tracker: list[dict] = []
     if on_exists is not None and on_exists not in {"override", "append_date"}:
         raise ValueError("Invalid value given for `on_exists`")
     if not summary_dir.exists():
@@ -94,24 +96,35 @@ def upload_summaries(
         print(f"Warning: `{rname}` already exists in the cohort summary!")
         if on_exists is None:
             print("No option for `on_exists` specified in config, will not upload")
-            return
+            return []
         elif on_exists == "append_date":
             summary_dir = summary_dir.parent / (f"{rname}_{TODAY}")
     for rdir in source.iterdir():
         if rdir.stem in samples:
             continue
         target_path = summary_dir / rdir.stem
+        template = {"old": rdir, "status": "success", "new": target_path}
         if not target_path.exists():
             shutil.copytree(rdir, target_path, dirs_exist_ok=False)
         elif on_exists == "override":
+            print(f"WARNING: overriding contents of {target_path}")
             shutil.copytree(rdir, target_path, dirs_exist_ok=True)
+        elif not on_exists:
+            template["status"] = "failure"
+            template["new"] = None
+        tracker.append(template)
+    return tracker
 
 
 def upload_helper(
     on_exists: ON_EXISTS, rname: str, sdir: Path, processed: Path
-) -> None:
+) -> tuple[Path, bool]:
     """
     Attempt to upload sample directory `sdir` to the `processed` directory of the given sample
+
+    Returns
+    -------
+    Tuple of (destination, boolean which is True if destination files were overriden)
     """
     target = processed / rname
     if target.exists() and on_exists == "override":
@@ -121,6 +134,7 @@ def upload_helper(
         shutil.copytree(sdir, target, dirs_exist_ok=False)
     else:
         shutil.copytree(sdir, target, dirs_exist_ok=False)
+    return target, on_exists == "override"
 
 
 def upload_samples(
@@ -132,32 +146,55 @@ def upload_samples(
     on_exists: ON_EXISTS,
 ) -> None:
     unassigned: Path = cohort_dir.parent.joinpath("unassigned")
+    sample_tracker: list[dict] = []
     for sample in samples:
         to_upload: Path = source / sample
+        template = {"sample": sample, "old": to_upload}
+        should_upload: bool = True
         if not to_upload.exists():
             raise ValueError(f"Sample {sample} doesn't exist in the results directory")
         target_dir: Path = cohort_dir / sample
         processed: Path = target_dir / "processed"
+        if not target_dir.exists():
+            print(f"WARNING: sample {sample} not found in {processed}")
+
         if target_dir.exists():
             if not processed.exists():
                 processed.mkdir()
+        elif not on_missing:
+            print("\t`on_missing` behavior not specified, skipping")
+            should_upload = False
         elif on_missing != "create":
             target_dir = unassigned / sample
             processed = target_dir / "processed"
             if not target_dir.exists() and on_missing == "unassigned_create":
+                print("\tNot found in `unassigned`, creating sample directory")
                 processed.mkdir(parents=True)
             elif not target_dir.exists() and on_missing == "unassigned":
-                continue
-        else:
+                print("\tNot found in `unassigned`, skipping")
+                should_upload = False
+        elif on_missing == "create":
+            print("\tCreating sample directory")
             processed.mkdir(parents=True)
-        upload_helper(
-            on_exists=on_exists, rname=rname, sdir=to_upload, processed=processed
+        uploaded, override = (
+            upload_helper(
+                on_exists=on_exists, rname=rname, sdir=to_upload, processed=processed
+            )
+            if should_upload
+            else (None, False)
         )
+        template["status"] = "failure" if not uploaded else "success"
+        template["override"] = override
+        template["new"] = uploaded
+        sample_tracker.append(template)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config", required=True)
+    parser.add_argument(
+        "-l", "--log", required=False, default=f"upload_record-{TODAY}.csv"
+    )
     config_file = parser.config
     with open(config_file, "rb") as f:
         config: dict = tomllib.load(f)
@@ -172,6 +209,29 @@ if __name__ == "__main__":
         / names["cohort"]
     )
     samples: list = config.get("samples", [])
-    upload_summaries(
-        samples=samples, config=config, target=cohort_dir, source=source, rname=rname
+    on_exists: ON_EXISTS = config.get("on_exists")
+    summaries_tracker = [
+        dict({"sample": None}, **r)
+        for r in upload_summaries(
+            samples=samples,
+            config=config,
+            target=cohort_dir,
+            source=source,
+            rname=rname,
+            on_exists=on_exists,
+        )
+    ]
+    samples_tracker = upload_samples(
+        samples=samples,
+        source=source,
+        rname=rname,
+        cohort_dir=cohort_dir,
+        on_exists=on_exists,
+        on_missing=config.get("on_missing"),
     )
+
+    with open(parser.log, "w") as logfile:
+        fields = ["sample", "old", "new", "status", "override"]
+        writer = csv.DictWriter(logfile, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(summaries_tracker)
