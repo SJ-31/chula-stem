@@ -10,15 +10,17 @@ import scirpy as ir
 try:
     from snakemake.script import snakemake as smk
 except ImportError:
-    smk = type("snakemake", (), {"rule": None})
+    smk = type("snakemake", (), {"rule": None, "config": {}})
 md.set_options(pull_on_update=False)
+
+SCOL: str = smk.config.get("sample_col", "Sample_Name")
 
 
 def check_consistent_ids(mdata: md.MuData, verbose: bool = False):
     if verbose:
         print("DEBUG")
-    whole = pd.crosstab(mdata.obs["Sample_Name"], mdata.obs["airr:clone_id"])
-    airr = pd.crosstab(mdata["airr"].obs["Sample_Name"], mdata["airr"].obs["clone_id"])
+    whole = pd.crosstab(mdata.obs[SCOL], mdata.obs["airr:clone_id"])
+    airr = pd.crosstab(mdata["airr"].obs[SCOL], mdata["airr"].obs["clone_id"])
     if verbose:
         print("------------")
         print("With entire mdata")
@@ -88,7 +90,7 @@ def assign_ranks(
 
 
 def mark_public_clones(
-    adata: ad.AnnData, clone_col: str = "clone_id", sample_col: str = "Sample_Name"
+    adata: ad.AnnData, clone_col: str = "clone_id", sample_col: str = SCOL
 ) -> None:
     public_clones = (
         pl.from_pandas(adata.obs)
@@ -162,7 +164,7 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
     )
     rna: ad.AnnData = md.read_h5mu(path.joinpath(f"{run_name}.cellismo")).mod["rna"]
     rna.obs = rna.obs.assign(
-        Sample_Name=rna.obs["Sample_Name"].cat.rename_categories(tag_mapping)
+        Sample_Name=rna.obs[SCOL].cat.rename_categories(tag_mapping)
     )
     mdata: md.MuData = md.MuData({"rna": rna, "airr": airr})
     return mdata
@@ -173,7 +175,6 @@ def load_runs():
     tag_mapping: dict = {
         f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
     }
-    scol = "Sample_Name"
 
     mdatas = []
     for run_name, dir in smk.params["runs"].items():
@@ -183,7 +184,7 @@ def load_runs():
         mdata["rna"].obs_names = [f"{x}_{run_name}" for x in mdata["rna"].obs_names]
         mdata.update_obs()
         mdata.pull_obs(mods="rna", prefix_unique=False)
-        mdata.push_obs("Sample_Name", mods="airr")
+        mdata.push_obs(SCOL, mods="airr")
         ir.pp.index_chains(mdata)
         ir.tl.chain_qc(mdata)
         mdatas.append(mdata)
@@ -202,7 +203,7 @@ def load_runs():
         for k, v in calling_config["define_clonotype_clusters"].items()
         if k in {"metric", "sequence"}
     }
-    assign_ranks(combined, within="Sample_Name", target_col="clone_id")
+    assign_ranks(combined, within=SCOL, target_col="clone_id")
     check_consistent_ids(combined)
 
     calling_config["ir_dist"].update(shared_kws)
@@ -210,16 +211,16 @@ def load_runs():
     ir.tl.define_clonotype_clusters(
         combined, key_added="cc_id", **calling_config["define_clonotype_clusters"]
     )
-    assign_ranks(combined, within="Sample_Name", target_col="cc_id")
-    ir.tl.clonal_expansion(combined, expanded_in=scol, **smk.config["clonal_expansion"])
+    assign_ranks(combined, within=SCOL, target_col="cc_id")
+    ir.tl.clonal_expansion(combined, expanded_in=SCOL, **smk.config["clonal_expansion"])
     mark_public_clones(combined["airr"])
 
     # ** Diversity
     for alpha in smk.config["alpha_metrics"]:
         if alpha == "richness":
-            alpha_richness(combined["airr"], groupby=scol, target_col="clone_id")
+            alpha_richness(combined["airr"], groupby=SCOL, target_col="clone_id")
         else:
-            ir.tl.alpha_diversity(combined, groupby=scol, metric=alpha)
+            ir.tl.alpha_diversity(combined, groupby=SCOL, metric=alpha)
 
     combined.write_h5mu(smk.output[0])
 

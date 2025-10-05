@@ -17,10 +17,13 @@ from plotnine.ggplot import ggplot
 
 md.set_options(pull_on_update=False)
 
+
 try:
     from snakemake.script import snakemake as smk
 except ImportError:
-    smk = type("snakemake", (), {"rule": None})
+    smk = type("snakemake", (), {"rule": None, "config": {}})
+
+SCOL: str = smk.config.get("sample_col", "Sample_Name")
 
 
 def from_pandas_categorical(
@@ -223,11 +226,11 @@ def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
 if smk.rule == "make_reports":
     mdata: md.MuData = md.read_h5mu(smk.input[0])
     if to_ignore := smk.config.get("ignore_samples"):
-        mdata = mdata[~mdata.obs["Sample_Name"].isin(to_ignore), :]
+        mdata = mdata[~mdata.obs[SCOL].isin(to_ignore), :]
     ct_col = smk.config["cell_type_col"]
     airrs = {
-        s: mdata[mdata.obs["Sample_Name"] == s, :]
-        for s in mdata.obs["Sample_Name"].unique()
+        s: mdata[mdata.obs[SCOL] == s, :]
+        for s in mdata.obs[SCOL].unique()
         if s not in {"Undetermined", "Multiplet"}
     }
     # TODO: Plot on per-run basis
@@ -265,26 +268,24 @@ if smk.rule == "make_reports":
             height=10,
             verbose=False,
         )
-        clone_calls.append(
-            top_clone_calls(cur["airr"], k=10).assign(Sample_Name=sample)
-        )
+        clone_calls.append(top_clone_calls(cur["airr"], k=10).assign(**{SCOL: sample}))
 
-    c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in="Sample_Name")
+    c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in=SCOL)
     c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
 
     c_rank_plot = plot_clone_ranking(
-        mdata, k=6, expanded_in="Sample_Name", target_col="cc_id"
+        mdata, k=6, expanded_in=SCOL, target_col="cc_id"
     ) + gg.labs(fill="Clone Cluster Rank")
     c_rank_plot.save(
         smk.output["clone_cluster_ranks"], width=10, height=8, verbose=False
     )
 
     dplot = plot_alpha_diversity(
-        mdata["airr"], smk.config["alpha_metrics"], groupby="Sample_Name"
+        mdata["airr"], smk.config["alpha_metrics"], groupby=SCOL
     ) + gg.xlab("Sample")
     dplot.save(smk.output["alpha_diversity"], verbose=False)
     public_private_plot = plot_group_abundance(
-        mdata["airr"], x="clone_id", fill="Sample_Name", max_cols=30
+        mdata["airr"], x="clone_id", fill=SCOL, max_cols=30
     ) + gg.xlab("CLone ID")
     public_private_plot.save(
         smk.output["public_private"], width=15, height=8, verbose=False

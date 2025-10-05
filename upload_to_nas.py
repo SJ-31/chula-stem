@@ -130,7 +130,7 @@ def upload_summaries(
     else:
         print(f"Warning: `{rname}` already exists in the cohort summary!")
         if on_exists is None:
-            print("No option for `on_exists` specified in config, will not upload")
+            print("\tNo option for `on_exists` specified in config, will not upload")
             return []
         elif on_exists == "append_date":
             summary_dir = summary_dir.parent / (f"{rname}_{TODAY}")
@@ -179,6 +179,7 @@ def upload_samples(
     source: Path,
     rname: str,
     samples: list,
+    sample_mapping: dict,
     on_missing: Literal["unassigned", "create", "unassigned_create"] | None,
     on_exists: ON_EXISTS,
 ) -> list:
