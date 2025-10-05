@@ -104,14 +104,18 @@ def upload_summaries(
             continue
         target_path = summary_dir / rdir.stem
         template = {"old": rdir, "status": "success", "new": target_path}
-        if not target_path.exists():
-            shutil.copytree(rdir, target_path, dirs_exist_ok=False)
-        elif on_exists == "override":
-            print(f"WARNING: overriding contents of {target_path}")
-            shutil.copytree(rdir, target_path, dirs_exist_ok=True)
-        elif not on_exists:
+        if target_path.exists() and on_exists == "override":
+            print(f"WARNING: overriding {target_path}")
+            template["override"] = True
+        else:
+            template["override"] = False
+        if target_path.exists() and not on_exists:
             template["status"] = "failure"
             template["new"] = None
+        elif rdir.is_file():
+            shutil.copy2(rdir, target_path)
+        else:
+            shutil.copytree(rdir, target_path, dirs_exist_ok=True)
         tracker.append(template)
     return tracker
 
@@ -127,14 +131,12 @@ def upload_helper(
     Tuple of (destination, boolean which is True if destination files were overriden)
     """
     target = processed / rname
-    if target.exists() and on_exists == "override":
-        shutil.copytree(sdir, target, dirs_exist_ok=True)
-    elif target.exists() and on_exists == "append_date":
+    if target.exists() and on_exists == "append_date":
         target = processed / f"{rname}_{TODAY}"
         shutil.copytree(sdir, target, dirs_exist_ok=False)
     else:
-        shutil.copytree(sdir, target, dirs_exist_ok=False)
-    return target, on_exists == "override"
+        shutil.copytree(sdir, target, dirs_exist_ok=True)
+    return target, on_exists == "override" and target.exists()
 
 
 def upload_samples(
@@ -142,7 +144,6 @@ def upload_samples(
     source: Path,
     rname: str,
     samples: list,
-    sample_mapping: dict,
     on_missing: Literal["unassigned", "create", "unassigned_create"] | None,
     on_exists: ON_EXISTS,
 ) -> None:
@@ -152,10 +153,6 @@ def upload_samples(
         to_upload: Path = source / sample
         template = {"sample": sample, "old": to_upload}
         should_upload: bool = True
-
-        if sample in sample_mapping:
-            print(f"Using remapping {sample} = {sample_mapping[sample]}")
-            sample = sample_mapping[sample]
 
         if not to_upload.exists():
             raise ValueError(f"Sample {sample} doesn't exist in the results directory")
@@ -216,13 +213,23 @@ if __name__ == "__main__":
         if not (try_path := cohort_dir.joinpath(names[key])).exists():
             raise ValueError(f"The path {try_path} given by key {key} doesn't exist")
         cohort_dir = try_path
-    samples: list = config.get("samples", [])
+    samples = []
+    sample_mapping = config.get("sample_mapping", {})
+    tmp_samples: list = config.get("samples", [])
+    for s in tmp_samples:
+        if s in sample_mapping:
+            print(f"Using remapping {s} = {sample_mapping[s]}")
+            samples.append(sample_mapping[s])
+        else:
+            samples.append(s)
+    if len(sample_mapping) != len(set(sample_mapping)):
+        raise ValueError("Sample mapping results in conflicting sample names")
+
     on_exists: ON_EXISTS = config.get("on_exists")
     summaries_tracker = [
         dict({"sample": None}, **r)
         for r in upload_summaries(
             samples=samples,
-            config=config,
             target=cohort_dir,
             source=source,
             rname=rname,
