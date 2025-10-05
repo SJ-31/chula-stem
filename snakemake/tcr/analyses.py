@@ -151,8 +151,10 @@ elif smk.rule == "extract_sequences":
     samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
     config = smk.config.get("get_sequences", {})
     top = config.get("top", 3)
-    rank_col = config.get("rank_key", "clone_id_Sample_Name_rank")
-    airr.obs = airr.obs.rename({rank_col: "rank", SCOL: "sample"}, axis=1)
+    rank_col = config.get("rank_key", "clone_id_Sample_Name_rank", "clone_id_size")
+    airr.obs = airr.obs.rename(
+        {rank_col: "rank", SCOL: "sample", "clone_id_size": "size"}, axis=1
+    )
     all_ignored = []
     for sample in samples:
         mask = (airr.obs["sample"] == sample) & (airr.obs["rank"] <= top)
@@ -161,7 +163,7 @@ elif smk.rule == "extract_sequences":
             cur,
             min_length=config.get("min_length", 2),
             chains=("VJ_1", "VDJ_1"),
-            cols_add=("rank", "sample"),
+            cols_add=("rank", "sample", "size"),
         )
         all_ignored.append(ignored)
         outfile = Path(smk.params["outdir"]) / f"{sample}.fasta"
