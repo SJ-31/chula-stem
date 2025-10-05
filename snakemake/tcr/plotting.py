@@ -231,7 +231,7 @@ if smk.rule == "make_reports":
     airrs = {
         s: mdata[mdata.obs[SCOL] == s, :]
         for s in mdata.obs[SCOL].unique()
-        if s not in {"Undetermined", "Multiplet"}
+        if s not in to_ignore
     }
     # TODO: Plot on per-run basis
     # tsne_fig = plot_obs(adata, "tSNE", hues=to_plot)

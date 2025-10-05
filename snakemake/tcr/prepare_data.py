@@ -90,13 +90,15 @@ def assign_ranks(
 
 
 def mark_public_clones(
-    adata: ad.AnnData, clone_col: str = "clone_id", sample_col: str = SCOL
+    adata: ad.AnnData,
+    clone_col: str = "clone_id",
+    sample_col: str = SCOL,
+    ignore_samples: tuple = (),
 ) -> None:
     public_clones = (
         pl.from_pandas(adata.obs)
         .filter(
-            ~pl.col(sample_col).is_in(["Multiplet", "Undetermined"])
-            & pl.col(clone_col).is_not_null()
+            ~pl.col(sample_col).is_in(ignore_samples) & pl.col(clone_col).is_not_null()
         )
         .group_by(clone_col)
         .agg(pl.col(sample_col).unique().len().alias("count"))
@@ -213,7 +215,9 @@ def load_runs():
     )
     assign_ranks(combined, within=SCOL, target_col="cc_id")
     ir.tl.clonal_expansion(combined, expanded_in=SCOL, **smk.config["clonal_expansion"])
-    mark_public_clones(combined["airr"])
+    mark_public_clones(
+        combined["airr"], ignore_samples=smk.config.get("ignore_samples", ())
+    )
 
     # ** Diversity
     for alpha in smk.config["alpha_metrics"]:
