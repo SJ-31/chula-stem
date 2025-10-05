@@ -51,7 +51,7 @@ on_missing = "unassigned" # How to handle samples listed in "samples" that aren'
 results = "variant_calling_1" # Name of results set
 cohort = "PHcase1" # Cohort name
 data_modality = "exome"
-cancer_type = "PDAC"
+cancer_type = "pdac" # Cancer type acronym (should be lowercase)
 
 [paths]
 results = ""    # Path to root directory for results
@@ -142,6 +142,7 @@ def upload_samples(
     source: Path,
     rname: str,
     samples: list,
+    sample_mapping: dict,
     on_missing: Literal["unassigned", "create", "unassigned_create"] | None,
     on_exists: ON_EXISTS,
 ) -> None:
@@ -151,12 +152,17 @@ def upload_samples(
         to_upload: Path = source / sample
         template = {"sample": sample, "old": to_upload}
         should_upload: bool = True
+
+        if sample in sample_mapping:
+            print(f"Using remapping {sample} = {sample_mapping[sample]}")
+            sample = sample_mapping[sample]
+
         if not to_upload.exists():
             raise ValueError(f"Sample {sample} doesn't exist in the results directory")
         target_dir: Path = cohort_dir / sample
         processed: Path = target_dir / "processed"
         if not target_dir.exists():
-            print(f"WARNING: sample {sample} not found in {processed}")
+            print(f"WARNING: sample {sample} not found in {cohort_dir}")
 
         if target_dir.exists():
             if not processed.exists():
@@ -229,6 +235,7 @@ if __name__ == "__main__":
         cohort_dir=cohort_dir,
         on_exists=on_exists,
         on_missing=config.get("on_missing"),
+        sample_mapping=config.get("sample_mapping", {}),
     )
 
     with open(parser.log, "w") as logfile:
