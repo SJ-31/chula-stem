@@ -146,7 +146,7 @@ def upload_samples(
     samples: list,
     on_missing: Literal["unassigned", "create", "unassigned_create"] | None,
     on_exists: ON_EXISTS,
-) -> None:
+) -> list:
     unassigned: Path = cohort_dir.parent.joinpath("unassigned")
     sample_tracker: list[dict] = []
     for sample in samples:
@@ -190,6 +190,7 @@ def upload_samples(
         template["override"] = override
         template["new"] = uploaded
         sample_tracker.append(template)
+    return samples_tracker
 
 
 if __name__ == "__main__":
@@ -222,8 +223,8 @@ if __name__ == "__main__":
             samples.append(sample_mapping[s])
         else:
             samples.append(s)
-    if len(sample_mapping) != len(set(sample_mapping)):
-        raise ValueError("Sample mapping results in conflicting sample names")
+    if len(samples) != len(set(samples)):
+        raise ValueError("Sample mapping causes conflicting names")
 
     on_exists: ON_EXISTS = config.get("on_exists")
     summaries_tracker = [
