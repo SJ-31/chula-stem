@@ -32,6 +32,7 @@ block comment for an example template
 samples = ["P1", "P2", "P3"] # (Optional) List of sample directories in results
 # These be present in the results directory and will throw an error if they don't
 # exist
+summary_ignore = [""] # (Optional) directory/file names to ignore in summary
 
 on_exists = "override" # What to do if a results directory already exists at target path
 # Valid options
@@ -68,7 +69,13 @@ with open("/home/shannc/Bio_SDD/chula-stem/pdac_upload.toml", "rb") as f:
     config = tomllib.load(f)
 
 
-def validate_config(config: dict) -> None:
+def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
+    """Validate config file for correct entries
+
+    Returns
+    -------
+    Tuple of (source_path, cohort_dir, sample_list)
+    """
     required_keys: dict = {
         "names": ["results", "cohort", "data_modality", "cancer_type"],
         "paths": ["cancer_ngs", "results"],
@@ -81,11 +88,39 @@ def validate_config(config: dict) -> None:
                 raise ValueError(f"The key {req} is required in table {k}")
             if not table[req]:
                 raise ValueError(f"The value to key {req} musn't be null")
+    paths, names = config["paths"], config["names"]
+    source = Path(paths["results"])
+    if not source.exists():
+        raise ValueError(f"The results source {source} doesn't exist")
+    cohort_dir: Path = Path(paths["cancer_ngs"])
+    for key in ["data_modality", "cancer_type", "cohort"]:
+        if not (try_path := cohort_dir.joinpath(names[key])).exists():
+            raise ValueError(f"The path {try_path} given by key {key} doesn't exist")
+        cohort_dir = try_path
+
+    samples_check = []
+    sample_mapping = config.get("sample_mapping", {})
+    samples: list = config.get("samples", [])
+    for s in samples:
+        if not source.joinpath(s).exists():
+            raise ValueError(f"Sample {s} doesn't exist in the results directory")
+
+        if s in sample_mapping:
+            print(f"Using remapping {s} = {sample_mapping[s]}")
+            samples_check.append(sample_mapping[s])
+        else:
+            samples_check.append(s)
+    if len(samples_check) != len(set(samples_check)):
+        raise ValueError("Sample mapping causes conflicting names")
+
+    return source, cohort_dir, samples, sample_mapping
 
 
 def upload_summaries(
-    on_exists: ON_EXISTS, target: Path, source: Path, rname: str, samples: list
+    on_exists: ON_EXISTS, target: Path, source: Path, rname: str, config: dict
 ) -> list[dict]:
+    samples = config.get("samples", [])
+    to_ignore = set(samples) | set(config.get("summary_ignore", []))
     summary_dir = target / "summary" / rname
     tracker: list[dict] = []
     if on_exists is not None and on_exists not in {"override", "append_date"}:
@@ -100,7 +135,7 @@ def upload_summaries(
         elif on_exists == "append_date":
             summary_dir = summary_dir.parent / (f"{rname}_{TODAY}")
     for rdir in source.iterdir():
-        if rdir.stem in samples:
+        if rdir.stem in to_ignore:
             continue
         target_path = summary_dir / rdir.stem
         template = {"old": rdir, "status": "success", "new": target_path}
@@ -154,8 +189,7 @@ def upload_samples(
         template = {"sample": sample, "old": to_upload}
         should_upload: bool = True
 
-        if not to_upload.exists():
-            raise ValueError(f"Sample {sample} doesn't exist in the results directory")
+        sample = sample_mapping.get(sample, sample)
         target_dir: Path = cohort_dir / sample
         processed: Path = target_dir / "processed"
         if not target_dir.exists():
@@ -201,36 +235,20 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config_file = args.config
+
     with open(config_file, "rb") as f:
         config: dict = tomllib.load(f)
-    validate_config(config)
-    paths, names = config["paths"], config["names"]
-    rname: str = names["results"]
-    source: Path = Path(paths["results"])
-    if not source.exists():
-        raise ValueError(f"The results source {source} doesn't exist")
-    cohort_dir: Path = Path(paths["cancer_ngs"])
-    for key in ["data_modality", "cancer_type", "cohort"]:
-        if not (try_path := cohort_dir.joinpath(names[key])).exists():
-            raise ValueError(f"The path {try_path} given by key {key} doesn't exist")
-        cohort_dir = try_path
-    samples = []
-    sample_mapping = config.get("sample_mapping", {})
-    tmp_samples: list = config.get("samples", [])
-    for s in tmp_samples:
-        if s in sample_mapping:
-            print(f"Using remapping {s} = {sample_mapping[s]}")
-            samples.append(sample_mapping[s])
-        else:
-            samples.append(s)
-    if len(samples) != len(set(samples)):
-        raise ValueError("Sample mapping causes conflicting names")
+    source: Path
+    cohort_dir: Path
+    source, cohort_dir, samples, sample_mapping = validate_config(config)
+
+    rname: str = config["names"]["results"]
 
     on_exists: ON_EXISTS = config.get("on_exists")
     summaries_tracker = [
         dict({"sample": None}, **r)
         for r in upload_summaries(
-            samples=samples,
+            config=config,
             target=cohort_dir,
             source=source,
             rname=rname,
@@ -244,6 +262,7 @@ if __name__ == "__main__":
         cohort_dir=cohort_dir,
         on_exists=on_exists,
         on_missing=config.get("on_missing"),
+        sample_mapping=sample_mapping,
     )
 
     with open(args.log, "w") as logfile:
