@@ -17,8 +17,10 @@ DATE = config.get("date", "no_date")
 
 OUT = add_root(f"{config.get('output')}/{DATE}")
 
-runs = {k: add_root(v) for k, v in config["bd_results"].items()}
+# * Variables set up
 
+runs = {k: add_root(v) for k, v in config["bd_results"].items()}
+samples = config["samples"]
 
 refs_to_get, references = {}, {}
 for ref, p in config["reference_files"].items():
@@ -38,7 +40,6 @@ if config["annotate_cells"]["cellassign"]["run"]:
         }
     )
 
-
 plots = {
     "top_clones": f"{OUT}/top_clones.csv",
     "expansion": f"{OUT}/plots/clone_expansion",
@@ -50,12 +51,25 @@ cohort_plots = {
 }
 plots.update(cohort_plots)
 
+sequence_out = {
+    "extracted": f"{OUT}/sequences/extracted",
+    "stitchr": f"{OUT}/sequences/stitchr",
+}
+extracted_seqs = expand("{o}/{s}.fasta", o=sequence_out["extracted"], s=samples)
+stitchr_seqs = expand(
+    "{o}/{s}.fasta", o=sequence_out["stitchr"], s=samples
+)  # TODO: add stitchr rule
+
+# * Rules
+
 
 rule all:
     input:
+        *extracted_seqs,
         **refs_to_get,
         **cell_annotation_results,
         **plots,
+        extracted_ignored=f"{sequence_out['extracted']}/ignored_sequences.csv",
         combined=f"{OUT}/combined.h5mu",
 
 
@@ -113,3 +127,38 @@ rule make_reports:
         ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),
     script:
         "plotting.py"
+
+
+# TODO: nicely format the pre-assembled bd rhapsody sequences
+rule extract_sequences:
+    input:
+        rules.load_runs.output,
+    params:
+        outdir=sequence_out["extracted"],
+    output:
+        extracted_seqs,
+        ignored=rules.all.input.extracted_ignored,
+    script:
+        "analyses.py"
+
+
+rule stitchr:
+    input:
+        rules.load_runs.output,
+    run:
+        import mudata as md
+        import scirpy as ir
+
+        arg_list = []
+        species = config.get("stitchr", {}).pop("species", "HUMAN")
+        for k, v in config("stitchr", {}).items():
+            if isinstance(v, str) and len(v) > 1:
+                arg_list.append(f"--{k} {v}")
+            elif v:
+                arg_list.append(f"--{k}")
+                # args.append("")
+                # args = " ".join(arg_list)
+
+                # command_args = " ".join([f"--{k} {v}" for k, v in
+                # thimble_command =
+        shell("thimble ")

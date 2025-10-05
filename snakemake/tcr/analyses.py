@@ -9,6 +9,8 @@ import mudata as md
 import pandas as pd
 import scirpy as ir
 
+md.set_options(pull_on_update=False)
+
 try:
     from snakemake.script import snakemake as smk
 except ImportError:
@@ -57,6 +59,7 @@ def fasta_from_airr(
         "chain": [],
         "receptor_subtype": [],
     }
+    ignored.update({c: [] for c in cols_add})
     cols = ["sequence_id", "sequence", "complete_vdj"]
     for (id, obs_row), (_, airr_row) in zip(
         adata.obs.iterrows(), ir.get.airr(adata, cols).iterrows()
@@ -76,6 +79,8 @@ def fasta_from_airr(
                 ignored["chain"].append(chain)
                 ignored["receptor_subtype"].append(subtype)
                 ignored["cell_id"].append(id)
+                for c in cols_add:
+                    ignored[c].append(obs_row[c])
                 for reason, val in zip(
                     ["incomplete", "is_ambiguous", "no_sequence", "no_ir"], ignore_if
                 ):
@@ -88,7 +93,7 @@ def fasta_from_airr(
             for col in cols_add:
                 header = f"{header} {col}={obs_row[col]}"
             sequences.append(f">{header}\n{sequence}")
-    return "\n".join(sequences), pd.DataFrame(ignored, strict=False)
+    return "\n".join(sequences), pd.DataFrame(ignored)
 
 
 def query_routine(
@@ -144,7 +149,7 @@ if smk.rule == "scirpy_query":
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
     samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
-    config = smk.config("get_sequences", {})
+    config = smk.config.get("get_sequences", {})
     top = config.get("top", 3)
     rank_col = config.get("rank_key", "clone_id_Sample_Name_rank")
     airr.obs = airr.obs.rename({rank_col: "rank", SCOL: "sample"}, axis=1)
@@ -158,7 +163,7 @@ elif smk.rule == "extract_sequences":
             chains=("VJ_1", "VDJ_1"),
             cols_add=("rank", "sample"),
         )
-        all_ignored.append(ignored.assign(**{SCOL: sample}))
+        all_ignored.append(ignored)
         outfile = Path(smk.params["outdir"]) / f"{sample}.fasta"
         outfile.write_text(fasta)
     pd.concat(all_ignored).to_csv(smk.output["ignored"], index=False)
