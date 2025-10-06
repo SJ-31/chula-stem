@@ -55,7 +55,9 @@ sequence_out = {
     "extracted": f"{OUT}/sequences/extracted",
     "stitchr": f"{OUT}/sequences/stitchr",
 }
-extracted_seqs = expand("{o}/{s}.fasta", o=sequence_out["extracted"], s=samples)
+extracted_seqs = expand(
+    "{o}/{s}{a}.fasta", o=sequence_out["extracted"], s=samples, a=["", "-aa"]
+)
 stitchr_seqs = expand(
     "{o}/{s}.fasta", o=sequence_out["stitchr"], s=samples
 )  # TODO: add stitchr rule

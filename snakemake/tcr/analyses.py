@@ -30,6 +30,7 @@ def fasta_from_airr(
     min_length: int = 10,
     chains: tuple = ("VJ_1", "VDJ_1"),
     cols_add: tuple = ("rank", "sample"),
+    return_aa: bool = False,
 ) -> tuple[str, pd.DataFrame]:
     """Extract full-length air sequences from IR data in `adata`
 
@@ -43,7 +44,8 @@ def fasta_from_airr(
     cols_add : tuple
         Columns in adata.obs to annotate the sequence fasta header with, in the format of
         ... <column_name>=<value>
-
+    return_aa : bool
+        Extracted sequences are amino acids
 
     Returns
     -------
@@ -60,7 +62,16 @@ def fasta_from_airr(
         "receptor_subtype": [],
     }
     ignored.update({c: [] for c in cols_add})
-    cols = ["sequence_id", "sequence", "complete_vdj"]
+    seq_str = "sequence" if not return_aa else "sequence_aa"
+    cols = [
+        "sequence_id",
+        seq_str,
+        "complete_vdj",
+        "v_call",
+        "c_call",
+        "d_call",
+        "j_call",
+    ]
     for (id, obs_row), (_, airr_row) in zip(
         adata.obs.iterrows(), ir.get.airr(adata, cols).iterrows()
     ):
@@ -69,8 +80,9 @@ def fasta_from_airr(
         is_ambiguous: bool = subtype == "ambiguous"
         no_ir: bool = subtype == "no IR"
         for chain in chains:
-            sequence = airr_row[f"{chain}_sequence"]
+            sequence = airr_row[f"{chain}_{seq_str}"]
             seqid = airr_row[f"{chain}_sequence_id"]
+            call_keys = ["v" "d", "j", "c"] if "D" in chains else ["v", "j", "c"]
             is_complete: bool = airr_row[f"{chain}_complete_vdj"]
             has_sequence: bool = sequence and len(sequence) > min_length
             ignore_if = [not is_complete, is_ambiguous, not has_sequence, no_ir]
@@ -88,8 +100,11 @@ def fasta_from_airr(
                         ignored["reason"].append(reason)
                         break
                 continue
+            calls = " ".join(
+                [f"{k}_call={airr_row[f'{chain}_{k}_call']}" for k in call_keys]
+            )
             chain_name = CHAIN_NAMING[re.sub("_[0-9]+.*", "", chain)].get(subtype, "na")
-            header = f"{seqid} clone_id={clone_id} chain={chain_name} subtype={subtype}"
+            header = f"{seqid} {calls} clone_id={clone_id} chain={chain_name} subtype={subtype}"
             for col in cols_add:
                 header = f"{header} {col}={obs_row[col]}"
             sequences.append(f">{header}\n{sequence}")
@@ -151,21 +166,23 @@ elif smk.rule == "extract_sequences":
     samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
     config = smk.config.get("get_sequences", {})
     top = config.get("top", 3)
-    rank_col = config.get("rank_key", "clone_id_Sample_Name_rank", "clone_id_size")
+    rank_col = config.get("rank_key", "clone_id_Sample_Name_rank")
     airr.obs = airr.obs.rename(
-        {rank_col: "rank", SCOL: "sample", "clone_id_size": "size"}, axis=1
+        {rank_col: "rank", SCOL: "sample", "clone_id_size": "clone_size"}, axis=1
     )
     all_ignored = []
-    for sample in samples:
-        mask = (airr.obs["sample"] == sample) & (airr.obs["rank"] <= top)
-        cur = airr[mask, :]
-        fasta, ignored = fasta_from_airr(
-            cur,
-            min_length=config.get("min_length", 2),
-            chains=("VJ_1", "VDJ_1"),
-            cols_add=("rank", "sample", "size"),
-        )
+    for return_aa, suffix in zip([False, True], ["", "-aa"]):
+        for sample in samples:
+            mask = (airr.obs["sample"] == sample) & (airr.obs["rank"] <= top)
+            cur = airr[mask, :]
+            fasta, ignored = fasta_from_airr(
+                cur,
+                min_length=config.get("min_length", 2),
+                chains=("VJ_1", "VDJ_1"),
+                cols_add=("rank", "sample", "clone_size"),
+                return_aa=return_aa,
+            )
+            outfile = Path(smk.params["outdir"]) / f"{sample}{suffix}.fasta"
+            outfile.write_text(fasta)
         all_ignored.append(ignored)
-        outfile = Path(smk.params["outdir"]) / f"{sample}.fasta"
-        outfile.write_text(fasta)
     pd.concat(all_ignored).to_csv(smk.output["ignored"], index=False)
