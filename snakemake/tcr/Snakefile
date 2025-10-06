@@ -62,12 +62,22 @@ stitchr_seqs = expand(
     "{o}/{s}.fasta", o=sequence_out["stitchr"], s=samples
 )  # TODO: add stitchr rule
 
+scirpy_query_results = [
+    *expand(
+        "{o}/reference_comparison/scirpy/{r}_query.pkl", o=OUT, r=references.keys()
+    ),
+    *expand(
+        "{o}/reference_comparison/scirpy/{r}_query.csv", o=OUT, r=references.keys()
+    ),
+]
+
 # * Rules
 
 
 rule all:
     input:
         *extracted_seqs,
+        *scirpy_query_results,
         **refs_to_get,
         **cell_annotation_results,
         **plots,
@@ -105,13 +115,11 @@ rule annotate_cells:
 rule scirpy_query:
     input:
         rules.load_runs.output,
-        refs_to_get.values(),
     params:
         references=references,
         outdir=f"{OUT}/reference_comparison/scirpy",
     output:
-        expand("{o}/reference_comparison/scirpy/{r}.h5ad", o=OUT, r=references.keys()),
-        expand("{o}/reference_comparison/scirpy/{r}.csv", o=OUT, r=references.keys()),
+        *scirpy_query_results,
     script:
         "analyses.py"
 
