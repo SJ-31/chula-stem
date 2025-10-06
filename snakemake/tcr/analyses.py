@@ -131,6 +131,9 @@ def query_routine(
     cutoff = kws.pop("cutoff", None)
     match_columns = kws.pop("match_columns", None)
     ir.pp.ir_dist(data, reference, cutoff=cutoff, **dist_kws)
+    cols = ["v_call", "d_call", "j_call", "junction_aa"]
+    query_seqs = ir.get.airr(data, cols).rename(lambda x: f"query_{x}", axis=1)
+    ref_seqs = ir.get.airr(reference, cols).rename(lambda x: f"ref_{x}", axis=1)
     ir.tl.ir_query(
         data,
         reference,
@@ -143,24 +146,35 @@ def query_routine(
         include_query_cols=include_query_cols,
         include_ref_cols=include_ref_cols,
         **dist_kws,
-    )
+    ).drop_duplicates()
+    match_df = match_df.merge(query_seqs, left_index=True, right_index=True, how="left")
+    match_df = match_df.merge(ref_seqs, left_index=True, right_index=True, how="left")
     return match_df
 
 
 # * Entry point
 if smk.rule == "scirpy_query":
-    mdata = md.read_h5mu(smk.input["mdata"])
+    airr = md.read_h5mu(smk.input[0])["airr"]
+    airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
+    config: dict = smk.config["query_reference"]
+    query_cols = [SCOL, "clone_id", "clone_id_size"]
+    if (rank_key := config.get("rank_key")) and (top := config.get("top")):
+        airr = airr[airr.obs[rank_key] <= top, :]
+        query_cols.append(rank_key)
     for db_name, path in smk.params["references"].items():
-        reference = md.read_h5mu(path)
+        reference = ad.read_h5ad(path)
         outfile = Path(smk.params["outdir"]) / f"{db_name}_query"
-        result: pd.DataFrame = query_routine(
-            mdata,
-            reference=reference,
-            include_query_cols=[SCOL, "airr:clone_id", "airr:clone_id_size"],
-            **smk.config["query_reference"]["scirpy"],
-        )
+        try:
+            result: pd.DataFrame = query_routine(
+                airr,
+                reference=reference,
+                include_query_cols=query_cols,
+                **config["scirpy"],
+            )
+        except KeyError:  # BUG: something is wrong with the McPAS database
+            result = pd.DataFrame()
         result.to_csv(outfile.with_suffix(".csv"), index=False)
-        joblib.dump(mdata.uns, outfile.with_suffix(".pkl"))
+        joblib.dump(airr.uns, outfile.with_suffix(".pkl"))
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
     samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
@@ -172,7 +186,7 @@ elif smk.rule == "extract_sequences":
     )
     all_ignored = []
     for return_aa, suffix in zip([False, True], ["", "-aa"]):
-        for sample in samples:
+        for i, sample in enumerate(samples):
             mask = (airr.obs["sample"] == sample) & (airr.obs["rank"] <= top)
             cur = airr[mask, :]
             fasta, ignored = fasta_from_airr(
@@ -184,5 +198,6 @@ elif smk.rule == "extract_sequences":
             )
             outfile = Path(smk.params["outdir"]) / f"{sample}{suffix}.fasta"
             outfile.write_text(fasta)
-        all_ignored.append(ignored)
+            if i == 0:
+                all_ignored.append(ignored)
     pd.concat(all_ignored).to_csv(smk.output["ignored"], index=False)

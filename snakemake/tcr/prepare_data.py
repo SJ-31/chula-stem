@@ -156,6 +156,7 @@ def format_mcpas(path) -> ad.AnnData:
             "CDR3.beta.aa",
         ]
     ).to_pandas()
+    mcpas.uns["DB"] = {"name": "McPAS", "date": None}
     ir.pp.index_chains(mcpas)
     return mcpas
 
