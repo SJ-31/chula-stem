@@ -206,6 +206,8 @@ def load_runs():
         for k, v in calling_config["define_clonotype_clusters"].items()
         if k in {"metric", "sequence"}
     }
+    combined.mod["airr"] = combined["airr"][~combined["airr"].obs["clone_id"].isna(), :]
+    combined.update_obs()
     assign_ranks(combined, within=SCOL, target_col="clone_id")
     check_consistent_ids(combined)
 
