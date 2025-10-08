@@ -1,7 +1,10 @@
 #!/usr/bin/env ipython
+import io
 import re
 from collections.abc import Sequence
 from pathlib import Path
+from subprocess import PIPE, Popen, run
+from tempfile import NamedTemporaryFile
 
 import anndata as ad
 import joblib
@@ -152,15 +155,7 @@ def query_routine(
     return match_df
 
 
-# * Entry point
-if smk.rule == "scirpy_query":
-    airr = md.read_h5mu(smk.input[0])["airr"]
-    airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
-    config: dict = smk.config["query_reference"]
-    query_cols = [SCOL, "clone_id", "clone_id_size"]
-    if (rank_key := config.get("rank_key")) and (top := config.get("top")):
-        airr = airr[airr.obs[rank_key] <= top, :]
-        query_cols.append(rank_key)
+def scirpy_query(airr: ad.AnnData, query_cols: list):
     for db_name, path in smk.params["references"].items():
         reference = ad.read_h5ad(path)
         outfile = Path(smk.params["outdir"]) / f"{db_name}_query"
@@ -175,6 +170,114 @@ if smk.rule == "scirpy_query":
             result = pd.DataFrame()
         result.to_csv(outfile.with_suffix(".csv"), index=False)
         joblib.dump(airr.uns, outfile.with_suffix(".pkl"))
+
+
+def tcrmatch_wrapper(
+    database: str,
+    adata: ad.AnnData | None = None,
+    sequences: Sequence | Path | str | None = None,
+    query_cols: tuple = ("clone_id", "clone_id_size"),
+    memory: int = 4,
+    threads: int = 1,
+    threshold: float = 0.97,
+    cdr3_col: str = "VDJ_1_cdr3_aa",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Wrapper function for tcrmatch
+
+    Parameters
+    ----------
+    adata : ad.AnnData | None
+        adata object containing air data
+    sequences : Sequence | Path | str | None
+        path to cdr3 beta sequences to analyze
+    """
+    seqs: Sequence
+    invalid: pd.DataFrame = pd.DataFrame()
+    tmp: pd.DataFrame = pd.DataFrame()
+    query_cols = (
+        ["clone_id"] + list(query_cols) if "clone_id" not in query_cols else query_cols
+    )
+    if adata is not None:
+        wrong_subtype = adata[adata.obs["receptor_subtype"] != "TRA+TRB", :]
+        valid = adata[adata.obs["receptor_subtype"] == "TRA+TRB", :]
+        cdr3s = ir.get.airr(valid, "cdr3_aa")
+        no_cdr3beta = valid[~cdr3s[cdr3_col].notnull(), :]
+        invalid = pd.concat(
+            [
+                df.obs.loc[:, query_cols].reset_index().assign(reason=r)
+                for df, r in zip(
+                    [wrong_subtype, no_cdr3beta], ["wrong_subtype", "no_cdr3_beta"]
+                )
+            ]
+        )
+        mask = ~cdr3s.index.isin(no_cdr3beta.obs.index)
+        tmp = (
+            valid.obs.loc[mask, query_cols]
+            .reset_index()
+            .merge(cdr3s.loc[mask, [cdr3_col]].reset_index(), on="index")
+        )
+        tmp = tmp.loc[~tmp.duplicated([cdr3_col, "clone_id"]), :]
+        seqs = tmp[cdr3_col]
+    elif isinstance(sequences, Path):
+        seqs = sequences.read_text().splitlines()
+    elif isinstance(sequences, str):
+        with open(sequences, "r") as f:
+            seqs = f.read().splitlines()
+    else:
+        raise ValueError("Either `adata` or `sequences` must be provided!")
+    database = str(database) if isinstance(database, Path) else database
+    args = ["-d", database, "-t", str(threads), "-m", str(memory), "-s", str(threshold)]
+    with NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write("\n".join(seqs))
+    command = f"tcrmatch -i {f.name} {' '.join(args)}"
+    stdout = run(command, shell=True, capture_output=True).stdout
+    Path(f.name).unlink()
+    if stdout is None:
+        return pd.DataFrame(), invalid
+    match_result: pd.DataFrame = pd.read_csv(io.StringIO(stdout.decode()), sep="\t")
+    if match_result.empty:
+        return pd.DataFrame(), invalid
+    if adata is not None:
+        match_result = (
+            tmp.merge(
+                match_result,
+                left_on=cdr3_col,
+                right_on="trimmed_input_sequence",
+                how="right",
+            )
+            .rename({"index": "cell_id"}, axis=1)
+            .drop(cdr3_col, axis=1)
+        )
+    return match_result, invalid
+
+
+# * Entry point
+if smk.rule in {"scirpy_query", "tcrmatch"}:
+    airr = md.read_h5mu(smk.input[0])["airr"]
+    airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
+    config: dict = smk.config["query_reference"]
+    query_cols = [SCOL, "clone_id", "clone_id_size"]
+    if (rank_key := config.get("rank_key")) and (top := config.get("top")):
+        airr = airr[airr.obs[rank_key] <= top, :]
+        query_cols.append(rank_key)
+    if smk.rule == "scirpy_query":
+        scirpy_query(airr, query_cols)
+    elif smk.rule == "tcrmatch":
+        tcrmatch_config: dict = config["tcrmatch"]
+        for i, (name, db) in enumerate(tcrmatch_config["databases"].items()):
+            result, invalid = tcrmatch_wrapper(
+                adata=airr,
+                database=db,
+                query_cols=query_cols,
+                memory=tcrmatch_config.get("m", 4),
+                threads=tcrmatch_config.get("threads", 1),
+                threshold=tcrmatch_config.get("threshold", 0.97),
+            )
+            result.to_csv(f"{smk.params['outdir']}/tcrmatch_{name}.csv", index=False)
+            if i == 0:
+                invalid.to_csv(
+                    f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False
+                )
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
     samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
