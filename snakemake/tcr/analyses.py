@@ -3,12 +3,13 @@ import io
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from subprocess import PIPE, Popen, run
+from subprocess import run
 from tempfile import NamedTemporaryFile
 
 import anndata as ad
 import joblib
 import mudata as md
+import numpy as np
 import pandas as pd
 import scirpy as ir
 
@@ -26,6 +27,19 @@ CHAIN_NAMING = {
 # TODO: you can include the other receptor subtypes  (BCRs mainly) if needed
 
 SCOL: str = smk.config.get("sample_col", "Sample_Name")
+
+
+def get_airr(input_key: str | int = 0, filter_samples: bool = False) -> ad.AnnData:
+    airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
+    if filter_samples:
+        airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
+    return airr
+
+
+def maybe_filter_by_rank(adata: ad.AnnData, config: dict) -> tuple[bool, ad.AnnData]:
+    if (rank_key := config.get("rank_key")) and (top := config.get("top")):
+        return True, adata[adata.obs[rank_key] <= top, :]
+    return False, adata
 
 
 def fasta_from_airr(
@@ -155,6 +169,9 @@ def query_routine(
     return match_df
 
 
+# * Wrapper functions
+
+
 def scirpy_query(airr: ad.AnnData, query_cols: list):
     for db_name, path in smk.params["references"].items():
         reference = ad.read_h5ad(path)
@@ -252,16 +269,18 @@ def tcrmatch_wrapper(
 
 
 # * Entry point
+# * Querying
 if smk.rule in {"scirpy_query", "tcrmatch"}:
-    airr = md.read_h5mu(smk.input[0])["airr"]
-    airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
+    airr = get_airr(0, filter_samples=True)
     config: dict = smk.config["query_reference"]
     query_cols = [SCOL, "clone_id", "clone_id_size"]
-    if (rank_key := config.get("rank_key")) and (top := config.get("top")):
-        airr = airr[airr.obs[rank_key] <= top, :]
-        query_cols.append(rank_key)
+    filtered, airr = maybe_filter_by_rank(airr, config)
+    if filtered:
+        query_cols.append(config["rank_key"])
+    # ** Scirpy
     if smk.rule == "scirpy_query":
         scirpy_query(airr, query_cols)
+    # ** tcrmatch
     elif smk.rule == "tcrmatch":
         tcrmatch_config: dict = config["tcrmatch"]
         for i, (name, db) in enumerate(tcrmatch_config["databases"].items()):
