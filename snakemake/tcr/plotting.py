@@ -213,12 +213,13 @@ def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
     """
     cols = ["c_call", "d_call", "j_call", "v_call"]
     with ir.get.airr_context(adata, cols) as m:
-        top = adata.obs["clone_id"].value_counts()[:k]
+        top = adata.obs["clone_id"].value_counts()[:k].reset_index()
+        top["rank"] = top["count"].rank(ascending=False, method="dense")
         call_cols = [col for col in m.obs.columns if "_call" in col]
-        filtered = m.obs.loc[m.obs["clone_id"].isin(top.index), :].loc[
+        filtered = m.obs.loc[m.obs["clone_id"].isin(top["clone_id"]), :].loc[
             :, ["clone_id"] + call_cols
         ]
-        df = top.reset_index().merge(filtered, on="clone_id").drop_duplicates()
+        df = top.merge(filtered, on="clone_id").drop_duplicates()
     return df
 
 
@@ -268,7 +269,8 @@ if smk.rule == "make_reports":
             height=10,
             verbose=False,
         )
-        clone_calls.append(top_clone_calls(cur["airr"], k=10).assign(**{SCOL: sample}))
+        tmp = top_clone_calls(cur["airr"], k=10).assign(**{SCOL: sample})
+        clone_calls.append(tmp.iloc[:, [-1] + list(range(len(tmp.columns) - 2))])
 
     c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in=SCOL)
     c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
