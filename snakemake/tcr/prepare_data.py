@@ -161,6 +161,44 @@ def format_mcpas(path) -> ad.AnnData:
     return mcpas
 
 
+def format_tcrdb(pid: str, path: Path):
+    csvs = filter(lambda x: x != "metadata.csv", path.glob("*csv"))
+    meta = pd.read_csv(path.joinpath("metadata.csv")).reset_index(drop=True)
+    combined = pd.concat([pd.read_csv(c).assign(sample=c.stem) for c in csvs])
+    # Place NNSeq under `junction` according to AIRR community standards
+    # and TCRdb's sequence qc (CDR3 should begin with C and end with F)
+    col_mapping = {
+        "v_call": "Vregion",
+        "j_call": "Jregion",
+        "d_call": "Dregion",
+        "junction": "NNSeq",
+        "junction_aa": "AASeq",
+    }
+    cells, samples = [], []
+    for i, (_, row) in enumerate(combined.iterrows()):
+        samples.append(row["sample"])
+        cell = ir.io.AirrCell(cell_id=i)
+        beta_chain = ir.io.AirrCell.empty_chain_dict()
+        for k, v in col_mapping.items():
+            beta_chain[k] = row[v] if row[v] != "Unknown" else None
+        beta_chain["locus"] = "TRB"
+        cell.add_chain(beta_chain)
+        cells.append(cell)
+    df = pd.DataFrame({"sample": samples}).reset_index(drop=True)
+    if "RunId" in meta.columns and len(set(meta["RunId"]) & set(samples)) > 0:
+        obs = df.merge(meta, left_on="sample", right_on="RunId", how="left")
+    elif "Comment" in meta.columns and len(set(meta["Comment"]) & set(samples)) > 0:
+        obs = df.merge(meta, left_on="sample", right_on="Comment", how="left").drop(
+            "Comment", axis=1
+        )
+    else:
+        raise ValueError("Cannot merge metadata with sample data")
+    adata = ir.io.from_airr_cells(cells)
+    adata.obs = obs
+    adata.uns["DB"] = {"name": pid, "date": None}
+    return adata
+
+
 def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData:
     airr: ad.AnnData = ir.io.read_airr(
         path.joinpath(f"{run_name}_VDJ_Dominant_Contigs_AIRR.tsv")
@@ -247,6 +285,9 @@ def prepare_references():
             adata = ir.datasets.vdjdb(cached=True, cache_path=as_adata)
         elif k == "iedb":
             adata = ir.datasets.iedb(cached=True, cache_path=as_adata)
+        elif "tcrdb" in k:
+            adata = format_tcrdb(k, path)
+            adata.write_h5ad(as_adata)
         elif as_adata.exists():
             continue
         else:  # Read in an aribtary airr-formatted tsv file

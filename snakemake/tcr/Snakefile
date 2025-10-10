@@ -22,13 +22,24 @@ OUT = add_root(f"{config.get('output')}/{DATE}")
 runs = {k: add_root(v) for k, v in config["bd_results"].items()}
 samples = config["samples"]
 
-refs_to_get, references = {}, {}
-for ref, p in config["reference_files"].items():
-    path = Path(add_root(p))
+REFS_TO_GET, REFERENCES = {}, {}
+
+
+def add_to_refs(ref, path_str):
+    path = Path(add_root(path_str))
     adata_file = path.with_suffix(".h5ad")
     if not adata_file.exists():
-        refs_to_get[ref] = adata_file
-    references[ref] = adata_file
+        REFS_TO_GET[ref] = adata_file
+    REFERENCES[ref] = adata_file
+
+
+for ref, p in config["reference_files"].items():
+    if ref == "tcrdb":
+        for pid, db_dir in p.items():
+            add_to_refs(f"tcrdb_{pid}", db_dir)
+    else:
+        add_to_refs(ref, p)
+
 
 for n, db in config["query_reference"]["tcrmatch"].get("databases", {}).items():
     config["query_reference"]["tcrmatch"]["databases"][n] = add_root(db)
@@ -68,8 +79,8 @@ stitchr_seqs = expand(
 q_outdir = f"{OUT}/reference_comparison"
 query_results = {
     "scirpy": [
-        *expand("{o}/scirpy/{r}_query.pkl", o=q_outdir, r=references.keys()),
-        *expand("{o}/scirpy/{r}_query.csv", o=q_outdir, r=references.keys()),
+        *expand("{o}/scirpy/{r}_query.pkl", o=q_outdir, r=REFERENCES.keys()),
+        *expand("{o}/scirpy/{r}_query.csv", o=q_outdir, r=REFERENCES.keys()),
     ],
     "tcrmatch": [
         *expand(
@@ -90,7 +101,7 @@ rule all:
         *extracted_seqs,
         *query_results["scirpy"],
         *query_results["tcrmatch"],
-        **refs_to_get,
+        **REFS_TO_GET,
         **cell_annotation_results,
         **plots,
         mixtcr_all=f"{OUT}/mixtcrpred_results.csv",
@@ -100,9 +111,9 @@ rule all:
 
 rule prepare_references:
     params:
-        refs_to_get=refs_to_get,
+        refs_to_get=REFS_TO_GET,
     output:
-        refs_to_get.values(),
+        REFS_TO_GET.values(),
     script:
         "prepare_data.py"
 
@@ -196,7 +207,7 @@ rule scirpy_query:
     input:
         rules.load_runs.output,
     params:
-        references=references,
+        references=REFERENCES,
         outdir=f"{q_outdir}/scirpy",
     output:
         *query_results["scirpy"],
