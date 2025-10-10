@@ -29,7 +29,7 @@ SCOL: str = smk.config.get("sample_col", "Sample_Name")
 
 
 def get_airr(input_key: str | int = 0, filter_samples: bool = False) -> ad.AnnData:
-    airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
+    airr: ad.AnnData = md.read_h5mu(smk.input[input_key])["airr"]
     if filter_samples:
         airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
     return airr
@@ -147,6 +147,7 @@ def query_routine(
     cutoff = kws.pop("cutoff", None)
     match_columns = kws.pop("match_columns", None)
     ir.pp.ir_dist(data, reference, cutoff=cutoff, **dist_kws)
+    # BUG: [2025-10-10 Fri] this won't work for tcrdb data because it needs both VJ and VDJ chains...
     cols = ["v_call", "d_call", "j_call", "junction_aa"]
     query_seqs = ir.get.airr(data, cols).rename(lambda x: f"query_{x}", axis=1)
     ref_seqs = ir.get.airr(reference, cols).rename(lambda x: f"ref_{x}", axis=1)
@@ -175,6 +176,8 @@ def scirpy_query(airr: ad.AnnData, query_cols: list):
     for db_name, path in smk.params["references"].items():
         reference = ad.read_h5ad(path)
         outfile = Path(smk.params["outdir"]) / f"{db_name}_query"
+        if "tcrdb" in db_name:
+            continue  # query_routine doesn't work with orphan VDJ
         try:
             result: pd.DataFrame = query_routine(
                 airr,

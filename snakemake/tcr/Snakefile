@@ -79,8 +79,12 @@ stitchr_seqs = expand(
 q_outdir = f"{OUT}/reference_comparison"
 query_results = {
     "scirpy": [
-        *expand("{o}/scirpy/{r}_query.pkl", o=q_outdir, r=REFERENCES.keys()),
-        *expand("{o}/scirpy/{r}_query.csv", o=q_outdir, r=REFERENCES.keys()),
+        r
+        for r in [
+            *expand("{o}/scirpy/{r}_query.pkl", o=q_outdir, r=REFERENCES.keys()),
+            *expand("{o}/scirpy/{r}_query.csv", o=q_outdir, r=REFERENCES.keys()),
+        ]
+        if "tcrdb" not in r
     ],
     "tcrmatch": [
         *expand(
