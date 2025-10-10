@@ -182,6 +182,7 @@ def format_tcrdb(pid: str, path: Path):
         for k, v in col_mapping.items():
             beta_chain[k] = row[v] if row[v] != "Unknown" else None
         beta_chain["locus"] = "TRB"
+        beta_chain["productive"] = True
         cell.add_chain(beta_chain)
         cells.append(cell)
     df = pd.DataFrame({"sample": samples}).reset_index(drop=True)
@@ -196,6 +197,8 @@ def format_tcrdb(pid: str, path: Path):
     adata = ir.io.from_airr_cells(cells)
     adata.obs = obs
     adata.uns["DB"] = {"name": pid, "date": None}
+    ir.pp.index_chains(adata)
+    ir.tl.chain_qc(adata)
     return adata
 
 
