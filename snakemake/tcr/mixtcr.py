@@ -36,36 +36,9 @@ length_mask = (input_obs["cdr3_TRA"].str.len() > 20) | (
 input_obs = input_obs.loc[~length_mask, :]
 if mixtcr_config.get("ignore_incomplete", False):
     input_obs = input_obs.loc[np.any(input_obs.loc[:, RENAME.values()].isna()), :]
+input_obs = input_obs.drop_duplicates([SCOL] + list(RENAME.values()))
 
 # * Run MixTCR
-
-
-def run_helper(input: pd.DataFrame, metadata: pd.DataFrame) -> pd.DataFrame:
-    input_file = Path(f"{smk.params["outdir"]}/input.csv")
-    input = input.drop_duplicates()  # Only consider duplicates within samples
-    input.loc[:, RENAME.values()].to_csv(input_file, index=False)
-    for model in mixtcr_config["models"]:
-        if len(model.split("_")) != 2:
-            raise ValueError("Invalid model specification for MixTCRpred!")
-        outfile = f"{smk.params["outdir"]}/{model}.csv"
-        command = (
-            f"./mixtcr_wrapper.sh {rundir} {model} {input_file} {outfile} {conda_flags}"
-        )
-        run(command, shell=True)
-        df = pd.read_csv(outfile, comment="#")
-        df = (
-            df.merge(input.reset_index(), on=list(RENAME.values()))
-            .loc[
-                :,
-                [input.index.name, SCOL, "score", "perc_rank"]
-                + mixtcr_config["obs_cols"],
-            ]
-            .assign(MixTCRpred_model_name=model)
-            .merge(metadata, on="MixTCRpred_model_name")
-        )
-        dfs.append(df)
-    input_file.unlink()
-    return pd.concat(dfs)
 
 
 if (env := mixtcr_config.get("env")) and (conda_dir := smk.config.get("conda")):
@@ -78,12 +51,28 @@ if not Path(rundir).exists():
 if not (meta_path := Path(rundir) / "pretrained_models" / "info_models.csv").exists():
     raise ValueError("MixTCRpred pretrained_models/info_models.csv file missing")
 metadata: pd.DataFrame = pd.read_csv(meta_path)
+input_file = Path(f"{smk.params["outdir"]}/input.csv")
 
 dfs = []
-# TODO: this should be parallel
-for sample in input_obs[SCOL]:
-    current = input_obs.loc[input_obs[SCOL] == sample, :]
-    df = run_helper(input=current, metadata=metadata)
+input_obs.loc[:, RENAME.values()].reset_index().to_csv(input_file, index=False)
+for model in mixtcr_config["models"]:
+    if len(model.split("_")) != 2:
+        raise ValueError("Invalid model specification for MixTCRpred!")
+    outfile = f"{smk.params["outdir"]}/{model}.csv"
+    command = (
+        f"./mixtcr_wrapper.sh {rundir} {model} {input_file} {outfile} {conda_flags}"
+    )
+    run(command, shell=True)
+    df = pd.read_csv(outfile, comment="#")
+    df = (
+        df.merge(input_obs.reset_index(), on=input_obs.index.name)
+        .loc[
+            :,
+            [input_obs.index.name, SCOL, "score", "perc_rank"]
+            + mixtcr_config["obs_cols"],
+        ]
+        .assign(MixTCRpred_model_name=model)
+        .merge(metadata, on="MixTCRpred_model_name")
+    )
     dfs.append(df)
-
 pd.concat(dfs).to_csv(smk.output[0], index=False)
