@@ -15,8 +15,8 @@ except ImportError:
 from analyses import SCOL, get_airr, maybe_filter_by_rank
 
 RENAME: dict = {
-    "VDJ_1_cdr3_aa": "cdr3_TRB",
-    "VJ_1_cdr3_aa": "cdr3_TRA",
+    "VDJ_1_junction_aa": "cdr3_TRB",
+    "VJ_1_junction_aa": "cdr3_TRA",
     "VDJ_1_v_call": "TRBV",
     "VDJ_1_j_call": "TRBJ",
     "VJ_1_v_call": "TRAV",
@@ -28,7 +28,7 @@ RENAME: dict = {
 airr = get_airr(filter_samples=True)
 _, airr = maybe_filter_by_rank(airr, smk.config["mixtcrpred"])
 mixtcr_config: dict = smk.config["mixtcrpred"]
-with ir.get.airr_context(airr, ["cdr3_aa", "v_call", "j_call"]):
+with ir.get.airr_context(airr, ["junction_aa", "v_call", "j_call"]):
     input_obs: pd.DataFrame = airr.obs.rename(RENAME, axis=1)
 length_mask = (input_obs["cdr3_TRA"].str.len() > 20) | (
     input_obs["cdr3_TRB"].str.len() > 20
