@@ -286,7 +286,7 @@ def prepare_references():
         elif k == "iedb":
             adata = ir.datasets.iedb(cached=True, cache_path=as_adata)
         elif "tcrdb" in k:
-            adata = format_tcrdb(k, path)
+            adata = format_tcrdb(k, path.with_suffix(""))
             adata.write_h5ad(as_adata)
         elif as_adata.exists():
             continue

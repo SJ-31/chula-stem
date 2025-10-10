@@ -196,6 +196,12 @@ rule mixtcrpred:
         outdir=f"{OUT}/mixtcrpred",
     output:
         rules.all.input["mixtcr_all"],
+        *[
+            temp(f)
+            for f in expand(
+                "{o}/{m}.csv", o=f"{OUT}/mixtcrpred", m=config["mixtcrpred"]["models"]
+            )
+        ],
     script:
         "mixtcr.py"
 
@@ -205,6 +211,7 @@ rule mixtcrpred:
 
 rule scirpy_query:
     input:
+        *rules.prepare_references.output,
         rules.load_runs.output,
     params:
         references=REFERENCES,
