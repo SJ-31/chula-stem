@@ -9,7 +9,6 @@ from tempfile import NamedTemporaryFile
 import anndata as ad
 import joblib
 import mudata as md
-import numpy as np
 import pandas as pd
 import scirpy as ir
 
@@ -268,48 +267,6 @@ def tcrmatch_wrapper(
     return match_result, invalid
 
 
-def mixtcr_wrapper(airr: ad.AnnData):
-    mixtcr_config: dict = smk.config["mixtcrpred"]
-    input_file = f"{smk.params["outdir"]}/input.csv"
-    with ir.get.airr_context(airr, ["cdr3_aa", "v_call", "j_call"]):
-        rename = {
-            "VDJ_1_cdr3_aa": "cdr3_TRB",
-            "VJ_1_cdr3_aa": "cdr3_TRA",
-            "VDJ_1_v_call": "TRBV",
-            "VDJ_1_j_call": "TRBJ",
-            "VJ_1_v_call": "TRAV",
-            "VJ_1_j_call": "TRAJ",
-        }
-        obs: pd.DataFrame = airr.obs.rename(rename)
-    length_mask = (obs["cdr3_TRA"].str.len() > 20) | (obs["cdr3_TRB"].str.len() > 20)
-    obs = obs.loc[~length_mask, :].loc[:, rename.values()]
-    if mixtcr_config.get("ignore_incomplete", False):
-        obs = obs.loc[np.any(obs.isna()), :]
-    obs.to_csv(input_file, index=False)
-    if (env := mixtcr_config.get("env")) and (conda_dir := smk.config.get("conda")):
-        conda_flags = f"--conda_env {env} --conda_dir {conda_dir}"
-    else:
-        conda_flags = ""
-    dfs = []
-    for model in mixtcr_config["models"]:
-        splits = model.split("_")
-        if len(splits) != 2:
-            raise ValueError("Invalid model specification for MixTCRpred!")
-        hla = splits[0]
-        peptide = splits[1]
-        outfile = f"{smk.params["outdir"]}/{model}.csv"
-        command = f"./mixtcr_wrapper.sh {mixtcr_config["dir"]} {input_file} {outfile} {conda_flags}"
-        run(command, shell=True)
-        df = (
-            pd.read_csv(outfile)
-            .assign(hla=hla, peptide=peptide)
-            .merge(on=rename.values())
-            .loc[:, ["score", "perc_rank"]]
-        )
-        dfs.append(df)
-    pd.concat(dfs).reset_index().to_csv(smk.output["all"], index=False)
-
-
 # * Querying
 if smk.rule in {"scirpy_query", "tcrmatch"}:
     airr = get_airr(0, filter_samples=True)
@@ -338,11 +295,6 @@ if smk.rule in {"scirpy_query", "tcrmatch"}:
                 invalid.to_csv(
                     f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False
                 )
-# * MixTCRpred
-elif smk.rule == "mixtcrpred":
-    airr = get_airr(filter_samples=True)
-    _, airr = maybe_filter_by_rank(airr, smk.config["mixtcrpred"])
-    mixtcr_wrapper(airr)
 # * Sequences
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]

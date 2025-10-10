@@ -119,7 +119,7 @@ if [[ -n "${_arg_conda_dir}" && -n "${_arg_conda_env}" ]]; then
     conda activate "${_arg_conda_env}"
 fi
 
-cur=$(cwd)
+cur=$(pwd)
 if [[ ! -d "${_arg_mixtcr_dir}" ]]; then
     echo "Given MixTCR directory doesn't exist!"
     exit 1
