@@ -176,7 +176,8 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
 # * Load data from Rhapsody and save to a single mudata object
 def load_runs():
     tag_mapping: dict = {
-        f"SampleTag{i}_hs": v for i, v in smk.config["sample_tags"].items()
+        f"SampleTag{i if len(str(i)) > 1 else f'0{i}'}_hs": v
+        for i, v in smk.config["sample_tags"].items()
     }
 
     mdatas = []
