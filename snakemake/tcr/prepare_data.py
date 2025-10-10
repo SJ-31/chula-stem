@@ -191,9 +191,8 @@ def load_runs():
         ir.pp.index_chains(mdata)
         ir.tl.chain_qc(mdata)
         mdatas.append(mdata)
-
     if len(mdatas) > 1:
-        combined: md.MuData = md.concat([mdatas])
+        combined: md.MuData = md.concat(mdatas)
     else:
         combined = mdatas[0]
 
