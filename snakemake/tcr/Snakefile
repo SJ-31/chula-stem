@@ -81,6 +81,9 @@ query_results = {
     ],
 }
 
+mixtcr_model_out = "{o}/{m}", o = f"{OUT}/mixtcrpred", m = config["mixtcrpred"][
+    "models"
+]
 
 # * Rules
 
@@ -88,11 +91,13 @@ query_results = {
 rule all:
     input:
         *extracted_seqs,
+        *mixtcr_out["models"],
         *query_results["scirpy"],
         *query_results["tcrmatch"],
         **refs_to_get,
         **cell_annotation_results,
         **plots,
+        mixtcr_all=f"{OUT}/mixtcrpred/all_predictions.csv",
         extracted_ignored=f"{sequence_out['extracted']}/ignored_sequences.csv",
         combined=f"{OUT}/combined.h5mu",
 
@@ -175,6 +180,18 @@ rule stitchr:
                 # command_args = " ".join([f"--{k} {v}" for k, v in
                 # thimble_command =
         shell("thimble ")
+
+
+rule mixtcrpred:
+    input:
+        rules.load_runs.output,
+    params:
+        outdir=f"{OUT}/mixtcrpred",
+    output:
+        *mixtcr_out["models"],
+        all=rules.all.input["mixtcr_all"],
+    script:
+        "analyses.py"
 
 
 # ** Database querying
