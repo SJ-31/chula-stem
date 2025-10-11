@@ -27,6 +27,19 @@ except ImportError:
 SCOL: str = smk.config.get("sample_col", "Sample_Name")
 
 
+def categorical_to_str(
+    df: pd.DataFrame, subset: Sequence | None = None
+) -> pd.DataFrame:
+    cols = subset or df.columns
+    new_df = df.copy()
+    to_cast = {c: str for c in cols if hasattr(new_df[c], "cat")}
+    new_df = new_df.astype(to_cast)
+    for c in to_cast:
+        if any(new_df[c].str.contains("[Nn]a[Nn]?")):
+            new_df[c] = new_df[c].replace("[Nn]a[Nn]?", np.nan, regex=True)
+    return new_df
+
+
 def from_pandas_categorical(
     df: pd.DataFrame, mapping: dict | None = None, make_categorical: bool = True
 ) -> pl.DataFrame:
@@ -148,8 +161,7 @@ def plot_group_abundance(
     ignore_nan: bool = True,
 ):
     "Custom plot because the scirpy version won't show legends for some reason"
-    if any(data.obs[fill].str.contains("nan")):
-        data.obs[fill] = data.obs[fill].replace({"nan": np.nan})
+    data.obs = categorical_to_str(data.obs, [fill, x])
     xlab = xlab if xlab is not None else x
     n_cols: pd.Series = data.obs[x].value_counts()
     if len(n_cols) > max_cols:
@@ -253,7 +265,7 @@ if smk.rule == "make_reports":
     for sample, cur in airrs.items():
         clone_expansion_plot = (
             plot_group_abundance(
-                cur, x=ct_col, fill="airr:clonal_expansion", max_cols=30
+                cur, x=ct_col, fill="airr:clonal_expansion", max_cols=30, at_least=10
             )
             + gg.guides(fill=gg.guide_legend(title="Clone Size", reverse=True))
             + gg.theme(axis_text_x=gg.element_text(rotation=45, hjust=1))
@@ -267,7 +279,9 @@ if smk.rule == "make_reports":
         )
 
         ct_plot = (
-            plot_group_abundance(cur, x="airr:clone_id", fill=ct_col, max_cols=20)
+            plot_group_abundance(
+                cur, x="airr:clone_id", fill=ct_col, max_cols=20, at_least=2
+            )
             + gg.xlab("Clone ID")
             + gg.ggtitle(sample)
         )
