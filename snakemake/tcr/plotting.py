@@ -35,8 +35,8 @@ def categorical_to_str(
     to_cast = {c: str for c in cols if hasattr(new_df[c], "cat")}
     new_df = new_df.astype(to_cast)
     for c in to_cast:
-        if any(new_df[c].str.contains("[Nn]a[Nn]?")):
-            new_df[c] = new_df[c].replace("[Nn]a[Nn]?", np.nan, regex=True)
+        if any(new_df[c].str.contains("^[Nn]a[Nn]?$")):
+            new_df[c] = new_df[c].replace("^[Nn]a[Nn]?$", np.nan, regex=True)
     return new_df
 
 
