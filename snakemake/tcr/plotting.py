@@ -295,13 +295,13 @@ if smk.rule == "make_reports":
             tmp = top_clone_calls(cur["airr"], k=5, key=key).assign(**{SCOL: sample})
             lst.append(tmp.iloc[:, [-1] + list(range(len(tmp.columns) - 2))])
 
-    c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in=SCOL)
+    c_rank_plot = plot_clone_ranking(mdata, k=4, expanded_in=SCOL)
     c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
 
-    c_rank_plot = plot_clone_ranking(
-        mdata, k=6, expanded_in=SCOL, target_col="cc_id"
+    cc_rank_plot = plot_clone_ranking(
+        mdata, k=4, expanded_in=SCOL, target_col="cc_id"
     ) + gg.labs(fill="Clone Cluster Rank")
-    c_rank_plot.save(
+    cc_rank_plot.save(
         smk.output["clone_cluster_ranks"], width=10, height=8, verbose=False
     )
 

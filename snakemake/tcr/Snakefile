@@ -73,7 +73,7 @@ cohort_plots = {
 plots.update(cohort_plots)
 
 sequence_out = {
-    "extracted": f"{OUT}/sequences/extracted",
+    "extracted": f"{OUT}/sequences",
     "stitchr": f"{OUT}/sequences/stitchr",
 }
 extracted_seqs = expand(
@@ -95,11 +95,11 @@ query_results = {
     ],
     "tcrmatch": [
         *expand(
-            "{o}/tcrmatch_{db}.csv",
+            "{o}/tcrmatch/tcrmatch_{db}.csv",
             o=q_outdir,
             db=config["query_reference"]["tcrmatch"]["databases"],
         ),
-        f"{q_outdir}/tcrmatch_invalid.csv",
+        f"{q_outdir}/tcrmatch/tcrmatch_invalid.csv",
     ],
 }
 
@@ -238,7 +238,7 @@ rule tcrmatch:
     input:
         rules.load_runs.output,
     params:
-        outdir=q_outdir,
+        outdir=f"{q_outdir}/tcrmatch",
     output:
         *query_results["tcrmatch"],
     script:
