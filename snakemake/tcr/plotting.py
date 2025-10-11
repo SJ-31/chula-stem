@@ -200,9 +200,11 @@ def plot_obs(
     return fig
 
 
-def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
+def top_clone_calls(
+    adata: ad.AnnData, k: int = 5, key: str = "clone_id"
+) -> pd.DataFrame:
     """Return a dataframe containing the V, D, J gene calls for
-        the most abundant clonotypes
+        the most abundant clonotypes or clone clusters
 
     Parameters
     ----------
@@ -213,13 +215,11 @@ def top_clone_calls(adata: ad.AnnData, k: int = 10) -> pd.DataFrame:
     """
     cols = ["c_call", "d_call", "j_call", "v_call"]
     with ir.get.airr_context(adata, cols) as m:
-        top = adata.obs["clone_id"].value_counts()[:k].reset_index()
+        top = adata.obs[key].value_counts()[:k].reset_index()
         top["rank"] = top["count"].rank(ascending=False, method="dense")
         call_cols = [col for col in m.obs.columns if "_call" in col]
-        filtered = m.obs.loc[m.obs["clone_id"].isin(top["clone_id"]), :].loc[
-            :, ["clone_id"] + call_cols
-        ]
-        df = top.merge(filtered, on="clone_id").drop_duplicates()
+        filtered = m.obs.loc[m.obs[key].isin(top[key]), :].loc[:, [key] + call_cols]
+        df = top.merge(filtered, on=key).drop_duplicates().astype({"rank": int})
     return df
 
 
@@ -237,7 +237,7 @@ if smk.rule == "make_reports":
     # TODO: Plot on per-run basis
     # tsne_fig = plot_obs(adata, "tSNE", hues=to_plot)
     # umap_fig = plot_obs(adata, "UMAP", hues=to_plot)
-    clone_calls = []
+    clone_calls, cluster_calls = [], []
     for p in ["expansion", "ct_abundance"]:
         if not (check_path := Path(smk.output[p])).exists():
             check_path.mkdir(parents=True)
@@ -265,12 +265,13 @@ if smk.rule == "make_reports":
         )
         ct_plot.save(
             f"{smk.output['ct_abundance']}/{sample}.png",
-            width=10,
+            width=13,
             height=10,
             verbose=False,
         )
-        tmp = top_clone_calls(cur["airr"], k=10).assign(**{SCOL: sample})
-        clone_calls.append(tmp.iloc[:, [-1] + list(range(len(tmp.columns) - 2))])
+        for key, lst in zip(["clone_id", "cc_id"], [clone_calls, cluster_calls]):
+            tmp = top_clone_calls(cur["airr"], k=5, key=key).assign(**{SCOL: sample})
+            lst.append(tmp.iloc[:, [-1] + list(range(len(tmp.columns) - 2))])
 
     c_rank_plot = plot_clone_ranking(mdata, k=6, expanded_in=SCOL)
     c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
@@ -288,9 +289,16 @@ if smk.rule == "make_reports":
     dplot.save(smk.output["alpha_diversity"], verbose=False)
     public_private_plot = plot_group_abundance(
         mdata["airr"], x="clone_id", fill=SCOL, max_cols=30
-    ) + gg.xlab("CLone ID")
+    ) + gg.xlab("Clone ID")
+    public_private_cc_plot = plot_group_abundance(
+        mdata["airr"], x="cc_id", fill=SCOL, max_cols=30
+    ) + gg.xlab("Cluster ID")
+
     public_private_plot.save(
         smk.output["public_private"], width=15, height=8, verbose=False
     )
-    top_clones = pd.concat(clone_calls)
-    top_clones.to_csv(smk.output["top_clones"], index=False)  # TODO
+    public_private_cc_plot.save(
+        smk.output["public_private_clusters"], width=15, height=8, verbose=False
+    )
+    pd.concat(clone_calls).to_csv(smk.output["top_clones"], index=False)
+    pd.concat(cluster_calls).to_csv(smk.output["top_clusters"], index=False)

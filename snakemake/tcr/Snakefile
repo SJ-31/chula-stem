@@ -56,12 +56,19 @@ if config["annotate_cells"]["cellassign"]["run"]:
 
 plots = {
     "top_clones": f"{OUT}/top_clones.csv",
+    "top_clusters": f"{OUT}/top_clusters.csv",
     "expansion": f"{OUT}/plots/clone_expansion",
     "ct_abundance": f"{OUT}/plots/cell_type_abundance",
 }
 cohort_plots = {
     k: f"{OUT}/plots/{k}.png"
-    for k in ["alpha_diversity", "public_private", "clone_ranks", "clone_cluster_ranks"]
+    for k in [
+        "alpha_diversity",
+        "public_private",
+        "clone_ranks",
+        "clone_cluster_ranks",
+        "public_private_clusters",
+    ]
 }
 plots.update(cohort_plots)
 
@@ -149,6 +156,7 @@ rule make_reports:
     output:
         **cohort_plots,
         top_clones=f"{OUT}/top_clones.csv",
+        top_clusters=f"{OUT}/top_clusters.csv",
         expansion=directory(f"{OUT}/plots/clone_expansion"),
         ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),
     script:
