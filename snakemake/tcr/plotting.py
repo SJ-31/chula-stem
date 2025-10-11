@@ -7,6 +7,7 @@ from typing import Literal
 import anndata as ad
 import matplotlib.pyplot as plt
 import mudata as md
+import numpy as np
 import pandas as pd
 import plotnine as gg
 import polars as pl
@@ -143,9 +144,12 @@ def plot_group_abundance(
     fill: str = "clonal_expansion",
     normalize: bool = False,
     max_cols: int = 50,
+    at_least: int = 20,
     ignore_nan: bool = True,
 ):
     "Custom plot because the scirpy version won't show legends for some reason"
+    if any(data.obs[fill].str.contains("nan")):
+        data.obs[fill] = data.obs[fill].replace({"nan": np.nan})
     xlab = xlab if xlab is not None else x
     n_cols: pd.Series = data.obs[x].value_counts()
     if len(n_cols) > max_cols:
@@ -160,6 +164,10 @@ def plot_group_abundance(
     if ":" in x:
         filtered = filtered.rename({x: x.replace(":", "_")}, axis=1)
         x = x.replace(":", "_")
+    if at_least > 0:
+        counts = pd.crosstab(filtered[x], filtered[fill]).sum(axis=1)
+        passed_vals = set(counts[counts >= at_least].index)
+        filtered = filtered.loc[filtered[x].isin(passed_vals), :]
     position = "fill" if normalize else "stack"
     plot = (
         gg.ggplot(
