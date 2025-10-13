@@ -178,7 +178,7 @@ def query_routine(
 def scirpy_query(airr: ad.AnnData, query_cols: list):
     for db_name, path in smk.params["references"].items():
         reference = ad.read_h5ad(path)
-        outfile = Path(smk.params["outdir"]) / f"{db_name}_query"
+        outfile = Path(smk.params["outdir"]) / f"scirpy_{db_name}"
         if "tcrdb" in db_name:
             continue  # query_routine doesn't work with orphan VDJ
         try:
@@ -386,11 +386,11 @@ def compairr_wrapper(
             with NamedTemporaryFile("+w", suffix="tsv") as outfile:
                 valid.write_csv(q.name, separator="\t")
                 valid_r.write_csv(r.name, separator="\t")
-                args.extend(["--outfile", outfile.name])
+                args.extend(["--pairs", outfile.name])
                 args = [str(a) for a in args]
                 with Popen(["compairr", q.name, r.name] + args) as proc:
                     _ = proc.communicate()
-                    pl.read_csv(outfile, separator="\t")
+                    result = pl.read_csv(outfile.name, separator="\t")
     chain_exprs = [
         [
             pl.col(f"sequence_id_{c}").str.extract(r"-(VD?J_[12])").alias(f"chain_{c}"),
@@ -439,8 +439,7 @@ if smk.rule in {"scirpy_query", "tcrmatch"}:
     # ** compairr
     elif smk.rule == "compairr":
         compairr_config: dict = config["compairr"]
-        databases = smk.params["references"]
-        for i, (name, db_path) in enumerate(databases.items()):
+        for i, (name, db_path) in enumerate(smk.params["references"]):
             result, invalid = compairr_wrapper(
                 airr,
                 ad.read_h5ad(db_path),
@@ -449,9 +448,9 @@ if smk.rule in {"scirpy_query", "tcrmatch"}:
                 new_ref_seqids=True,
                 **compairr_config,
             )
-            result.write_csv(f"{smk.params['outdir']}/{name}.csv")
+            result.write_csv(f"{smk.params['outdir']}/compairr_{name}.csv")
             if i == 0:
-                invalid.write_csv(f"{smk.params['outdir']}/invalid.csv")
+                invalid.write_csv(f"{smk.params['outdir']}/compairr_invalid.csv")
 # * Sequences
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
