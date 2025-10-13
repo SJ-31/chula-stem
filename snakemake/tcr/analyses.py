@@ -3,13 +3,16 @@ import io
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from subprocess import run
+from subprocess import Popen, run
 from tempfile import NamedTemporaryFile
+from typing import Literal
 
 import anndata as ad
 import joblib
 import mudata as md
 import pandas as pd
+import polars as pl
+import polars.selectors as cs
 import scirpy as ir
 
 md.set_options(pull_on_update=False)
@@ -270,13 +273,148 @@ def tcrmatch_wrapper(
     return match_result, invalid
 
 
+def format_for_compairr(
+    adata: ad.AnnData,
+    repertoire: str,
+    nucleotides: bool = False,
+    cdr3: bool = False,
+    repertoire_from_obs: bool = False,
+    new_seqids: bool = False,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    cols = ["sequence_id", "v_call", "j_call", "junction", "junction_aa"]
+    chains = ("VJ_1", "VDJ_1")
+    iname: str = adata.obs.index.name
+    df = pl.from_pandas(ir.get.airr(adata, cols), include_index=True)
+    if cdr3:
+        cols.extend(["cdr3", "cdr3_aa"])
+    if new_seqids:
+        exprs = [pl.col(iname).alias(f"{c}_sequence_id") for c in chains]
+        df = df.with_columns(*exprs)
+    suffix = "_aa" if not nucleotides else ""
+    to_group_by = ["v_call", "j_call", f"junction{suffix}"]
+    if cdr3:
+        to_group_by.append(f"cdr3{suffix}")
+    keep_first = (set(cols) - set(to_group_by)) | {"repertoire_id"}
+    if not repertoire_from_obs:
+        df = df.with_columns(pl.lit(repertoire).alias("repertoire_id"))
+    else:
+        df = df.join(
+            pl.from_pandas(adata.obs.loc[:, [repertoire]], include_index=True), on=iname
+        ).with_columns(pl.col(repertoire).alias("repertoire_id"))
+    df = (
+        pl.concat(
+            [
+                df.select(cs.starts_with(chain) | pl.col("repertoire_id"))
+                .rename(lambda x: x.replace(f"{chain}_", ""))
+                .with_columns(pl.col("sequence_id") + pl.lit(f"-{chain}"))
+                for chain in chains
+            ]
+        )
+        .sort("sequence_id")
+        .group_by(to_group_by)
+        .agg(pl.col(keep_first).first(), pl.len().alias("duplicate_count"))
+        .with_columns(
+            pl.all_horizontal(pl.col(to_group_by).is_not_null()).alias("all"),
+        )
+    )
+    invalid = df.filter(pl.col("all").not_()).drop("all")
+    return df.filter(pl.col("all")).drop("all"), invalid
+
+
+def compairr_wrapper(
+    query: ad.AnnData | md.MuData,
+    reference: ad.AnnData | md.MuData,
+    repertoire_col: str,
+    ref_name: str = "",
+    repertoire_from_obs: bool = True,
+    nucleotides: bool = False,
+    differences: int = 0,
+    cdr3: bool = False,
+    indels: bool = False,
+    threads: int = 1,
+    score: Literal["product", "ratio", "min", "max", "mean"] = "product",
+    switches: Sequence = ("ignore-unknown",),
+    include_ref_obs: bool = True,
+    new_ref_seqids: bool = False,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Wrapper function for calling compairr in query mode (--existence switch)
+
+    Parameters
+    ----------
+    param : argument
+    switches : Sequence
+        Additional switches to pass to compairr, WITHOUT the prefix dashes
+        e.g. "ignore-counts", "distance"
+    """
+    valid, invalid = format_for_compairr(
+        query,
+        repertoire_col,
+        nucleotides=nucleotides,
+        cdr3=cdr3,
+        repertoire_from_obs=repertoire_from_obs,
+    )
+    valid_r, _ = format_for_compairr(
+        reference,
+        ref_name,
+        nucleotides=nucleotides,
+        cdr3=cdr3,
+        new_seqids=new_ref_seqids,
+    )
+    args = [
+        "--existence",
+        "--differences",
+        differences,
+        "--threads",
+        threads,
+        "--score",
+        score,
+    ]
+    valid_switches = {"ignore-unknown", "ignore-genes", "ignore-counts", "indels"}
+    for switch in switches:
+        if switch in valid_switches:
+            args.append(f"--{switch}")
+        else:
+            raise ValueError(f"Switch {switch} not supported by compairr")
+    if cdr3:
+        args.append("--cdr3")
+    if nucleotides:
+        args.append("--nucleotides")
+    if indels:
+        args.append("--indels")
+    with NamedTemporaryFile("+w", suffix="tsv") as q:
+        with NamedTemporaryFile("+w", suffix="tsv") as r:
+            with NamedTemporaryFile("+w", suffix="tsv") as outfile:
+                valid.write_csv(q.name, separator="\t")
+                valid_r.write_csv(r.name, separator="\t")
+                args.extend(["--outfile", outfile.name])
+                args = [str(a) for a in args]
+                with Popen(["compairr", q.name, r.name] + args) as proc:
+                    _ = proc.communicate()
+                    pl.read_csv(outfile, separator="\t")
+    chain_exprs = [
+        [
+            pl.col(f"sequence_id_{c}").str.extract(r"-(VD?J_[12])").alias(f"chain_{c}"),
+            pl.col(f"sequence_id_{c}").str.replace_many(["-VDJ_1", "-VJ_1"], ["", ""]),
+        ]
+        for c in ["query", "ref"]
+    ]
+    result = result.rename(
+        lambda x: x.replace("_1", "_query").replace("_2", "_ref")
+    ).with_columns(*chain_exprs[0], *chain_exprs[1])
+    if include_ref_obs:
+        id_col = "sequence_id_ref"
+        ref_obs: pl.DataFrame = pl.from_pandas(reference.obs, include_index=True)
+        result = result.join(ref_obs, left_on=id_col, right_on=reference.obs.index.name)
+    return result, invalid
+
+
 # * Querying
 if smk.rule in {"scirpy_query", "tcrmatch"}:
     airr = get_airr(0, filter_samples=True)
     config: dict = smk.config["query_reference"]
     query_cols = [SCOL, "clone_id", "clone_id_size"]
-    filtered, airr = maybe_filter_by_rank(airr, config)
-    if filtered:
+    did_filter, airr = maybe_filter_by_rank(airr, config)
+    if did_filter:
         query_cols.append(config["rank_key"])
     # ** Scirpy
     if smk.rule == "scirpy_query":
@@ -298,6 +436,22 @@ if smk.rule in {"scirpy_query", "tcrmatch"}:
                 invalid.to_csv(
                     f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False
                 )
+    # ** compairr
+    elif smk.rule == "compairr":
+        compairr_config: dict = config["compairr"]
+        databases = smk.params["references"]
+        for i, (name, db_path) in enumerate(databases.items()):
+            result, invalid = compairr_wrapper(
+                airr,
+                ad.read_h5ad(db_path),
+                repertoire_col=SCOL,
+                ref_name=name,
+                new_ref_seqids=True,
+                **compairr_config,
+            )
+            result.write_csv(f"{smk.params['outdir']}/{name}.csv")
+            if i == 0:
+                invalid.write_csv(f"{smk.params['outdir']}/invalid.csv")
 # * Sequences
 elif smk.rule == "extract_sequences":
     airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
