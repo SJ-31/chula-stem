@@ -69,7 +69,7 @@ for model in mixtcr_config["models"]:
         .loc[
             :,
             [input_obs.index.name, SCOL, "score", "perc_rank"]
-            + mixtcr_config["obs_cols"],
+            + smk.config["obs_cols_include"],
         ]
         .assign(MixTCRpred_model_name=model)
         .merge(metadata, on="MixTCRpred_model_name")
