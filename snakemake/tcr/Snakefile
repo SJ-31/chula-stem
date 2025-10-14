@@ -88,8 +88,8 @@ query_results = {
     "scirpy": [
         r
         for r in [
-            *expand("{o}/scirpy/{r}_query.pkl", o=q_outdir, r=REFERENCES.keys()),
-            *expand("{o}/scirpy/{r}_query.csv", o=q_outdir, r=REFERENCES.keys()),
+            *expand("{o}/scirpy/scirpy_{r}.pkl", o=q_outdir, r=REFERENCES.keys()),
+            *expand("{o}/scirpy/scirpy_{r}.csv", o=q_outdir, r=REFERENCES.keys()),
         ]
         if "tcrdb" not in r
     ],
@@ -101,6 +101,10 @@ query_results = {
         ),
         f"{q_outdir}/tcrmatch/tcrmatch_invalid.csv",
     ],
+    "compairr": [
+        *expand("{o}/compairr/compairr_{db}.csv", o=q_outdir, db=REFERENCES.keys()),
+        f"{q_outdir}/compairr/compairr_invalid.csv",
+    ],
 }
 
 
@@ -110,8 +114,9 @@ query_results = {
 rule all:
     input:
         *extracted_seqs,
-        *query_results["scirpy"],
-        *query_results["tcrmatch"],
+        # *query_results["scirpy"],
+        # *query_results["tcrmatch"],
+        *query_results["compairr"],
         **REFS_TO_GET,
         **cell_annotation_results,
         **plots,
@@ -230,6 +235,19 @@ rule scirpy_query:
         outdir=f"{q_outdir}/scirpy",
     output:
         *query_results["scirpy"],
+    script:
+        "analyses.py"
+
+
+rule compairr:
+    input:
+        *rules.prepare_references.output,
+        rules.load_runs.output,
+    params:
+        references=REFERENCES,
+        outdir=f"{q_outdir}/compairr",
+    output:
+        *query_results["compairr"],
     script:
         "analyses.py"
 
