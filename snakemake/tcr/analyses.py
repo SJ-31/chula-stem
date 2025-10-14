@@ -283,7 +283,7 @@ def format_for_compairr(
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     cols = ["sequence_id", "v_call", "j_call", "junction", "junction_aa"]
     chains = ("VJ_1", "VDJ_1")
-    iname: str = adata.obs.index.name
+    iname: str = adata.obs.index.name or "None"
     df = pl.from_pandas(ir.get.airr(adata, cols), include_index=True)
     if cdr3:
         cols.extend(["cdr3", "cdr3_aa"])
@@ -390,7 +390,11 @@ def compairr_wrapper(
                 args = [str(a) for a in args]
                 with Popen(["compairr", q.name, r.name] + args) as proc:
                     _ = proc.communicate()
-                    result = pl.read_csv(outfile.name, separator="\t")
+                    result = pl.read_csv(
+                        outfile.name, separator="\t", raise_if_empty=False
+                    )
+    if result.is_empty():
+        return pl.DataFrame(), invalid
     chain_exprs = [
         [
             pl.col(f"sequence_id_{c}").str.extract(r"-(VD?J_[12])").alias(f"chain_{c}"),
@@ -409,7 +413,7 @@ def compairr_wrapper(
 
 
 # * Querying
-if smk.rule in {"scirpy_query", "tcrmatch"}:
+if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
     airr = get_airr(0, filter_samples=True)
     config: dict = smk.config["query_reference"]
     query_cols = [SCOL, "clone_id", "clone_id_size"]
@@ -439,17 +443,27 @@ if smk.rule in {"scirpy_query", "tcrmatch"}:
     # ** compairr
     elif smk.rule == "compairr":
         compairr_config: dict = config["compairr"]
-        for i, (name, db_path) in enumerate(smk.params["references"]):
-            result, invalid = compairr_wrapper(
-                airr,
-                ad.read_h5ad(db_path),
-                repertoire_col=SCOL,
-                ref_name=name,
-                new_ref_seqids=True,
-                **compairr_config,
-            )
+        for i, (name, db_path) in enumerate(smk.params["references"].items()):
+            db = ad.read_h5ad(db_path)
+            result_lst, invalid_lst = [], []
+            for sample in airr.obs[SCOL].unique():
+                current = airr[airr.obs[SCOL] == sample, :]
+                cur_res, cur_invalid = compairr_wrapper(
+                    current,
+                    db,
+                    repertoire_col=SCOL,
+                    ref_name=name,
+                    new_ref_seqids=True,
+                    **compairr_config,
+                )
+                if not cur_res.is_empty():
+                    result_lst.append(cur_res)
+                if not cur_invalid.is_empty():
+                    invalid_lst.append(cur_invalid)
+            result = pl.concat(result_lst) if result_lst else pl.DataFrame()
             result.write_csv(f"{smk.params['outdir']}/compairr_{name}.csv")
             if i == 0:
+                invalid = pl.concat(invalid_lst) if invalid_lst else pl.DataFrame()
                 invalid.write_csv(f"{smk.params['outdir']}/compairr_invalid.csv")
 # * Sequences
 elif smk.rule == "extract_sequences":
