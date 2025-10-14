@@ -443,6 +443,22 @@ if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
     # ** compairr
     elif smk.rule == "compairr":
         compairr_config: dict = config["compairr"]
+        seqid_col = "sequence_id_query"
+        query_obs: pl.DataFrame = (
+            pl.from_pandas(
+                ir.get.airr(airr, "sequence_id").join(
+                    airr.obs.loc[:, query_cols],
+                    on="index",
+                )
+            )
+            .unpivot(
+                on=cs.ends_with("_sequence_id"),
+                index=~cs.ends_with("_sequence_id"),
+                value_name=seqid_col,
+            )
+            .filter(pl.col(seqid_col).is_not_null())
+            .drop(["variable", SCOL])
+        )
         for i, (name, db_path) in enumerate(smk.params["references"].items()):
             db = ad.read_h5ad(db_path)
             result_lst, invalid_lst = [], []
@@ -457,7 +473,7 @@ if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
                     **compairr_config,
                 )
                 if not cur_res.is_empty():
-                    result_lst.append(cur_res)
+                    result_lst.append(query_obs.join(cur_res, on=seqid_col))
                 if not cur_invalid.is_empty():
                     invalid_lst.append(cur_invalid)
             result = pl.concat(result_lst) if result_lst else pl.DataFrame()
