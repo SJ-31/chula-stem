@@ -83,6 +83,10 @@ stitchr_seqs = expand(
     "{o}/{s}.fasta", o=sequence_out["stitchr"], s=samples
 )  # TODO: add stitchr rule
 
+chains = ("VJ_1", "VDJ_1")
+vdj_plots = expand("{o}/plots/vdj/{s}/{c}", o=OUT, s=samples, c=chains)
+vdj_alignments = expand("{o}/vdj_alignments/{s}/{c}", o=OUT, s=samples, c=chains)
+
 q_outdir = f"{OUT}/reference_comparison"
 query_results = {
     "scirpy": [
@@ -114,9 +118,11 @@ query_results = {
 rule all:
     input:
         *extracted_seqs,
-        # *query_results["scirpy"],
-        # *query_results["tcrmatch"],
+        *query_results["scirpy"],
+        *query_results["tcrmatch"],
         *query_results["compairr"],
+        *vdj_plots,
+        *vdj_alignments,
         **REFS_TO_GET,
         **cell_annotation_results,
         **plots,
@@ -152,6 +158,9 @@ rule annotate_cells:
         "prepare_data.py"
 
 
+# ** Plots & Reports
+
+
 rule make_reports:
     input:
         rules.load_runs.output,
@@ -167,6 +176,19 @@ rule make_reports:
     script:
         "plotting.py"
         # TODO: add a rarefaction curve
+
+
+rule plot_sequence:
+    input:
+        rules.load_runs.output,
+    params:
+        plotdir=f"{OUT}/plots/vdj",
+        outdir=f"{OUT}/vdj_alignments",
+    output:
+        *[directory(d) for d in vdj_plots],
+        *[directory(d) for d in vdj_alignments],
+    script:
+        "plotting.py"
 
 
 # ** Full-length sequencing

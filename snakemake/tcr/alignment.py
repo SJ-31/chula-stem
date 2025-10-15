@@ -88,9 +88,10 @@ def align_vdj(
     outdir = Path(outdir) if not isinstance(outdir, Path) else outdir
     outdir.mkdir(exist_ok=True)
     for id, row in zip(df[id_col], df.iter_rows(named=True)):
-        success = align_one(id, row)
-        tracker[id_col].append(id)
-        tracker["alignment_success"].append(success)
+        if id is not None:
+            success = align_one(id, row)
+            tracker[id_col].append(id)
+            tracker["alignment_success"].append(success)
 
     return pl.DataFrame(tracker)
 

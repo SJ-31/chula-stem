@@ -11,10 +11,14 @@ import numpy as np
 import pandas as pd
 import plotnine as gg
 import polars as pl
+import polars.selectors as cs
 import scirpy as ir
 import seaborn as sns
 from matplotlib.figure import Figure
 from plotnine.ggplot import ggplot
+
+from alignment import align_vdj, plot_vdj
+from analyses import SCOL, get_airr, maybe_filter_by_rank
 
 md.set_options(pull_on_update=False)
 
@@ -233,7 +237,7 @@ def top_clone_calls(
     adata : ad.AnnData
         AnnData object with IR
     """
-    cols = ["c_call", "d_call", "j_call", "v_call"]
+    cols = ["sequence_id", "c_call", "d_call", "j_call", "v_call"]
     with ir.get.airr_context(adata, cols) as m:
         top = adata.obs[key].value_counts()[:k].reset_index()
         top["rank"] = top["count"].rank(ascending=False, method="dense")
@@ -324,3 +328,45 @@ if smk.rule == "make_reports":
     )
     pd.concat(clone_calls).to_csv(smk.output["top_clones"], index=False)
     pd.concat(cluster_calls).to_csv(smk.output["top_clusters"], index=False)
+if smk.rule == "plot_sequence":
+    outdir = Path(smk.params["outdir"])
+    plotdir = Path(smk.params["plotdir"])
+    airr = get_airr(filter_samples=True)
+    viz_config = smk.config["vdj_plot"]
+    _, airr = maybe_filter_by_rank(airr, viz_config)
+    cols = ["sequence", "cdr3", "cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"] + [
+        s
+        for seq in [
+            [f"{k}_sequence_start", f"{k}_sequence_end", f"{k}_call"]
+            for k in ("v", "d", "j")
+        ]
+        for s in seq
+    ]
+    for sample in airr.obs[SCOL].unique():
+        mask = airr.obs[SCOL] == sample
+        cur = airr[mask, :]
+        seqs = pl.from_pandas(ir.get.airr(cur, ["sequence_id"] + cols + ["c_call"]))
+        for chain in ("VJ_1", "VDJ_1"):
+            id_col = f"{chain}_sequence_id"
+            chain_seqs = seqs.select(cs.starts_with(chain)).unique(
+                [f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"]
+            )
+            keep_unique = chain_seqs.select()
+            cur_outdir = outdir / sample / chain
+            cur_plotdir = plotdir / sample / chain
+            cur_plotdir.mkdir(exist_ok=True, parents=True)
+            successes = align_vdj(chain_seqs, chain, outdir=cur_outdir, id_col=id_col)
+            for afile in cur_outdir.glob("*.fasta"):
+                outfile = cur_plotdir / f"{afile.stem}.png"
+                mv = plot_vdj(
+                    afile.stem,
+                    chain,
+                    chain_seqs,
+                    file=afile,
+                    id_col=id_col,
+                    wrap_length=viz_config.get("wrap_length", 200),
+                )
+                fig = mv.plotfig()
+                fig.set_figwidth(viz_config.get("width", 30))
+                fig.set_dpi(viz_config.get("dpi", 100))
+                fig.savefig(outfile)
