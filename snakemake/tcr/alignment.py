@@ -1,0 +1,117 @@
+#!/usr/bin/env ipython
+
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+import polars as pl
+import rpy2.robjects as ro
+from pymsaviz import MsaViz
+
+try:
+    from snakemake.script import snakemake as smk
+except ImportError:
+    smk = type("snakemake", (), {"rule": None, "config": {}})
+
+
+SEQ_COLS = ["sequence", "cdr1", "cdr2", "cdr3", "fwr1", "fwr2", "fwr3", "fwr4"]
+VDJ_COLORS = {"v": "red", "j": "blue", "c": "green", "d": "orange", "d2": "purple"}
+
+
+def global_local_alignment(
+    pattern: dict[str, str],
+    subject: str,
+    outfile: Path | None = None,
+    subject_name: str = "sequence",
+    **kws,
+) -> dict:
+    """Wrapper for global-local alignment as implemented in pwalign"""
+    ro.r("library(Biostrings)")
+    ro.globalenv["pattern"] = ro.ListVector(pattern)
+    ro.globalenv["subject"] = subject
+    ro.globalenv["subject_name"] = subject_name
+    ro.r("pattern <- unlist(pattern)")
+    b_pattern = ro.r("BStringSet(pattern)")
+    b_subject = ro.r("BStringSet(subject)")
+    kws.update({"pattern": b_pattern, "subject": b_subject, "type": "global-local"})
+    ro.globalenv["kws"] = ro.ListVector(kws)
+    ro.r("align <- do.call(pwalign::pairwiseAlignment, kws)")
+    ro.r("aligned_patterns <- pwalign::aligned(align)")
+    ro.r("names(aligned_patterns) <- names(pattern)")
+    ro.r("names(kws$subject) <- subject_name")
+    ro.r("string_set <- c(kws$subject, aligned_patterns)")
+    if outfile is not None:
+        ro.globalenv["out"] = str(outfile)
+        ro.r("writeXStringSet(string_set, out)")
+    as_char = ro.r("as.character(string_set)")
+    seqs = {as_char.names[i]: as_char[i] for i in range(len(as_char))}
+    return seqs
+
+
+def align_vdj(
+    df: pl.DataFrame,
+    chain: str,
+    outdir: Path | str,
+    nucleotide: bool = True,
+    id_col: str = "sequence_id",
+) -> pl.DataFrame:
+    """Wrapper function for producing global-local alignments of TCR segments onto
+        the full-length sequence
+
+    Parameters
+    ----------
+    df : pl.DataFrame containing AIR data e.g. obtained with ir.get.airr
+    """
+
+    def align_one(id, row: dict):
+        outfile = outdir.joinpath(id).with_suffix(".fasta")
+        sequence: str = ""
+        patterns = {}
+        for col in SEQ_COLS:
+            key = f"{chain}_{col}" if nucleotide else f"{chain}_{col}_aa"
+            val = row.get(key)
+            if val and col != "sequence":
+                patterns[col] = val
+            elif val:
+                sequence = val
+        if len(patterns) <= 1 or not sequence:
+            return False
+        else:
+            f = NamedTemporaryFile("w+t", suffix=".fasta")
+        _ = global_local_alignment(
+            pattern=patterns, subject=sequence, subject_name="full", outfile=outfile
+        )
+        if f is not None:
+            f.close()
+        return False
+
+    tracker = {id_col: [], "alignment_success": []}
+    outdir = Path(outdir) if not isinstance(outdir, Path) else outdir
+    outdir.mkdir(exist_ok=True)
+    for id, row in zip(df[id_col], df.iter_rows(named=True)):
+        success = align_one(id, row)
+        tracker[id_col].append(id)
+        tracker["alignment_success"].append(success)
+
+    return pl.DataFrame(tracker)
+
+
+def plot_vdj(
+    id,
+    chain: str,
+    df: pl.DataFrame,
+    file: str | Path,
+    id_col: str = "sequence_id",
+    **kws,
+):
+    row = df.filter(pl.col(id_col) == id).row(0, named=True)
+    mv = MsaViz(file, **kws)
+    for seq in ["d", "d2", "v", "j", "c"]:
+        start = row.get(f"{chain}_{seq}_sequence_start")
+        call = row.get(f"{chain}_{seq}_call")
+        end = row.get(f"{chain}_{seq}_sequence_end")
+        if start is None:
+            continue
+        anno = f"{seq.upper()} call: {call}"
+        rc = VDJ_COLORS.get(seq, "black")
+        mv.add_text_annotation((start, end), text=anno, range_color=rc)
+    return mv

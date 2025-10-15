@@ -321,51 +321,6 @@ def format_for_compairr(
     return df.filter(pl.col("all")).drop("all"), invalid
 
 
-SEQ_COLS = ["sequence", "cdr1", "cdr2", "cdr3", "fwr1", "fwr2", "fwr3", "fwr4"]
-
-
-def align_vdj(
-    df: pl.DataFrame,
-    chain: str,
-    outdir: Path,
-    nucleotide: bool = True,
-    aligner: Literal["famsa", "muscle"] = "famsa",
-    id_col: str = "sequence_id",
-) -> pl.DataFrame:
-    def align_one(id, row: dict):
-        outfile = outdir.joinpath(id).with_suffix(".fasta")
-        sequences = []
-        for seq in SEQ_COLS:
-            key = f"{chain}_{seq}" if nucleotide else f"{chain}_{seq}_aa"
-            val = row.get(key)
-            if val:
-                sequences.append(f">{id}_{seq}\n{val}")
-        if len(sequences) <= 1:
-            return False
-        with NamedTemporaryFile("w+t", suffix=".fasta") as f:
-            Path(f.name).write_text("\n".join(sequences))
-            # f.write("\n".join(sequences))
-            if aligner == "famsa":
-                command = f"famsa {f.name} {outfile}"
-            elif aligner == "muscle":
-                command = f"muscle -align {f.name} -output {outfile}"
-            ran = run(command, shell=True)
-        if ran.returncode == 0:
-            return True
-        return False
-
-    tracker = {id_col: [], "alignment_success": []}
-    outdir = Path(outdir) if not isinstance(outdir, Path) else outdir
-    if not outdir.exists():
-        outdir.mkdir()
-    for id, row in zip(df[id_col], df.iter_rows(named=True)):
-        success = align_one(id, row)
-        tracker[id_col].append(id)
-        tracker["alignment_success"].append(success)
-
-    return pl.DataFrame(tracker)
-
-
 def compairr_wrapper(
     query: ad.AnnData | md.MuData,
     reference: ad.AnnData | md.MuData,
