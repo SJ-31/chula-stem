@@ -37,6 +37,7 @@ Taking BD Rhapsody full-length TCR/BCR data as input, this analysis routine does
 + `public_private.png`, `public_private_clusters.png`: plots visualizing the top clones and clone-clusters in the cohort, and whether any are shared between samples
 + `clone_expansion`: directory containing sample-level plots showing the relationship between clone size and cell type
 + `cell_type_abundance`: directory containing sample-level plots showing the distribution of clonotypes across cell types.
++ `vdj`: directory containing annotated visualizations of full-length TCR sequences for the top clones, organized by sample and chain type.
 + `alpha_diversity.png`: cohort-level comparison of clonotype alpha diversity. The included metrics range from 0–1, and the higher they are, the more diverse the sample
     + `richness`: the number of unique clonotypes in the sample, normalized by the total number of unique clonotypes in the cohort
     + `pielou_e`: Pielou's Evenness index, higher when many clones are present in the sample and clone sizes are evenly distributed

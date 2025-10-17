@@ -1,3 +1,13 @@
+* IEDB_data.tsv
+*Relative Path:* =analyses/data/IEDB_data.tsv=
+*Date Added:* <2025-10-06 Mon>
+*Source:* [[https://downloads.iedb.org/misc/TCRMatch/IEDB_data.tsv]]
+IEDB data formatted for TCRMatch
+* CEDAR_data.tsv
+*Relative Path:* =analyses/data/CEDAR_data.tsv=
+*Date Added:* <2025-10-06 Mon>
+*Source:* https://github.com/IEDB/TCRMatch
+Epitope data from the CEDAR database as provided in the 1.3 release of TCRMatch 
 * vdjdb.h5ad
 *Relative Path:* =analyses/data/vdjdb.h5ad=
 *Date Added:* <2025-09-26 Fri>
