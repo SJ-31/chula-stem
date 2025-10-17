@@ -17,7 +17,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 from plotnine.ggplot import ggplot
 
-from alignment import align_vdj, get_leaders, plot_vdj
+from alignment import align_vdj, get_stitchr_seqs, plot_vdj
 from analyses import SCOL, get_airr, maybe_filter_by_rank
 
 md.set_options(pull_on_update=False)
@@ -343,24 +343,56 @@ if smk.rule == "plot_sequence":
         ]
         for s in seq
     ]
-    v_calls = ir.get.airr(airr, "v_call")
-    cohort_v_alleles = list(v_calls["VJ_1_v_call"]) + list(v_calls["VDJ_1_v_call"])
-    v_leaders: pl.DataFrame = get_leaders(set(cohort_v_alleles)).rename(
-        {"sequence": "v_leader"}
+    cols = ["sequence_id"] + cols + ["c_call"]
+    allele_df = pl.from_pandas(
+        ir.get.airr(airr, ["v_call", "c_call"]).reset_index(names="index")
+    ).with_columns(cs.ends_with("c_call") + "*01")
+    # WARNING: BD pipeline doesn't provide allele specificity for C, so we will just
+    # take the first allele
+    cohort_v_alleles = list(allele_df["VJ_1_v_call"]) + list(allele_df["VDJ_1_v_call"])
+    cohort_c_genes = list(allele_df["VJ_1_c_call"]) + list(allele_df["VDJ_1_c_call"])
+    v_leaders: pl.DataFrame = get_stitchr_seqs(
+        set(cohort_v_alleles), seqtype="~LEADER"
+    ).rename({"sequence": "v_leader"})
+    c_genes: pl.DataFrame = get_stitchr_seqs(
+        set(cohort_c_genes), seqtype="~CONSTANT"
+    ).rename({"sequence": "c_gene"})
+    c_gene_dict = dict(zip(c_genes["allele"], c_genes["c_gene"]))
+    c_genes = (
+        allele_df.select(pl.col("index"), cs.ends_with("c_call"))
+        .with_columns(
+            cs.ends_with("c_call").map_elements(
+                lambda x: c_gene_dict.get(x, None), return_dtype=pl.String
+            )
+        )
+        .rename(
+            lambda x: x if "c_call" not in x else x.replace("_c_call", "_c_sequence")
+        )
     )
     for sample in airr.obs[SCOL].unique():
         mask = airr.obs[SCOL] == sample
         cur = airr[mask, :]
-        seqs = pl.from_pandas(ir.get.airr(cur, ["sequence_id"] + cols + ["c_call"]))
+        seqs = pl.from_pandas(ir.get.airr(cur, cols).reset_index(names="index"))
         title_obs = pl.from_pandas(cur.obs.loc[:, for_title])
         seqs = pl.concat([seqs, title_obs], how="horizontal")
         for chain in ("VJ_1", "VDJ_1"):
             id_col = f"{chain}_sequence_id"
             chain_seqs: pl.DataFrame = seqs.select(
-                cs.starts_with(chain), pl.col(for_title)
+                cs.starts_with(chain), pl.col(for_title + ["index"])
             ).unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
             chain_seqs = chain_seqs.join(
                 v_leaders, left_on=f"{chain}_v_call", right_on="allele", how="left"
+            )
+            cur_c = c_genes.select(cs.starts_with(chain), pl.col("index"))
+            chain_seqs = (
+                chain_seqs.join(cur_c, on="index", how="left")
+                .filter(pl.col(id_col).is_not_null())
+                .with_columns(
+                    pl.col(f"{chain}_c_sequence").str.head(
+                        pl.col(f"{chain}_sequence").str.len_chars()
+                        - pl.col(f"{chain}_j_sequence_end")
+                    )
+                )
             )
             cur_outdir = outdir / sample / chain
             cur_plotdir = plotdir / sample / chain
@@ -370,7 +402,10 @@ if smk.rule == "plot_sequence":
                 chain,
                 outdir=cur_outdir,
                 id_col=id_col,
-                additional_seqs={"v_leader": "v_leader"},
+                additional_seqs={
+                    "v_leader": "v_leader",
+                    "c_gene": f"{chain}_c_sequence",
+                },
             )
             for afile in cur_outdir.glob("*.fasta"):
                 outfile = cur_plotdir / f"{afile.stem}.png"
@@ -381,7 +416,10 @@ if smk.rule == "plot_sequence":
                     file=afile,
                     id_col=id_col,
                     wrap_length=viz_config.get("wrap_length", 200),
-                    title_spec=[("", id_col)] + viz_config["title_spec"],
+                    title_spec=[("", id_col)]
+                    + viz_config["title_spec"]
+                    + [("C call", f"{chain}_c_call")],
+                    color_scheme="Clustal",
                 )
                 fig.set_figwidth(viz_config.get("width", 30))
                 fig.set_dpi(viz_config.get("dpi", 100))

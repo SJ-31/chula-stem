@@ -5,6 +5,7 @@ from itertools import chain
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
+from typing import Literal
 
 import polars as pl
 import rpy2.robjects as ro
@@ -23,7 +24,11 @@ SEQ_COLS = ["sequence", "cdr1", "cdr2", "cdr3", "fwr1", "fwr2", "fwr3", "fwr4"]
 VDJ_COLORS = {"v": "red", "j": "blue", "c": "green", "d": "orange", "d2": "purple"}
 
 
-def get_leaders(allele_names, species: str = "HUMAN") -> pl.DataFrame:
+def get_stitchr_seqs(
+    allele_names,
+    species: str = "HUMAN",
+    seqtype: Literal["~LEADER", "~CONSTANT", "~JOINING"] = "~LEADER",
+) -> pl.DataFrame:
     """Return a dataframe containing the leader sequences of the specified alleles
     Requires stitchr to be installed
     """
@@ -65,7 +70,7 @@ def get_leaders(allele_names, species: str = "HUMAN") -> pl.DataFrame:
         allele, feature_type = splits[1], splits[-1]
         if (
             allele in allele_set
-            and feature_type == "~LEADER"
+            and feature_type == seqtype
             and allele not in seen_alleles
         ):
             seen_alleles.add(allele)  # Precaution
