@@ -1,11 +1,15 @@
 #!/usr/bin/env ipython
 
 from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
+from subprocess import run
 from tempfile import NamedTemporaryFile
 
 import polars as pl
 import rpy2.robjects as ro
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 from matplotlib.figure import Figure
 from pymsaviz import MsaViz
 
@@ -17,6 +21,59 @@ except ImportError:
 
 SEQ_COLS = ["sequence", "cdr1", "cdr2", "cdr3", "fwr1", "fwr2", "fwr3", "fwr4"]
 VDJ_COLORS = {"v": "red", "j": "blue", "c": "green", "d": "orange", "d2": "purple"}
+
+
+def get_leaders(allele_names, species: str = "HUMAN") -> pl.DataFrame:
+    """Return a dataframe containing the leader sequences of the specified alleles
+    Requires stitchr to be installed
+    """
+    allele_set: set = set(allele_names)
+    if len(allele_set) != len(allele_names):
+        raise ValueError("WARNING: given list of allele names is not unique!")
+    stitchr_dir = Path(
+        run("stitchr -dd", shell=True, capture_output=True).stdout.decode().strip()
+    )
+    stitchr_dir = stitchr_dir / species
+    fasta_to_load = []
+    genes = {"TRA", "TRB", "TRD", "TRG"}
+    for allele in allele_names:
+        if not allele:
+            continue
+        seen_gene = ""
+        for g in genes:
+            if allele.startswith(g):
+                gene_file = stitchr_dir / f"{g}.fasta"
+                if not gene_file.exists():
+                    raise ValueError(
+                        f"gene file {g}.fasta is missing from the stitchr directory"
+                    )
+                seen_gene = g
+                fasta_to_load.append(gene_file)
+                break
+        if not genes:
+            break
+        if seen_gene:
+            genes.remove(seen_gene)
+
+    seen_alleles = set()
+    seq_dict = {"allele": [], "sequence": []}
+    for seqrecord in chain(*(SeqIO.parse(fa, "fasta") for fa in fasta_to_load)):
+        seqrecord: SeqRecord
+        splits = seqrecord.description.split("|")
+        if not splits or len(splits) < 2:
+            continue
+        allele, feature_type = splits[1], splits[-1]
+        if (
+            allele in allele_set
+            and feature_type == "~LEADER"
+            and allele not in seen_alleles
+        ):
+            seen_alleles.add(allele)  # Precaution
+            seq_dict["allele"].append(allele)
+            seq_dict["sequence"].append(str(seqrecord.seq).upper())
+        if len(seen_alleles) == len(allele_set):
+            break
+    return pl.DataFrame(seq_dict)
 
 
 def global_local_alignment(
@@ -55,6 +112,7 @@ def align_vdj(
     outdir: Path | str,
     nucleotide: bool = True,
     id_col: str = "sequence_id",
+    additional_seqs: dict | None = None,
 ) -> pl.DataFrame:
     """Wrapper function for producing global-local alignments of TCR segments onto
         the full-length sequence
@@ -62,7 +120,11 @@ def align_vdj(
     Parameters
     ----------
     df : pl.DataFrame containing AIR data e.g. obtained with ir.get.airr
+    additional_seqs : dict | None
+        Optional dictionary describing columns in `df` to also include in the alignment
+        format is sequence_name->column_name
     """
+    additional_seqs = additional_seqs or {}
 
     def align_one(id, row: dict):
         outfile = outdir.joinpath(id).with_suffix(".fasta")
@@ -75,6 +137,10 @@ def align_vdj(
                 patterns[col] = val
             elif val:
                 sequence = val
+        for pat, col in additional_seqs.items():
+            val = row.get(col)
+            if val:
+                patterns[pat] = val
         if len(patterns) <= 1 or not sequence:
             return False
         else:

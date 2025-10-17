@@ -17,7 +17,7 @@ import seaborn as sns
 from matplotlib.figure import Figure
 from plotnine.ggplot import ggplot
 
-from alignment import align_vdj, plot_vdj
+from alignment import align_vdj, get_leaders, plot_vdj
 from analyses import SCOL, get_airr, maybe_filter_by_rank
 
 md.set_options(pull_on_update=False)
@@ -343,6 +343,11 @@ if smk.rule == "plot_sequence":
         ]
         for s in seq
     ]
+    v_calls = ir.get.airr(airr, "v_call")
+    cohort_v_alleles = list(v_calls["VJ_1_v_call"]) + list(v_calls["VDJ_1_v_call"])
+    v_leaders: pl.DataFrame = get_leaders(set(cohort_v_alleles)).rename(
+        {"sequence": "v_leader"}
+    )
     for sample in airr.obs[SCOL].unique():
         mask = airr.obs[SCOL] == sample
         cur = airr[mask, :]
@@ -351,13 +356,22 @@ if smk.rule == "plot_sequence":
         seqs = pl.concat([seqs, title_obs], how="horizontal")
         for chain in ("VJ_1", "VDJ_1"):
             id_col = f"{chain}_sequence_id"
-            chain_seqs = seqs.select(cs.starts_with(chain), pl.col(for_title)).unique(
-                [f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"]
+            chain_seqs: pl.DataFrame = seqs.select(
+                cs.starts_with(chain), pl.col(for_title)
+            ).unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
+            chain_seqs = chain_seqs.join(
+                v_leaders, left_on=f"{chain}_v_call", right_on="allele", how="left"
             )
             cur_outdir = outdir / sample / chain
             cur_plotdir = plotdir / sample / chain
             cur_plotdir.mkdir(exist_ok=True, parents=True)
-            successes = align_vdj(chain_seqs, chain, outdir=cur_outdir, id_col=id_col)
+            successes = align_vdj(
+                chain_seqs,
+                chain,
+                outdir=cur_outdir,
+                id_col=id_col,
+                additional_seqs={"v_leader": "v_leader"},
+            )
             for afile in cur_outdir.glob("*.fasta"):
                 outfile = cur_plotdir / f"{afile.stem}.png"
                 fig = plot_vdj(
