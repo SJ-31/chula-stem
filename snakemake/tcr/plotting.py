@@ -333,6 +333,7 @@ if smk.rule == "plot_sequence":
     plotdir = Path(smk.params["plotdir"])
     airr = get_airr(filter_samples=True)
     viz_config = smk.config["vdj_plot"]
+    for_title = [c[1] for c in viz_config["title_spec"]]
     _, airr = maybe_filter_by_rank(airr, viz_config)
     cols = ["sequence", "cdr3", "cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"] + [
         s
@@ -346,27 +347,28 @@ if smk.rule == "plot_sequence":
         mask = airr.obs[SCOL] == sample
         cur = airr[mask, :]
         seqs = pl.from_pandas(ir.get.airr(cur, ["sequence_id"] + cols + ["c_call"]))
+        title_obs = pl.from_pandas(cur.obs.loc[:, for_title])
+        seqs = pl.concat([seqs, title_obs], how="horizontal")
         for chain in ("VJ_1", "VDJ_1"):
             id_col = f"{chain}_sequence_id"
-            chain_seqs = seqs.select(cs.starts_with(chain)).unique(
+            chain_seqs = seqs.select(cs.starts_with(chain), pl.col(for_title)).unique(
                 [f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"]
             )
-            keep_unique = chain_seqs.select()
             cur_outdir = outdir / sample / chain
             cur_plotdir = plotdir / sample / chain
             cur_plotdir.mkdir(exist_ok=True, parents=True)
             successes = align_vdj(chain_seqs, chain, outdir=cur_outdir, id_col=id_col)
             for afile in cur_outdir.glob("*.fasta"):
                 outfile = cur_plotdir / f"{afile.stem}.png"
-                mv = plot_vdj(
+                fig = plot_vdj(
                     afile.stem,
                     chain,
                     chain_seqs,
                     file=afile,
                     id_col=id_col,
                     wrap_length=viz_config.get("wrap_length", 200),
+                    title_spec=[("", id_col)] + viz_config["title_spec"],
                 )
-                fig = mv.plotfig()
                 fig.set_figwidth(viz_config.get("width", 30))
                 fig.set_dpi(viz_config.get("dpi", 100))
                 fig.savefig(outfile)
