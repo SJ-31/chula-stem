@@ -40,6 +40,29 @@ platform_ids2name <- function(ids) {
   )
 }
 
+recode_t_stage <- function(x) {
+  # Keep prefixes
+  x <- str_trim(x)
+  case_when(
+    str_detect(x, "^[1-4]$") ~ paste0("T", x),
+    str_detect(x, "[()]") ~ str_remove_all(x, "\\(.*\\)"),
+    x == "999" ~ NA, # Weird formatting in GSE123845
+    .default = x
+  )
+}
+
+recode_hist_type <- function(x) {
+  x <- str_to_lower(x) |>
+    str_remove_all(",") |>
+    str_replace_all(" ", "_")
+  case_match(x, NA ~ NA, .default = x) # TODO: might want to ask for help on this
+}
+
+recode_hist_grade <- function(x) {
+  x <- str_trim(str_remove_all(x, "SBR"))
+  case_match(x, "I" ~ "1", "II" ~ "2", "III" ~ "3", .default = x)
+}
+
 ##' Unify subtype names
 recode_subtype <- function(vec) {
   vec <- str_to_lower(vec) |> str_replace_all(" ", "_")
@@ -75,7 +98,8 @@ SHARED_COLS <- c(
 # If the above columns cannot be found in `meta_remap` or `meta_fill`, they will be filled with NA
 
 MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
-TO_CHARACTER <- c("histological_grade", "t_stage", "sample_type", "join_id")
+TO_CHARACTER <- c("join_id")
+TO_FACTOR <- c("histological_grade", "t_stage", "sample_type")
 
 # Aggregate metadata
 mdata <- lapply(names(env$datasets), \(name) {
@@ -126,10 +150,25 @@ mdata <- lapply(names(env$datasets), \(name) {
     select(all_of(SHARED_COLS)) |>
     mutate(
       subtype = recode_subtype(subtype),
+      sample_type = str_to_lower(sample_type),
       dataset = name,
-      platform = platform_ids2name(platform)
+      platform = platform_ids2name(platform),
+      t_stage = recode_t_stage(t_stage),
+      histological_type = recode_hist_type(histological_type),
+      histological_grade = recode_hist_grade(histological_grade)
     ) |>
     mutate(across(all_of(MARKER_COLS), recode_status)) |>
-    mutate(across(all_of(TO_CHARACTER), as.character))
+    mutate(across(all_of(TO_CHARACTER), as.character)) |>
+    mutate(across(all_of(TO_FACTOR), as.factor)) |>
+    mutate(across(
+      where(is.character) | where(is.factor),
+      \(x) iconv(x, from = "UTF-8", to = "ASCII", sub = "")
+    ))
 }) |>
   bind_rows()
+
+# TODO:
+# unify
+# - treatment
+#     for this, you can get the specific meanings for the "yzxtxn4nmd" dataset
+# - sample type
