@@ -31,6 +31,15 @@ recode_status <- function(vec) {
   )
 }
 
+platform_ids2name <- function(ids) {
+  case_match(
+    ids,
+    "GPL20078" ~ "Agendia32627_DPv1.14_SCFGplus",
+    "GPL30493" ~ "Agilent_human_DiscoverPrint_15746",
+    .default = ids
+  )
+}
+
 ##' Unify subtype names
 recode_subtype <- function(vec) {
   vec <- str_to_lower(vec) |> str_replace_all(" ", "_")
@@ -66,7 +75,7 @@ SHARED_COLS <- c(
 # If the above columns cannot be found in `meta_remap` or `meta_fill`, they will be filled with NA
 
 MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
-TO_CHARACTER <- c("histological_grade")
+TO_CHARACTER <- c("histological_grade", "t_stage", "sample_type", "join_id")
 
 # Aggregate metadata
 mdata <- lapply(names(env$datasets), \(name) {
@@ -78,12 +87,15 @@ mdata <- lapply(names(env$datasets), \(name) {
   } else {
     tb <- suppressMessages(read_tsv(here(mpath, glue("{name}.tsv"))))
   }
-  join_id <- cur$id_col
-  if (is.null(join_id)) {
-    join_id <- env$id_col
-  }
-  tb <- tb |> mutate(dataset = name, join_id = !!as.symbol(join_id))
+  ## join_id <- cur$id_col
+  ## if (is.null(join_id)) {
+  ##   join_id <- env$id_col
+  ## }
   to_remap <- unlist(cur$meta_remap)
+  to_remap["join_id"] <- ifelse(!is.null(cur$id_col), cur$id_col, env$id_col)
+  if (is.na(to_remap["platform"]) && env$platform_col %in% colnames(tb)) {
+    to_remap["platform"] <- env$platform_col
+  }
   to_fill <- cur$meta_fill
   if (!is.null(to_remap)) {
     tb <- dplyr::rename(tb, to_remap)
@@ -91,7 +103,10 @@ mdata <- lapply(names(env$datasets), \(name) {
   if (!is.null(to_fill)) {
     tb <- mutate(tb, !!!to_fill)
   }
-  remaining_cols <- setdiff(SHARED_COLS, c(names(to_remap), names(to_fill)))
+  remaining_cols <- setdiff(
+    SHARED_COLS,
+    c(names(to_remap), names(to_fill), "join_id")
+  )
   add_na <- rep(NA, length(remaining_cols)) |>
     as.list() |>
     setNames(remaining_cols)
@@ -110,9 +125,9 @@ mdata <- lapply(names(env$datasets), \(name) {
   tb |>
     select(all_of(SHARED_COLS)) |>
     mutate(
-      t_stage = as.character(t_stage),
-      sample_type = as.character(sample_type),
-      subtype = recode_subtype(subtype)
+      subtype = recode_subtype(subtype),
+      dataset = name,
+      platform = platform_ids2name(platform)
     ) |>
     mutate(across(all_of(MARKER_COLS), recode_status)) |>
     mutate(across(all_of(TO_CHARACTER), as.character))
