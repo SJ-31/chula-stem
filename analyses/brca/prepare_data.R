@@ -1,11 +1,15 @@
 library(here)
 library(tidyverse)
 library(glue)
-## library(ensembldb)
+setAnnotationHubOption("CACHE", here(".cache", "AnnotationHub"))
+
+geo_cache <- here(".cache", "GEO")
 
 cur_dir <- here("analyses", "brca")
 env <- yaml::read_yaml(here(cur_dir, "env.yaml"))
 mpath <- env$metadata_path
+
+## * Helper functions
 
 lget <- function(lst, key, default = NULL) {
   if (is.null(lst[[key]])) {
@@ -45,6 +49,7 @@ recode_treatment_response <- function(vec) {
   )
 }
 
+
 ##' Unify representation of marker gene status into binary vector
 recode_status <- function(vec) {
   case_match(
@@ -57,11 +62,12 @@ recode_status <- function(vec) {
     "no" ~ 0,
     "p" ~ 1,
     "n" ~ 0,
-    .default = 0
+    .default = NA
   )
 }
 
 platform_ids2name <- function(ids) {
+  ids <- as.character(ids)
   case_match(
     ids,
     "GPL20078" ~ "Agendia32627_DPv1.14_SCFGplus",
@@ -108,6 +114,8 @@ recode_subtype <- function(vec) {
   )
 }
 
+## * Metadata columns
+
 # Sample columns to keep or generate
 SHARED_COLS <- c(
   "join_id", # identifier column with which to join columns in raw data
@@ -118,6 +126,7 @@ SHARED_COLS <- c(
   "treatment", # "none" if no treament given
   "treatment_response",
   "platform",
+  "platform_name",
   "histological_grade",
   "histological_type",
   "collection_period",
@@ -136,7 +145,7 @@ MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
 TO_CHARACTER <- c("join_id", "patient_id", "collection_period")
 TO_FACTOR <- c("histological_grade", "t_stage", "sample_type")
 
-## *  Aggregate metadata
+## * Aggregate metadata
 mdata <- lapply(names(env$datasets), \(name) {
   cur <- env$datasets[[name]]
   meta_files <- lget(cur, "files", list())$meta
@@ -203,11 +212,11 @@ mdata <- lapply(names(env$datasets), \(name) {
   }
 
   tb <- mutate(tb, !!!add_na) |>
-    select(all_of(SHARED_COLS)) |>
+    dplyr::select(all_of(SHARED_COLS)) |>
     mutate(
       subtype = recode_subtype(subtype),
       dataset = name,
-      platform = platform_ids2name(platform),
+      platform_name = platform_ids2name(platform),
       t_stage = recode_t_stage(t_stage),
       treatment_response = recode_treatment_response(treatment_response),
       histological_type = recode_hist_type(histological_type),
@@ -226,8 +235,54 @@ mdata <- lapply(names(env$datasets), \(name) {
 }) |>
   bind_rows()
 
-# TODO:
-# see if you can determine pam50 subtype from er,pr,her2 status
-# unify
-# - treatment
-#     for this, you can get the specific meanings for the "yzxtxn4nmd" dataset
+# TODO: need gene id mappings for
+# ensembl, symbol, entrez ids,
+# and microarrays
+# - "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Probe Name Version)"
+# - "Illumina HumanWG-6 v3.0 expression beadchip"
+# - "Agilent_human_DiscoverPrint_15746"
+# - Agendia32627_DPv1.14_SCFGplus
+
+## * Aggregate samples
+
+library(AnnotationHub)
+library(Biobase)
+ah <- AnnotationHub()
+db <- query(ah, "org.Hs.eg.db")[[1]]
+# %%
+
+lapply(names(env$datasets), \(name) {
+  cur <- env$datasets[[name]]
+  gene_id_style <- cur$gene_id
+  if (is.null(gene_id_style) && is.null(cur$microarray)) {
+    gene_id_style <- env$gene_id
+  }
+  # Take the first file in the directory by default
+  dir <- here(env$raw_path, name)
+  if (!is.null(lget(cur, "files", list())$raw)) {
+    file <- here(dir, cur$files$raw)
+  } else {
+    file <- list.files(dir, full.names = TRUE)[1]
+  }
+  expr <- if (str_ends(file, "csv")) read_csv(file) else read_tsv(file)
+  expr <- column_to_rownames(expr, var = colnames(expr)[1])
+
+  print(head(expr))
+
+  meta <- dplyr::filter(mdata, dataset == name & join_id %in% colnames(expr))
+  print(nrow(meta))
+  print(ncol(expr))
+
+  eset <- Biobase::ExpressionSet(
+    assayData = as.matrix(expr),
+    phenoData = AnnotatedDataFrame(meta)
+  )
+
+  if (is.null(cur$microarray)) {
+    platforms <- unique(meta$platform)
+    for (p in platforms) {
+      id_mapping <- getGEO(p, destdir = )
+    }
+  } else if (gene_id_style != "ncbi") {
+  }
+})
