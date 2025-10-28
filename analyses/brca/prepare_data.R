@@ -29,6 +29,22 @@ replace_re_matches <- function(x, spec, .default = NA) {
   replace_na(coalesce(!!!match_vecs), .default)
 }
 
+recode_treatment_response <- function(vec) {
+  vec <- str_to_lower(vec)
+  case_match(
+    vec,
+    "pcr" ~ "pCR",
+    "cr+kl" ~ "CR+known_lesion", # WARNING: this is an AI-assisted guess
+    "cr" ~ "CR",
+    "nocr" ~ "no_CR",
+    "no pcr" ~ "no_pCR",
+    "rd" ~ "no_CR",
+    "pd" ~ "PD",
+    "ne" ~ NA,
+    .default = vec
+  )
+}
+
 ##' Unify representation of marker gene status into binary vector
 recode_status <- function(vec) {
   case_match(
@@ -145,7 +161,11 @@ mdata <- lapply(names(env$datasets), \(name) {
   if (!is.null(to_fill)) {
     tb <- mutate(tb, !!!to_fill)
   }
-
+  to_filter_out <- cur$meta_filter
+  for (col in names(to_filter_out)) {
+    blacklist <- to_filter_out[[col]]
+    tb <- tb[!tb[[col]] %in% blacklist, ]
+  }
   remaining_cols <- setdiff(
     SHARED_COLS,
     c(names(to_remap), names(to_fill), "join_id")
@@ -189,6 +209,7 @@ mdata <- lapply(names(env$datasets), \(name) {
       dataset = name,
       platform = platform_ids2name(platform),
       t_stage = recode_t_stage(t_stage),
+      treatment_response = recode_treatment_response(treatment_response),
       histological_type = recode_hist_type(histological_type),
       histological_grade = recode_hist_grade(histological_grade),
       sample_type = replace_na(str_to_lower(sample_type), "primary"),
@@ -206,10 +227,7 @@ mdata <- lapply(names(env$datasets), \(name) {
   bind_rows()
 
 # TODO:
-# Add in collection dates (just put in yaml)
 # see if you can determine pam50 subtype from er,pr,her2 status
-# Change how you handle recurrence and sample types
 # unify
 # - treatment
 #     for this, you can get the specific meanings for the "yzxtxn4nmd" dataset
-# - treatment response
