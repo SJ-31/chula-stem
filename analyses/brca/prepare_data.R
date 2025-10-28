@@ -15,6 +15,20 @@ lget <- function(lst, key, default = NULL) {
   }
 }
 
+#' Replace all values in character vector `x` if they match a regexp in `spec`
+#'
+#' @param x character vector
+#' @param spec list whose names are values to replace with and values are the corresponding regexps
+replace_re_matches <- function(x, spec, .default = NA) {
+  match_vecs <- lapply(names(spec), \(s) {
+    matches <- str_detect(x, spec[[s]])
+    vals <- rep(NA, length(matches))
+    vals[matches] <- s
+    vals
+  })
+  replace_na(coalesce(!!!match_vecs), .defalt)
+}
+
 ##' Unify representation of marker gene status into binary vector
 recode_status <- function(vec) {
   case_match(
@@ -80,6 +94,7 @@ recode_subtype <- function(vec) {
 # Sample columns to keep or generate
 SHARED_COLS <- c(
   "join_id", # identifier column with which to join columns in raw data
+  "patient_id", # identifier column for patients (some datasets have pre-, post-)
   "dataset",
   "subtype", # brca subtype
   "age",
@@ -88,9 +103,12 @@ SHARED_COLS <- c(
   "platform",
   "histological_grade",
   "histological_type",
+  "collection_period",
   "t_stage",
-  "sample_type", # recurrent or primary. Default "primary"
-  # Columns for markers
+  "sample_type",
+  "pre_post",
+  "recurrent", # binary marker for recurrent or not
+  # Columns for molecular markers
   "er_status",
   "pr_status",
   "her2_status"
@@ -101,7 +119,7 @@ MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
 TO_CHARACTER <- c("join_id")
 TO_FACTOR <- c("histological_grade", "t_stage", "sample_type")
 
-# Aggregate metadata
+## *  Aggregate metadata
 mdata <- lapply(names(env$datasets), \(name) {
   cur <- env$datasets[[name]]
   meta_files <- lget(cur, "files", list())$meta
@@ -111,22 +129,22 @@ mdata <- lapply(names(env$datasets), \(name) {
   } else {
     tb <- suppressMessages(read_tsv(here(mpath, glue("{name}.tsv"))))
   }
-  ## join_id <- cur$id_col
-  ## if (is.null(join_id)) {
-  ##   join_id <- env$id_col
-  ## }
   to_remap <- unlist(cur$meta_remap)
   to_remap["join_id"] <- ifelse(!is.null(cur$id_col), cur$id_col, env$id_col)
   if (is.na(to_remap["platform"]) && env$platform_col %in% colnames(tb)) {
     to_remap["platform"] <- env$platform_col
   }
-  to_fill <- cur$meta_fill
   if (!is.null(to_remap)) {
     tb <- dplyr::rename(tb, to_remap)
   }
+  if (!"patient_id" %in% colnames(tb)) {
+    tb <- mutate(tb, patient_id = join_id)
+  }
+  to_fill <- cur$meta_fill
   if (!is.null(to_fill)) {
     tb <- mutate(tb, !!!to_fill)
   }
+
   remaining_cols <- setdiff(
     SHARED_COLS,
     c(names(to_remap), names(to_fill), "join_id")
@@ -145,6 +163,21 @@ mdata <- lapply(names(env$datasets), \(name) {
     tb[[col]] <- unlist(to_replace[[col]])[vec] |>
       unlist(use.names = FALSE)
   }
+
+  match_re <- cur$meta_match_re
+  for (col in names(match_re)) {
+    tb[[col]] <- replace_re_matches(tb[[col]], spec = match_re[[col]])
+  }
+
+  to_remove <- cur$meta_str_remove
+  for (col in names(to_remove)) {
+    tb[[col]] <- purrr::reduce(
+      to_remove,
+      \(acc, pat) str_remove_all(acc, pat),
+      .init = tb[[col]]
+    )
+  }
+
   tb <- mutate(tb, !!!add_na)
   tb |>
     select(all_of(SHARED_COLS)) |>
@@ -168,6 +201,8 @@ mdata <- lapply(names(env$datasets), \(name) {
   bind_rows()
 
 # TODO:
+# Add in collection dates (just put in yaml)
+# Change how you handle recurrence and sample types
 # unify
 # - treatment
 #     for this, you can get the specific meanings for the "yzxtxn4nmd" dataset
