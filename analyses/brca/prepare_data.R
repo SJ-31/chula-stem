@@ -8,6 +8,7 @@ geo_cache <- here(".cache", "GEO")
 cur_dir <- here("analyses", "brca")
 env <- yaml::read_yaml(here(cur_dir, "env.yaml"))
 mpath <- env$metadata_path
+# %%
 
 ## * Helper functions
 
@@ -234,6 +235,7 @@ mdata <- lapply(names(env$datasets), \(name) {
   tb
 }) |>
   bind_rows()
+# %%
 
 # TODO: need gene id mappings for
 # ensembl, symbol, entrez ids,
@@ -266,7 +268,21 @@ lapply(names(env$datasets), \(name) {
   }
   expr <- if (str_ends(file, "csv")) read_csv(file) else read_tsv(file)
   expr <- column_to_rownames(expr, var = colnames(expr)[1])
+  if (is.null(cur$microarray)) {
+    platforms <- unique(meta$platform)
+    for (p in platforms) {
+      id_mapping <- getGEO(p, destdir = )
+    }
+  } else if (gene_id_style != "ncbi") {
+    if (gene_id_style == "ensembl") {
+      keys <- "ENSEMBL"
+    } else if (gene_id_style == "symbol") {
+      keys <- "SYMBOL"
+    }
+    rownames(expr) <- mapIds(db, keys = keys, column = "ENTREZID")
+  }
 
+  print(name)
   print(head(expr))
 
   meta <- dplyr::filter(mdata, dataset == name & join_id %in% colnames(expr))
@@ -277,12 +293,4 @@ lapply(names(env$datasets), \(name) {
     assayData = as.matrix(expr),
     phenoData = AnnotatedDataFrame(meta)
   )
-
-  if (is.null(cur$microarray)) {
-    platforms <- unique(meta$platform)
-    for (p in platforms) {
-      id_mapping <- getGEO(p, destdir = )
-    }
-  } else if (gene_id_style != "ncbi") {
-  }
 })
