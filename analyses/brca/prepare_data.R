@@ -26,7 +26,7 @@ replace_re_matches <- function(x, spec, .default = NA) {
     vals[matches] <- s
     vals
   })
-  replace_na(coalesce(!!!match_vecs), .defalt)
+  replace_na(coalesce(!!!match_vecs), .default)
 }
 
 ##' Unify representation of marker gene status into binary vector
@@ -49,6 +49,7 @@ platform_ids2name <- function(ids) {
   case_match(
     ids,
     "GPL20078" ~ "Agendia32627_DPv1.14_SCFGplus",
+    "GPL6884" ~ "Illumina HumanWG-6 v3.0 expression beadchip",
     "GPL30493" ~ "Agilent_human_DiscoverPrint_15746",
     .default = ids
   )
@@ -116,7 +117,7 @@ SHARED_COLS <- c(
 # If the above columns cannot be found in `meta_remap` or `meta_fill`, they will be filled with NA
 
 MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
-TO_CHARACTER <- c("join_id")
+TO_CHARACTER <- c("join_id", "patient_id", "collection_period")
 TO_FACTOR <- c("histological_grade", "t_stage", "sample_type")
 
 ## *  Aggregate metadata
@@ -162,6 +163,9 @@ mdata <- lapply(names(env$datasets), \(name) {
     }
     tb[[col]] <- unlist(to_replace[[col]])[vec] |>
       unlist(use.names = FALSE)
+    if (!is.null(to_replace[[".default"]])) {
+      tb[[col]] <- replace_na(tb[[col]], to_replace[[".default"]])
+    }
   }
 
   match_re <- cur$meta_match_re
@@ -172,23 +176,23 @@ mdata <- lapply(names(env$datasets), \(name) {
   to_remove <- cur$meta_str_remove
   for (col in names(to_remove)) {
     tb[[col]] <- purrr::reduce(
-      to_remove,
+      to_remove[[col]],
       \(acc, pat) str_remove_all(acc, pat),
       .init = tb[[col]]
     )
   }
 
-  tb <- mutate(tb, !!!add_na)
-  tb |>
+  tb <- mutate(tb, !!!add_na) |>
     select(all_of(SHARED_COLS)) |>
     mutate(
       subtype = recode_subtype(subtype),
-      sample_type = str_to_lower(sample_type),
       dataset = name,
       platform = platform_ids2name(platform),
       t_stage = recode_t_stage(t_stage),
       histological_type = recode_hist_type(histological_type),
-      histological_grade = recode_hist_grade(histological_grade)
+      histological_grade = recode_hist_grade(histological_grade),
+      sample_type = replace_na(str_to_lower(sample_type), "primary"),
+      recurrent = replace_na(recurrent, 0)
     ) |>
     mutate(across(all_of(MARKER_COLS), recode_status)) |>
     mutate(across(all_of(TO_CHARACTER), as.character)) |>
@@ -197,13 +201,15 @@ mdata <- lapply(names(env$datasets), \(name) {
       where(is.character) | where(is.factor),
       \(x) iconv(x, from = "UTF-8", to = "ASCII", sub = "")
     ))
+  tb
 }) |>
   bind_rows()
 
 # TODO:
 # Add in collection dates (just put in yaml)
+# see if you can determine pam50 subtype from er,pr,her2 status
 # Change how you handle recurrence and sample types
 # unify
 # - treatment
 #     for this, you can get the specific meanings for the "yzxtxn4nmd" dataset
-# - sample type
+# - treatment response
