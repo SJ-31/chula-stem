@@ -1,17 +1,37 @@
-library(here)
-library(tidyverse)
-library(glue)
-library(AnnotationHub)
-setAnnotationHubOption("CACHE", here(".cache", "AnnotationHub"))
+suppressMessages({
+  library(here)
+  library(tidyverse)
+  library(glue)
+  library(AnnotationHub)
+  library(Biobase)
+  library(GEOquery)
+  setAnnotationHubOption("CACHE", here(".cache", "AnnotationHub"))
+})
 
 geo_cache <- here(".cache", "GEO")
 
+date <- format(Sys.time(), "%Y-%m-%d")
+
 cur_dir <- here("analyses", "brca")
 env <- yaml::read_yaml(here(cur_dir, "env.yaml"))
+outdir <- here("analyses", "output", "brca")
 mpath <- env$metadata_path
 # %%
 
 ## * Helper functions
+
+# Extract expression data in sample tables of GSE80999
+format_GSE80999 <- function() {
+  file <- here(env$raw_path, "GSE80999", "GSE80999_family.soft.gz")
+  gsms <- GSMList(getGEO(filename = file))
+  lapply(names(gsms), \(name) {
+    Table(gsms[[name]]) |>
+      as_tibble() |>
+      rename(VALUE = name)
+  }) |>
+    purrr::reduce(\(x, y) left_join(x, y, by = join_by(ID_REF))) |>
+    write_tsv(here(env$raw_path, "GSE80999", "GSE80999.tsv"))
+}
 
 lget <- function(lst, key, default = NULL) {
   if (is.null(lst[[key]])) {
@@ -20,6 +40,7 @@ lget <- function(lst, key, default = NULL) {
     lst[[key]]
   }
 }
+
 
 #' Replace all values in character vector `x` if they match a regexp in `spec`
 #'
@@ -240,22 +261,16 @@ mdata <- lapply(names(env$datasets), \(name) {
 # %%
 
 # TODO: need gene id mappings for
-# ensembl, symbol, entrez ids,
 # and microarrays
 # - "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Probe Name Version)"
 # - "Illumina HumanWG-6 v3.0 expression beadchip"
 # - "Agilent_human_DiscoverPrint_15746"
 # - Agendia32627_DPv1.14_SCFGplus
 
-# TODO: need to get the raw data for GSE80999
-## https://www.ncbi.nlm.nih.gov/geo/geo2r/?acc=GSE80999
-
 ## * Aggregate samples
 
-library(AnnotationHub)
-library(Biobase)
-library(GEOquery)
-ah <- AnnotationHub(localHub = TRUE)
+## ah <- AnnotationHub(localHub = TRUE)
+ah <- AnnotationHub()
 db <- query(ah, "org.Hs.eg.db")[[1]]
 # %%
 
@@ -273,25 +288,38 @@ esets <- lapply(names(env$datasets), \(name) {
     file <- list.files(dir, full.names = TRUE)[1]
   }
 
-  expr <- if (str_ends(file, "csv")) read_csv(file) else read_tsv(file)
+  expr <- suppressMessages(
+    if (str_ends(file, "csv")) read_csv(file) else read_tsv(file)
+  )
   meta <- dplyr::filter(mdata, dataset == name & join_id %in% colnames(expr))
   expr <- distinct(expr, across(1), .keep_all = TRUE)
-  expr <- column_to_rownames(expr, var = colnames(expr)[1]) |> as.matrix()
+  expr <- column_to_rownames(expr, var = colnames(expr)[1])
   colnames(expr) <- paste0(name, "_", colnames(expr))
   if (!is.null(cur$microarray)) {
-    return(AnnotatedDataFrame())
-    platforms <- unique(meta$platform)
-    for (p in platforms) {
-      gpl <- getGEO(p, destdir = geo_cache) |> Table()
-      mapped_names <- mapIds(
-        db,
-        gpl$GeneName,
-        keytype = "SYMBOL",
-        column = "ENTREZID"
-      )
-      ids <- setNames(gpl$ID, mapped_names)
+    platform <- unique(meta$platform)
+    # Will collapse probes mapping to the same genes with the mean, if any exist,
+    # following the protocol in the I-SPY 2 dataset (GSE194040)
+    if (length(platform) != 1) {
+      stop("There should only be one platform per dataset")
     }
-  } else if (gene_id_style != "ncbi") {
+    gpl <- getGEO(platform, destdir = geo_cache) |> Table()
+    print(platform)
+    print(head(gpl))
+    probeid2symbol <- setNames(gpl$GeneName, gpl$ID)
+    to_symbol <- probeid2symbol[rownames(expr)]
+    if (any(duplicated(to_symbol))) {
+      expr <- as_tibble(expr) |>
+        mutate(ID = to_symbol) |>
+        group_by(ID) |>
+        summarise(across(everything(), mean)) |>
+        column_to_rownames(var = "ID")
+    } else {
+      rownames(expr) <- to_symbol
+    }
+    gene_id_style <- "SYMBOL"
+  }
+
+  if (gene_id_style != "ncbi") {
     kt <- gene_id_style
     mapped <- mapIds(db, rownames(expr), keytype = kt, column = "ENTREZID") |>
       unlist()
@@ -299,15 +327,18 @@ esets <- lapply(names(env$datasets), \(name) {
     expr <- expr[mask, ]
     rownames(expr) <- mapped[mask]
   }
+
   meta <- AnnotatedDataFrame(column_to_rownames(meta, var = "join_id"))
   rownames(meta) <- paste0(name, "_", rownames(meta))
   ## message(glue("n samples in meta {nrow(meta)}"))
   ## message(glue("n samples in expr {ncol(expr)}"))
   expr <- expr[, colnames(expr) %in% rownames(meta)]
   meta <- meta[sort(rownames(meta)), ] # Required to construct eset
-  expr <- expr[, sort(colnames(expr))]
+  expr <- expr[, sort(colnames(expr))] |> as.matrix()
   Biobase::ExpressionSet(assayData = expr, phenoData = meta)
 }) |>
   `names<-`(names(env$datasets))
 
 filtered_mdata <- lapply(esets, \(x) as_tibble(pData(x))) |> bind_rows()
+
+write_tsv(filtered_mdata, here(outdir, glue("sample_metadata-{date}.tsv")))
