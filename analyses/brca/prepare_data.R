@@ -104,6 +104,15 @@ recode_t_stage <- function(x) {
   # Keep prefixes
   x <- str_trim(x)
   case_when(
+    str_detect(x, "^Stage") ~
+      map_chr(x, \(val) {
+        count <- str_count(val, "I")
+        val <- str_to_lower(val) |>
+          str_remove_all(" ") |>
+          str_remove_all("stage") |>
+          str_remove_all("i")
+        paste0("T", count, val)
+      }),
     str_detect(x, "^[1-4]$") ~ paste0("T", x),
     str_detect(x, "[()]") ~ str_remove_all(x, "\\(.*\\)"),
     x == "999" ~ NA, # Weird formatting in GSE123845
@@ -167,6 +176,7 @@ SHARED_COLS <- c(
 MARKER_COLS <- keep(SHARED_COLS, \(x) str_detect(x, "_status$"))
 TO_CHARACTER <- c("join_id", "patient_id", "collection_period")
 TO_FACTOR <- c("histological_grade", "t_stage", "sample_type")
+# %%
 
 ## * Aggregate metadata
 mdata <- lapply(names(env$datasets), \(name) {
@@ -200,7 +210,7 @@ mdata <- lapply(names(env$datasets), \(name) {
   }
   remaining_cols <- setdiff(
     SHARED_COLS,
-    c(names(to_remap), names(to_fill), "join_id")
+    unique(c(names(to_remap), names(to_fill), "join_id", "patient_id"))
   )
   add_na <- rep(NA, length(remaining_cols)) |>
     as.list() |>
