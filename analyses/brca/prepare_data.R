@@ -269,8 +269,8 @@ mdata <- lapply(names(env$datasets), \(name) {
 
 ## * Aggregate samples
 
-## ah <- AnnotationHub(localHub = TRUE)
-ah <- AnnotationHub()
+ah <- AnnotationHub(localHub = TRUE)
+## ah <- AnnotationHub()
 db <- query(ah, "org.Hs.eg.db")[[1]]
 # %%
 
@@ -305,16 +305,20 @@ esets <- lapply(names(env$datasets), \(name) {
     gpl <- getGEO(platform, destdir = geo_cache) |> Table()
     print(platform)
     print(head(gpl))
-    probeid2symbol <- setNames(gpl$GeneName, gpl$ID)
+    id_col <- if (is.null(cur$probeset_id_col)) "ID" else cur$probeset_id_col
+    probeid2symbol <- setNames(gpl$GeneName, gpl[[id_col]])
     to_symbol <- probeid2symbol[rownames(expr)]
     if (any(duplicated(to_symbol))) {
       expr <- as_tibble(expr) |>
         mutate(ID = to_symbol) |>
+        filter(!is.na(ID)) |>
         group_by(ID) |>
         summarise(across(everything(), mean)) |>
         column_to_rownames(var = "ID")
     } else {
-      rownames(expr) <- to_symbol
+      mask <- !is.na(to_symbol)
+      expr <- expr[mas, ]
+      rownames(expr) <- to_symbol[mask]
     }
     gene_id_style <- "SYMBOL"
   }
