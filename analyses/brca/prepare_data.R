@@ -1,6 +1,7 @@
 library(here)
 library(tidyverse)
 library(glue)
+library(AnnotationHub)
 setAnnotationHubOption("CACHE", here(".cache", "AnnotationHub"))
 
 geo_cache <- here(".cache", "GEO")
@@ -218,6 +219,7 @@ mdata <- lapply(names(env$datasets), \(name) {
       subtype = recode_subtype(subtype),
       dataset = name,
       platform_name = platform_ids2name(platform),
+      platform_type = if (!is.null(cur$microarray)) "microarray" else "RNA-seq",
       t_stage = recode_t_stage(t_stage),
       treatment_response = recode_treatment_response(treatment_response),
       histological_type = recode_hist_type(histological_type),
@@ -245,15 +247,19 @@ mdata <- lapply(names(env$datasets), \(name) {
 # - "Agilent_human_DiscoverPrint_15746"
 # - Agendia32627_DPv1.14_SCFGplus
 
+# TODO: need to get the raw data for GSE80999
+## https://www.ncbi.nlm.nih.gov/geo/geo2r/?acc=GSE80999
+
 ## * Aggregate samples
 
 library(AnnotationHub)
 library(Biobase)
-ah <- AnnotationHub()
+library(GEOquery)
+ah <- AnnotationHub(localHub = TRUE)
 db <- query(ah, "org.Hs.eg.db")[[1]]
 # %%
 
-lapply(names(env$datasets), \(name) {
+esets <- lapply(names(env$datasets), \(name) {
   cur <- env$datasets[[name]]
   gene_id_style <- cur$gene_id
   if (is.null(gene_id_style) && is.null(cur$microarray)) {
@@ -266,31 +272,42 @@ lapply(names(env$datasets), \(name) {
   } else {
     file <- list.files(dir, full.names = TRUE)[1]
   }
+
   expr <- if (str_ends(file, "csv")) read_csv(file) else read_tsv(file)
-  expr <- column_to_rownames(expr, var = colnames(expr)[1])
-  if (is.null(cur$microarray)) {
+  meta <- dplyr::filter(mdata, dataset == name & join_id %in% colnames(expr))
+  expr <- distinct(expr, across(1), .keep_all = TRUE)
+  expr <- column_to_rownames(expr, var = colnames(expr)[1]) |> as.matrix()
+  colnames(expr) <- paste0(name, "_", colnames(expr))
+  if (!is.null(cur$microarray)) {
+    return(AnnotatedDataFrame())
     platforms <- unique(meta$platform)
     for (p in platforms) {
-      id_mapping <- getGEO(p, destdir = )
+      gpl <- getGEO(p, destdir = geo_cache) |> Table()
+      mapped_names <- mapIds(
+        db,
+        gpl$GeneName,
+        keytype = "SYMBOL",
+        column = "ENTREZID"
+      )
+      ids <- setNames(gpl$ID, mapped_names)
     }
   } else if (gene_id_style != "ncbi") {
-    if (gene_id_style == "ensembl") {
-      keys <- "ENSEMBL"
-    } else if (gene_id_style == "symbol") {
-      keys <- "SYMBOL"
-    }
-    rownames(expr) <- mapIds(db, keys = keys, column = "ENTREZID")
+    kt <- gene_id_style
+    mapped <- mapIds(db, rownames(expr), keytype = kt, column = "ENTREZID") |>
+      unlist()
+    mask <- !duplicated(mapped) & !is.na(mapped)
+    expr <- expr[mask, ]
+    rownames(expr) <- mapped[mask]
   }
+  meta <- AnnotatedDataFrame(column_to_rownames(meta, var = "join_id"))
+  rownames(meta) <- paste0(name, "_", rownames(meta))
+  ## message(glue("n samples in meta {nrow(meta)}"))
+  ## message(glue("n samples in expr {ncol(expr)}"))
+  expr <- expr[, colnames(expr) %in% rownames(meta)]
+  meta <- meta[sort(rownames(meta)), ] # Required to construct eset
+  expr <- expr[, sort(colnames(expr))]
+  Biobase::ExpressionSet(assayData = expr, phenoData = meta)
+}) |>
+  `names<-`(names(env$datasets))
 
-  print(name)
-  print(head(expr))
-
-  meta <- dplyr::filter(mdata, dataset == name & join_id %in% colnames(expr))
-  print(nrow(meta))
-  print(ncol(expr))
-
-  eset <- Biobase::ExpressionSet(
-    assayData = as.matrix(expr),
-    phenoData = AnnotatedDataFrame(meta)
-  )
-})
+filtered_mdata <- lapply(esets, \(x) as_tibble(pData(x))) |> bind_rows()
