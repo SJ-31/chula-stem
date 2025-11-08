@@ -65,10 +65,6 @@ P1 = Patient1
 """
 
 
-with open("/home/shannc/Bio_SDD/chula-stem/pdac_upload.toml", "rb") as f:
-    config = tomllib.load(f)
-
-
 def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
     """Validate config file for correct entries
 
@@ -95,7 +91,9 @@ def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
     cohort_dir: Path = Path(paths["cancer_ngs"])
     for key in ["data_modality", "cancer_type", "cohort"]:
         if not (try_path := cohort_dir.joinpath(names[key])).exists():
-            raise ValueError(f"The path {try_path} given by key {key} doesn't exist")
+            print(f"The path {try_path} given by key {key} doesn't exist")
+            print(f"\tCreating path {try_path}")
+            try_path.mkdir()
         cohort_dir = try_path
 
     samples_check = []
@@ -225,7 +223,7 @@ def upload_samples(
         template["override"] = override
         template["new"] = uploaded
         sample_tracker.append(template)
-    return samples_tracker
+    return sample_tracker
 
 
 if __name__ == "__main__":
