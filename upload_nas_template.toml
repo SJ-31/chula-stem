@@ -1,0 +1,36 @@
+samples = ["P1", "P12", "P3"] # List of sample directories in results
+# These be present in the results directory and will throw an error if they don't
+# exist
+
+on_exists = "override" # What to do if a results directory already exists at target path
+# Valid options
+# - override: override all files
+# - append_date: upload instead to <results_name>_<current_date>  
+# - null: do nothing
+
+on_missing = "create" # How to handle samples listed in "samples" that aren't found in the specified cohort
+# Valid options:
+# - create: create a new directory for the sample name
+# - unsorted_create: 
+# - unsorted: attempt to look up the sample in the "unsorted" cohort and upload it there
+# if found, and do nothing if not found
+# - null: do nothing
+
+[names]
+results = "variant_calling_1" # Name of results set
+cohort = "PHcase1"            # Cohort name
+data_modality = "exome"
+cancer_type = "PDAC"
+
+[paths]
+results = ""    # Path to root directory for results
+cancer_ngs = "" # Root path to cancer NGS directory (after mounting)
+
+
+[sample_mapping] # (Optional) Mapping specifying equivalent samples in the samples
+# list and in the cohort i.e. sample aliases
+# P1 = Patient1
+
+[cohort_override] # (Optional) Mapping specifying alternate cohort for a specific sample
+# P1 = "unassigned"
+# CEN2-P3 = "DCEN2"

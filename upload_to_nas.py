@@ -2,7 +2,9 @@
 
 import argparse
 import csv
+import pprint
 import shutil
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Literal, TypeAlias
@@ -11,6 +13,8 @@ import tomllib
 
 ON_EXISTS: TypeAlias = Literal["override", "append_date"] | None
 TODAY: str = date.today().isoformat()
+
+# TODO: [2025-11-08 Sat] add dictionary to override cohort name for specific samples
 
 """
 Helper script for uploading processed data to the CU stem cells NAS
@@ -96,26 +100,35 @@ def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
             try_path.mkdir()
         cohort_dir = try_path
 
-    samples_check = []
     sample_mapping = config.get("sample_mapping", {})
+    cohort_override: dict = config.get("cohort_override", {})
     samples: list = config.get("samples", [])
+    default_cohort_name = names["cohort"]
+    samples_check: dict = defaultdict(list)
     for s in samples:
+        cur_cohort = cohort_override.get(s, default_cohort_name)
         if not source.joinpath(s).exists():
             raise ValueError(f"Sample {s} doesn't exist in the results directory")
-
         if s in sample_mapping:
             print(f"Using remapping {s} = {sample_mapping[s]}")
-            samples_check.append(sample_mapping[s])
-        else:
-            samples_check.append(s)
-    if len(samples_check) != len(set(samples_check)):
-        raise ValueError("Sample mapping causes conflicting names")
-
+            s = sample_mapping[s]
+        samples_check[cur_cohort].append(s)
+    for k, v in samples_check.items():
+        if len(v) != len(set(v)):
+            raise ValueError(f"Sample mapping in cohort {k} causes conflicting names")
+    print("\nFinal cohort assignment:")
+    pprint.pprint(samples_check)
+    print()
     return source, cohort_dir, samples, sample_mapping
 
 
 def upload_summaries(
-    on_exists: ON_EXISTS, target: Path, source: Path, rname: str, config: dict
+    on_exists: ON_EXISTS,
+    target: Path,
+    source: Path,
+    rname: str,
+    config: dict,
+    dry_run: bool,
 ) -> list[dict]:
     samples = config.get("samples", [])
     to_ignore = set(samples) | set(config.get("summary_ignore", []))
@@ -145,6 +158,8 @@ def upload_summaries(
         if target_path.exists() and not on_exists:
             template["status"] = "failure"
             template["new"] = None
+        elif dry_run:
+            print(f"{rdir}->{target_path}")
         elif rdir.is_file():
             shutil.copy2(rdir, target_path)
         else:
@@ -154,7 +169,7 @@ def upload_summaries(
 
 
 def upload_helper(
-    on_exists: ON_EXISTS, rname: str, sdir: Path, processed: Path
+    on_exists: ON_EXISTS, rname: str, sdir: Path, processed: Path, dry_run: bool
 ) -> tuple[Path, bool]:
     """
     Attempt to upload sample directory `sdir` to the `processed` directory of the given sample
@@ -166,7 +181,12 @@ def upload_helper(
     target = processed / rname
     if target.exists() and on_exists == "append_date":
         target = processed / f"{rname}_{TODAY}"
-        shutil.copytree(sdir, target, dirs_exist_ok=False)
+        if dry_run:
+            print(f"{sdir}->{target}")
+        else:
+            shutil.copytree(sdir, target, dirs_exist_ok=False)
+    elif dry_run:
+        print(f"{sdir}->{target}")
     else:
         shutil.copytree(sdir, target, dirs_exist_ok=True)
     return target, on_exists == "override" and target.exists()
@@ -178,8 +198,10 @@ def upload_samples(
     rname: str,
     samples: list,
     sample_mapping: dict,
+    cohort_override: dict,
     on_missing: Literal["unassigned", "create", "unassigned_create"] | None,
     on_exists: ON_EXISTS,
+    dry_run: bool,
 ) -> list:
     unassigned: Path = cohort_dir.parent.joinpath("unassigned")
     sample_tracker: list[dict] = []
@@ -187,7 +209,9 @@ def upload_samples(
         to_upload: Path = source / sample
         template = {"sample": sample, "old": to_upload}
         should_upload: bool = True
-
+        if c_override := cohort_override.get(sample):
+            print("Overriding cohort...")
+            cohort_dir = cohort_dir.parent.joinpath(c_override)
         sample = sample_mapping.get(sample, sample)
         target_dir: Path = cohort_dir / sample
         processed: Path = target_dir / "processed"
@@ -214,7 +238,11 @@ def upload_samples(
             processed.mkdir(parents=True)
         uploaded, override = (
             upload_helper(
-                on_exists=on_exists, rname=rname, sdir=to_upload, processed=processed
+                on_exists=on_exists,
+                rname=rname,
+                sdir=to_upload,
+                processed=processed,
+                dry_run=dry_run,
             )
             if should_upload
             else (None, False)
@@ -231,6 +259,13 @@ if __name__ == "__main__":
     parser.add_argument("config")
     parser.add_argument(
         "-l", "--log", required=False, default=f"upload_record-{TODAY}.csv"
+    )
+    parser.add_argument(
+        "-d",
+        "--dry_run",
+        required=False,
+        default=False,
+        action="store_true",
     )
     args = parser.parse_args()
     config_file = args.config
@@ -252,6 +287,7 @@ if __name__ == "__main__":
             source=source,
             rname=rname,
             on_exists=on_exists,
+            dry_run=args.dry_run,
         )
     ]
     samples_tracker = upload_samples(
@@ -259,9 +295,11 @@ if __name__ == "__main__":
         source=source,
         rname=rname,
         cohort_dir=cohort_dir,
+        cohort_override=config.get("cohort_override", {}),
         on_exists=on_exists,
         on_missing=config.get("on_missing"),
         sample_mapping=sample_mapping,
+        dry_run=args.dry_run,
     )
 
     with open(args.log, "w") as logfile:
