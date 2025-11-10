@@ -20,18 +20,40 @@ mpath <- env$metadata_path
 
 ## * Helper functions
 
-# Extract expression data in sample tables of GSE80999
-format_GSE80999 <- function() {
-  file <- here(env$raw_path, "GSE80999", "GSE80999_family.soft.gz")
-  gsms <- GSMList(getGEO(filename = file))
+from_sample_table <- function(infile, outfile) {
+  gsms <- GSMList(getGEO(filename = infile))
   lapply(names(gsms), \(name) {
     Table(gsms[[name]]) |>
       as_tibble() |>
       rename(VALUE = name)
   }) |>
     purrr::reduce(\(x, y) left_join(x, y, by = join_by(ID_REF))) |>
-    write_tsv(here(env$raw_path, "GSE80999", "GSE80999.tsv"))
+    write_tsv(outfile)
 }
+
+# Extract expression data in sample tables of GSE80999
+format_GSE80999 <- function() {
+  from_sample_table(
+    here(env$raw_path, "GSE80999", "GSE80999_family.soft.gz"),
+    here(env$raw_path, "GSE80999", "GSE80999.tsv")
+  )
+}
+
+format_SRP157974 <- function(file) {
+  tb <- readxl::read_xlsx(file, skip = 1)
+  treatment_cols <- c("Chemotherapy", "Paclitaxel", "Radiotherapy")
+  tb <- tb |> mutate(across(all_of(treatment_cols), as.character))
+  treat_col <- lapply(treatment_cols, \(t) {
+    case_match(tb[[t]], "TRUE" ~ str_to_lower(t), .default = NA)
+  }) |>
+    bind_cols() |>
+    unite(sep = " + ", col = "treatment", na.rm = TRUE) |>
+    mutate(treatment = case_match(treatment, "" ~ NA, .default = treatment))
+  bind_cols(tb, treat_col) |> write_tsv(here(mpath, "SRP157974.tsv"))
+}
+
+
+## tb |> mutate(therapy = )
 
 lget <- function(lst, key, default = NULL) {
   if (is.null(lst[[key]])) {
@@ -270,12 +292,8 @@ mdata <- lapply(names(env$datasets), \(name) {
   bind_rows()
 # %%
 
-# TODO: need gene id mappings for
-# and microarrays
-# - "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Probe Name Version)"
-# - "Illumina HumanWG-6 v3.0 expression beadchip"
-# - "Agilent_human_DiscoverPrint_15746"
-# - Agendia32627_DPv1.14_SCFGplus
+# TODO: format the xls file for the SRP157974 dataset
+# /home/shannc/Downloads/mmc2.xlsx
 
 ## * Aggregate samples
 
