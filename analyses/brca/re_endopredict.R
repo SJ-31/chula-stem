@@ -346,27 +346,54 @@ sslm <- import("sksurv.linear_model")
 ssm <- import("sksurv.metrics")
 
 surv2structured_array(g.response, "y_train")
+surv2structured_array(g.test_response, "y_test")
+
+g.times <- seq(
+  min(g.train_eset[["dmfs_time"]]),
+  max(g.train_eset[["dmfs_time"]]),
+  by = 20
+)[-1]
 
 # %%
 evaluate_cox <- function(feature_subset = NULL, name = NULL) {
   cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
   cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
-  coxnet <- sslm$CoxnetSurvivalAnalysis()
+  coxnet <- sslm$CoxnetSurvivalAnalysis(fit_baseline_model = TRUE)
 
-  coxnet$fit(t(exprs(cur_eset)), py$y_train)
-  pred <- coxnet$predict(t(exprs(cur_test_eset)))
+  x_train <- t(exprs(cur_eset))
+  x_test <- t(exprs(cur_test_eset))
+
+  coxnet$fit(x_train, py$y_train)
+  pred <- coxnet$predict(x_test)
 
   cic_result <- ssm$concordance_index_censored(
     np_array(g.test_status, dtype = "bool"),
     g.test_time,
     pred
   )
+  # TODO: this is not becoming a nice matrix unfortunately
+  survs <- coxnet$predict_survival_function(x_test)
+  surv_preds <- sapply(survs, \(surv_fn) {
+    vals <- sapply(g.times, \(t) surv_fn(t))
+    matrix(vals, nrow = 1, ncol = length(vals))
+  }) |>
+    rbind() |>
+    t()
+
+  ibs <- ssm$integrated_brier_score(
+    survival_train = py$y_train,
+    survival_test = py$y_test,
+    estimate = surv_preds,
+    times = g.times
+  )
+
   result <- list()
   result$cindex <- cic_result[1]
   result$concordant <- cic_result[2]
   result$discordant <- cic_result[3]
   result$tied_risk <- cic_result[4]
   result$tied_time <- cic_result[5]
+  result$integrated_brier <- ibs
   result$name <- name
   message(glue("{name} complete"))
   tb <- as_tibble(result) |> mutate(across(everything(), unlist))
