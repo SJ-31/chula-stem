@@ -1,3 +1,14 @@
+* u133a_mapping.tsv
+*Relative Path:* =analyses/data/u133a_mapping.tsv=
+*Date Added:* <2025-11-12 Wed>
+*Source:* [[https://mart.ensembl.org/biomart/martview][Biomart]]
+Mapping between Ensembl IDs, HUGO gene symbols, NCBI IDs, and Affymetrix U133A probe ids. Obtained from Ensembl biomart (version 115) with the GRCh38.p14 assembly
+* mammaprint_candidate_genes.tsv
+*Relative Path:* =analyses/data/mammaprint_candidate_genes.tsv=
+*Date Added:* <2025-11-12 Wed>
+*Source:* [[https://www.nature.com/articles/415530a][Gene expression profiling predicts clinical outcome of breast cancer]]
+List of 231 prognosis reporter genes obtained by Veer et al. (Supplementary Table 2 of the linked paper). The 70 genes belonging to the final prognostic signature (used in the Mammaprint test) are indicated by the =final_list= column. These are the 70 genes with the highest correlation coefficients
+
 * IEDB_data.tsv
 *Relative Path:* =analyses/data/IEDB_data.tsv=
 *Date Added:* <2025-10-06 Mon>

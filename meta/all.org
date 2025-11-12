@@ -8,6 +8,7 @@ CU stem cells [[http://10.128.196.216:5000/?_dc=1750307331882][NAS]]
     * Must specify =--partition gpu= AND =--gres=gpu:3g.20gb:1=
     * [2025-07-22 Tue] Don't use the =--gpus-per-task= flag because you only have one gpu
       * Specify memory with =--mem-per-cpu=
+  * *gpu40g*
 + Running on CentOS Linux 7, Fedora
 * Data
 + All scRNA data acquired with 10x genomics, sequencer is either NovaSeq or HiSeq
