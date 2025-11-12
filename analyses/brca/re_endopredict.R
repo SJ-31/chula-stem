@@ -35,7 +35,7 @@ g.gene2probe <- local({
   tb <- read_tsv(here(ENV$probe_mapping)) |>
     group_by(`HGNC symbol`) |>
     summarise(probe = list(`AFFY HG U133A 2 probe`))
-  # This is a one-to-many relationship
+  # one-to-many relationship
   setNames(tb$probe, tb$`HGNC symbol`)
 })
 
@@ -282,8 +282,8 @@ g.response <- Surv(
   time = g.train_eset[["dmfs_time"]],
   event = g.train_eset[["dmfs_status"]]
 )
-g.test_time <- g.train_eset[["dmfs_time"]]
-g.test_status <- g.train_eset[["dmfs_status"]]
+g.test_time <- g.test_eset[["dmfs_time"]]
+g.test_status <- g.test_eset[["dmfs_status"]]
 g.test_response <- Surv(
   time = g.test_eset[["dmfs_time"]],
   event = g.test_eset[["dmfs_status"]]
@@ -312,7 +312,6 @@ glmnet_cox_wrapper <- function(name, eset, penalized = FALSE) {
 
 penalized_cox <- glmnet_cox_wrapper("penalized_cox", g.train_eset, TRUE)
 
-
 coefs <- coef(penalized_cox, s = "lambda.min") |>
   as.matrix() |>
   `colnames<-`("beta") |>
@@ -322,7 +321,6 @@ coefs <- coef(penalized_cox, s = "lambda.min") |>
 
 
 nonzero <- dplyr::filter(coefs, beta > 0)
-
 result$penalized_cox$selection <- unique(nonzero$symbol)
 result$penalized_cox$probes <- nonzero$ID_REF
 result$penalized_cox$common <- intersect(
@@ -332,37 +330,16 @@ result$penalized_cox$common <- intersect(
 
 ## *** Univariate Cox
 
-# This is what the original authors did
-
-# TODO:
+# This is what the original endopredict authors did
 
 ## * Feature set comparison
 
 # Compare the best C measure that other feature sets can obtain against the one
 # obtained by the full penalized cox model
 
-# - Will include...
-# the original paper's selection
-# %%
-
-# BUG: something's wrong with predict.glmnet
-# it doesn't work on the models trained with the feature subset but you have no idea why
-
-# Will resort to using scikit-survival. [2025-11-11 Tue] finish writing the below
-
-assess_helper <- function(model) {
-  assess.glmnet(
-    model,
-    newx = t(exprs(g.test_eset)),
-    newy = Surv(
-      time = g.test_eset[["dmfs_time"]],
-      event = g.test_eset[["dmfs_status"]]
-    ),
-    family = "cox"
-  ) |>
-    as.data.frame()
-}
-
+# NOTE: due to issues with predict.glmnet
+#   (it won't work for certain models, and raises uninformative errors),
+#   must resort to evaluation with scikit-survival
 
 np <- import("numpy")
 sslm <- import("sksurv.linear_model")
@@ -370,14 +347,19 @@ ssm <- import("sksurv.metrics")
 
 surv2structured_array(g.response, "y_train")
 
+# %%
 evaluate_cox <- function(feature_subset = NULL, name = NULL) {
   cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
+  cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
   coxnet <- sslm$CoxnetSurvivalAnalysis()
+
   coxnet$fit(t(exprs(cur_eset)), py$y_train)
+  pred <- coxnet$predict(t(exprs(cur_test_eset)))
+
   cic_result <- ssm$concordance_index_censored(
-    g.test_status,
+    np_array(g.test_status, dtype = "bool"),
     g.test_time,
-    coxnet$predict(t(exprs(g.train_eset)))
+    pred
   )
   result <- list()
   result$cindex <- cic_result[1]
@@ -386,22 +368,30 @@ evaluate_cox <- function(feature_subset = NULL, name = NULL) {
   result$tied_risk <- cic_result[4]
   result$tied_time <- cic_result[5]
   result$name <- name
-  return(as.data.frame(result))
+  message(glue("{name} complete"))
+  tb <- as_tibble(result) |> mutate(across(everything(), unlist))
+  return(tb)
 }
 
-c_indices <- lapply(names(result), \(method) {
-  if (length(result[[method]]) > 0) {
-    df <- evaluate_cox(
-      feature_subset = result[[method]]$probes,
+## ** Run
+
+# Include random gene sets as a baseline
+with_randoms <- result
+n_random_probes <- 80
+n_random_iter <- 5
+for (i in seq(n_random_iter)) {
+  randoms <- sample(rownames(g.eset), n_random_probes)
+  with_randoms[[glue("random{n_random_probes}_{i}")]] <- list(probes = randoms)
+}
+c_indices <- lapply(names(with_randoms), \(method) {
+  if (length(with_randoms[[method]]) > 0) {
+    evaluate_cox(
+      feature_subset = with_randoms[[method]]$probes,
       name = method
     )
+  } else {
+    tibble()
   }
-  ## mutate(df, method = method)
-})
-
-# TODO: [2025-11-11 Tue] the below work, but probably should make a helper function for this
-
-## |>
-##   bind_rows()
-
-# Also wanna see whether random gene selections will do just as well as the traditional selection process
+}) |>
+  bind_rows()
+print(c_indices)
