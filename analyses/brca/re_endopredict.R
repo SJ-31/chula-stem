@@ -284,6 +284,8 @@ g.response <- Surv(
 )
 g.test_time <- g.test_eset[["dmfs_time"]]
 g.test_status <- g.test_eset[["dmfs_status"]]
+g.train_time <- g.train_eset[["dmfs_time"]]
+g.train_status <- g.train_eset[["dmfs_status"]]
 g.test_response <- Surv(
   time = g.test_eset[["dmfs_time"]],
   event = g.test_eset[["dmfs_status"]]
@@ -355,24 +357,17 @@ g.times <- seq(
 )[-1]
 
 # %%
-evaluate_cox <- function(feature_subset = NULL, name = NULL) {
-  cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
-  cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
-  coxnet <- sslm$CoxnetSurvivalAnalysis(fit_baseline_model = TRUE)
 
-  x_train <- t(exprs(cur_eset))
-  x_test <- t(exprs(cur_test_eset))
-
-  coxnet$fit(x_train, py$y_train)
-  pred <- coxnet$predict(x_test)
-
+# Helper function for getting metrics for survival analysis on train and test datasets
+# Including the former gives an idea to the degree of overfitting
+get_survival_metrics <- function(model, x_test, y_test, statuses, times) {
+  pred <- model$predict(x_test)
   cic_result <- ssm$concordance_index_censored(
-    np_array(g.test_status, dtype = "bool"),
-    g.test_time,
+    np_array(statuses, dtype = "bool"),
+    times,
     pred
   )
-  # TODO: this is not becoming a nice matrix unfortunately
-  survs <- coxnet$predict_survival_function(x_test)
+  survs <- model$predict_survival_function(x_test)
   surv_preds <- sapply(survs, \(surv_fn) {
     vals <- sapply(g.times, \(t) surv_fn(t))
     matrix(vals, nrow = 1, ncol = length(vals))
@@ -382,21 +377,48 @@ evaluate_cox <- function(feature_subset = NULL, name = NULL) {
 
   ibs <- ssm$integrated_brier_score(
     survival_train = py$y_train,
-    survival_test = py$y_test,
+    survival_test = y_test,
     estimate = surv_preds,
     times = g.times
   )
 
   result <- list()
-  result$cindex <- cic_result[1]
-  result$concordant <- cic_result[2]
-  result$discordant <- cic_result[3]
-  result$tied_risk <- cic_result[4]
-  result$tied_time <- cic_result[5]
+  result$harell_c_index <- cic_result[1]
+  result$harell_concordant <- cic_result[2]
+  result$harell_discordant <- cic_result[3]
+  result$harell_tied_risk <- cic_result[4]
+  result$harell_tied_time <- cic_result[5]
   result$integrated_brier <- ibs
-  result$name <- name
-  message(glue("{name} complete"))
   tb <- as_tibble(result) |> mutate(across(everything(), unlist))
+}
+
+
+evaluate_cox <- function(feature_subset = NULL, name = NULL) {
+  cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
+  cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
+  model <- sslm$CoxPHSurvivalAnalysis()
+  ## model <- sslm$CoxnetSurvivalAnalysis(fit_baseline_model = TRUE)
+  x_train <- t(exprs(cur_eset))
+  model$fit(x_train, py$y_train)
+
+  train_metrics <- get_survival_metrics(
+    model,
+    x_test = x_train,
+    y_test = py$y_train,
+    statuses = g.train_status,
+    times = g.train_time
+  ) |>
+    mutate(set = "train")
+  test_metrics <- get_survival_metrics(
+    model,
+    x_test = t(exprs(cur_test_eset)),
+    y_test = py$y_test,
+    statuses = g.test_status,
+    times = g.test_time
+  ) |>
+    mutate(set = "test")
+  tb <- bind_rows(train_metrics, test_metrics) |> mutate(name = name)
+  message(glue("{name} complete"))
   return(tb)
 }
 
