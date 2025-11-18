@@ -640,3 +640,21 @@ for (n in names(with_randoms)) {
     get_clustered_curves(with_randoms[[n]]$selection, n, outdir = SC_OUTDIR)
   }
 }
+
+overlap_df <- local({
+  completed <- result[map_int(result, length) > 0]
+  sets <- names(completed)
+  all_symbols <- lapply(completed, \(x) x$selection) |> unlist()
+  to_df <- lapply(
+    all_symbols,
+    \(sym) {
+      sapply(completed, \(s) {
+        sym %in% s$selection
+      })
+    }
+  ) |>
+    `names<-`(all_symbols)
+  as.data.frame(to_df) |> mutate(across(everything(), as.integer))
+})
+set_dist <- vegan::vegdist(overlap_df, method = "jaccard")
+
