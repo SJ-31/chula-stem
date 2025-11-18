@@ -364,6 +364,53 @@ g.test_response <- Surv(
   event = g.test_eset[["dmfs_status"]]
 )
 
+## *** Original EndoPredict
+## Method is univariate and bivariate cox
+
+ori_wrapper <- function(eset) {
+  top2a_probes <- c("201291_s_at", "201292_at")
+  features <- rownames(g.train_eset)
+  lapply(features, \(feature) {
+    uni_data <- bind_for_surv(
+      g.response,
+      g.train_eset[rownames(g.train_eset) == feature, ]
+    )
+    uni_model <- coxph(Surv(time, status) ~ ., data = uni_data, x = TRUE)
+    uni_tb <- broom::tidy(uni_model) |>
+      mutate(method = "univariate")
+
+    bi_data <- bind_for_surv(
+      g.response,
+      g.train_eset[rownames(g.train_eset) %in% c(feature, top2a_probes)]
+    )
+    bi_model <- coxph(Surv(time, status) ~ ., data = bi_data, x = TRUE)
+    bi_tb <- broom::tidy(bi_model) |>
+      mutate(method = "bivariate") |>
+      filter(!str_remove_all(term, "`") %in% top2a_probes)
+    bind_rows(uni_tb, bi_tb)
+  }) |>
+    bind_rows() |>
+    mutate(p.adjust = p.adjust(p.value))
+}
+
+endopredict_selection <- read_existing(
+  here(OUTDIR, "endopredict_original_selection.tsv"),
+  \(f) {
+    tb <- ori_wrapper()
+    write_tsv(tb, f)
+    tb
+  },
+  read_tsv
+)
+
+# [2025-11-17 Mon] no
+ep_significant <- dplyr::filter(endopredict_selection, p.adjust <= 0.05)
+
+result$endopredict_rep$selection <- ep_significant$term
+result$endopredict_rep$common <- intersect(
+  ep_significant$term,
+  original_set$Gene_name
+)
 
 ## *** Multivariable Cox
 
