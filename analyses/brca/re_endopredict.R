@@ -50,7 +50,8 @@ g.gene2probe <- local({
 original_set <- read_tsv(here(CUR_DIR, "endopredict_candidates.tsv")) |>
   rename_with(\(x) str_replace_all(x, " ", "_"))
 
-# Authors already re-normalized the data from the different cohorts in the same way as theirs
+# Authors already re-normalized the data from the different cohorts in the same way as theirs.
+# The units are normalized such that output signal intensities of each array have a mean target intensity of 500
 # shared variable is time to distant recurrence
 
 # Unit of dmfs_time is months
@@ -59,16 +60,18 @@ shared_cols <- c("geo_accession", "subcohort", "dmfs_time", "dmfs_status")
 mfiles <- list(
   GSE26971 = "GSE26971.tsv", # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE26971
   GSE12093 = "GSE12093.tsv", # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE12093
-  `GSE6532-GPL96` = "GSE6532_LUMINAL_demo.txt" # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE6532
+  `GSE6532-GPL96` = "GSE6532_LUMINAL_demo.txt", # https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE6532
+  `GSE4922-GPL96` = "GSE4922-GPL96.tsv" # External validation set
 )
 
-efiles <- c(
-  "GSE26971_GSE12093_dataset.txt",
-  "GSE26971_GSE6532_dataset.txt",
-  "GSE26971.tsv"
+expr_dir <- here(ENV$data_path, "GSE26971")
+efiles <- list(
+  "GSE26971_GSE12093_dataset.txt" = expr_dir,
+  "GSE26971_GSE6532_dataset.txt" = expr_dir,
+  "GSE26971.tsv" = expr_dir,
+  "GSE4922.tsv" = here(ENV$data_path, "GSE4922-GPL96")
 )
 
-expr_dir <- here(ENV$raw_path, "GSE26971")
 
 ## * Gather metadata
 meta <- lapply(names(mfiles), \(x) {
@@ -82,6 +85,8 @@ meta <- lapply(names(mfiles), \(x) {
   if (!is.null(to_remap)) tb <- dplyr::rename(tb, to_remap)
   if (x == "GSE6532-GPL96") {
     tb <- mutate(tb, dmfs_time = floor(dmfs_time / (365.24 / 12)))
+  } else if (x == "GSE4922-GPL96") {
+    tb <- mutate(tb, dmfs_time = floor(dmfs_time * 12))
   }
   to_replace <- spec$meta_replace
   for (col in names(to_replace)) {
