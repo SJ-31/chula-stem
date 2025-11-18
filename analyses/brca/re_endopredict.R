@@ -105,8 +105,8 @@ meta <- lapply(names(mfiles), \(x) {
 
 ## * Gather expression
 
-expr <- lapply(efiles, \(x) read_tsv(here(expr_dir, x))) |>
-  reduce(\(x, y) left_join(x, y, by = join_by("ID_REF")))
+expr <- lmap(efiles, \(x) read_tsv(here(x[[1]], names(x[1])))) |>
+  purrr::reduce(\(x, y) left_join(x, y, by = join_by("ID_REF")))
 meta <- dplyr::filter(meta, geo_accession %in% colnames(expr)) |>
   column_to_rownames(var = "geo_accession")
 expr <- dplyr::select(expr, all_of(c("ID_REF", rownames(meta)))) |>
@@ -114,15 +114,31 @@ expr <- dplyr::select(expr, all_of(c("ID_REF", rownames(meta)))) |>
   as.matrix()
 expr <- expr[, sort(colnames(expr))]
 meta <- meta[sort(rownames(meta)), ]
+
+# Represent genes with max of the probe value in group
+expr <- local({
+  rownames_to_column(as.data.frame(expr), var = "id") |>
+    mutate(symbol = g.probe2gene[id]) |>
+    dplyr::filter(!is.na(symbol)) |>
+    dplyr::group_by(symbol) |>
+    dplyr::summarise(across(where(is.numeric), max)) |>
+    dplyr::ungroup() |>
+    column_to_rownames(var = "symbol") |>
+    as.matrix()
+})
+
+# ------------- Routines below only depend on expr, meta and the probe mappings
+
 g.eset <- ExpressionSet(
   assayData = expr,
   phenoData = AnnotatedDataFrame(as.data.frame(meta))
 )
 
 g.eset <- g.eset[, !is.na(g.eset[["dmfs_status"]])]
-train_idx <- createDataPartition(g.eset[["dmfs_status"]], p = 0.8)[[1]]
-g.train_eset <- g.eset[, train_idx]
-g.test_eset <- g.eset[, -train_idx]
+## train_idx <- createDataPartition(g.eset[["dmfs_status"]], p = 0.8)[[1]]
+
+g.train_eset <- g.eset[, pData(g.eset)$subcohort != "GSE4922-GPL96"]
+g.test_eset <- g.eset[, pData(g.eset)$subcohort == "GSE4922-GPL96"]
 
 ## * Analyses
 
@@ -133,7 +149,8 @@ result <- list(
   endopredict_candidates = list(
     selection = original_set$Gene_name,
     probes = original_set$Probe_set
-  )
+  ),
+  endopredict_rep = list()
 )
 other_lists <- yaml::read_yaml(here(CUR_DIR, "gene_lists.yaml"))
 for (l in names(other_lists)) {
@@ -320,8 +337,7 @@ coefs <- coef(penalized_cox, s = "lambda.min") |>
   as.matrix() |>
   `colnames<-`("beta") |>
   as.data.frame() |>
-  rownames_to_column(var = "ID_REF") |>
-  mutate(symbol = g.probe2gene[ID_REF])
+  rownames_to_column(var = "symbol")
 
 
 nonzero <- dplyr::filter(coefs, beta > 0)
@@ -428,21 +444,31 @@ evaluate_cox <- function(feature_subset = NULL, name = NULL) {
 
 # Include random gene sets as a baseline
 with_randoms <- result
-n_random_probes <- 80
+n_random_genes <- 80
 n_random_iter <- 5
 for (i in seq(n_random_iter)) {
-  randoms <- sample(rownames(g.eset), n_random_probes)
-  with_randoms[[glue("random{n_random_probes}_{i}")]] <- list(probes = randoms)
+  randoms <- sample(rownames(g.eset), n_random_genes)
+  with_randoms[[glue("random{n_random_genes}_{i}")]] <- list(
+    selection = randoms
+  )
 }
-c_indices <- lapply(names(with_randoms), \(method) {
-  if (length(with_randoms[[method]]) > 0) {
-    evaluate_cox(
-      feature_subset = with_randoms[[method]]$probes,
-      name = method
-    )
-  } else {
-    tibble()
-  }
-}) |>
-  bind_rows()
-print(c_indices)
+
+c_indices <- read_existing(
+  here(OUTDIR, "feature_set_metrics.tsv"),
+  \(f) {
+    tb <- lapply(names(with_randoms), \(method) {
+      if (length(with_randoms[[method]]) > 0) {
+        evaluate_cox(
+          feature_subset = with_randoms[[method]]$selection,
+          name = method
+        )
+      } else {
+        tibble()
+      }
+    }) |>
+      bind_rows()
+    write_tsv(tb, f)
+    tb
+  },
+  read_tsv
+)
