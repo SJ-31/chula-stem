@@ -2,6 +2,7 @@ suppressMessages({
   library(here)
   library(tidyverse)
   library(glue)
+  library(ggsurvfit)
   library(AnnotationHub)
   library(ggplot2)
   library(Biobase)
@@ -31,6 +32,10 @@ OUTDIR <- here("analyses", "output", "brca", "re_endopredict")
 dir.create(OUTDIR)
 CALIB_OUTDIR <- here(OUTDIR, "calibration")
 dir.create(CALIB_OUTDIR)
+SC_OUTDIR <- here(OUTDIR, "survival_curves")
+dir.create(SC_OUTDIR)
+
+
 MPATH <- ENV$metadata_path
 TIME_HORIZON <- 50
 
@@ -165,6 +170,50 @@ for (l in names(other_lists)) {
 }
 
 ## ** Helper functions
+
+survival_curves <- function(model, data, cumulative = FALSE) {
+  sfit <- survfit(model, data)
+  key <- if (cumulative) "cumhaz" else "surv"
+  sfit[[key]] |>
+    as.data.frame() |>
+    `rownames<-`(sfit$time)
+}
+
+bind_for_surv <- function(surv, eset) {
+  if ("ExpressionSet" %in% class(eset)) {
+    df <- as.data.frame(t(exprs(eset)))
+  } else {
+    df <- eset
+  }
+  cbind(as.data.frame(as.matrix(surv)), df)
+}
+
+safe_ibs <- function(model, data, set) {
+  tb <- tibble(metric = "integrated_brier_score", Estimate = NA, set = set)
+  try(
+    tb <- tibble(
+      metric = "integrated_brier_score",
+      Estimate = IBS(model, data),
+      set = set
+    )
+  )
+  tb
+}
+
+##' Helper function to get scoring metrics from fitted coxph model `model`
+coxph2tb <- function(model) {
+  sm <- summary(model)
+  tibble(
+    coef = model$coefficients,
+    wald_test = sm$waldtest["test"],
+    wald_test_p = sm$waldtest["pvalue"],
+    lr_test = sm$logtest["test"],
+    lr_test_p = sm$logtest["pvalue"],
+    logrank_test = sm$sctest["test"],
+    logrank_test_p = sm$sctest["pvalue"]
+  )
+}
+
 
 viz_routine <- function(embeddings, x, y, prefix) {
   with_meta <- cbind(embeddings, pData(g.eset))
@@ -365,13 +414,11 @@ result$penalized_cox$common <- intersect(
 # NOTE: due to issues with predict.glmnet
 #   (it won't work for certain models, and raises uninformative errors),
 #   must resort to evaluation with scikit-survival
+# TODO: SurvMetrics' calculation of IBS is super slow, can replace with something else
 
-np <- import("numpy")
-sslm <- import("sksurv.linear_model")
-ssm <- import("sksurv.metrics")
-
-surv2structured_array(g.response, "y_train")
-surv2structured_array(g.test_response, "y_test")
+# Unused: if you need to go back to scikit-survival
+## surv2structured_array(g.response, "y_train")
+## surv2structured_array(g.test_response, "y_test")
 
 g.times <- seq(
   min(g.train_eset[["dmfs_time"]]),
@@ -380,67 +427,73 @@ g.times <- seq(
 )[-1]
 
 # %%
+# Certain metrics depend on the evaluated time `timeHorizon` parameter
+# - OE
+# - Brier
+# - Everything in `Calibration$Statistics`: ICI, E50, E90, Emax
 
 # Helper function for getting metrics for survival analysis on train and test datasets
 # Including the former gives an idea to the degree of overfitting
-get_survival_metrics <- function(model, x_test, y_test, statuses, times) {
-  pred <- model$predict(x_test)
-  cic_result <- ssm$concordance_index_censored(
-    np_array(statuses, dtype = "bool"),
-    times,
-    pred
+get_survival_metrics <- function(model, data, name) {
+  cal <- valProbSurvival(
+    model,
+    valdata = data,
+    plotCal = "ggplot",
+    timeHorizon = TIME_HORIZON,
+    nk = 5
   )
-  survs <- model$predict_survival_function(x_test)
-  surv_preds <- sapply(survs, \(surv_fn) {
-    vals <- sapply(g.times, \(t) surv_fn(t))
-    matrix(vals, nrow = 1, ncol = length(vals))
+  with_intervals <- list(
+    InTheLarge = c("Calibration", "OE"),
+    TimeDependentAUC = "Uno AUC",
+    Slope = c("Calibration", "calibration slope")
+  )
+
+  other_stats <- lmap(with_intervals, \(x) {
+    n <- names(x)
+    x <- x[[1]]
+    if (length(x) == 1) {
+      entry <- cal$stats[[n]]
+    } else {
+      entry <- cal$stats[[x[1]]][[n]]
+      x <- x[2]
+    }
+    tibble(
+      metric = x,
+      Estimate = entry[x[[1]]],
+      `2.5 %` = entry["2.5 %"],
+      `97.5 %` = entry["97.5 %"],
+    )
   }) |>
-    rbind() |>
-    t()
+    bind_rows()
 
-  ibs <- ssm$integrated_brier_score(
-    survival_train = py$y_train,
-    survival_test = y_test,
-    estimate = surv_preds,
-    times = g.times
+  ggsave(here(CALIB_OUTDIR, glue("{name}_curve.png")))
+  bind_rows(
+    other_stats,
+    tibble(metric = "integrated_brier_score", Estimate = IBS(model, data)),
+    rownames_to_column(as.data.frame(cal$stats$Concordance), var = "metric"),
   )
-
-  result <- list()
-  result$harell_c_index <- cic_result[1]
-  result$harell_concordant <- cic_result[2]
-  result$harell_discordant <- cic_result[3]
-  result$harell_tied_risk <- cic_result[4]
-  result$harell_tied_time <- cic_result[5]
-  result$integrated_brier <- ibs
-  tb <- as_tibble(result) |> mutate(across(everything(), unlist))
 }
 
 
 evaluate_cox <- function(feature_subset = NULL, name = NULL) {
   cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
   cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
-  model <- sslm$CoxPHSurvivalAnalysis()
-  ## model <- sslm$CoxnetSurvivalAnalysis(fit_baseline_model = TRUE)
-  x_train <- t(exprs(cur_eset))
-  model$fit(x_train, py$y_train)
+  x_train <- bind_for_surv(g.response, cur_eset)
+  x_test <- bind_for_surv(g.test_response, cur_test_eset)
+  model <- coxph(Surv(time, status) ~ ., data = x_train, x = TRUE)
 
-  train_metrics <- get_survival_metrics(
-    model,
-    x_test = x_train,
-    y_test = py$y_train,
-    statuses = g.train_status,
-    times = g.train_time
-  ) |>
-    mutate(set = "train")
-  test_metrics <- get_survival_metrics(
-    model,
-    x_test = t(exprs(cur_test_eset)),
-    y_test = py$y_test,
-    statuses = g.test_status,
-    times = g.test_time
-  ) |>
+  ## train_metrics <- get_survival_metrics(model, x_train) |> mutate(set = "train")
+  test_metrics <- get_survival_metrics(model, x_test, name) |>
     mutate(set = "test")
-  tb <- bind_rows(train_metrics, test_metrics) |> mutate(name = name)
+  metrics <- bind_rows(
+    test_metrics,
+    tibble(
+      metric = "integrated_brier_score",
+      Estimate = IBS(model, x_train),
+      set = "train"
+    )
+  )
+  tb <- mutate(metrics, name = name)
   message(glue("{name} complete"))
   return(tb)
 }
@@ -496,3 +549,47 @@ c_indices <- read_existing(
   },
   read_tsv
 )
+
+## ** Visualize results
+
+get_clustered_curves <- function(feature_subset, name, outdir, k = 8) {
+  responses <- list(train = g.response, test = g.test_response)
+  esets <- list(train = g.train_eset, test = g.test_eset)
+
+  plots <- lapply(c("train", "test"), \(n) {
+    eset <- esets[[n]]
+    response <- responses[[n]]
+    cur <- t(exprs(eset[rownames(eset) %in% feature_subset, ]))
+    clust <- hclust(dist(cur))
+    clusters <- paste0("cluster_", cutree(clust, k = k))
+    obj <- bind_for_surv(response, data.frame(cluster = clusters))
+    plot <- survfit2(Surv(time, status) ~ cluster, data = obj) |>
+      ggsurvfit() +
+      add_risktable(
+        theme = list(theme(plot.title = element_text(face = "bold")))
+      ) +
+      ggtitle(glue("Feature set: {name}")) +
+      xlab("Follow up time (months)") +
+      scale_ggsurvfit() +
+      ggsurvfit_build()
+    if (n == "test") {
+      plot <- plot + theme(axis.title.y = element_blank())
+    }
+    plot
+  }) |>
+    `names<-`(c("train", "test"))
+
+  plot <- cowplot::plot_grid(plots$train, plots$test, ncol = 2)
+  ggsave(
+    filename = glue("{outdir}/{name}_curves.png"),
+    plot = plot,
+    height = 12,
+    width = 15
+  )
+}
+
+for (n in names(with_randoms)) {
+  if (length(with_randoms[[n]]) > 0) {
+    get_clustered_curves(with_randoms[[n]]$selection, n, outdir = SC_OUTDIR)
+  }
+}
