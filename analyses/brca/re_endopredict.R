@@ -5,18 +5,23 @@ suppressMessages({
   library(AnnotationHub)
   library(ggplot2)
   library(Biobase)
-  library(caret)
   library(GEOquery)
+  library(CalibrationCurves)
+  library(SurvMetrics)
+  library(glmnet)
+  library(survival)
+  library(limma)
   setAnnotationHubOption("CACHE", here(".cache", "AnnotationHub"))
   source(here("src", "R", "utils.R"))
+  if (path.expand("~") == "/home/shannc") {
+    reticulate::use_condaenv("stem-base")
+  } else {
+    reticulate::use_condaenv("nf")
+  }
+  set.seed(3110)
+  library(reticulate)
 })
-if (path.expand("~") == "/home/shannc") {
-  reticulate::use_condaenv("stem-base")
-} else {
-  reticulate::use_condaenv("nf")
-}
-set.seed(3110)
-library(reticulate)
+
 
 GEO_CACHE <- here(".cache", "GEO")
 DATE <- format(Sys.time(), "%Y-%m-%d")
@@ -24,7 +29,10 @@ CUR_DIR <- here("analyses", "brca")
 ENV <- yaml::read_yaml(here(CUR_DIR, "env.yaml"))
 OUTDIR <- here("analyses", "output", "brca", "re_endopredict")
 dir.create(OUTDIR)
+CALIB_OUTDIR <- here(OUTDIR, "calibration")
+dir.create(CALIB_OUTDIR)
 MPATH <- ENV$metadata_path
+TIME_HORIZON <- 50
 
 g.probe2gene <- local({
   tb <- read_tsv(here(ENV$probe_mapping)) |>
@@ -252,7 +260,6 @@ viz_routine(umap_obj, "U1", "U2", "umap")
 
 ## *** DE
 
-library(limma)
 mm <- cbind(
   as.integer(g.train_eset[["dmfs_status"]] == 0),
   as.integer(g.train_eset[["dmfs_status"]] == 1)
@@ -265,18 +272,13 @@ contrast <- makeContrasts(no_recurrence - recurrence, levels = mm)
 fit2 <- contrasts.fit(fit, contrast)
 fit2 <- eBayes(fit2, robust = TRUE)
 top <- topTable(fit2, number = dim(g.train_eset)[1], p.value = 0.05)
-top$symbol <- g.probe2gene[rownames(top)]
 
-result$de$selection <- unique(top$symbol) |> discard(is.na)
-result$de$probes <- rownames(top)
+result$de$selection <- rownames(top)
 result$de$common <- intersect(original_set$Gene_name, top$symbol)
 
 ## *** Logistic regression with Lasso
 
 ## ** Survival analysis
-
-library(glmnet)
-library(survival)
 
 g.response <- Surv(
   time = g.train_eset[["dmfs_time"]],
