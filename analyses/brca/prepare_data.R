@@ -22,10 +22,12 @@ mpath <- env$metadata_path
 
 from_sample_table <- function(infile, outfile) {
   gsms <- GSMList(getGEO(filename = infile))
+
   lapply(names(gsms), \(name) {
     Table(gsms[[name]]) |>
       as_tibble() |>
-      rename(VALUE = name)
+      dplyr::rename(setNames("VALUE", name)) |>
+      select(ID_REF, !!as.symbol(name))
   }) |>
     purrr::reduce(\(x, y) left_join(x, y, by = join_by(ID_REF))) |>
     write_tsv(outfile)
@@ -34,8 +36,15 @@ from_sample_table <- function(infile, outfile) {
 # Extract expression data in sample tables of GSE80999
 format_GSE80999 <- function() {
   from_sample_table(
-    here(env$raw_path, "GSE80999", "GSE80999_family.soft.gz"),
-    here(env$raw_path, "GSE80999", "GSE80999.tsv")
+    here(env$data_path, "GSE80999", "GSE80999_family.soft.gz"),
+    here(env$data_path, "GSE80999", "GSE80999.tsv")
+  )
+}
+
+format_GSE4922 <- function() {
+  from_sample_table(
+    here(env$data_path, "GSE4922", "GSE4922_family.soft.gz"),
+    here(env$data_path, "GSE4922", "GSE4922.tsv")
   )
 }
 
@@ -172,7 +181,7 @@ recode_subtype <- function(vec) {
 
 # Sample columns to keep or generate
 SHARED_COLS <- c(
-  "join_id", # identifier column with which to join columns in raw data
+  "join_id", # identifier column with which to join columns in processed data
   "patient_id", # identifier column for patients (some datasets have pre-, post-)
   "dataset",
   "subtype", # brca subtype
@@ -309,9 +318,9 @@ esets <- lapply(names(env$datasets), \(name) {
     gene_id_style <- env$gene_id
   }
   # Take the first file in the directory by default
-  dir <- here(env$raw_path, name)
-  if (!is.null(lget(cur, "files", list())$raw)) {
-    file <- here(dir, cur$files$raw)
+  dir <- here(env$data_path, name)
+  if (!is.null(lget(cur, "files", list())$processed)) {
+    file <- here(dir, cur$files$processed)
   } else {
     file <- list.files(dir, full.names = TRUE)[1]
   }
