@@ -169,7 +169,8 @@ result <- list(
     selection = original_set$Gene_name,
     probes = original_set$Probe_set
   ),
-  endopredict_rep = list()
+  endopredict_rep = list(),
+  ep_rep_committee = list()
 )
 other_lists <- yaml::read_yaml(here(CUR_DIR, "gene_lists.yaml"))
 for (l in names(other_lists)) {
@@ -438,6 +439,7 @@ ori_wrapper <- function(eset) {
     mutate(p.adjust = p.adjust(p.value))
 }
 
+
 endopredict_selection <- read_existing(
   here(O$main, "endopredict_original_selection.tsv"),
   \(f) {
@@ -455,6 +457,118 @@ result$endopredict_rep$common <- intersect(
   ep_significant$term,
   original_set$Gene_name
 )
+
+testph <- fit_coxph(g.train_eset, g.response, result$endopredict_rep$selection)
+
+## *** Replicate of final algorithm
+
+ori_final_algo <- function(
+  n_members = 4,
+  n_var_per_member = 2,
+  wald_threshold = 0.05,
+  prog_threshold = 0.05,
+  tolerance = 100
+) {
+  library(aod)
+  cohorts <- unique(pData(g.train_eset)$subcohort)
+  filtered <- filter_features(g.train_eset, result$endopredict_rep$selection)
+  all_features <- result$endopredict_rep$selection
+  committee <- list()
+
+  calculate_regression <- function(cur_features) {
+    from_cohorts <- lapply(cohorts, \(cohort) {
+      mask <- pData(filtered)$subcohort == cohort
+      cur_train <- filtered[rownames(filtered) %in% cur_features, mask]
+      cur_resp <- g.response[mask, ]
+      cur_train <- bind_for_surv(cur_resp, cur_train)
+      model <- coxph(Surv(time, status) ~ ., data = cur_train, x = TRUE)
+      cf <- as.data.frame(summary(model)$coefficients)
+      vcov <- vcov(model)
+      wt <- map_dbl(seq_along(nrow(cf)), \(i) {
+        wald.test(Sigma = vcov, b = cf$coef, Terms = i)$result$chi2[
+          "P"
+        ]
+      })
+      tibble(
+        feature = rownames(cf),
+        coef = cf$coef,
+        var = cf$`se(coef)`,
+        cohort = cohort,
+        wt = p.adjust(wt)
+      )
+    }) |>
+      bind_rows()
+    sig_features <- unique(filter(from_cohorts, wt <= wald_threshold)$feature)
+
+    lapply(cur_features, \(feat) {
+      if (!feat %in% sig_features) {
+        tibble(feature = feat, coef = NA, var = NA, p = 1)
+      } else {
+        f_tb <- dplyr::filter(from_cohorts, feature == feat)
+        v <- 1 / mean(f_tb$var)
+        c <- sum((f_tb$coef * (1 / f_tb$var)) * v)
+        p <- 2 * pnorm(-abs(c) / sqrt(v))
+        tibble(feature = feat, coef = c, var = v, p = p)
+      }
+    }) |>
+      bind_rows()
+  }
+
+  while (length(committee) != n_members) {
+    member_features <- tibble()
+    rounds_unchanged <- 0
+    while (nrow(member_features) != n_var_per_member) {
+      if (rounds_unchanged >= tolerance) {
+        stop("Failed to converge")
+      }
+      for (features in suppressWarnings(setdiff(
+        all_features,
+        member_features$feature
+      ))) {
+        prev_size <- nrow(member_features)
+
+        res <- calculate_regression(features)
+        best_f <- arrange(res, p) |> slice_head(n = 1)
+        if (best_f$p <= wald_threshold) {
+          member_features <- bind_rows(member_features, best_f)
+          if (nrow(member_features) == n_var_per_member) {
+            break
+          }
+        }
+
+        res2 <- calculate_regression(member_features$feature)
+        insig <- res2 |>
+          dplyr::filter(p > prog_threshold) |>
+          pluck("feature")
+
+        member_features <- member_features |> filter(!feature %in% insig)
+
+        cur_size <- nrow(member_features)
+        if (prev_size == cur_size) {
+          rounds_unchanged <- rounds_unchanged + 1
+        } else {
+          rounds_unchanged <- 0
+        }
+      }
+    }
+    member_res <- calculate_regression(member_features$feature)
+    committee[[length(committee) + 1]] <- member_res
+    all_features <- setdiff(all_features, member_res$feature)
+  }
+  committee
+}
+
+committee <- ori_final_algo()
+result$ep_rep_committee <- list()
+result$ep_rep_committee$selection <- unlist(lapply(
+  committee,
+  \(x) x$feature
+))
+result$ep_rep_committee$common <- intersect(
+  original_set$Gene_name,
+  result$ep_rep_committee$selection
+)
+
 
 ## *** Multivariable Cox
 
