@@ -55,10 +55,11 @@ basename_no_ext <- function(file) {
 #' Flatten the character vector `char_vec` by `separator`, then
 #'  get unique values
 flatten_by <- function(
-    char_vec,
-    separator = ";",
-    collapse = TRUE,
-    unique = FALSE) {
+  char_vec,
+  separator = ";",
+  collapse = TRUE,
+  unique = FALSE
+) {
   helper <- function(str) {
     if (is.na(str)) {
       return(NA)
@@ -115,10 +116,18 @@ to <- function(obj, x, val) {
 
 
 read_existing <- function(filename, expr, read_fn = identity) {
-  if (file.exists(filename)) {
-    read_fn(filename)
+  if (class(filename) != "list") {
+    if (file.exists(filename)) {
+      read_fn(filename)
+    } else {
+      expr(filename)
+    }
   } else {
-    expr(filename)
+    if (all(map_lgl(filename, file.exists))) {
+      sapply(filename, read_fn, simplify = FALSE, USE.NAMES = TRUE)
+    } else {
+      expr(filename)
+    }
   }
 }
 
@@ -151,13 +160,14 @@ get_legend <- function(myggplot) {
 #' @param id_mapping a two-column tb or df where the first column is the old ids and
 #'    the second column is the new
 get_rnaseq_counts <- function(
-    metadata_tb,
-    id_mapping = NULL,
-    sample_col = "cases",
-    file_col = "files",
-    gene_col = 1,
-    count_col = 2,
-    read_fn = \(x) read_tsv(x, col_names = FALSE)) {
+  metadata_tb,
+  id_mapping = NULL,
+  sample_col = "cases",
+  file_col = "files",
+  gene_col = 1,
+  count_col = 2,
+  read_fn = \(x) read_tsv(x, col_names = FALSE)
+) {
   sum_counts <- function(tb) {
     cols <- colnames(tb)
     gcol <- cols[1]
@@ -273,27 +283,28 @@ shift_stranded <- function(x, shift = 0L, ...) {
 }
 
 into_granges <- function(
-    vep_file,
-    allowed_consequences = c(
-      "missense_variant",
-      "frameshift_variant",
-      "downstream_gene_variant",
-      "upstream_gene_variant",
-      "stop_gained",
-      "splice_region_variant",
-      "inframe_deletion",
-      "splice_donor_5th_base_variant"
-    ),
-    wanted_cols = c(
-      "ref",
-      "alt",
-      "vaf",
-      "alt_depth",
-      "gene_biotype",
-      "symbol",
-      "consequence",
-      "existing_variation"
-    )) {
+  vep_file,
+  allowed_consequences = c(
+    "missense_variant",
+    "frameshift_variant",
+    "downstream_gene_variant",
+    "upstream_gene_variant",
+    "stop_gained",
+    "splice_region_variant",
+    "inframe_deletion",
+    "splice_donor_5th_base_variant"
+  ),
+  wanted_cols = c(
+    "ref",
+    "alt",
+    "vaf",
+    "alt_depth",
+    "gene_biotype",
+    "symbol",
+    "consequence",
+    "existing_variation"
+  )
+) {
   library(GenomicRanges)
   if (is.character(vep_file)) {
     tb <- read_tsv(vep_file)
@@ -326,3 +337,29 @@ into_granges <- function(
   gr
 }
 
+reduce_by_name <- function(
+  lst,
+  fn = bind_rows,
+  names = NULL,
+  fn_by_name = NULL
+) {
+  if (length(lst) == 0) {
+    stop("`lst` must not be empty")
+  }
+  if (is.null(names)) names <- names(lst[[1]])
+  reduce(lst, \(x, y) {
+    sapply(
+      names,
+      \(n) {
+        if (n %in% names(fn_by_name)) {
+          cur_fn <- fn_by_name[[n]]
+        } else {
+          cur_fn <- fn
+        }
+        cur_fn(x[[n]], y[[n]])
+      },
+      simplify = FALSE,
+      USE.NAMES = TRUE
+    )
+  })
+}
