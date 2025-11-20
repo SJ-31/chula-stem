@@ -8,7 +8,6 @@ suppressMessages({
   library(Biobase)
   library(GEOquery)
   library(CalibrationCurves)
-  library(SurvMetrics)
   library(glmnet)
   library(survival)
   library(limma)
@@ -28,12 +27,14 @@ GEO_CACHE <- here(".cache", "GEO")
 DATE <- format(Sys.time(), "%Y-%m-%d")
 CUR_DIR <- here("analyses", "brca")
 ENV <- yaml::read_yaml(here(CUR_DIR, "env.yaml"))
-OUTDIR <- here("analyses", "output", "brca", "re_endopredict")
-dir.create(OUTDIR)
-CALIB_OUTDIR <- here(OUTDIR, "calibration")
-dir.create(CALIB_OUTDIR)
-SC_OUTDIR <- here(OUTDIR, "survival_curves")
-dir.create(SC_OUTDIR)
+
+O <- list(main = here("analyses", "output", "brca", "re_endopredict"))
+O$calib <- here(O$main, "calibration")
+O$sc <- here(O$main, "survival_curves")
+O$assumptions <- here(O$main, "cph_assumptions")
+for (outdir in O) {
+  dir.create(outdir)
+}
 
 
 MPATH <- ENV$metadata_path
@@ -91,7 +92,8 @@ meta <- lapply(names(mfiles), \(x) {
   if (x == "GSE6532-GPL96") {
     tb <- mutate(tb, dmfs_time = floor(dmfs_time / (365.24 / 12)))
   } else if (x == "GSE4922-GPL96") {
-    tb <- mutate(tb, dmfs_time = floor(dmfs_time * 12))
+    tb <- mutate(tb, dmfs_time = floor(dmfs_time * 12)) |>
+      dplyr::filter(er_status == "ER+")
   }
   to_replace <- spec$meta_replace
   for (col in names(to_replace)) {
@@ -150,6 +152,13 @@ g.eset <- g.eset[, !is.na(g.eset[["dmfs_status"]])]
 g.train_eset <- g.eset[, pData(g.eset)$subcohort != "GSE4922-GPL96"]
 g.test_eset <- g.eset[, pData(g.eset)$subcohort == "GSE4922-GPL96"]
 
+g.times <- seq(
+  min(g.train_eset[["dmfs_time"]]),
+  max(g.train_eset[["dmfs_time"]]),
+  by = 20
+)[-1]
+
+
 ## * Analyses
 
 result <- list(
@@ -179,6 +188,10 @@ survival_curves <- function(model, data, cumulative = FALSE) {
     `rownames<-`(sfit$time)
 }
 
+filter_features <- function(eset, features) {
+  eset[rownames(eset) %in% features, ]
+}
+
 bind_for_surv <- function(surv, eset) {
   if ("ExpressionSet" %in% class(eset)) {
     df <- as.data.frame(t(exprs(eset)))
@@ -188,16 +201,12 @@ bind_for_surv <- function(surv, eset) {
   cbind(as.data.frame(as.matrix(surv)), df)
 }
 
-safe_ibs <- function(model, data, set) {
-  tb <- tibble(metric = "integrated_brier_score", Estimate = NA, set = set)
-  try(
-    tb <- tibble(
-      metric = "integrated_brier_score",
-      Estimate = IBS(model, data),
-      set = set
-    )
-  )
-  tb
+fit_coxph <- function(eset, y, subset = NULL) {
+  if (!is.null(subset)) {
+    eset <- eset[rownames(eset) %in% subset, ]
+  }
+  train <- bind_for_surv(y, eset)
+  coxph(Surv(time, status) ~ ., data = train, x = TRUE)
 }
 
 ##' Helper function to get scoring metrics from fitted coxph model `model`
@@ -235,7 +244,7 @@ viz_routine <- function(embeddings, x, y, prefix) {
     theme(axis.title.y = element_blank())
   combined <- cowplot::plot_grid(viz, subcohort)
   ggsave(
-    here(OUTDIR, glue("{prefix}_combined.png")),
+    here(O$main, glue("{prefix}_combined.png")),
     combined,
     width = 15,
     height = 8
@@ -293,9 +302,35 @@ surv2structured_array <- function(surv, obj_name) {
 
 ## ** Visualization
 
+surv_summary_tibble <- function(fit, times = NULL) {
+  # Compute the survival summary, optionally at specified times
+  s <- summary(fit, times = times)
+  n <- length(s$time)
+  strata <- if (!is.null(s$strata)) {
+    rep(names(s$strata), times = s$strata)
+  } else {
+    NULL
+  }
+  tb <- tibble(
+    time = s$time,
+    n_risk = s$n.risk,
+    n_event = s$n.event,
+    n_censor = s$n.censor,
+    surv = s$surv,
+    std_err = s$std.err,
+    conf_low = s$lower,
+    conf_high = s$upper
+  )
+  if (!is.null(strata)) {
+    tb$strata <- strata
+  }
+  tb
+}
+
+
 ## *** PCA
 pca_obj <- read_existing(
-  here(OUTDIR, "prcomp.rds"),
+  here(O$main, "prcomp.rds"),
   \(f) {
     obj <- prcomp(t(exprs(g.eset)))
     saveRDS(obj, f)
@@ -310,7 +345,7 @@ viz_routine(as.data.frame(pca_obj$x), "PC1", "PC2", "pca")
 ## *** UMAP
 
 umap_obj <- read_existing(
-  here(OUTDIR, "umap.rds"),
+  here(O$main, "umap.rds"),
   \(f) {
     module <- reticulate::import("umap")
     umap <- module$UMAP()
@@ -355,14 +390,24 @@ g.response <- Surv(
   time = g.train_eset[["dmfs_time"]],
   event = g.train_eset[["dmfs_status"]]
 )
-g.test_time <- g.test_eset[["dmfs_time"]]
-g.test_status <- g.test_eset[["dmfs_status"]]
-g.train_time <- g.train_eset[["dmfs_time"]]
-g.train_status <- g.train_eset[["dmfs_status"]]
 g.test_response <- Surv(
   time = g.test_eset[["dmfs_time"]],
   event = g.test_eset[["dmfs_status"]]
 )
+
+train_surv <- survfit(
+  Surv(time, status) ~ 1,
+  data = bind_for_surv(g.response, g.train_eset)
+) |>
+  surv_summary_tibble(c(0, g.times))
+write_tsv(train_surv, here(O$main, "train_survival.tsv"))
+
+test_surv <- survfit(
+  Surv(time, status) ~ 1,
+  data = bind_for_surv(g.test_response, g.test_eset)
+) |>
+  surv_summary_tibble(c(0, g.times))
+write_tsv(test_surv, here(O$main, "test_survival.tsv"))
 
 ## *** Original EndoPredict
 ## Method is univariate and bivariate cox
@@ -394,7 +439,7 @@ ori_wrapper <- function(eset) {
 }
 
 endopredict_selection <- read_existing(
-  here(OUTDIR, "endopredict_original_selection.tsv"),
+  here(O$main, "endopredict_original_selection.tsv"),
   \(f) {
     tb <- ori_wrapper()
     write_tsv(tb, f)
@@ -403,10 +448,9 @@ endopredict_selection <- read_existing(
   read_tsv
 )
 
-# [2025-11-17 Mon] no
 ep_significant <- dplyr::filter(endopredict_selection, p.adjust <= 0.05)
 
-result$endopredict_rep$selection <- ep_significant$term
+result$endopredict_rep$selection <- unique(ep_significant$term)
 result$endopredict_rep$common <- intersect(
   ep_significant$term,
   original_set$Gene_name
@@ -416,7 +460,7 @@ result$endopredict_rep$common <- intersect(
 
 glmnet_cox_wrapper <- function(name, eset, penalized = FALSE) {
   read_existing(
-    here(OUTDIR, glue("{name}.rds")),
+    here(O$main, glue("{name}.rds")),
     \(f) {
       x <- t(exprs(eset))
       y <- g.response
@@ -461,22 +505,14 @@ result$penalized_cox$common <- intersect(
 # NOTE: due to issues with predict.glmnet
 #   (it won't work for certain models, and raises uninformative errors),
 #   must resort to evaluation with scikit-survival
-# TODO: SurvMetrics' calculation of IBS is super slow, can replace with something else
 
 # Unused: if you need to go back to scikit-survival
 ## surv2structured_array(g.response, "y_train")
 ## surv2structured_array(g.test_response, "y_test")
 
-g.times <- seq(
-  min(g.train_eset[["dmfs_time"]]),
-  max(g.train_eset[["dmfs_time"]]),
-  by = 20
-)[-1]
-
 # %%
 # Certain metrics depend on the evaluated time `timeHorizon` parameter
 # - OE
-# - Brier
 # - Everything in `Calibration$Statistics`: ICI, E50, E90, Emax
 
 # Helper function for getting metrics for survival analysis on train and test datasets
@@ -491,7 +527,6 @@ get_survival_metrics <- function(model, data, name) {
   )
   with_intervals <- list(
     InTheLarge = c("Calibration", "OE"),
-    TimeDependentAUC = "Uno AUC",
     Slope = c("Calibration", "calibration slope")
   )
 
@@ -513,43 +548,63 @@ get_survival_metrics <- function(model, data, name) {
   }) |>
     bind_rows()
 
-  ggsave(here(CALIB_OUTDIR, glue("{name}_curve.png")))
+  ggsave(here(O$calib, glue("{name}_curve.png")))
   bind_rows(
     other_stats,
-    tibble(metric = "integrated_brier_score", Estimate = IBS(model, data)),
     rownames_to_column(as.data.frame(cal$stats$Concordance), var = "metric"),
   )
 }
 
+get_aucs <- function(model, test, name) {
+  library(survAUC)
+  auc_uno <- AUC.uno(
+    Surv.rsp = g.response,
+    Surv.rsp.new = g.test_response,
+    lpnew = predict(model, test),
+    times = g.times
+  )
+  auc_sh <- AUC.sh(
+    Surv.rsp = g.response,
+    lp = predict(model),
+    lpnew = predict(model, test),
+    times = g.times,
+    type = "cumulative"
+  )
+  tb <- tibble(times = g.times)
+  tb[[glue("{name}_uno")]] <- auc_uno$auc
+  tb[[glue("{name}_sh")]] <- auc_sh$auc
+  list(at_times = tb, iauc = list(uno = auc_uno$iauc, sh = auc_sh$iauc))
+}
 
 evaluate_cox <- function(feature_subset = NULL, name = NULL) {
-  cur_eset <- g.train_eset[rownames(g.train_eset) %in% feature_subset, ]
   cur_test_eset <- g.test_eset[rownames(g.test_eset) %in% feature_subset, ]
-  x_train <- bind_for_surv(g.response, cur_eset)
-  x_test <- bind_for_surv(g.test_response, cur_test_eset)
-  model <- coxph(Surv(time, status) ~ ., data = x_train, x = TRUE)
 
-  ## train_metrics <- get_survival_metrics(model, x_train) |> mutate(set = "train")
-  test_metrics <- get_survival_metrics(model, x_test, name) |>
-    mutate(set = "test")
+  model <- fit_coxph(g.train_eset, g.response, feature_subset)
+  check <- cox.zph(model)
+  check$table |>
+    as.data.frame() |>
+    rownames_to_column(var = "feature") |>
+    write_tsv(here(O$assumptions, glue("{name}.tsv")))
+
+  x_test <- bind_for_surv(g.test_response, cur_test_eset)
+  x_train <- bind_for_surv(g.response, model$x)
+
+  test_metrics <- get_survival_metrics(model, x_test, name)
+
+  aucs <- get_aucs(model, x_test, name)
+
   metrics <- bind_rows(
     test_metrics,
     tibble(
-      metric = "integrated_brier_score",
-      Estimate = IBS(model, x_train),
-      set = "train"
+      metric = c("Uno iAUC", "Song&Zhou iAUC"),
+      Estimate = c(aucs$iauc$uno, aucs$iauc$sh)
     )
   )
-  tb <- mutate(metrics, name = name)
+  tb <- mutate(test_metrics, name = name)
   message(glue("{name} complete"))
-  return(tb)
+  return(list(misc = tb, auc = aucs$at_times))
 }
 
-# TODO: make a function for getting AUCs
-
-## get_aucs <- function(model) {
-##   lpnew <-
-## }
 
 ## ** Run
 
@@ -564,27 +619,41 @@ for (i in seq(n_random_iter)) {
   )
 }
 
-c_indices <- read_existing(
-  here(OUTDIR, "feature_set_metrics.tsv"),
+tmp <- read_existing(
+  list(
+    misc = here(O$main, "test_set_metrics.tsv"),
+    auc = here(O$main, "test_set_aucs.tsv")
+  ),
   \(f) {
-    tb <- lapply(names(with_randoms), \(method) {
+    tibbles <- lapply(names(with_randoms), \(method) {
       if (length(with_randoms[[method]]) > 0) {
         evaluate_cox(
           feature_subset = with_randoms[[method]]$selection,
           name = method
         )
-      } else {
-        tibble()
       }
     }) |>
-      bind_rows()
-    write_tsv(tb, f)
-    tb
+      discard(is.null)
+    result <- reduce_by_name(
+      tibbles,
+      fn = bind_rows,
+      fn_by_name = list(auc = \(x, y) inner_join(x, y, by = join_by(times)))
+    )
+    write_tsv(result$misc, f$misc)
+    write_tsv(result$auc, f$auc)
+    result
   },
   read_tsv
 )
+main_metrics <- tmp$misc
+aucs <- tmp$auc
+
 
 ## ** Visualize results
+
+# TODO: redo this by instead stratifying patients by their hazard as obtained by the model
+# And you can check if there is a statistically significant difference with logrank test, but make sure if this is something valid
+# nah you should just learn how to properly interpret a cox model
 
 get_clustered_curves <- function(feature_subset, name, outdir, k = 8) {
   responses <- list(train = g.response, test = g.test_response)
@@ -602,9 +671,9 @@ get_clustered_curves <- function(feature_subset, name, outdir, k = 8) {
       add_risktable(
         theme = list(theme(plot.title = element_text(face = "bold")))
       ) +
-      ggtitle(glue("Feature set: {name}")) +
+      ggtitle(n) +
       xlab("Follow up time (months)") +
-      scale_ggsurvfit() +
+      scale_ggsurvfit() |>
       ggsurvfit_build()
     if (n == "test") {
       plot <- plot + theme(axis.title.y = element_blank())
@@ -624,7 +693,7 @@ get_clustered_curves <- function(feature_subset, name, outdir, k = 8) {
 
 for (n in names(with_randoms)) {
   if (length(with_randoms[[n]]) > 0) {
-    get_clustered_curves(with_randoms[[n]]$selection, n, outdir = SC_OUTDIR)
+    get_clustered_curves(with_randoms[[n]]$selection, n, outdir = O$sc)
   }
 }
 
@@ -645,3 +714,88 @@ overlap_df <- local({
 })
 set_dist <- vegan::vegdist(overlap_df, method = "jaccard")
 
+## ** Compare models
+
+yaml::write_yaml(result, here(O$main, "feature_list.yaml"))
+
+## *** visualize previous
+
+# TODO:
+
+## *** compareC
+
+#' Compare the c-indices of fitted coxph models m1, m2
+#' on `data`
+#'
+#' @param y_true Surv object containing observed events
+#' @param x1 Dataframe of shape n_samples x n_predictors
+compareC_wrapper <- function(m1, m2, y_true, x1, x2 = NULL) {
+  library(compareC)
+  x1 <- bind_for_surv(y_true, x1)
+  pred1 <- survival_curves(m1, x1)
+  if (is.null(x2)) {
+    x2 <- x2
+  } else {
+    x2 <- bind_for_surv(y_true, x2)
+  }
+  pred2 <- survival_curves(m2, x2)
+  status <- x1$status
+  times <- rownames(pred1)
+  lapply(seq_len(nrow(y_true)), \(i) {
+    score1 <- pred1[, i]
+    score2 <- pred2[, i]
+    comparison <- compareC(times, status, score1, score2)
+    comparison$est.c <- NULL
+    as_tibble(comparison)
+  }) |>
+    bind_rows() |>
+    mutate(padj = p.adjust(pval)) |>
+    summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+}
+
+combinations <- combn(
+  names(purrr::keep_at(with_randoms, \(names) {
+    map_lgl(names, \(n) {
+      length(with_randoms[[n]]) > 0 &&
+        (!str_detect(n, "random") || n == glue("random{n_random_genes}_1"))
+    })
+  })),
+  2
+)
+
+cc_wrapper <- function() {
+  apply(combinations, 2, \(pair) {
+    x <- pair[1]
+    y <- pair[2]
+    f1 <- result[[x]]$selection
+    f2 <- result[[y]]$selection
+    m1 <- fit_coxph(g.train_eset, g.response, f1)
+    m2 <- fit_coxph(g.train_eset, g.response, f2)
+    tb_train <- compareC_wrapper(m1, m2, g.response, m1$x, m2$x) |>
+      mutate(set = "train")
+    print(tb_train)
+    tb_test <- compareC_wrapper(
+      m1,
+      m2,
+      g.test_response,
+      filter_features(g.test_eset, f1),
+      filter_features(g.test_eset, f2)
+    ) |>
+      mutate(set = "test")
+    bind_rows(tb_train, tb_test) |> mutate(comparison = glue("{x} vs {y}"))
+  }) |>
+    bind_rows()
+}
+
+print(dim(combinations))
+
+## BUG: this fails horribly
+## concordance_comparison <- read_existing(
+##   here(O$main, "concordance_comparison.tsv"),
+##   \(f) {
+##     tb <- cc_wrapper()
+##     write_tsv(f)
+##     tb
+##   },
+##   read_tsv
+## )
