@@ -1,0 +1,15 @@
+samples = ["P17"]
+on_missing = "create"
+
+[names]
+results = "variant_calling_shannc"
+cancer_type = "hcc"
+data_modality = "exome"
+cohort = "unassigned"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/HCC/Exome"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+P17 = "17"

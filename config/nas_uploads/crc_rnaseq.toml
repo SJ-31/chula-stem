@@ -1,0 +1,98 @@
+samples = [
+  "CEN2-44-C",
+  "CEN2-46-C",
+  "CEN2-47-C",
+  "CEN2-48-C",
+  "CEN2-51-C",
+  "CEN2-52-C",
+  "CEN2-N30-C",
+  "CEN2-N31-C",
+  "CEN2-N32-C",
+  "CEN2-N33-C",
+  "CEN2-N35-C",
+  "CEN2-N36-C",
+  "CEN2-N37-C",
+  "CEN2-N39-C",
+  "CEN2-N40-C",
+  "CEN2-N42-C",
+  "CEN2-N43-C",
+  "N14",
+  "N14-C-CO",
+  "N14-C-WO",
+  "N20-C-CO",
+  "N20-C-WO",
+  "N24",
+  "N24-C-CO",
+  "N24-C-WO",
+  "N26-C",
+  "N28-C",
+  "N4-2-C-CO",
+  "N4-2-C-WO",
+  "N9-C-CO",
+  "N9-C-WO",
+]
+on_missing = "create"
+
+[names]
+results = "rnaseq_default_shannc"
+cohort = "unassigned"
+data_modality = "rnaseq"
+cancer_type = "crc"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/CRC/RNASEQ"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+"CEN2-52-C" = "CEN2-52"
+"CEN2-51-C" = "CEN2-51"
+"CEN2-48-C" = "CEN2-48"
+"CEN2-47-C" = "CEN2-47"
+"CEN2-46-C" = "CEN2-46"
+"CEN2-44-C" = "CEN2-44"
+CEN2-N30-C = "CEN2-N30"
+CEN2-N31-C = "CEN2-N31"
+CEN2-N32-C = "CEN2-N32"
+CEN2-N33-C = "CEN2-N33"
+CEN2-N35-C = "CEN2-N35"
+CEN2-N36-C = "CEN2-N36"
+CEN2-N37-C = "CEN2-N37"
+CEN2-N39-C = "CEN2-N39"
+CEN2-N40-C = "CEN2-N40"
+CEN2-N42-C = "CEN2-N42"
+CEN2-N43-C = "CEN2-N43"
+N26-C = "N26"
+N28-C = "N28"
+
+[cohort_override]
+"CEN2-52-C" = "CRC-QT18030001-RNA-Seq_Part_11"
+"CEN2-51-C" = "CRC-QT18030001-RNA-Seq_Part_11"
+"CEN2-48-C" = "CRC-QT18030001-RNA-Seq_Part_11"
+"CEN2-47-C" = "CRC-QT18030001-RNA-Seq_Part_11"
+"CEN2-46-C" = "CRC-QT18030001-RNA-Seq_Part_11"
+"CEN2-44" = "CRC-QT18030001-RNA-Seq_Part_11"
+CEN2-N30-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N31-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N32-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N33-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N35-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N36-C = "CRC-QT18030001-RNA-Seq_Part_7"
+CEN2-N37-C = "CRC-QT18030001-RNA-Seq_Part_9"
+CEN2-N39-C = "CRC-QT18030001-RNA-Seq_Part_9"
+CEN2-N40-C = "CRC-QT18030001-RNA-Seq_Part_9"
+CEN2-N42-C = "CRC-QT18030001-RNA-Seq_Part_9"
+CEN2-N43-C = "CRC-QT18030001-RNA-Seq_Part_9"
+N14-C-CO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N9-C-CO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N9-C-WO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N4-2-C-CO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N4-2-C-WO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N14-C-WO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N20-C-CO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N20-C-WO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N24-C-CO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N24-C-WO = "CRC_GF_condition_QT18030001-GF_RNA-Seq_Part_6"
+N14 = "unassigned"
+N24 = "unassigned"
+N26-C = "unassigned"
+N28-C = "unassigned"

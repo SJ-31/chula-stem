@@ -1,0 +1,7 @@
+sample,old,new,status,override
+CEN2_N18,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/CEN2_N18,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/CEN2/N18/processed/variant_calling_shannc,success,False
+CEN2_N27,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/CEN2_N27,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/CEN2/N27/processed/variant_calling_shannc,success,False
+D-CEN2-N22,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/D-CEN2-N22,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/D-CEN2/N22/processed/variant_calling_shannc,success,False
+D-CEN2-N20,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/D-CEN2-N20,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/D-CEN2/N20/processed/variant_calling_shannc,success,False
+N20,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/N20,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/D-CEN2/N20/processed/variant_calling_shannc,success,False
+N22,/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/N22,/data/project/stemcell/shannc/output/cancer_ngs/exome/crc/D-CEN2/N22/processed/variant_calling_shannc,success,False

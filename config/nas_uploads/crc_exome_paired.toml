@@ -1,0 +1,74 @@
+samples = [
+  "CEN2_N1",
+  "CEN2_N4",
+  "CEN2_N5",
+  "CEN2_N7",
+  "CEN2_N8",
+  "CEN2_N9",
+  "CEN2_N10",
+  "CEN2_N11",
+  "CEN2_N14",
+  "CEN2_N16",
+  "CEN2_N23",
+  "CEN2_N24",
+  "CEN2_N28",
+  "CEN2_N30",
+  "CEN2_N31",
+  "CEN2_N32",
+  "CEN2_N33",
+  "CEN2_N35",
+  "CEN2_N36",
+  "CEN2_N37",
+  "CEN2_N39",
+  "CEN2_N40",
+  "CEN2_N42",
+  "CEN2_N43",
+]
+summary_ignore = [
+  "CEN2_N18",
+  "CEN2_N27",
+  "D-CEN2-N20",
+  "D-CEN2-N22",
+  "N20",
+  "N22",
+]
+on_missing = "create"
+
+[names]
+results = "variant_calling_shannc"
+cancer_type = "crc"
+data_modality = "exome"
+cohort = "CEN2"
+
+
+[paths]
+results = "/data/project/stemcell/shannc/output/CRC/EXOME-PAIRED"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+CEN2_N18 = "N18"
+CEN2_N27 = "N27"
+CEN2_N1 = "N1"
+CEN2_N4 = "N4"
+CEN2_N5 = "N5"
+CEN2_N7 = "N7"
+CEN2_N8 = "N8"
+CEN2_N9 = "N9"
+CEN2_N10 = "N10"
+CEN2_N11 = "N11"
+CEN2_N14 = "N14"
+CEN2_N16 = "N16"
+CEN2_N23 = "N23"
+CEN2_N24 = "N24"
+CEN2_N28 = "N28"
+CEN2_N30 = "N30"
+CEN2_N31 = "N31"
+CEN2_N32 = "N32"
+CEN2_N33 = "N33"
+CEN2_N35 = "N35"
+CEN2_N36 = "N36"
+CEN2_N37 = "N37"
+CEN2_N39 = "N39"
+CEN2_N40 = "N40"
+CEN2_N42 = "N42"
+CEN2_N43 = "N43"

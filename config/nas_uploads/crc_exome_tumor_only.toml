@@ -1,0 +1,23 @@
+samples = ["CEN2_N18", "CEN2_N27", "D-CEN2-N22", "D-CEN2-N20", "N20", "N22"]
+summary_ignore = []
+on_missing = "create"
+
+[names]
+results = "variant_calling_shannc"
+cancer_type = "crc"
+data_modality = "exome"
+cohort = "CEN2"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+CEN2_N18 = "N18"
+CEN2_N27 = "N27"
+"D-CEN2-N20" = "N20"
+"D-CEN2-N22" = "N22"
+
+[cohort_override]
+"D-CEN2-N20" = "D-CEN2"
+"D-CEN2-N22" = "D-CEN2"

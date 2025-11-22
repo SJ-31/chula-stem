@@ -1,0 +1,83 @@
+samples = [
+  "N45_2",
+  "N51_2",
+  "N56_2",
+  "N59_2",
+  "N68_2",
+  "N76_1",
+  "N80_1",
+  "P1",
+  "P3",
+  "P12",
+  "P18",
+  "P19",
+  "P20",
+  "P24",
+  "P36",
+  "P38",
+  "P40",
+  "P41",
+  "P42",
+  "P43",
+  "P71",
+  "P74",
+  "P75",
+  "P82",
+  "P83_1",
+]
+summary_ignore = [
+  "OLD",
+  "8-prev_cohort-MultiQC_data",
+  "check_kras.bash",
+  "PHcase_1",
+  "PHcase_6",
+  "8-prev_cohort-MultiQC.html",
+  "8-prev_cohort-SigProfilerAssignment_activities.tsv",
+]
+on_missing = "create"
+
+[names]
+results = "variant_calling_shannc"
+cancer_type = "pdac"
+data_modality = "exome"
+cohort = "HN00215149"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/PDAC"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[cohort_override]
+N45_2 = "unassigned"
+N51_2 = "unassigned"
+N56_2 = "unassigned"
+N59_2 = "unassigned"
+N68_2 = "unassigned"
+N76_1 = "unassigned"
+N80_1 = "unassigned"
+
+[sample_mapping]
+P1 = "PDAC1"
+P3 = "PDAC3"
+P12 = "PDAC12"
+P18 = "PDAC18"
+P19 = "PDAC19"
+P20 = "PDAC20"
+P24 = "PDAC24"
+P36 = "PDAC36"
+P38 = "PDAC38"
+P40 = "PDAC40"
+P41 = "PDAC41"
+P42 = "PDAC42"
+P43 = "PDAC43"
+P71 = "PDAC71"
+P74 = "PDAC74"
+P75 = "PDAC75"
+P82 = "PDAC82"
+P83_1 = "PDAC83_1"
+N45_2 = "N45"
+N51_2 = "N51"
+N56_2 = "N56"
+N59_2 = "N59"
+N68_2 = "N68"
+N76_1 = "N76"
+N80_1 = "N80"

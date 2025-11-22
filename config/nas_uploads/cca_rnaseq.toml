@@ -1,0 +1,59 @@
+samples = [
+  "CCA-N22-C",
+  "CCA-N24-C",
+  "CCA-N23-C",
+  "CCA-N4-C",
+  "CCA-N5-C",
+  "CCA_R11C",
+  "CCA_R12C",
+  "CCA_R13C",
+  "CCA_R16C",
+  "CCA_R4C",
+  "CCA_R9C",
+  "CCA_R_15_C",
+  "CCA_R_20_C",
+  "CCA_R_18_C",
+  "CCA_R_19_C",
+  "CCA_R_2_C",
+  "KBN-C",
+  "KSWP-C",
+  "KYUAN-C",
+]
+on_missing = "create"
+[names]
+results = "rnaseq_default_shannc"
+cohort = "HN00157405_RNAseq"
+data_modality = "rnaseq"
+cancer_type = "cca"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/CCA/RNASEQ"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+"KBN-C" = "KBN"
+"KSWP-C" = "KSWP"
+"CCA-N22-C" = "CCA_N22"
+"CCA-N24-C" = "CCA_N24"
+"CCA-N23-C" = "CCA_N24"
+"CCA-N4-C" = "CCA_N4"
+"CCA-N5-C" = "CCA_N5"
+"CCA_R_15_C" = "CCA_R_15"
+"CCA_R_20_C" = "CCA_R_20"
+"CCA_R_18_C" = "CCA_R_18"
+"CCA_R_19_C" = "CCA_R_19"
+"CCA_R_2_C" = "CCA_R_2"
+
+[cohort_override]
+"CCA_R_15_C" = "HN00160817_RNAseq_CCA_OC"
+"CCA_R_20_C" = "HN00160817_RNAseq_CCA_OC"
+"CCA_R_18_C" = "HN00160817_RNAseq_CCA_OC"
+"CCA_R_19_C" = "HN00160817_RNAseq_CCA_OC"
+"CCA_R_2_C" = "HN00160817_RNAseq_CCA_OC"
+"KYUAN-C" = "unassigned"
+"CCA_R11C" = "unassigned"
+"CCA_R12C" = "unassigned"
+"CCA_R13C" = "unassigned"
+"CCA_R16C" = "unassigned"
+"CCA_R4C" = "unassigned"
+"CCA_R9C" = "unassigned"

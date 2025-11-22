@@ -1,0 +1,16 @@
+samples = ["PHcase_1", "PHcase_6"]
+on_missing = "create"
+
+[names]
+results = "variant_calling_shannc"
+cancer_type = "pdac"
+data_modality = "exome"
+cohort = "PHcase"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/PHCase/EXOME"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+PHcase_1 = "PHcase-1"
+PHcase_6 = "PHcase-6"

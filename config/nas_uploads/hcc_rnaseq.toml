@@ -1,0 +1,39 @@
+samples = [
+  "P1",
+  "P13",
+  "P14",
+  "P17",
+  "P19",
+  "P22",
+  "P3",
+  "P34",
+  "P3Cyts",
+  "P5C3D",
+  "P8",
+  "P9",
+]
+on_missing = "create"
+
+[names]
+results = "rnaseq_default_shannc"
+cohort = "unassigned"
+data_modality = "rnaseq"
+cancer_type = "hcc"
+
+[paths]
+results = "/data/project/stemcell/shannc/output/HCC/RNASEQ"
+cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
+
+[sample_mapping]
+"P1" = "HCC_R1CH"
+"P13" = "HCC_R13CH"
+"P14" = "R_HCC_14"
+"P17" = "HCC_R17CH"
+"P19" = "HCC_R19CH"
+"P22" = "HCC_R_22"
+"P3" = "HCC_R3"
+"P34" = "R_HCC_34"
+"P3Cyts" = "R_HCC_3_Cyts"
+"P5C3D" = "HCC_R5C3D"
+"P8" = "HCC_R8"
+"P9" = "HCC_R9"
