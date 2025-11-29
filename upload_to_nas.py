@@ -4,7 +4,7 @@ import argparse
 import csv
 import pprint
 import shutil
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Literal, TypeAlias
@@ -14,7 +14,6 @@ import tomllib
 ON_EXISTS: TypeAlias = Literal["override", "append_date"] | None
 TODAY: str = date.today().isoformat()
 
-# TODO: [2025-11-08 Sat] add dictionary to override cohort name for specific samples
 
 """
 Helper script for uploading processed data to the CU stem cells NAS
@@ -62,10 +61,13 @@ cancer_type = "pdac" # Cancer type acronym (should be lowercase)
 results = ""    # Path to root directory for results
 cancer_ngs = "" # Root path to cancer NGS directory (after mounting)
 
-
 [sample_mapping] # (Optional) Mapping specifying equivalent samples in the samples
 # list and in the cohort i.e. sample aliases
 P1 = Patient1
+
+[cohort_override] # (Optional) Mapping specifying alternate cohort for a specific sample
+# P1 = "unassigned"
+# CEN2-P3 = "DCEN2"
 """
 
 
@@ -115,7 +117,11 @@ def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
         samples_check[cur_cohort].append(s)
     for k, v in samples_check.items():
         if len(v) != len(set(v)):
-            raise ValueError(f"Sample mapping in cohort {k} causes conflicting names")
+            message = f"Sample mapping in cohort {k} causes name conflicts"
+            message += (
+                f"\n\tDuplicated names: {[k for k,v in Counter(v).items() if v> 1]}"
+            )
+            raise ValueError(message)
     print("\nFinal cohort assignment:")
     pprint.pprint(samples_check)
     print()
