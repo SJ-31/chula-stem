@@ -71,7 +71,7 @@ P1 = Patient1
 """
 
 
-def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
+def validate_config(config: dict, dry_run: bool) -> tuple[Path, Path, list, dict]:
     """Validate config file for correct entries
 
     Returns
@@ -99,7 +99,7 @@ def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
         if not (try_path := cohort_dir.joinpath(names[key])).exists():
             print(f"The path {try_path} given by key {key} doesn't exist")
             print(f"\tCreating path {try_path}")
-            try_path.mkdir()
+            smart_mkdir(try_path, dry_run=dry_run)
         cohort_dir = try_path
 
     sample_mapping = config.get("sample_mapping", {})
@@ -128,6 +128,13 @@ def validate_config(config: dict) -> tuple[Path, Path, list, dict]:
     return source, cohort_dir, samples, sample_mapping
 
 
+def smart_mkdir(dir: Path, parents=False, dry_run: bool = False) -> bool:
+    if not dry_run and not dir.exists():
+        dir.mkdir(parents=parents)
+        return True
+    return False
+
+
 def upload_summaries(
     on_exists: ON_EXISTS,
     target: Path,
@@ -142,9 +149,7 @@ def upload_summaries(
     tracker: list[dict] = []
     if on_exists is not None and on_exists not in {"override", "append_date"}:
         raise ValueError("Invalid value given for `on_exists`")
-    if not summary_dir.exists():
-        summary_dir.mkdir(parents=True)
-    else:
+    if not smart_mkdir(summary_dir, parents=True):
         print(f"Warning: `{rname}` already exists in the cohort summary!")
         if on_exists is None:
             print("\tNo option for `on_exists` specified in config, will not upload")
@@ -225,8 +230,7 @@ def upload_samples(
             print(f"WARNING: sample {sample} not found in {cohort_dir}")
 
         if target_dir.exists():
-            if not processed.exists():
-                processed.mkdir()
+            smart_mkdir(processed, dry_run=dry_run)
         elif not on_missing:
             print("\t`on_missing` behavior not specified, skipping")
             should_upload = False
@@ -235,13 +239,13 @@ def upload_samples(
             processed = target_dir / "processed"
             if not target_dir.exists() and on_missing == "unassigned_create":
                 print("\tNot found in `unassigned`, creating sample directory")
-                processed.mkdir(parents=True)
+                smart_mkdir(processed, parents=True, dry_run=dry_run)
             elif not target_dir.exists() and on_missing == "unassigned":
                 print("\tNot found in `unassigned`, skipping")
                 should_upload = False
         elif on_missing == "create":
             print("\tCreating sample directory")
-            processed.mkdir(parents=True)
+            smart_mkdir(processed, parents=True, dry_run=dry_run)
         uploaded, override = (
             upload_helper(
                 on_exists=on_exists,
@@ -257,6 +261,7 @@ def upload_samples(
         template["override"] = override
         template["new"] = uploaded
         sample_tracker.append(template)
+        print("---")
     return sample_tracker
 
 
@@ -280,7 +285,10 @@ if __name__ == "__main__":
         config: dict = tomllib.load(f)
     source: Path
     cohort_dir: Path
-    source, cohort_dir, samples, sample_mapping = validate_config(config)
+    source, cohort_dir, samples, sample_mapping = validate_config(
+        config, dry_run=args.dry_run
+    )
+    print(f"Default cohort: {cohort_dir}")
 
     rname: str = config["names"]["results"]
 
@@ -300,7 +308,7 @@ if __name__ == "__main__":
         samples=samples,
         source=source,
         rname=rname,
-        cohort_dir=cohort_dir,
+        initial_cohort_dir=cohort_dir,
         cohort_override=config.get("cohort_override", {}),
         on_exists=on_exists,
         on_missing=config.get("on_missing"),
