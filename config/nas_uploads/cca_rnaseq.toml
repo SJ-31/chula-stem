@@ -33,6 +33,7 @@ cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
 [sample_mapping]
 "KBN-C" = "KBN"
 "KSWP-C" = "KSWP"
+"KYUAN-C" = "KYUAN"
 "CCA-N22-C" = "CCA_N22"
 "CCA-N24-C" = "CCA_N24"
 "CCA-N23-C" = "CCA_N23"
