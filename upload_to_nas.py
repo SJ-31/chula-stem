@@ -204,7 +204,7 @@ def upload_helper(
 
 
 def upload_samples(
-    cohort_dir: Path,
+    initial_cohort_dir: Path,
     source: Path,
     rname: str,
     samples: list,
@@ -214,15 +214,18 @@ def upload_samples(
     on_exists: ON_EXISTS,
     dry_run: bool,
 ) -> list:
-    unassigned: Path = cohort_dir.parent.joinpath("unassigned")
+    unassigned: Path = initial_cohort_dir.parent.joinpath("unassigned")
     sample_tracker: list[dict] = []
+    print("---")
     for sample in samples:
         to_upload: Path = source / sample
         template = {"sample": sample, "old": to_upload}
         should_upload: bool = True
         if c_override := cohort_override.get(sample):
             print("Overriding cohort...")
-            cohort_dir = cohort_dir.parent.joinpath(c_override)
+            cohort_dir = initial_cohort_dir.parent.joinpath(c_override)
+        else:
+            cohort_dir = initial_cohort_dir
         sample = sample_mapping.get(sample, sample)
         target_dir: Path = cohort_dir / sample
         processed: Path = target_dir / "processed"
