@@ -1,0 +1,9 @@
+patient,fastq_1,fastq_2,source,read_group_platform_unit,read_group_platform,read_group_library,read_group_sample_name
+11,/data/project/stemcell/shannc/CCA/Exome/D_fixed/11_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/11_C_2.fastq.gz,tumor,1,ILLUMINA,D-11,11-tumor
+2,/data/project/stemcell/shannc/CCA/Exome/D_fixed/2_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/2_C_2.fastq.gz,tumor,1,ILLUMINA,D-2,2-tumor
+4,/data/project/stemcell/shannc/CCA/Exome/D_fixed/4_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/4_C_2.fastq.gz,tumor,1,ILLUMINA,D-4,4-tumor
+KBN,/data/project/stemcell/shannc/CCA/Exome/D_fixed/KBN_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/KBN_C_2.fastq.gz,tumor,1,ILLUMINA,D-KBN,KBN-tumor
+KSWP,/data/project/stemcell/shannc/CCA/Exome/D_fixed/KSWP_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/KSWP_C_2.fastq.gz,tumor,1,ILLUMINA,D-KSWP,KSWP-tumor
+K_Yuan,/data/project/stemcell/shannc/CCA/Exome/D_fixed/K_Yuan_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/K_Yuan_C_2.fastq.gz,tumor,1,ILLUMINA,D-K_Yuan,K_Yuan-tumor
+N4,/data/project/stemcell/shannc/CCA/Exome/D_fixed/N4_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/N4_C_2.fastq.gz,tumor,1,ILLUMINA,D-N4,N4-tumor
+N5,/data/project/stemcell/shannc/CCA/Exome/D_fixed/N5_C_1.fastq.gz,/data/project/stemcell/shannc/CCA/Exome/D_fixed/N5_C_2.fastq.gz,tumor,1,ILLUMINA,D-N5,N5-tumor
