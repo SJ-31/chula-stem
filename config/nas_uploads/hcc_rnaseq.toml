@@ -17,7 +17,7 @@ on_missing = "create"
 [names]
 results = "rnaseq_default_shannc"
 cohort = "unassigned"
-data_modality = "rnaseq"
+data_modality = "rna_seq"
 cancer_type = "hcc"
 
 [paths]

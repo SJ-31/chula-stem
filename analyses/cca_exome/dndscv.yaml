@@ -1,0 +1,17 @@
+cohort: "CCA_EXOME"
+outdir: "/data/home/shannc/chula-stem/analyses/output/cca_exome"
+sample_sheet: "./vcfs.tsv" # TODO: get this file as well
+
+# Supported parameters for running dndscv
+refdb: "hg38"
+sm: null
+kc: null
+max_muts_per_gene_per_sample: null
+max_coding_muts_per_sample: null
+use_indel_sites: null
+min_indels: null
+maxcovs: null
+constrain_wnon_wspl: null
+numcode: null
+mingenecovs: null
+gene_list: null

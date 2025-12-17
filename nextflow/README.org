@@ -1,6 +1,6 @@
 + *General conventions*
   * Outputs are prefixed with a number (referred to as =module_number=) which represents their order in the pipeline (roughly)
-  * Essential parameters for each pipeline are specified in a separate nextflow file (the =run_conf=  parameter)
+  * Essential parameters for each pipeline are specified in a separate nextflow file (the =run_conf=  parameter) e.g. =nextflow run main.nf --run_conf CONFIG=
     * All input data e.g. reference genomes, bait files, population variation data are specified with =params.ref=, a groovy map
       * The required entries for each pipeline are detailed below under "Input"
     * See ./config/run_conf_template.config.nf and the =nextflow.config= file for more information
@@ -102,9 +102,6 @@ TODO
 *** Fusion detection
 
 * VAR
-# Local Variables:
-# citar-prev-references: ("aroraFACETSFractionAlleleSpecific2022")
-# End:
 :REFERENCES:
 + [1] https://support.illumina.com/content/dam/illumina-support/help/Illumina_DRAGEN_Bio_IT_Platform_v3_7_1000000141465/Content/SW/Informatics/Dragen/GPipelineAltMap_fDG.htm
 + [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
