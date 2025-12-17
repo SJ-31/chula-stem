@@ -1,0 +1,11 @@
+root: "/data/project/stemcell/shannc/output/CCA/EXOME-PAIRED"
+outdir: "/data/home/shannc/chula-stem/analyses/output/cca_exome"
+conda: "nf" # conda environment for reticulate
+manifest: "/data/home/shannc/chula-stem/nextflow/input/manifests/cca_exome_paired.csv"
+src:
+  py: "/data/home/shannc/chula-stem/src/chula_stem"
+  r: "/data/home/shannc/chula-stem/src/R"
+cohort: "CEN2"
+
+extra: # TODO: add in the extra cases if needed
+  cases: ["CEN2_N18", "CEN2_N27", "D-CEN2-N20", "D-CEN2-N22"]
