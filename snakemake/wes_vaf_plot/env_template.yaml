@@ -23,7 +23,7 @@ plot:
   height: 10
 
 alignment_plot:
-  reference_genome: "/data/home/shannc/chula-stem/analyses/data/GRCh38.p14_filtered.rds" # Path to Biostrings object (.rds) of reference genome
+  reference_genome: "/data/project/stemcell/shannc/reference/genomes/GRCh38.p14_filtered.fasta" # Path to reference genome fasta file
   ref_add_chr: True # Add the "chr" prefix to reference genome
   sample_add_chr: True # Add the "chr" prefix to sample vcf positions
   window: 50 # Width of alignment for plotting

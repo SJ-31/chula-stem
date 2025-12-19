@@ -110,7 +110,7 @@ plot_helper <- function(
 }
 
 cfg <- snakemake@config$alignment_plot
-ref_genome <- readRDS(cfg$reference_genome)
+ref_genome <- readDNAStringSet(cfg$reference_genome)
 if (cfg$ref_add_chr) {
   seqlevels(ref_genome) <- paste0("chr", seqlevels(ref_genome))
 }
