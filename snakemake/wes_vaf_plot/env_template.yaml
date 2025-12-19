@@ -22,6 +22,15 @@ plot:
   width: 15
   height: 10
 
+alignment_plot:
+  reference_genome: "/data/home/shannc/chula-stem/analyses/data/GRCh38.p14_filtered.rds" # Path to Biostrings object (.rds) of reference genome
+  ref_add_chr: True # Add the "chr" prefix to reference genome
+  sample_add_chr: True # Add the "chr" prefix to sample vcf positions
+  window: 50 # Width of alignment for plotting
+  target_symbols: # Symbols whose variants to plot
+    - "KRAS"
+    - "TP53"
+
 only_curated: False # Only allow named variants, regardless of type
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`

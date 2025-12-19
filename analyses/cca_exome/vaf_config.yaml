@@ -9,16 +9,26 @@ cohort:
   "D"
 
   # TODO: [2025-12-17 Wed] symlink these directories from the tumor-only group
-extra:
-  cases: ["11", "2", "4", "KBN", "KSWP", "K_Yuan", "N4", "N5"]
-  multiqc_vep:
-    [
-      "/data/project/stemcell/shannc/output/CCA/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
-    ]
+# extra:
+#   cases: ["11", "2", "4", "KBN", "KSWP", "K_Yuan", "N4", "N5"]
+#   multiqc_vep:
+#     [
+#       "/data/project/stemcell/shannc/output/CCA/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
+#     ]
+
+alignment_plot:
+  reference_genome: "/data/home/shannc/chula-stem/analyses/data/GRCh38.p14_filtered.rds"
+  ref_add_chr: True # Add the "chr" prefix to reference genome
+  sample_add_chr: True # Add the "chr" prefix to sample vcf positions
+  window: 50 # Width of alignment for plotting
+  target_symbols:
+    - "KRAS"
+    - "TP53"
 
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
-  min_alt_depth: 10 # Minimum depth that variants are counted in the plot
+  min_alt_depth: 0 # Minimum depth that variants are counted in the plot
+  # [2025-12-19 Fri] Removed because some callers don't report alt depth
 plot:
   dpi: 500
   width: 15

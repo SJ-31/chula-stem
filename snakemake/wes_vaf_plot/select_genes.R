@@ -51,7 +51,9 @@ get_wanted_genes <- function(name, file, is_paired = TRUE, vep = TRUE) {
   system2("bcftools", args, stdout = tmp)
 
   outfile <- glue("{OUTDIR}/{name}.tsv")
-  query <- glue("[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/{SOURCE_TAG}")
+  query <- glue(
+    "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/{SOURCE_TAG}\t%CHROM\t%POS"
+  )
   args2 <- c(
     glue("-i {tmp}"),
     glue("-o {outfile}"),
