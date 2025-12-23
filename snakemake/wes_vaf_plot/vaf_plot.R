@@ -1,18 +1,21 @@
-library(ggpubr)
-library(cowplot)
-library(glue)
-library(ggplot2)
-library(tidyverse)
-library(paletteer)
-library(here)
-utils <- new.env()
-source(here("src", "R", "utils.R"), local = utils)
+suppressMessages({
+  library(ggpubr)
+  library(cowplot)
+  library(glue)
+  library(ggplot2)
+  library(tidyverse)
+  library(paletteer)
+  library(ggtext)
+  library(here)
+  utils <- new.env()
+  source(here("src", "R", "utils.R"), local = utils)
+  tmb_merged <- read_tsv(snakemake@input$tmb)
+  sbs <- read_tsv(snakemake@input$sbs)
+  target_genes <- snakemake@params$wanted_genes
+  combined_vep <- read_tsv(snakemake@input$combined_vep)
+  config <- snakemake@config
+})
 
-tmb_merged <- read_tsv(snakemake@input$tmb)
-sbs <- read_tsv(snakemake@input$sbs)
-target_genes <- snakemake@params$wanted_genes
-combined_vep <- read_tsv(snakemake@input$combined_vep)
-config <- snakemake@config
 
 accepted_consequence <- config$accepted_consequence
 min_alt_depth <- config$variant_calling$min_alt_depth
@@ -83,12 +86,11 @@ n_samples <- sbs$sample |>
 
 sample_names <- as.factor(unique(sbs$sample)) |> sort()
 add_groupings <- FALSE
-if (
-  ("sample_grouping" %in%
-    names(config)) &&
-    ("extra" %in% names(config$sample_grouping))
-) {
+
+extra <- c()
+if ("cases" %in% names(config$extra) && length(config$extra$cases) != 0) {
   add_groupings <- TRUE
+  extra <- config$extra$cases
 }
 
 
@@ -148,29 +150,6 @@ replicate_figure <- combined_vep |>
 
 if (!is.null(min_alt_depth)) {
   replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
-}
-
-if (add_groupings) {
-  replicate_figure <- local({
-    mapping <- config$sample_grouping$extra
-    sample2group_extra <- lapply(names(mapping), \(x) {
-      setNames(rep(x, length(mapping[[x]])), mapping[[x]])
-    }) |>
-      unlist()
-    default <- config$sample_grouping$default
-    replicate_figure |>
-      mutate(
-        group = if_else(
-          sample %in% names(sample2group_extra),
-          sample2group_extra[sample],
-          default
-        )
-      )
-  })
-  sample_names <- arrange(replicate_figure, group, sample) |>
-    pluck("sample") |>
-    unique() |>
-    as.factor()
 }
 
 if (!ONLY_CURATED) {
@@ -304,18 +283,43 @@ r1 <- replicate_figure |>
   ) +
   scale_x_discrete(limits = sample_names)
 
+if (add_groupings) {
+  replicate_figure <- local({
+    is_paired <- config$variant_calling$paired
+    replicate_figure |>
+      mutate(
+        group = case_when(
+          is_paired & sample %in% extra ~ "tumor-only",
+          is_paired & !sample %in% extra ~ "paired",
+          !is_paired & sample %in% extra ~ "tumor-only",
+          .default = "paired"
+        )
+      )
+  })
+  tmp <- replicate_figure |>
+    ungroup() |>
+    ungroup() |>
+    arrange(group, sample) %>%
+    mutate(
+      labs = glue_data(
+        .,
+        "<span style='color: {if_else(group == 'tumor-only', 'purple', 'black')}'>{sample}</span>"
+      )
+    ) |>
+    distinct(sample, .keep_all = TRUE)
+  labs <- tmp$labs |> `names<-`(tmp$sample)
+  sample_names <- tmp$sample
+  r1 <- r1 +
+    theme(axis.text.x = element_markdown()) +
+    scale_x_discrete(labels = labs, limits = sample_names)
+}
+
 r2 <- r1 +
   scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
   guides(fill = "none") +
   theme(axis.ticks.y = element_blank())
 
 freq_plot <- ggdraw(get_y_axis(r2))
-r3 <- ggdraw(insert_yaxis_grob(
-  r1,
-  get_y_axis(r2),
-  position = "right",
-  width = unit(0.03, "null")
-))
 
 ## **** for each variant type
 
@@ -339,7 +343,14 @@ heatmap_helper <- function(tb) {
     facet_wrap(~Consequence)
 }
 
-with_separate_cons <- heatmap_helper(replicate_figure)
+with_separate_cons <- heatmap_helper(replicate_figure) +
+  scale_x_discrete(limits = sample_names)
+if (add_groupings) {
+  with_separate_cons <- with_separate_cons +
+    theme(axis.text.x = element_markdown()) +
+    scale_x_discrete(labels = labs, limits = sample_names)
+}
+
 
 ## ** Arranging
 
