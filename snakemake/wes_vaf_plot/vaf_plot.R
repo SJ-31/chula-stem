@@ -133,8 +133,11 @@ replicate_figure <- combined_vep |>
     )
   ) |>
   dplyr::rename(sample = subject) |>
-  distinct() |>
-  filter(Alt_depth >= min_alt_depth)
+  distinct()
+
+if (!is.null(min_alt_depth)) {
+  replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
+}
 
 
 if (!ONLY_CURATED) {

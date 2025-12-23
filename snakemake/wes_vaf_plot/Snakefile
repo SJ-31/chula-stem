@@ -32,13 +32,20 @@ cases = list(cases - to_ignore)
 vcf_dir = f"{outdir}/vcfs"
 align_dir = f"{outdir}/alignments"
 
+TARGETS = {
+    "gene_metrics": f"{outdir}/gene_metrics.png",
+    "vaf_separate": f"{outdir}/vaf_separate.png",
+    "vaf": f"{outdir}/vaf.png",
+}
+
+if config.get("get_alignments"):
+    print("Creating alignment plot only...")
+    TARGETS = {"alignments": expand("{o}/{c}", o=align_dir, c=cases)}
+
 
 rule all:
     input:
-        gene_metrics=f"{outdir}/gene_metrics.png",
-        vaf_separate=f"{outdir}/vaf_separate.png",
-        vaf=f"{outdir}/vaf.png",
-        alignments=expand("{o}/{c}", o=align_dir, c=cases),
+        **TARGETS,
 
 
 rule get_vep:  # Retrieve vep results for select genes
@@ -102,5 +109,7 @@ rule alignment_plot:
     params:
         outdir=align_dir,
         data_path=data_path,
+    log:
+        f"{align_dir}/alignment_plot.log",
     script:
         "alignment_plot.R"
