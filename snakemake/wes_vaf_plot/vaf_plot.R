@@ -79,7 +79,18 @@ vaf_heatmap <- function(plot) {
 n_samples <- sbs$sample |>
   unique() |>
   length()
-sample_names <- as.factor(unique(sbs$sample))
+
+
+sample_names <- as.factor(unique(sbs$sample)) |> sort()
+add_groupings <- FALSE
+if (
+  ("sample_grouping" %in%
+    names(config)) &&
+    ("extra" %in% names(config$sample_grouping))
+) {
+  add_groupings <- TRUE
+}
+
 
 replicate_figure <- combined_vep |>
   filter(apply(combined_vep, 1, \(row) {
@@ -139,6 +150,28 @@ if (!is.null(min_alt_depth)) {
   replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
 }
 
+if (add_groupings) {
+  replicate_figure <- local({
+    mapping <- config$sample_grouping$extra
+    sample2group_extra <- lapply(names(mapping), \(x) {
+      setNames(rep(x, length(mapping[[x]])), mapping[[x]])
+    }) |>
+      unlist()
+    default <- config$sample_grouping$default
+    replicate_figure |>
+      mutate(
+        group = if_else(
+          sample %in% names(sample2group_extra),
+          sample2group_extra[sample],
+          default
+        )
+      )
+  })
+  sample_names <- arrange(replicate_figure, group, sample) |>
+    pluck("sample") |>
+    unique() |>
+    as.factor()
+}
 
 if (!ONLY_CURATED) {
   replicate_figure <- mutate(
@@ -252,6 +285,7 @@ counts_plot <- replicate_figure |>
   scale_fill_paletteer_d(rep_theme, drop = FALSE)
 
 ## *** Heatmap
+
 r1 <- replicate_figure |>
   prettify() |>
   ggplot(aes(
