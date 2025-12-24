@@ -6,6 +6,8 @@ src: # source directories
   py: "../../src/chula_stem"
   r: "../../src/R"
 
+get_alignments: False # Set to true to get alignment plots instead
+
 cohort: "8-CEN2"
 
 extra:

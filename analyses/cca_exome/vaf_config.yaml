@@ -6,10 +6,10 @@ src:
   py: "/data/home/shannc/chula-stem/src/chula_stem"
   r: "/data/home/shannc/chula-stem/src/R"
 cohort: "D"
-alignment: False
+get_alignments: False
 
 extra:
-  cases: ["11", "2", "4", "KBN", "KSWP", "K_Yuan", "N4", "N5"]
+  cases: ["11", "2", "4", "KBN", "KSWP", "K_Yuan", "N5"]
   multiqc_vep:
     [
       "/data/project/stemcell/shannc/output/CCA/EXOME-TUMOR_ONLY/8-D-MultiQC_data/vep.txt",
@@ -17,9 +17,12 @@ extra:
 
 alignment_plot:
   reference_genome: "/data/project/stemcell/shannc/reference/genomes/GRCh38.p14_filtered.fasta"
-  ref_add_chr: True # Add the "chr" prefix to reference genome
-  sample_add_chr: True # Add the "chr" prefix to sample vcf positions
   window: 50 # Width of alignment for plotting
+  # Plot file dimensions
+  width: 12
+  height: 12
+  with_prob: False
+  protein_only: True # Only allow variants that affect proteins
   target_symbols:
     - "KRAS"
     - "TP53"
@@ -28,6 +31,7 @@ variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: null # Minimum depth that variants are counted in the plot
   # [2025-12-19 Fri] Removed because some callers don't report alt depth
+  protein_only: True # Only allow variants that affect proteins
 plot:
   dpi: 500
   width: 15

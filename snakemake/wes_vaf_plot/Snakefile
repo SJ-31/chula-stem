@@ -37,6 +37,7 @@ VAF_OUT = {
     "gene_metrics": f"{outdir}/gene_metrics.png",
     "vaf_separate": f"{outdir}/vaf_separate.png",
     "vaf": f"{outdir}/vaf.png",
+    "plot_data": f"{outdir}/vaf_plot_data.tsv",
 }
 ALIGN_OUT = {"alignments": expand("{o}/{c}", o=align_dir, c=cases)}
 
@@ -101,6 +102,7 @@ rule vaf_plot:  # Assemble plot
         gene_metrics=VAF_OUT["gene_metrics"],
         vaf_separate=VAF_OUT["vaf_separate"],
         vaf=VAF_OUT["vaf"],
+        plot_data=VAF_OUT["plot_data"],
     script:
         "vaf_plot.R"
 

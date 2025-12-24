@@ -150,7 +150,8 @@ replicate_figure <- combined_vep |>
         }
       }),
       na.rm = TRUE
-    )
+    ),
+    HGVSp = paste0(HGVSp, collapse = ";")
   ) |>
   dplyr::rename(sample = subject) |>
   distinct()
@@ -270,6 +271,16 @@ counts_plot <- replicate_figure |>
   xlab("Number of samples") +
   guides(fill = "none") +
   scale_fill_paletteer_d(rep_theme, drop = FALSE)
+
+## *** Save plotting data
+
+replicate_figure |>
+  unnest(cols = c(Consequence)) |>
+  separate_longer_delim(HGVSp, ";") |>
+  prettify() |>
+  distinct(sample, SYMBOL, type, HGVSp, .keep_all = TRUE) |>
+  select(-c(Consequence, CLIN_SIG)) |>
+  write_tsv(snakemake@output$plot_data)
 
 ## *** Heatmap
 
