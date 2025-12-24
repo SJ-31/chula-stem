@@ -28,13 +28,22 @@ make_pileup <- function(
     stop("`region` must be a GRanges object of length 1")
   }
 
-  piled <- GenomicAlignments::stackStringsFromGAlignments(alignments, region)
+  padding_char <- "+"
+  piled <- GenomicAlignments::stackStringsFromGAlignments(
+    alignments,
+    region,
+    Lpadding.letter = padding_char,
+    Rpadding.letter = padding_char
+  )
+  to_remove <- as.character(XVector::subseq(piled, start = 1, width = 1)) ==
+    padding_char
+  piled <- piled[-to_remove]
   if (with_prob) {
-    probs <- XVector::subseq(mcols(piled)$qual, start = target, end = target) |>
+    probs <- XVector::subseq(mcols(piled)$qual, start = target, width = 1) |>
       as.character() |>
       phred_ascii2pr() |>
       round(3)
-    probs <- probs * 100
+    probs <- probs * 100 # Probability of correct base call at variant region
     align_names <- glue("{paste0(prefix, seq_along(piled))} ({probs})")
   } else {
     align_names <- paste0(prefix, seq_along(piled))
@@ -81,6 +90,7 @@ plot_alignment_as_msa <- function(
   reference = NULL,
   normal_bam_file = "",
   position_highlight = NULL,
+  with_prob = TRUE,
   ...
 ) {
   region <- GenomicRanges::GRanges(
@@ -99,9 +109,23 @@ plot_alignment_as_msa <- function(
   }) |>
     `names<-`(c("tumor", "normal"))
 
-  tumor_piled <- make_pileup(alignments$tumor, region, reference, "t")
+  tumor_piled <- make_pileup(
+    alignments$tumor,
+    region,
+    reference,
+    "t",
+    target = position_highlight,
+    with_prob = with_prob
+  )
   if (!is.null(alignments$normal)) {
-    normal_piled <- make_pileup(alignments$normal, region, reference, "n")
+    normal_piled <- make_pileup(
+      alignments$normal,
+      region,
+      reference,
+      "n",
+      target = position_highlight,
+      with_prob = with_prob
+    )
   } else {
     normal_piled <- NULL
   }
@@ -122,20 +146,25 @@ plot_alignment_as_msa <- function(
   }
 
   make_plot <- function(pileup) {
-    ggmsa(
+    plot <- ggmsa(
       pileup,
       ref = ref_str,
       consensus_views = !is.null(ref_str),
       border = "white",
       position_highlight = position_highlight,
       show.legend = FALSE,
+      seq_name = with_prob,
       ...
     ) +
       theme(
-        axis.text.x = element_blank(),
-        axis.text.y = element_blank()
+        axis.text.x = element_blank()
       ) +
       guides(fill = "none")
+    if (!with_prob) {
+      plot + theme(axis.text.y = element_blank())
+    } else {
+      plot
+    }
   }
 
   tplot <- make_plot(tumor_piled)
@@ -182,6 +211,7 @@ plot_helper <- function(
     title = title,
     subtitle = glue("Subject: {subject}"),
     position_highlight = highlight,
+    with_prob = cfg$with_prob,
     font = "mono",
     color = "Chemistry_NT",
   )
