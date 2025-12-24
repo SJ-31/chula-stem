@@ -220,7 +220,7 @@ make_exp <- function(
   assay_samples <- colnames(assay) |> discard(\(x) x == assay_feature_col)
   if (how == "intersect") {
     in_both <- intersect(samples[[sample_col]], colnames(assay))
-    assay <- select(assay, all_of(c(assay_feature_col, in_both)))
+    assay <- dplyr::select(assay, all_of(c(assay_feature_col, in_both)))
     samples <- samples[samples[[sample_col]] %in% in_both, ]
   } else if (how == "keep_assay") {
     not_in <- assay_samples |> discard(\(x) x %in% samples[[sample_col]])
@@ -233,7 +233,10 @@ make_exp <- function(
     )
   }
   # Samples must be in the same order
-  assay <- select(assay, all_of(c(assay_feature_col, samples[[sample_col]])))
+  assay <- dplyr::select(
+    assay,
+    all_of(c(assay_feature_col, samples[[sample_col]]))
+  )
   SummarizedExperiment(
     assays = `names<-`(
       list(column_to_rownames(
