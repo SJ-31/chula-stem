@@ -10,7 +10,7 @@ DATE = config.get("date", TODAY)
 """
 Generate VAF figures from the results of the wes/wes_tumor_only pipeline
 
-See config.yaml for what to specify
+See env_template.yaml for what to specify
 """
 
 
@@ -32,15 +32,19 @@ cases = list(cases - to_ignore)
 vcf_dir = f"{outdir}/vcfs"
 align_dir = f"{outdir}/alignments"
 
-TARGETS = {
+
+VAF_OUT = {
     "gene_metrics": f"{outdir}/gene_metrics.png",
     "vaf_separate": f"{outdir}/vaf_separate.png",
     "vaf": f"{outdir}/vaf.png",
 }
+ALIGN_OUT = {"alignments": expand("{o}/{c}", o=align_dir, c=cases)}
 
 if config.get("get_alignments"):
     print("Creating alignment plot only...")
-    TARGETS = {"alignments": expand("{o}/{c}", o=align_dir, c=cases)}
+    TARGETS = ALIGN_OUT
+else:
+    TARGETS = VAF_OUT
 
 
 rule all:
@@ -94,9 +98,9 @@ rule vaf_plot:  # Assemble plot
     params:
         wanted_genes=config["wanted_genes"].keys(),
     output:
-        gene_metrics=rules.all.input.gene_metrics,
-        vaf_separate=rules.all.input.vaf_separate,
-        vaf=rules.all.input.vaf,
+        gene_metrics=VAF_OUT["gene_metrics"],
+        vaf_separate=VAF_OUT["vaf_separate"],
+        vaf=VAF_OUT["vaf"],
     script:
         "vaf_plot.R"
 
