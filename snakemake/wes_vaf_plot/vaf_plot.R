@@ -6,6 +6,7 @@ suppressMessages({
   library(tidyverse)
   library(paletteer)
   library(ggtext)
+  library(logger)
   library(here)
   utils <- new.env()
   source(here("src", "R", "utils.R"), local = utils)
@@ -93,6 +94,12 @@ if ("cases" %in% names(config$extra) && length(config$extra$cases) != 0) {
   extra <- config$extra$cases
 }
 
+if (config$variant_calling$protein_only) {
+  log_info("Filtering by coding variants...")
+  log_info("Count before: {nrow(combined_vep)}")
+  combined_vep <- filter(combined_vep, !is.na(HGVSp))
+  log_info("Count after: {nrow(combined_vep)}")
+}
 
 replicate_figure <- combined_vep |>
   filter(apply(combined_vep, 1, \(row) {
@@ -151,6 +158,7 @@ replicate_figure <- combined_vep |>
 if (!is.null(min_alt_depth)) {
   replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
 }
+
 
 if (!ONLY_CURATED) {
   replicate_figure <- mutate(

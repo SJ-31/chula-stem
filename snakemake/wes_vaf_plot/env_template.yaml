@@ -17,6 +17,7 @@ extra:
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
+  protein_only: True # If true, only allow variants that affect proteins
 plot:
   dpi: 500
   width: 15
@@ -27,6 +28,7 @@ alignment_plot:
   ref_add_chr: True # Add the "chr" prefix to reference genome
   sample_add_chr: True # Add the "chr" prefix to sample vcf positions
   window: 50 # Width of alignment for plotting
+  protein_only: True # If true, only allow variants that affect proteins
   target_symbols: # Symbols whose variants to plot
     - "KRAS"
     - "TP53"

@@ -250,7 +250,9 @@ t0 <- apply(sample_tb, 1, \(tb_row) {
   dir.create(glue("{outdir}/{sample}"), showWarnings = FALSE)
   for (symbol in cfg$target_symbols) {
     filtered <- vcf |>
-      filter(SYMBOL == symbol & !is.na(POS)) |>
+      filter(
+        SYMBOL == symbol & !is.na(POS) & (!cfg$protein_only | !is.na(HGVSp))
+      ) |>
       select(CHROM, POS, HGVSg, HGVSp) |>
       distinct()
     if (nrow(filtered) == 0) {
