@@ -334,6 +334,8 @@ if smk.rule == "plot_sequence":
     airr = get_airr(filter_samples=True)
     viz_config = smk.config["vdj_plot"]
     for_title = [c[1] for c in viz_config["title_spec"]]
+    if "clone_id" not in for_title:
+        for_title.append("clone_id")
     _, airr = maybe_filter_by_rank(airr, viz_config)
     cols = ["sequence", "cdr3", "cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"] + [
         s
@@ -377,9 +379,18 @@ if smk.rule == "plot_sequence":
         seqs = pl.concat([seqs, title_obs], how="horizontal")
         for chain in ("VJ_1", "VDJ_1"):
             id_col = f"{chain}_sequence_id"
-            chain_seqs: pl.DataFrame = seqs.select(
-                cs.starts_with(chain), pl.col(for_title + ["index"])
-            ).unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
+            chain_seqs: pl.DataFrame = (
+                seqs.select(cs.starts_with(chain), pl.col(for_title + ["index"]))
+                .unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
+                .with_columns(
+                    pl.struct(["clone_id", id_col])
+                    .map_elements(
+                        lambda x: f"cid{x['clone_id']}-{x[id_col]}",
+                        return_dtype=pl.String,
+                    )
+                    .alias(id_col)
+                )
+            )
             chain_seqs = chain_seqs.join(
                 v_leaders, left_on=f"{chain}_v_call", right_on="allele", how="left"
             )
