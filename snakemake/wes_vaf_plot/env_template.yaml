@@ -35,6 +35,9 @@ alignment_plot:
     - "KRAS"
     - "TP53"
 
+variant_table:
+  wanted_genes: ["KRAS", "TP53"]
+
 only_curated: False # Only allow named variants, regardless of type
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`

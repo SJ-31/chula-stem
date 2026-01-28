@@ -1,26 +1,44 @@
-root: "/data/project/stemcell/shannc/output/CRC/EXOME-PAIRED"
-outdir: "/data/home/shannc/chula-stem/analyses/output/crc_exome"
+root: "../../analyses/data_all/output/CRC/EXOME-PAIRED"
+outdir: "../../analyses/output/crc_exome"
 conda: "nf" # conda environment for reticulate
-manifest: "/data/home/shannc/chula-stem/nextflow/input/manifests/crc_exome_paired.csv"
+manifest: "../../nextflow/input/manifests/crc_exome_paired.csv"
+date: "2026-01-28"
 src:
-  py: "/data/home/shannc/chula-stem/src/chula_stem"
-  r: "/data/home/shannc/chula-stem/src/R"
+  py: "../../src/chula_stem"
+  r: "../../src/R"
 cohort: "CEN2"
 
 extra:
   cases: ["CEN2_N18", "CEN2_N27", "D-CEN2-N20", "D-CEN2-N22"]
   multiqc_vep:
     [
-      "/data/project/stemcell/shannc/output/CRC/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
+      "../../analyses/data_all/output/CRC/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
     ]
+
+alignment_plot:
+  reference_genome: "../../analyses/data_all/reference/genomes/GRCh38.p14_filtered.fasta"
+  window: 50 # Width of alignment for plotting
+  # Plot file dimensions
+  width: 12
+  height: 12
+  with_prob: False
+  protein_only: True # Only allow variants that affect proteins
+  target_symbols:
+    - "KRAS"
+    - "TP53"
 
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
-  min_alt_depth: 10 # Minimum depth that variants are counted in the plot
+  min_alt_depth: 1 # Minimum depth that variants are counted in the plot
+  protein_only: False
+
 plot:
   dpi: 500
   width: 15
   height: 10
+
+variant_table:
+  wanted_genes: ["KRAS", "TP53"]
 
 only_curated: False # Only allow named variants, regardless of type
 
