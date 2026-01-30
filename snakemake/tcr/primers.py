@@ -148,7 +148,7 @@ class PrimerFmt:
                 if p is None:
                     continue
                 seq = str(p.seq)
-                result[pname] = {
+                result[name][pname] = {
                     "seq": seq,
                     "tm": calc_tm(seq, **self.kws),
                     "gc_content": p.gc(),
