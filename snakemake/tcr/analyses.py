@@ -412,6 +412,21 @@ def compairr_wrapper(
     return result, invalid
 
 
+def tcrmatch(airr: ad.AnnData, cfg):
+    for i, (name, db) in enumerate(cfg["databases"].items()):
+        result, invalid = tcrmatch_wrapper(
+            adata=airr,
+            database=db,
+            query_cols=query_cols,
+            memory=cfg.get("m", 4),
+            threads=cfg.get("threads", 1),
+            threshold=cfg.get("threshold", 0.97),
+        )
+        result.to_csv(f"{smk.params['outdir']}/tcrmatch_{name}.csv", index=False)
+        if i == 0:
+            invalid.to_csv(f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False)
+
+
 # * Querying
 if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
     airr = get_airr(0, filter_samples=True)
@@ -426,20 +441,7 @@ if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
     # ** tcrmatch
     elif smk.rule == "tcrmatch":
         tcrmatch_config: dict = config["tcrmatch"]
-        for i, (name, db) in enumerate(tcrmatch_config["databases"].items()):
-            result, invalid = tcrmatch_wrapper(
-                adata=airr,
-                database=db,
-                query_cols=query_cols,
-                memory=tcrmatch_config.get("m", 4),
-                threads=tcrmatch_config.get("threads", 1),
-                threshold=tcrmatch_config.get("threshold", 0.97),
-            )
-            result.to_csv(f"{smk.params['outdir']}/tcrmatch_{name}.csv", index=False)
-            if i == 0:
-                invalid.to_csv(
-                    f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False
-                )
+        tcrmatch(airr=airr, cfg=tcrmatch_config)
     # ** compairr
     elif smk.rule == "compairr":
         compairr_config: dict = config["compairr"]

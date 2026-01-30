@@ -247,6 +247,139 @@ def top_clone_calls(
     return df
 
 
+def plot_sequence():
+    outdir = Path(smk.params["outdir"])
+    plotdir = Path(smk.params["plotdir"])
+    airr = get_airr(filter_samples=True)
+    viz_config = smk.config["vdj_plot"]
+    for_title = [c[1] for c in viz_config["title_spec"]]
+    if "clone_id" not in for_title:
+        for_title.append("clone_id")
+    _, airr = maybe_filter_by_rank(airr, viz_config)
+    cols = ["sequence", "cdr3", "cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"] + [
+        s
+        for seq in [
+            [f"{k}_sequence_start", f"{k}_sequence_end", f"{k}_call"]
+            for k in ("v", "d", "j")
+        ]
+        for s in seq
+    ]
+    cols = ["sequence_id"] + cols + ["c_call"]
+    allele_df = pl.from_pandas(
+        ir.get.airr(airr, ["v_call", "c_call"]).reset_index(names="index")
+    ).with_columns(cs.ends_with("c_call") + "*01")
+    # WARNING: BD pipeline doesn't provide allele specificity for C, so we will just
+    # take the first allele
+    cohort_v_alleles = list(allele_df["VJ_1_v_call"]) + list(allele_df["VDJ_1_v_call"])
+    cohort_c_genes = list(allele_df["VJ_1_c_call"]) + list(allele_df["VDJ_1_c_call"])
+    v_leaders: pl.DataFrame = get_stitchr_seqs(
+        set(cohort_v_alleles), seqtype="~LEADER"
+    ).rename({"sequence": "v_leader"})
+    c_genes: pl.DataFrame = get_stitchr_seqs(
+        set(cohort_c_genes), seqtype="~CONSTANT"
+    ).rename({"sequence": "c_gene"})
+    c_gene_dict = dict(zip(c_genes["allele"], c_genes["c_gene"]))
+    c_genes = (
+        allele_df.select(pl.col("index"), cs.ends_with("c_call"))
+        .with_columns(
+            cs.ends_with("c_call").map_elements(
+                lambda x: c_gene_dict.get(x, None), return_dtype=pl.String
+            )
+        )
+        .rename(
+            lambda x: x if "c_call" not in x else x.replace("_c_call", "_c_sequence")
+        )
+    )
+    for sample in airr.obs[SCOL].unique():
+        mask = airr.obs[SCOL] == sample
+        cur = airr[mask, :]
+        seqs = pl.from_pandas(ir.get.airr(cur, cols).reset_index(names="index"))
+        title_obs = pl.from_pandas(cur.obs.loc[:, for_title])
+        seqs = pl.concat([seqs, title_obs], how="horizontal")
+        for chain in ("VJ_1", "VDJ_1"):
+            id_col = f"{chain}_sequence_id"
+            chain_seqs = get_chain_seqs(
+                seqs,
+                chain,
+                id_col=id_col,
+                cols_for_title=for_title,
+                v_leaders=v_leaders,
+                c_genes=c_genes,
+            )
+            cur_outdir = outdir / sample / chain
+            cur_plotdir = plotdir / sample / chain
+            align_to_plot(
+                chain_seqs=chain_seqs,
+                chain=chain,
+                plot_out=cur_plotdir,
+                align_out=cur_outdir,
+                id_col=id_col,
+                cfg=viz_config,
+            )
+
+
+def get_chain_seqs(
+    seqs: pl.DataFrame, chain, id_col, cols_for_title, v_leaders, c_genes
+):
+    chain_seqs: pl.DataFrame = (
+        seqs.select(cs.starts_with(chain), pl.col(cols_for_title + ["index"]))
+        .unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
+        .with_columns(
+            pl.struct(["clone_id", id_col])
+            .map_elements(
+                lambda x: f"cid{x['clone_id']}-{x[id_col]}",
+                return_dtype=pl.String,
+            )
+            .alias(id_col)
+        )
+    )
+    chain_seqs = chain_seqs.join(
+        v_leaders, left_on=f"{chain}_v_call", right_on="allele", how="left"
+    )
+    cur_c = c_genes.select(cs.starts_with(chain), pl.col("index"))
+    return (
+        chain_seqs.join(cur_c, on="index", how="left")
+        .filter(pl.col(id_col).is_not_null())
+        .with_columns(
+            pl.col(f"{chain}_c_sequence").str.head(
+                pl.col(f"{chain}_sequence").str.len_chars()
+                - pl.col(f"{chain}_j_sequence_end")
+            )
+        )
+    )
+
+
+def align_to_plot(chain_seqs, chain, align_out: Path, plot_out: Path, id_col, cfg):
+    plot_out.mkdir(exist_ok=True, parents=True)
+    _ = align_vdj(
+        chain_seqs,
+        chain,
+        outdir=align_out,
+        id_col=id_col,
+        additional_seqs={
+            "v_leader": "v_leader",
+            "c_gene": f"{chain}_c_sequence",
+        },
+    )
+    for afile in align_out.glob("*.fasta"):
+        outfile = plot_out / f"{afile.stem}.png"
+        fig = plot_vdj(
+            afile.stem,
+            chain,
+            chain_seqs,
+            file=afile,
+            id_col=id_col,
+            wrap_length=cfg.get("wrap_length", 200),
+            title_spec=[("", id_col)]
+            + cfg["title_spec"]
+            + [("C call", f"{chain}_c_call")],
+            color_scheme="Clustal",
+        )
+        fig.set_figwidth(cfg.get("width", 30))
+        fig.set_dpi(cfg.get("dpi", 100))
+        fig.savefig(outfile)
+
+
 # * Generate plots
 if smk.rule == "make_reports":
     mdata: md.MuData = md.read_h5mu(smk.input[0])
@@ -329,109 +462,4 @@ if smk.rule == "make_reports":
     pd.concat(clone_calls).to_csv(smk.output["top_clones"], index=False)
     pd.concat(cluster_calls).to_csv(smk.output["top_clusters"], index=False)
 if smk.rule == "plot_sequence":
-    outdir = Path(smk.params["outdir"])
-    plotdir = Path(smk.params["plotdir"])
-    airr = get_airr(filter_samples=True)
-    viz_config = smk.config["vdj_plot"]
-    for_title = [c[1] for c in viz_config["title_spec"]]
-    if "clone_id" not in for_title:
-        for_title.append("clone_id")
-    _, airr = maybe_filter_by_rank(airr, viz_config)
-    cols = ["sequence", "cdr3", "cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"] + [
-        s
-        for seq in [
-            [f"{k}_sequence_start", f"{k}_sequence_end", f"{k}_call"]
-            for k in ("v", "d", "j")
-        ]
-        for s in seq
-    ]
-    cols = ["sequence_id"] + cols + ["c_call"]
-    allele_df = pl.from_pandas(
-        ir.get.airr(airr, ["v_call", "c_call"]).reset_index(names="index")
-    ).with_columns(cs.ends_with("c_call") + "*01")
-    # WARNING: BD pipeline doesn't provide allele specificity for C, so we will just
-    # take the first allele
-    cohort_v_alleles = list(allele_df["VJ_1_v_call"]) + list(allele_df["VDJ_1_v_call"])
-    cohort_c_genes = list(allele_df["VJ_1_c_call"]) + list(allele_df["VDJ_1_c_call"])
-    v_leaders: pl.DataFrame = get_stitchr_seqs(
-        set(cohort_v_alleles), seqtype="~LEADER"
-    ).rename({"sequence": "v_leader"})
-    c_genes: pl.DataFrame = get_stitchr_seqs(
-        set(cohort_c_genes), seqtype="~CONSTANT"
-    ).rename({"sequence": "c_gene"})
-    c_gene_dict = dict(zip(c_genes["allele"], c_genes["c_gene"]))
-    c_genes = (
-        allele_df.select(pl.col("index"), cs.ends_with("c_call"))
-        .with_columns(
-            cs.ends_with("c_call").map_elements(
-                lambda x: c_gene_dict.get(x, None), return_dtype=pl.String
-            )
-        )
-        .rename(
-            lambda x: x if "c_call" not in x else x.replace("_c_call", "_c_sequence")
-        )
-    )
-    for sample in airr.obs[SCOL].unique():
-        mask = airr.obs[SCOL] == sample
-        cur = airr[mask, :]
-        seqs = pl.from_pandas(ir.get.airr(cur, cols).reset_index(names="index"))
-        title_obs = pl.from_pandas(cur.obs.loc[:, for_title])
-        seqs = pl.concat([seqs, title_obs], how="horizontal")
-        for chain in ("VJ_1", "VDJ_1"):
-            id_col = f"{chain}_sequence_id"
-            chain_seqs: pl.DataFrame = (
-                seqs.select(cs.starts_with(chain), pl.col(for_title + ["index"]))
-                .unique([f"{chain}_j_call", f"{chain}_v_call", f"{chain}_cdr3"])
-                .with_columns(
-                    pl.struct(["clone_id", id_col])
-                    .map_elements(
-                        lambda x: f"cid{x['clone_id']}-{x[id_col]}",
-                        return_dtype=pl.String,
-                    )
-                    .alias(id_col)
-                )
-            )
-            chain_seqs = chain_seqs.join(
-                v_leaders, left_on=f"{chain}_v_call", right_on="allele", how="left"
-            )
-            cur_c = c_genes.select(cs.starts_with(chain), pl.col("index"))
-            chain_seqs = (
-                chain_seqs.join(cur_c, on="index", how="left")
-                .filter(pl.col(id_col).is_not_null())
-                .with_columns(
-                    pl.col(f"{chain}_c_sequence").str.head(
-                        pl.col(f"{chain}_sequence").str.len_chars()
-                        - pl.col(f"{chain}_j_sequence_end")
-                    )
-                )
-            )
-            cur_outdir = outdir / sample / chain
-            cur_plotdir = plotdir / sample / chain
-            cur_plotdir.mkdir(exist_ok=True, parents=True)
-            successes = align_vdj(
-                chain_seqs,
-                chain,
-                outdir=cur_outdir,
-                id_col=id_col,
-                additional_seqs={
-                    "v_leader": "v_leader",
-                    "c_gene": f"{chain}_c_sequence",
-                },
-            )
-            for afile in cur_outdir.glob("*.fasta"):
-                outfile = cur_plotdir / f"{afile.stem}.png"
-                fig = plot_vdj(
-                    afile.stem,
-                    chain,
-                    chain_seqs,
-                    file=afile,
-                    id_col=id_col,
-                    wrap_length=viz_config.get("wrap_length", 200),
-                    title_spec=[("", id_col)]
-                    + viz_config["title_spec"]
-                    + [("C call", f"{chain}_c_call")],
-                    color_scheme="Clustal",
-                )
-                fig.set_figwidth(viz_config.get("width", 30))
-                fig.set_dpi(viz_config.get("dpi", 100))
-                fig.savefig(outfile)
+    plot_sequence()
