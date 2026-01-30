@@ -251,12 +251,17 @@ def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
             df = df.join(
                 get_cdr3_indices(airr, chain=chain, verify=True), on="index"
             ).filter(pl.col(f"{chain}_cdr3_index_consistent"))
-    df = df.filter(
-        pl.struct("Sample_Name", "clone_id").map_elements(
-            lambda x: (x["clone_id"], x["Sample_Name"]) in cfg["wanted_clones"],
-            return_dtype=pl.Boolean,
+    df = (
+        df.filter(
+            pl.struct("Sample_Name", "clone_id").map_elements(
+                lambda x: [x["clone_id"], x["Sample_Name"]] in cfg["wanted_clones"],
+                return_dtype=pl.Boolean,
+            )
         )
-    )
+        .group_by("Sample_Name", "clone_id")
+        .agg(pl.all().first())
+    )  # WARNING: taking just the first sequence is kinda arbitrary, maybe do something
+    # better
     to_json_raw = []
     primer_dfs = []
     if tm_kws := cfg.get("tm_function"):
@@ -264,13 +269,13 @@ def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
     else:
         tm_func = tm.tm_default
     for row in df.iter_rows(named=True):
-        df, dct = format_one_sample(row, cfg=cfg, tm_func=tm_func)
+        cur, dct = format_one_sample(row, cfg=cfg, tm_func=tm_func)
         for col in meta_cols:
             dct[col] = row[col]
         to_json_raw.append(dct)
-        primer_dfs.append(df)
+        primer_dfs.append(cur)
     final: pl.DataFrame = pl.concat(primer_dfs, how="diagonal_relaxed").join(
-        df.select(meta_cols, "index"), on="index", validate="m:1"
+        df.select(*meta_cols, "index"), on="index"
     )
     with open(out_json, "w") as f:
         json.dump(to_json_raw, f)
@@ -281,8 +286,13 @@ def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
 
 
 def create_primers():
-    airr = md.read_h5mu(smk.input[0])
-    main(airr=airr, cfg=smk.config, out_tabular=smk.output[0], out_json=smk.output[1])
+    airr = md.read_h5mu(smk.input[0])["airr"]
+    main(
+        airr=airr,
+        cfg=RCONFIG,
+        out_tabular=smk.output["primers_tabular"],
+        out_json=smk.output["primers_json"],
+    )
 
 
 if fn := globals().get(smk.rule):

@@ -79,10 +79,6 @@ sequence_out = {
 extracted_seqs = expand(
     "{o}/{s}{a}.fasta", o=sequence_out["extracted"], s=samples, a=["", "-aa"]
 )
-stitchr_seqs = expand(
-    "{o}/{s}.fasta", o=sequence_out["stitchr"], s=samples
-)  # TODO: add stitchr rule
-
 chains = ("VJ_1", "VDJ_1")
 vdj_plots = expand("{o}/plots/vdj/{s}/{c}", o=OUT, s=samples, c=chains)
 vdj_alignments = expand("{o}/vdj_alignments/{s}/{c}", o=OUT, s=samples, c=chains)
@@ -111,6 +107,13 @@ query_results = {
     ],
 }
 
+if config["create_primers"].get("wanted_clones"):
+    primer_out = {
+        "primers_tabular": f"{OUT}/fusion_primers.csv",
+        "primers_json": f"{OUT}/.fusion_primers.json",
+    }
+else:
+    primer_out = {}
 
 # * Rules
 
@@ -124,6 +127,7 @@ rule all:
         *vdj_plots,
         *vdj_alignments,
         **REFS_TO_GET,
+        **primer_out,
         **cell_annotation_results,
         **plots,
         mixtcr_all=f"{OUT}/mixtcrpred_results.csv",
@@ -283,3 +287,13 @@ rule tcrmatch:
         *query_results["tcrmatch"],
     script:
         "analyses.py"
+
+
+# ** Primers
+rule create_primers:
+    input:
+        rules.load_runs.output,
+    output:
+        **primer_out,
+    script:
+        "primers.py"
