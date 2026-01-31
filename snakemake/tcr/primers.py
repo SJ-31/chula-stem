@@ -129,18 +129,18 @@ def get_cdr3_fusion_primers(
 
 
 class PrimerFmt:
-    def __init__(self, how: Literal["text", "df", "json"] = "df", **kws) -> None:
+    def __init__(self, how: Literal["text", "df", "dict"] = "df", **kws) -> None:
         self.kws: dict = kws
-        self.how: Literal["text", "df", "json"] = how
+        self.how: Literal["text", "df", "dict"] = how
 
     def __call__(self, primers: dict[str, Amplicon]) -> str | dict | pl.DataFrame:
         if self.how == "text":
             return self._to_text(primers)
         elif self.how == "df":
             return self._to_df(primers)
-        return self._2dict(primers)
+        return self._to_dict(primers)
 
-    def _2dict(self, primers: dict[str, Amplicon]) -> dict:
+    def _to_dict(self, primers: dict[str, Amplicon]) -> dict:
         result = {}
         for name, amp in primers.items():
             result[name] = {"figure": amp.figure()}

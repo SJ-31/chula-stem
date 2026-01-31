@@ -107,10 +107,13 @@ query_results = {
     ],
 }
 
-if config["create_primers"].get("wanted_clones"):
+if clone_primers := config["create_primers"].get("wanted_clones"):
     primer_out = {
         "primers_tabular": f"{OUT}/fusion_primers.csv",
         "primers_json": f"{OUT}/.fusion_primers.json",
+        "primers_tables": [
+            f"{OUT}/fusion_primers/cid{i}_{s}.html" for i, s in clone_primers
+        ],
     }
 else:
     primer_out = {}
@@ -294,6 +297,17 @@ rule create_primers:
     input:
         rules.load_runs.output,
     output:
-        **primer_out,
+        **{k: v for k, v in primer_out.items() if not k.endswith("tables")},
     script:
         "primers.py"
+
+
+rule write_primer_tables:
+    input:
+        rules.create_primers.output.primers_json,
+    params:
+        outdir=f"{OUT}/fusion_primers",
+    output:
+        primer_out["primers_tables"],
+    script:
+        "primer_table.R"

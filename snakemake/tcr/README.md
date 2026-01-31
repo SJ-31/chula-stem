@@ -14,6 +14,7 @@ Taking BD Rhapsody full-length TCR/BCR data as input, this analysis routine does
     + **Note:** all ranks in plots and preprocessing are sorted in decreasing size e.g., the rank 1 clonotype is the largest (has the most cells)
 
 ## Output details
++ The "cid" prefix stands for "Clone ID", which is the number immediately after (no space separation) 
 + `mixtcrpred_results.csv`: aggregated results of MixTCRpred's predictions of TCR-pMHC binding for the top clones in each sample. This file contains model metadata including the MHC class, peptide, and its origin.
     + Prediction quality is measured using two metrics:
         1. **score:** the higher the score, the more likely the sequence is to bind the pMHC complex
