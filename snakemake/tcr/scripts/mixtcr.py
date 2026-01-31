@@ -59,9 +59,7 @@ for model in mixtcr_config["models"]:
     if len(model.split("_")) != 2:
         raise ValueError("Invalid model specification for MixTCRpred!")
     outfile = f"{smk.params["outdir"]}/{model}.csv"
-    command = (
-        f"./mixtcr_wrapper.sh {rundir} {model} {input_file} {outfile} {conda_flags}"
-    )
+    command = f"./scripts/mixtcr_wrapper.sh {rundir} {model} {input_file} {outfile} {conda_flags}"
     run(command, shell=True)
     df = pd.read_csv(outfile, comment="#")
     df = (

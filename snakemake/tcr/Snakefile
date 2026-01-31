@@ -144,7 +144,7 @@ rule prepare_references:
     output:
         REFS_TO_GET.values(),
     script:
-        "prepare_data.py"
+        "scripts/prepare_data.py"
 
 
 rule load_runs:
@@ -153,7 +153,7 @@ rule load_runs:
     params:
         runs=runs,
     script:
-        "prepare_data.py"
+        "scripts/prepare_data.py"
 
 
 rule annotate_cells:
@@ -162,7 +162,7 @@ rule annotate_cells:
     input:
         rules.load_runs.output,
     script:
-        "prepare_data.py"
+        "scripts/prepare_data.py"
 
 
 # ** Plots & Reports
@@ -181,7 +181,7 @@ rule make_reports:
         expansion=directory(f"{OUT}/plots/clone_expansion"),
         ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),
     script:
-        "plotting.py"
+        "scripts/plotting.py"
         # TODO: add a rarefaction curve
 
 
@@ -195,7 +195,7 @@ rule plot_sequence:
         *[directory(d) for d in vdj_plots],
         *[directory(d) for d in vdj_alignments],
     script:
-        "plotting.py"
+        "scripts/plotting.py"
 
 
 # ** Full-length sequencing
@@ -210,7 +210,7 @@ rule extract_sequences:
         extracted_seqs,
         ignored=rules.all.input.extracted_ignored,
     script:
-        "analyses.py"
+        "scripts/analyses.py"
 
 
 rule stitchr:
@@ -249,7 +249,7 @@ rule mixtcrpred:
             )
         ],
     script:
-        "mixtcr.py"
+        "scripts/mixtcr.py"
 
 
 # ** Database querying
@@ -265,7 +265,7 @@ rule scirpy_query:
     output:
         *query_results["scirpy"],
     script:
-        "analyses.py"
+        "scripts/analyses.py"
 
 
 rule compairr:
@@ -278,7 +278,7 @@ rule compairr:
     output:
         *query_results["compairr"],
     script:
-        "analyses.py"
+        "scripts/analyses.py"
 
 
 rule tcrmatch:
@@ -289,7 +289,7 @@ rule tcrmatch:
     output:
         *query_results["tcrmatch"],
     script:
-        "analyses.py"
+        "scripts/analyses.py"
 
 
 # ** Primers
@@ -299,7 +299,7 @@ rule create_primers:
     output:
         **{k: v for k, v in primer_out.items() if not k.endswith("tables")},
     script:
-        "primers.py"
+        "scripts/primers.py"
 
 
 rule write_primer_tables:
@@ -310,4 +310,4 @@ rule write_primer_tables:
     output:
         primer_out["primers_tables"],
     script:
-        "primer_table.R"
+        "scripts/primer_table.R"
