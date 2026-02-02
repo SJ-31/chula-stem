@@ -210,6 +210,8 @@ def format_one_sample(
             tm_func=tm_func,
             target_tm=cfg.get("target_tm", 55),
             how=cfg.get("how", "pydna"),
+            forward_len=cfg.get("forward_len", 30),
+            reverse_len=cfg.get("reverse_len", 30),
         )
         fmt: pl.DataFrame = PrimerFmt("df")(primers)
         exprs = []

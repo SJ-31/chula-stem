@@ -178,8 +178,19 @@ rule make_reports:
         **cohort_plots,
         top_clones=f"{OUT}/top_clones.csv",
         top_clusters=f"{OUT}/top_clusters.csv",
-        expansion=directory(f"{OUT}/plots/clone_expansion"),
-        ct_abundance=directory(f"{OUT}/plots/cell_type_abundance"),
+        expansion=report(
+            directory(f"{OUT}/plots/clone_expansion"),
+            category="Clonal Expansion",
+            patterns=["{sample}.png"],
+            subcategory="Per sample",
+            labels={"Sample": "{sample}"},
+        ),
+        ct_abundance=report(
+            directory(f"{OUT}/plots/cell_type_abundance"),
+            category="Cell type abundance",
+            patterns=["{sample}.png"],
+            labels={"Sample": "{sample}"},
+        ),
     script:
         "scripts/plotting.py"
         # TODO: add a rarefaction curve
@@ -192,7 +203,21 @@ rule plot_sequence:
         plotdir=f"{OUT}/plots/vdj",
         outdir=f"{OUT}/vdj_alignments",
     output:
-        *[directory(d) for d in vdj_plots],
+        *[
+            report(
+                directory(d),
+                patterns=["cid{clone_id}-{index}_{chain}.png"],
+                category="Chain alignment plots",
+                subcategory=Path(d).parent.stem,
+                labels={
+                    "Chain type": Path(d).stem,
+                    "Clone ID": "{clone_id}",
+                    "Index": "{index}",
+                    "Name": "{chain}",
+                },
+            )
+            for d in vdj_plots
+        ],
         *[directory(d) for d in vdj_alignments],
     script:
         "scripts/plotting.py"
@@ -309,5 +334,11 @@ rule write_primer_tables:
         outdir=f"{OUT}/fusion_primers",
     output:
         primer_out["primers_tables"],
+        report(
+            directory(f"{OUT}/fusion_primers"),
+            category="Fusion primers",
+            patterns=["cid{clone_id}_{sample}.html"],
+            labels={"Sample": "{sample}", "Clone ID": "{clone_id}"},
+        ),
     script:
         "scripts/primer_table.R"
