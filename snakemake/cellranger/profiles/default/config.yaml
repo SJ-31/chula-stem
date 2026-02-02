@@ -1,0 +1,12 @@
+cores: 1
+jobs: 10
+executor: slurm
+slurm-logdir: "/data/home/shannc/chula-stem/snakemake/cellranger/slurm_logs"
+default-resources:
+  mem: 30G
+  qos: cpu24h
+rerun-triggers: mtime
+keep-incomplete: True
+delete-all-output: False
+delete-temp-output: False
+rerun-incomplete: True

@@ -1,0 +1,45 @@
+configfile: "env.yaml"
+
+
+import pandas as pd
+
+manifest = pd.read_csv(config["manifest"])
+
+OUTDIR = config["outdir"]
+
+sample_outdirs = expand(
+    f"{OUTDIR}/{{s}}/processed/cellranger_{{t}}",
+    zip,
+    s=manifest["sample_name"],
+    t=manifest["type"],
+)
+
+sample_fastq_lookup = {
+    (n, t): p
+    for n, t, p in zip(
+        manifest["sample_name"], manifest["type"], manifest["fastq_path"]
+    )
+}
+
+
+rule all:
+    input:
+        sample_outdirs,
+
+
+rule cellranger_count:
+    input:
+        lambda wc: sample_fastq_lookup[(wc.get("sample"), wc.get("type"))],
+    output:
+        directory(f"{OUTDIR}/{{sample}}/processed/cellranger_{{type}}"),
+    shadow:
+        "shallow"
+    shell:
+        f"""
+        cellranger count --id={{wildcards.sample}} \
+            --transcriptome {config["cellranger_count"]["reference"]} \
+            --fastqs {{input[0]}} \
+            --create-bam {config["cellranger_count"]["create-bam"]}
+        
+        mv outs {{output[0]}}
+        """

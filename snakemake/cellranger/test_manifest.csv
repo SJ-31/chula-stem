@@ -1,0 +1,2 @@
+sample_name,type,fastq_path
+pbmc1,tumor,/data/project/stemcell/shannc/public_data/pbmc_1k_v3_fastqs
