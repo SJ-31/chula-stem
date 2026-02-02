@@ -111,9 +111,7 @@ if clone_primers := config["create_primers"].get("wanted_clones"):
     primer_out = {
         "primers_tabular": f"{OUT}/fusion_primers.csv",
         "primers_json": f"{OUT}/.fusion_primers.json",
-        "primers_tables": [
-            f"{OUT}/fusion_primers/cid{i}_{s}.html" for i, s in clone_primers
-        ],
+        "primers_tables": f"{OUT}/fusion_primers",
     }
 else:
     primer_out = {}
@@ -333,12 +331,15 @@ rule write_primer_tables:
     params:
         outdir=f"{OUT}/fusion_primers",
     output:
-        primer_out["primers_tables"],
         report(
             directory(f"{OUT}/fusion_primers"),
             category="Fusion primers",
-            patterns=["cid{clone_id}_{sample}.html"],
-            labels={"Sample": "{sample}", "Clone ID": "{clone_id}"},
+            patterns=["cid{clone_id}_{sample}.{ext}"],
+            labels={
+                "Sample": "{sample}",
+                "Clone ID": "{clone_id}",
+                "File type": "{ext}",
+            },
         ),
     script:
         "scripts/primer_table.R"

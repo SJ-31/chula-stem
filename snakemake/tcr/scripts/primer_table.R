@@ -117,14 +117,35 @@ make_sample_primer_table <- function(sample_data, sample_key = "Sample_Name") {
     tab_header(title = title, subtitle = subtitle)
 }
 
+write_sample_primers_fasta <- function(sample_data, outfile) {
+  sname <- sample_data$Sample_Name
+  clone_id <- sample_data$clone_id
+  entries <- lapply(c("VJ_1", "VDJ_1"), \(chain) {
+    chain_data <- sample_data[[chain]]
+    lapply(c("pair 1", "pair 2"), \(pair) {
+      pname <- str_replace(pair, "pair ", "p")
+      directions <- c("Forward", "Reverse")
+      seqs <- map_chr(directions, \(d) chain_data[[pair]][[d]]$seq)
+      glue(
+        ">{sname}_cid{clone_id}_{chain}_{pname}_{str_to_lower(directions)}\n{seqs}"
+      )
+    })
+  }) |>
+    unlist(use.names = FALSE)
+  write_lines(entries, outfile)
+}
+
 
 write_primer_tables <- function() {
   data <- jsonlite::read_json(snakemake@input[[1]])
   outdir <- snakemake@params[["outdir"]]
+  dir.create(outdir)
   for (d in data) {
     outfile <- glue("{outdir}/cid{d$clone_id}_{d$Sample_Name}.html")
+    fasta_out <- glue("{outdir}/cid{d$clone_id}_{d$Sample_Name}.fasta")
     table <- make_sample_primer_table(d)
-    gtsave(table, outfile)
+    write_sample_primers_fasta(d, fasta_out)
+    as_raw_html(table, inline_css = TRUE) |> htmltools::save_html(outfile)
   }
 }
 
