@@ -32,7 +32,7 @@ except ImportError:
 RCONFIG: dict = smk.config[smk.rule]
 
 CHAINS: tuple = ("VJ_1", "VDJ_1")
-WANTED_COLS = [
+AIRR_WANTED_COLS = [
     "cdr3",
     "j_sequence_start",
     "j_sequence_end",
@@ -44,6 +44,10 @@ WANTED_COLS = [
     "v_sequence_end",
     "sequence",
 ]
+META_COLS = ["Sample_Name", "chain_pairing", "clone_id"]
+
+
+# * Utility functions
 
 
 def get_cdr3_indices(
@@ -379,16 +383,15 @@ def format_one_sample(
     return pl.concat(primer_dfs, how="diagonal_relaxed"), dct_result
 
 
-def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
-    meta_cols = ["Sample_Name", "chain_pairing", "clone_id"]
+def filter_wanted_clones(airr: ad.AnnData, cfg: dict):
     fields = airr.obsm["airr"].fields
     df = (
         pl.from_pandas(
-            ir.get.airr(airr, WANTED_COLS, chain=CHAINS),
+            ir.get.airr(airr, AIRR_WANTED_COLS, chain=CHAINS),
             include_index=True,
         )
         .join(
-            pl.from_pandas(airr.obs.loc[:, meta_cols], include_index=True),
+            pl.from_pandas(airr.obs.loc[:, META_COLS], include_index=True),
             on="index",
         )
         .filter(pl.col("chain_pairing") == "single pair")
@@ -409,6 +412,22 @@ def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
         .agg(pl.all().first())
     )  # WARNING: taking just the first sequence is kinda arbitrary, maybe do something
     # better
+    return df
+
+
+# * Rules
+
+# ** Construct creation
+
+# def create_one_construct(airr_data: dict):
+
+# def create_construct_main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
+
+# ** Primer creation
+
+
+def primers_main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
+    df = filter_wanted_clones(airr, cfg)
     to_json_raw = []
     primer_dfs = []
     if tm_kws := cfg.get("tm_function"):
@@ -417,24 +436,21 @@ def main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
         tm_func = tm.tm_default
     for row in df.iter_rows(named=True):
         cur, dct = format_one_sample(row, cfg=cfg, tm_func=tm_func)
-        for col in meta_cols:
+        for col in META_COLS:
             dct[col] = row[col]
         to_json_raw.append(dct)
         primer_dfs.append(cur)
     final: pl.DataFrame = pl.concat(primer_dfs, how="diagonal_relaxed").join(
-        df.select(*meta_cols, "index"), on="index"
+        df.select(*META_COLS, "index"), on="index"
     )
     with open(out_json, "w") as f:
         json.dump(to_json_raw, f)
     final.write_csv(out_tabular)
 
 
-# * Entry point
-
-
 def create_primers():
     airr = md.read_h5mu(smk.input[0])["airr"]
-    main(
+    primers_main(
         airr=airr,
         cfg=RCONFIG,
         out_tabular=smk.output["primers_tabular"],
@@ -442,10 +458,10 @@ def create_primers():
     )
 
 
+# * Entry point & tests
+
 if fn := globals().get(smk.rule):
     fn()
-
-# * Tests
 
 
 @pytest.fixture
@@ -457,7 +473,7 @@ def airr_data_test():
 def test_get_c(airr_data_test):
     chain = "VJ_1"
     df = pl.from_pandas(
-        ir.get.airr(airr_data_test, WANTED_COLS, chain=chain),
+        ir.get.airr(airr_data_test, AIRR_WANTED_COLS, chain=chain),
         include_index=True,
     )
     dct = next(df.iter_rows(named=True))
