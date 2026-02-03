@@ -283,7 +283,10 @@ class PrimerFmt:
     def _to_dict(self, primers: dict[str, Amplicon]) -> dict:
         result = {}
         for name, amp in primers.items():
-            result[name] = {"figure": amp.figure()}
+            result[name] = {
+                "figure": amp.figure(),
+                "product_length": amp.accession.removesuffix("bp"),
+            }
             for p, pname in zip(amp.primers(), ("Forward", "Reverse")):
                 if p is None:
                     continue
@@ -356,7 +359,7 @@ def format_one_sample(
         )
         fmt: pl.DataFrame = PrimerFmt("df")(primers)
         exprs = []
-        dct_result[chain] = PrimerFmt("json")(primers)
+        dct_result[chain] = PrimerFmt("dict")(primers)
         for key in [
             f"{chain}_sequence",
             f"{chain}_v_call",

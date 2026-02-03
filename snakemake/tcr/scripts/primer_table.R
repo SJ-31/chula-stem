@@ -6,6 +6,7 @@ make_chain_tb <- function(lst, chain) {
   cur <- lst[[chain]]
   table <- lapply(c("pair 1", "pair 2"), \(name) {
     pair_info <- cur[[name]]
+    plen <- pair_info$product_length
     tb <- lapply(
       c("Forward", "Reverse"),
       \(x) {
@@ -15,7 +16,8 @@ make_chain_tb <- function(lst, chain) {
           length = pair_info[[x]]$length,
           seq = pair_info[[x]]$seq,
           tm = pair_info[[x]]$tm,
-          pair = name
+          pair = name,
+          product_length = plen
         )
       }
     ) |>
@@ -86,10 +88,11 @@ make_sample_primer_table <- function(sample_data, sample_key = "Sample_Name") {
   )
   gt(
     combined,
-    rowname_col = c("pair", "direction"),
+    rowname_col = c("pair", "product_length", "direction"),
     groupname_col = "chain",
     process_md = TRUE
   ) |>
+    tab_stubhead(c("", "Product length", "Direction")) |>
     tab_formatting() |>
     opt_stylize(style = 6, add_row_striping = FALSE, color = "green") |>
     text_transform(
