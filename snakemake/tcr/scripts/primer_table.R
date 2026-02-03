@@ -96,7 +96,7 @@ make_sample_primer_table <- function(sample_data, sample_key = "Sample_Name") {
       \(clist) {
         chain <- head(unlist(clist), n = 1)
         chain_data <- sample_data[[chain]]
-        gene_info <- map_chr(c("v", "d", "j"), \(gene) {
+        gene_info <- map_chr(c("v", "d", "j", "c"), \(gene) {
           val <- chain_data[[glue("{gene}_call")]]
           if (!is.null(val)) {
             glue("<b>{str_to_upper(gene)}</b> call: {val}")

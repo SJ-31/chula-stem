@@ -150,10 +150,8 @@ def get_best_alignment(query: DNA, references: list[DNA]) -> tuple[float, DNA]:
 
 
 def get_c_sequence_from_call(
-    airr_data: dict,
-    chain: str,
-    try_match_allele: bool = True,
-) -> str:
+    airr_data: dict, chain: str, try_match_allele: bool = True
+) -> DNA:
     """
     Return the sequence of an AIR gene from its call (predicted identity)
 
@@ -178,12 +176,12 @@ def get_c_sequence_from_call(
             f"No sequences for C gene could be found in {seq_file}. Try checking its contents"
         )
     if not try_match_allele or len(candidates) == 1:
-        return str(candidates[0])
+        return candidates[0]
     full = airr_data[f"{chain}_sequence"]
     j_end = airr_data[f"{chain}_j_sequence_end"]
     seq = full[j_end + 1 :]
     score, best_seq = get_best_alignment(DNA(seq), candidates)
-    return str(best_seq)
+    return best_seq
 
 
 def add_new_c(airr_data: dict, chain: str, c_seq: str) -> str:
@@ -208,7 +206,25 @@ def get_cdr3_fusion_primers(
     end_gene: Literal["c", "j"] = "c",
     tm_func: Callable[[str], float] = tm.tm_default,
     target_tm: float = 55.0,
-) -> dict:
+) -> tuple[dict, dict]:
+    """
+    Generate fusion primer pairs targeting the CDR3 region of a TCR in `airr_data`
+
+    Parameters
+    ----------
+    end_gene : j, c
+        Gene for which the reverse primer of the second primer pair should extend to
+        Specifying j produces a fusion product of V-(D)-J; specifying c yields V-(D)-J-C
+
+        In the case when data for the C gene is unavailable, a match is attempted using
+        IMGT reference genes (in the stitchr data directory) and the (possibly partial)
+        C gene sequence using the J sequence end
+
+    Returns
+    -------
+    Dictionary of primer pairs and modified airr data dictionary
+
+    """
     full: Dseqrecord = Dseqrecord(airr_data[f"{chain}_sequence"])
     end_gene = end_gene.lower()
     p1_start, p1_end = (
@@ -219,14 +235,15 @@ def get_cdr3_fusion_primers(
     full_seq: str = airr_data[f"{chain}_sequence"]
     if end_lookup not in airr_data and end_gene == "c":
         logger.info("C gene sequence missing, retrieving from call...")
-        new_c_seq: str = get_c_sequence_from_call(
+        new_c_seq: DNA = get_c_sequence_from_call(
             airr_data, chain=chain, try_match_allele=True
         )
-        full_seq = add_new_c(airr_data, chain, new_c_seq)
-        airr_data[f"{chain}_{end_gene}_sequence_start"] = (
+        full_seq = add_new_c(airr_data, chain, str(new_c_seq))
+        airr_data[f"{chain}_c_call"] = new_c_seq.metadata["description"].split("|")[1]
+        airr_data[f"{chain}_c_sequence_start"] = (
             airr_data[f"{chain}_j_sequence_start"] + 1
         )
-        airr_data[f"{chain}_{end_gene}_sequence_end"] = len(full_seq)
+        airr_data[f"{chain}_c_sequence_end"] = len(full_seq)
     elif end_lookup not in airr_data:
         # TODO: you could also do this for the j call...
         raise ValueError("J gene sequence end not present in AIR data")
@@ -245,8 +262,7 @@ def get_cdr3_fusion_primers(
             primers = (Primer(fwd, id=f"f{end-start}"), Primer(rev, id=f"r{end-start}"))
             amp = pcr(primers, full)
         results[f"pair {i+1}"] = amp
-
-    return results
+    return results, airr_data
 
 
 # * Formatting functions
@@ -328,7 +344,7 @@ def format_one_sample(
     primer_dfs: list = []
     dct_result = {}
     for chain in CHAINS:
-        primers = get_cdr3_fusion_primers(
+        primers, airr_update = get_cdr3_fusion_primers(
             airr_data,
             chain=chain,
             tm_func=tm_func,
@@ -346,9 +362,10 @@ def format_one_sample(
             f"{chain}_v_call",
             f"{chain}_d_call",
             f"{chain}_j_call",
+            f"{chain}_c_call",
         ]:
             new_key = key.removeprefix(f"{chain}_")
-            val = airr_data.get(key)
+            val = airr_update.get(key)
             exprs.append(pl.lit(val).alias(new_key))
             dct_result[chain][new_key] = val
         fmt = fmt.with_columns(
