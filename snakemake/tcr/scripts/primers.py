@@ -47,7 +47,27 @@ AIRR_WANTED_COLS = [
 META_COLS = ["Sample_Name", "chain_pairing", "clone_id"]
 
 
-# * Utility functions
+# * Utilities
+
+
+class ChainData:
+    "Helper class for retrieving data following AIRR standards from a specific chain of a single clone"
+
+    def __init__(self, chain: str, data: dict) -> None:
+        self.data: str = data
+        self.chain: str = chain
+
+    def __contains__(self, key):
+        return f"{self.chain}_{key}" in self.data
+
+    def get(self, key, default=None):
+        return self.data.get(f"{self.chain}_{key}", default)
+
+    def __getitem__(self, key: str):
+        return self.data[f"{self.chain}_{key}"]
+
+    def __setitem__(self, key, val) -> None:
+        self.data[f"{self.chain}_{key}"] = val
 
 
 def get_cdr3_indices(
@@ -120,15 +140,20 @@ def get_chain_name_from_call(call: str) -> Literal["TRB", "TRA", "TRD", "TRG"]:
 
 
 def get_imgt_seqs(
-    file: Path, gene: Literal["c", "d", "j", "v"], species: str = "Homo sapiens"
+    file: Path,
+    region: Literal["c", "d", "j", "v", ""],
+    species: str = "Homo sapiens",
 ) -> list[DNA]:
     """Return fasta entries corresponding to `gene` in a fasta file with IMGT headers"""
     seqs = []
-    region = f"{gene.upper()}-REGION"
+    gene_key = f"{region.upper()}-REGION"
     for record in SeqIO.parse(file, "fasta"):
         desc = record.description.split("|")
-        is_constant = desc[-1] == "~CONSTANT"
-        if is_constant and gene == "c" or (desc[4] == region):
+        if (
+            (desc[-1] == "~CONSTANT" and region == "c")
+            or (desc[-1] == "~LEADER" and region == "leader")
+            or (desc[4] == gene_key)
+        ):
             seq = str(record.seq)
             if seq.islower():
                 seq = seq.upper()
@@ -153,9 +178,7 @@ def get_best_alignment(query: DNA, references: list[DNA]) -> tuple[float, DNA]:
     return cur_best
 
 
-def get_c_sequence_from_call(
-    airr_data: dict, chain: str, try_match_allele: bool = True
-) -> DNA:
+def get_c_sequence_from_call(cdata: ChainData, try_match_allele: bool = True) -> DNA:
     """
     Return the sequence of an AIR gene from its call (predicted identity)
 
@@ -166,7 +189,7 @@ def get_c_sequence_from_call(
         for the gene sequence unless `try_match_allele` is True.
         If it is, the sequence of the allele with the highest alignment score is returned
     """
-    call = airr_data[f"{chain}_c_call"]
+    call = cdata["c_call"]
     data_dir: Path = Path(
         sp.run("stitchr -dd", shell=True, capture_output=True).stdout.decode().strip()
     )
@@ -181,36 +204,35 @@ def get_c_sequence_from_call(
         )
     if not try_match_allele or len(candidates) == 1:
         return candidates[0]
-    full = airr_data[f"{chain}_sequence"]
-    j_end = airr_data[f"{chain}_j_sequence_end"]
+    full = cdata["sequence"]
+    j_end = cdata["j_sequence_end"]
     seq = full[j_end + 1 :]
     score, best_seq = get_best_alignment(DNA(seq), candidates)
     return best_seq
 
 
-def add_new_c(airr_data: dict, chain: str, c_seq: str) -> str:
+def add_new_c(cdata: ChainData, c_seq: str) -> str:
     """
     Return full-length AIR sequence modified to have a new C gene sequence
 
     This function simply strips any sequence downstream of airr_data["j_sequence_end"]
     and replaces it with `c_seq`
     """
-    j_end = airr_data[f"{chain}_j_sequence_end"]
-    cut = airr_data[f"{chain}_sequence"][:j_end]
+    j_end = cdata["j_sequence_end"]
+    cut = cdata["sequence"][:j_end]
     return cut + c_seq
 
 
 # TODO: add in support for adding arbitrary overhang sequences
 def get_cdr3_fusion_primers(
-    airr_data: dict,
-    chain: str,
+    cdata: ChainData,
     how: Literal["pydna", "manual"] = "pydna",
     forward_len: int = 30,
     reverse_len: int = 30,
     end_gene: Literal["c", "j"] = "c",
     tm_func: Callable[[str], float] = tm.tm_default,
     target_tm: float = 55.0,
-) -> tuple[dict, dict]:
+) -> tuple[dict, ChainData]:
     """
     Generate fusion primer pairs targeting the CDR3 region of a TCR in `airr_data`
 
@@ -229,31 +251,24 @@ def get_cdr3_fusion_primers(
     Dictionary of primer pairs and modified airr data dictionary
 
     """
-    full: Dseqrecord = Dseqrecord(airr_data[f"{chain}_sequence"])
+    full: Dseqrecord = Dseqrecord(cdata["sequence"])
     end_gene = end_gene.lower()
-    p1_start, p1_end = (
-        airr_data[f"{chain}_v_sequence_start"],
-        airr_data[f"{chain}_cdr3_end"],
-    )
-    end_lookup: str = f"{chain}_{end_gene}_sequence_end"
-    full_seq: str = airr_data[f"{chain}_sequence"]
-    if end_lookup not in airr_data and end_gene == "c":
+    p1_start, p1_end = (cdata["v_sequence_start"], cdata["cdr3_end"])
+    end_lookup: str = f"{end_gene}_sequence_end"
+    full_seq: str = cdata["sequence"]
+    if end_lookup not in cdata and end_gene == "c":
         logger.info("C gene sequence missing, retrieving from call...")
-        new_c_seq: DNA = get_c_sequence_from_call(
-            airr_data, chain=chain, try_match_allele=True
-        )
-        full_seq = add_new_c(airr_data, chain, str(new_c_seq))
-        airr_data[f"{chain}_c_call"] = new_c_seq.metadata["description"].split("|")[1]
-        airr_data[f"{chain}_c_sequence_start"] = (
-            airr_data[f"{chain}_j_sequence_start"] + 1
-        )
-        airr_data[f"{chain}_c_sequence_end"] = len(full_seq)
-    elif end_lookup not in airr_data:
+        new_c_seq: DNA = get_c_sequence_from_call(cdata, try_match_allele=True)
+        full_seq = add_new_c(cdata, str(new_c_seq))
+        cdata["c_call"] = new_c_seq.metadata["description"].split("|")[1]
+        cdata["c_sequence_start"] = cdata["j_sequence_start"] + 1
+        cdata["c_sequence_end"] = len(full_seq)
+    elif end_lookup not in cdata:
         # TODO: you could also do this for the j call...
         raise ValueError("J gene sequence end not present in AIR data")
     p2_start, p2_end = (
-        airr_data[f"{chain}_cdr3_start"],
-        airr_data[f"{chain}_{end_gene}_sequence_end"],
+        cdata["cdr3_start"],
+        cdata[f"{end_gene}_sequence_end"],
     )
     results = {}
     for i, (start, end) in enumerate([(p1_start, p1_end), (p2_start, p2_end)]):
@@ -266,7 +281,7 @@ def get_cdr3_fusion_primers(
             primers = (Primer(fwd, id=f"f{end-start}"), Primer(rev, id=f"r{end-start}"))
             amp = pcr(primers, full)
         results[f"pair {i+1}"] = amp
-    return results, airr_data
+    return results, cdata
 
 
 # * Formatting functions
@@ -351,9 +366,9 @@ def format_one_sample(
     primer_dfs: list = []
     dct_result = {}
     for chain in CHAINS:
+        cdata: ChainData = ChainData(chain, airr_data)
         primers, airr_update = get_cdr3_fusion_primers(
-            airr_data,
-            chain=chain,
+            cdata,
             tm_func=tm_func,
             target_tm=cfg.get("target_tm", 55),
             how=cfg.get("how", "pydna"),
@@ -364,17 +379,10 @@ def format_one_sample(
         fmt: pl.DataFrame = PrimerFmt("df")(primers)
         exprs = []
         dct_result[chain] = PrimerFmt("dict")(primers)
-        for key in [
-            f"{chain}_sequence",
-            f"{chain}_v_call",
-            f"{chain}_d_call",
-            f"{chain}_j_call",
-            f"{chain}_c_call",
-        ]:
-            new_key = key.removeprefix(f"{chain}_")
+        for key in ["sequence", "v_call", "d_call", "j_call", "c_call"]:
             val = airr_update.get(key)
-            exprs.append(pl.lit(val).alias(new_key))
-            dct_result[chain][new_key] = val
+            exprs.append(pl.lit(val).alias(key))
+            dct_result[chain][key] = val
         fmt = fmt.with_columns(
             pl.lit(chain).alias("chain"),
             pl.lit(airr_data["index"]).alias("index"),
@@ -419,7 +427,10 @@ def filter_wanted_clones(airr: ad.AnnData, cfg: dict):
 
 # ** Construct creation
 
-# def create_one_construct(airr_data: dict):
+
+def create_one_construct(airr_data: dict, chain: str, cfg: str) -> DNA:
+    v_seq = airr_data[f"{chain}"]
+
 
 # def create_construct_main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
 
