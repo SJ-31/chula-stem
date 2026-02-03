@@ -5,7 +5,10 @@ import pandas as pd
 
 manifest = pd.read_csv(config["manifest"])
 
-OUTDIR = config["outdir"]
+OUTDIR = Path(config["outdir"])
+TMPDIR = OUTDIR / ".tmp"
+
+TMPDIR.mkdir(exist_ok=True, parents=True)
 
 sample_outdirs = expand(
     f"{OUTDIR}/{{s}}/processed/cellranger_{{t}}",
@@ -27,19 +30,47 @@ rule all:
         sample_outdirs,
 
 
+def get_cellranger_kws() -> str:
+    args = []
+    for k, default in zip(
+        (
+            "create-bam",
+            "transcriptome",
+            "jobmode",
+            "expect-cells",
+            "include-introns",
+            "chemistry",
+        ),
+        (False, None, "slurm", None, True, None),
+    ):
+        val = config["cellranger_count"].get(k, default)
+        if k == "transcriptome" and not val:
+            raise ValueError("Transcriptome must be provided")
+        elif k in {"create-bam", "include-introns"}:
+            val = str(val).lower()
+        if k in {"expect-cells", "jobmode", "chemistry"} and not val:
+            continue
+        else:
+            args.append(f"--{k} {val}")
+    return " ".join(args)
+
+
 rule cellranger_count:
     input:
         lambda wc: sample_fastq_lookup[(wc.get("sample"), wc.get("type"))],
     output:
         directory(f"{OUTDIR}/{{sample}}/processed/cellranger_{{type}}"),
-    shadow:
-        "shallow"
+        directory(f"{TMPDIR}/cellranger_{{sample}}_{{type}}"),
+    resources:
+        qos="cpu24h",
+        mem="50G",
+    threads: 4
     shell:
         f"""
         cellranger count --id={{wildcards.sample}} \
-            --transcriptome {config["cellranger_count"]["reference"]} \
             --fastqs {{input[0]}} \
-            --create-bam {config["cellranger_count"]["create-bam"]}
+            --output-dir {{output[1]}} \
+            {get_cellranger_kws()}
         
-        mv outs {{output[0]}}
+        mv {{output[1]}}/outs {{output[0]}}
         """
