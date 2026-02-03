@@ -60,6 +60,9 @@ class ChainData:
     def __contains__(self, key):
         return f"{self.chain}_{key}" in self.data
 
+    def start_end(self, key):
+        return self.get(f"{key}_sequence-start"), self.get(f"{key}_sequence_end")
+
     def get(self, key, default=None):
         return self.data.get(f"{self.chain}_{key}", default)
 
@@ -141,7 +144,7 @@ def get_chain_name_from_call(call: str) -> Literal["TRB", "TRA", "TRD", "TRG"]:
 
 def get_imgt_seqs(
     file: Path,
-    region: Literal["c", "d", "j", "v", ""],
+    region: Literal["c", "d", "j", "v", "leader"],
     species: str = "Homo sapiens",
 ) -> list[DNA]:
     """Return fasta entries corresponding to `gene` in a fasta file with IMGT headers"""
@@ -166,30 +169,36 @@ def get_imgt_seqs(
     return seqs
 
 
-def get_best_alignment(query: DNA, references: list[DNA]) -> tuple[float, DNA]:
-    ends = (
-        [True, False] if len(query) <= np.mean([len(s) for s in references]) else None
+def get_best_alignment(
+    query: DNA, references: list[DNA], free_ends
+) -> tuple[float, DNA]:
+    cur_best = (
+        pair_align(query, references[0], free_ends=free_ends).score,
+        references[0],
     )
-    cur_best = (pair_align(query, references[0], free_ends=ends).score, references[0])
     for s in references[1:]:
-        alignment = pair_align(query, s, free_ends=ends)
+        alignment = pair_align(query, s, free_ends=free_ends)
         if alignment.score > cur_best[0]:
             cur_best = (alignment.score, s)
     return cur_best
 
 
-def get_c_sequence_from_call(cdata: ChainData, try_match_allele: bool = True) -> DNA:
+def infer_air_endpoint(
+    cdata: ChainData,
+    endpoint: Literal["c", "leader"] = "c",
+    c_try_match_allele: bool = True,
+) -> DNA:
     """
-    Return the sequence of an AIR gene from its call (predicted identity)
+    Infer sequence of an end segment (leader or C gene) of a TCR from available data
 
     Parameters
     ----------
-    try_match_allele : boolean
-        If the call is generic and does not match an allele, then return the first allele
-        for the gene sequence unless `try_match_allele` is True.
-        If it is, the sequence of the allele with the highest alignment score is returned
+    c_try_match_allele : boolean
+        When inferring the C gene, if the c call is generic and does not match an allele,
+        then return the first allele unless this is false.
+        Otherwise, the sequence of the allele with the highest alignment score is returned
     """
-    call = cdata["c_call"]
+    call = cdata["c_call"] if endpoint == "c" else cdata["v_call"]
     data_dir: Path = Path(
         sp.run("stitchr -dd", shell=True, capture_output=True).stdout.decode().strip()
     )
@@ -197,17 +206,21 @@ def get_c_sequence_from_call(cdata: ChainData, try_match_allele: bool = True) ->
     seq_file = data_dir / "HUMAN" / f"{chain_name}.fasta"
     if not seq_file.exists():
         raise ValueError(f"{chain_name}.fasta not found in stitchr data directory")
-    candidates = get_imgt_seqs(seq_file, "c")
+    candidates = get_imgt_seqs(seq_file, region=endpoint)
     if not candidates:
         raise ValueError(
-            f"No sequences for C gene could be found in {seq_file}. Try checking its contents"
+            f"No sequences for {endpoint} could be found in {seq_file}. Try checking its contents"
         )
-    if not try_match_allele or len(candidates) == 1:
+    if (endpoint == "c" and not c_try_match_allele) or len(candidates) == 1:
         return candidates[0]
     full = cdata["sequence"]
-    j_end = cdata["j_sequence_end"]
-    seq = full[j_end + 1 :]
-    score, best_seq = get_best_alignment(DNA(seq), candidates)
+    if endpoint == "c":
+        seq = full[cdata["j_sequence_end"] :]
+        free_ends = [True, False]
+    else:
+        seq = full[: cdata["v_sequence_start"]]
+        free_ends = [False, True]
+    score, best_seq = get_best_alignment(DNA(seq), candidates, free_ends=free_ends)
     return best_seq
 
 
@@ -258,7 +271,7 @@ def get_cdr3_fusion_primers(
     full_seq: str = cdata["sequence"]
     if end_lookup not in cdata and end_gene == "c":
         logger.info("C gene sequence missing, retrieving from call...")
-        new_c_seq: DNA = get_c_sequence_from_call(cdata, try_match_allele=True)
+        new_c_seq: DNA = infer_air_endpoint(cdata, "c", c_try_match_allele=True)
         full_seq = add_new_c(cdata, str(new_c_seq))
         cdata["c_call"] = new_c_seq.metadata["description"].split("|")[1]
         cdata["c_sequence_start"] = cdata["j_sequence_start"] + 1
@@ -391,11 +404,11 @@ def format_one_sample(
     return pl.concat(primer_dfs, how="diagonal_relaxed"), dct_result
 
 
-def filter_wanted_clones(airr: ad.AnnData, cfg: dict):
+def filter_wanted_clones(airr: ad.AnnData, cfg: dict, extras=()):
     fields = airr.obsm["airr"].fields
     df = (
         pl.from_pandas(
-            ir.get.airr(airr, AIRR_WANTED_COLS, chain=CHAINS),
+            ir.get.airr(airr, AIRR_WANTED_COLS + list(extras), chain=CHAINS),
             include_index=True,
         )
         .join(
@@ -428,11 +441,113 @@ def filter_wanted_clones(airr: ad.AnnData, cfg: dict):
 # ** Construct creation
 
 
-def create_one_construct(airr_data: dict, chain: str, cfg: str) -> DNA:
-    v_seq = airr_data[f"{chain}"]
+def get_seq_from_cfg(
+    cfg: dict, key: tuple[str, str] | str, name: str = "", default: str = ""
+) -> DNA:
+    if isinstance(key, str):
+        val = cfg.get(key)
+    else:
+        val = cfg.get(key[0], {}).get(key[1])
+    val = val or default
+    if (path := Path(val)).exists() and val != "":
+        return DNA.read(path, "fasta")
+    return DNA(val, metadata={"id": name})
 
 
-# def create_construct_main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict):
+def get_construct_chain_regions(
+    cdata: ChainData, cfg: dict, acc
+) -> tuple[list, list, int]:
+    construct_seqs = []
+    for_viz = []
+    if cfg.get("include_leader", False):
+        leader = infer_air_endpoint(cdata, "leader")
+        logger.info(f"Inferred leader sequence as {leader.metadata['id']}")
+        leader.metadata["interval"] = (acc, acc + len(leader))
+        acc += len(leader)
+        construct_seqs.append(leader)
+        for_viz.append(leader)
+    for region in ("fwr1", "cdr1", "fwr2", "cdr2", "fwr3", "cdr3", "fwr4"):
+        region_seq = DNA(cdata[region], metadata={"id": region})
+        region_seq.metadata["interval"] = (acc, acc + len(region_seq))
+        acc += len(region_seq)
+        construct_seqs.append(region_seq)
+        for_viz.append(region_seq)
+
+    full = cdata["sequence"]
+    genes = ["v", "j"]
+    if cdata.chain.startswith("VDJ"):
+        genes.insert(1, "d")
+    for g in genes:
+        start, end = cdata.start_end(g)
+        seq = full[start:end]
+        for_viz.append(
+            DNA(seq, metadata={"id": f"{g.upper()} gene", "interval": (start, end)})
+        )
+    if cfg.get("include_c", True):
+        chain_name = get_chain_name_from_call(cdata["c_call"])
+        c_gene = get_seq_from_cfg(
+            cfg.get("sequences", {}), ("c_gene", chain_name), "C gene", default=""
+        )
+        if not c_gene:
+            c_gene = infer_air_endpoint(cdata, "c")
+            logger.info(f"Inferred C gene as {c_gene.metadata["id"]}")
+        c_gene.metadata["interval"] = (acc, acc + len(c_gene))
+        acc += len(c_gene)
+        construct_seqs.append(c_gene)
+        for_viz.append(c_gene)
+    return construct_seqs, for_viz, acc
+
+
+def construct_add_flanking(
+    cfg: dict,
+    flank: Literal["five_prime", "three_prime"],
+    construct_seqs: list,
+    for_viz: list,
+    acc: int,
+) -> int:
+    name = "5' flank" if flank == "five_prime" else "3' flank"
+    flank_seq = get_seq_from_cfg(
+        cfg.get("sequences", {}), ("flanking", flank), name, default=""
+    )
+    if flank_seq:
+        flank_seq.metadata["interval"] = (acc, len(flank_seq))
+        construct_seqs.append(flank_seq)
+        for_viz.append(flank_seq)
+        acc += len(flank_seq)
+    return acc
+
+
+# def plot_construct(sequence: str, features: list[DNA]):
+
+
+def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
+    tmp = []
+    for_viz = []
+    acc = 0
+    seq_cfg: dict = cfg.get("sequences", {})
+    acc = construct_add_flanking(cfg, "five_prime", tmp, for_viz, acc)
+    for chain in chains:
+        cdata = ChainData(chain, airr_data)
+        cur_seqs, cur_viz, acc = get_construct_chain_regions(cdata, cfg, acc)
+        tmp.extend(cur_seqs)
+        for_viz.extend(cur_viz)
+        linker = get_seq_from_cfg(seq_cfg, "linker", "linker sequence", default="")
+        if linker:
+            linker.metadata["interval"] = (acc, acc + len(linker))
+            tmp.append(linker)
+            for_viz.append(linker)
+    acc = construct_add_flanking(cfg, "three_prime", tmp, for_viz, acc)
+    full_construct = "".join([str(seq) for seq in tmp])
+    return full_construct
+
+
+def create_construct_main(
+    airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict
+):
+    df = filter_wanted_clones(
+        airr, cfg, extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"]
+    )
+
 
 # ** Primer creation
 
@@ -493,7 +608,7 @@ def test_get_c(airr_data_test):
     j_start = f"{chain}_j_sequence_start"
     old_j = full[dct[j_start] : dct[j_end]]
     old_c = full[dct[j_end] :]
-    new_c = get_c_sequence_from_call(dct, chain, try_match_allele=True)
+    new_c = infer_air_endpoint(dct, chain, c_try_match_allele=True)
     print(f"Old: {old_c}\nNew: {new_c}")
     print(f"Old full: {full}")
     new_full = add_new_c(dct, chain, new_c)
