@@ -497,14 +497,7 @@ def get_construct_chain_regions(
     gene_offset -= cdata.get("v_sequence_start", 0)
     chain_name = get_chain_name_from_call(cdata["v_call"])
     if cfg.get("include_leader", False):
-        leader = get_seq_from_cfg(
-            cfg["sequences"], ("leader", chain_name), "V leader", "V leader"
-        )
-        if not leader:
-            leader = infer_air_endpoint(cdata, "leader")
-            leader_allele = leader.metadata["description"].split("|")[1]
-            leader.metadata["id"] = f"V leader: {leader_allele}"
-            logger.info(f"Inferred leader sequence as {leader_allele}")
+        leader = get_leader(cdata, chain_name, cfg)
         leader.metadata["interval"] = (acc, acc + len(leader))
         construct_seqs.append(leader)
         for_viz.append(leader)
@@ -516,13 +509,24 @@ def get_construct_chain_regions(
         acc += len(region_seq)
         construct_seqs.append(region_seq)
         for_viz.append(region_seq)
-
     full = cdata.get("sequence")
     genes = ["v", "j"]
     if cdata.chain.startswith("VDJ"):
         genes.insert(1, "d")
+    if full:
+        add_genes_to_viz(full, for_viz, genes, cdata, gene_offset)
+    if cfg.get("include_c", True):
+        c_gene = get_c_gene(cdata, chain_name, cfg)
+        c_gene.metadata["interval"] = (acc, acc + len(c_gene))
+        acc += len(c_gene)
+        construct_seqs.append(c_gene)
+        for_viz.append(c_gene)
+    return construct_seqs, for_viz, acc
+
+
+def add_genes_to_viz(full, viz_list: list, genes, cdata, gene_offset):
     for g in genes:
-        if not cdata.get(f"{g}_call") or not full:
+        if not cdata.get(f"{g}_call"):
             continue
         start, end = cdata.start_end(g)
         seq = full[start:end]
@@ -531,25 +535,38 @@ def get_construct_chain_regions(
             "id": f"{g.upper()} gene: {call}",
             "interval": (start + gene_offset, end + gene_offset),
         }
-        for_viz.append(DNA(seq, metadata=meta))
-    if cfg.get("include_c", True):
-        c_gene = get_seq_from_cfg(
-            cfg.get("sequences", {}),
-            ("c_gene", chain_name),
-            "C gene",
-            prefix="C gene: ",
-            default="",
-        )
-        if not c_gene:
-            c_gene = infer_air_endpoint(cdata, "c")
-            c_allele = c_gene.metadata["description"].split("|")[1]
-            c_gene.metadata["id"] = f"C gene: {c_allele}"
-            logger.info(f"Inferred C gene as {c_allele}")
-        c_gene.metadata["interval"] = (acc, acc + len(c_gene))
-        acc += len(c_gene)
-        construct_seqs.append(c_gene)
-        for_viz.append(c_gene)
-    return construct_seqs, for_viz, acc
+        viz_list.append(DNA(seq, metadata=meta))
+
+
+def get_leader(cdata, chain_name, cfg) -> DNA:
+    leader = get_seq_from_cfg(
+        cfg["sequences"], ("leader", chain_name), "V leader", "V leader"
+    )
+    if not leader:
+        leader = infer_air_endpoint(cdata, "leader")
+        leader_allele = leader.metadata["description"].split("|")[1]
+        leader.metadata["id"] = f"V leader: {leader_allele}"
+        logger.info(f"Inferred leader sequence as {leader_allele}")
+    return leader
+
+
+def get_c_gene(cdata, chain_name, cfg) -> DNA:
+    c_gene: DNA = get_seq_from_cfg(
+        cfg.get("sequences", {}),
+        ("c_gene", chain_name),
+        "C gene",
+        prefix="C gene: ",
+        default="",
+    )
+    if not c_gene:
+        c_gene = infer_air_endpoint(cdata, "c")
+        c_allele = c_gene.metadata["description"].split("|")[1]
+        c_gene.metadata["id"] = f"C gene: {c_allele}"
+        logger.info(f"Inferred C gene as {c_allele}")
+    last_codon = str(c_gene)
+    if str(c_gene).endswith("TAA"):
+        c_gene = c_gene[:-3]
+    return c_gene
 
 
 def construct_add_flanking(
