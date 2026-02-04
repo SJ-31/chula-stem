@@ -3,19 +3,20 @@
 import json
 import re
 import subprocess as sp
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 from typing import Callable, Literal
 
 import anndata as ad
 import mudata as md
-import numpy as np
 import polars as pl
 import polars.selectors as cs
 import pydna.tm as tm
 import pytest
 import scirpy as ir
 from Bio import SeqIO
+from dna_features_viewer import GraphicFeature, GraphicRecord
 from loguru import logger
 from pydna.design import Amplicon, pcr, primer_design
 from pydna.dseqrecord import Dseqrecord
@@ -41,6 +42,8 @@ AIRR_WANTED_COLS = [
     "j_call",
     "c_call",
     "d_call",
+    "d_sequence_start",
+    "d_sequence_end",
     "v_sequence_end",
     "sequence",
 ]
@@ -61,7 +64,7 @@ class ChainData:
         return f"{self.chain}_{key}" in self.data
 
     def start_end(self, key):
-        return self.get(f"{key}_sequence-start"), self.get(f"{key}_sequence_end")
+        return self.get(f"{key}_sequence_start"), self.get(f"{key}_sequence_end")
 
     def get(self, key, default=None):
         return self.data.get(f"{self.chain}_{key}", default)
@@ -442,7 +445,11 @@ def filter_wanted_clones(airr: ad.AnnData, cfg: dict, extras=()):
 
 
 def get_seq_from_cfg(
-    cfg: dict, key: tuple[str, str] | str, name: str = "", default: str = ""
+    cfg: dict,
+    key: tuple[str, str] | str,
+    name: str = "",
+    prefix: str = "",
+    default: str = "",
 ) -> DNA:
     if isinstance(key, str):
         val = cfg.get(key)
@@ -450,22 +457,46 @@ def get_seq_from_cfg(
         val = cfg.get(key[0], {}).get(key[1])
     val = val or default
     if (path := Path(val)).exists() and val != "":
-        return DNA.read(path, "fasta")
+        seq = DNA.read(path, "fasta")
+        seq.metadata["id"] = f"{prefix}{seq.metadata['id']}"
+        return seq
     return DNA(val, metadata={"id": name})
 
 
 def get_construct_chain_regions(
-    cdata: ChainData, cfg: dict, acc
+    cdata: ChainData, cfg: dict, acc, gene_offset
 ) -> tuple[list, list, int]:
+    """Combine sequences from ChainData object `cdata` into a construct
+    Intended to be called by `create_one_construct`
+
+    Parameters
+    ----------
+    param : argument
+
+    Returns
+    -------
+    tuple of list, list, int
+    - The first list contains the ordered sequences in the construct
+    [v_leader] <fwr1> <cdr1> <fwr2> <cdr2> <fwr3> <cdr3> <fwr4> [c_gene]
+    - The second are construct features for visualization purposes, which includes
+        all elements of the first list as well as the V, (D), J genes
+    - Adjusted offset for incrementing intervals correctly in visualization
+    """
     construct_seqs = []
     for_viz = []
+    gene_offset -= cdata["v_sequence_start"]
     if cfg.get("include_leader", False):
-        leader = infer_air_endpoint(cdata, "leader")
-        logger.info(f"Inferred leader sequence as {leader.metadata['id']}")
+        leader = get_seq_from_cfg(cfg["sequences"], "leader", "V leader", "V leader")
+        if not leader:
+            leader = infer_air_endpoint(cdata, "leader")
+            leader_allele = leader.metadata["description"].split("|")[1]
+            leader.metadata["id"] = f"V leader: {leader_allele}"
+            logger.info(f"Inferred leader sequence as {leader_allele}")
         leader.metadata["interval"] = (acc, acc + len(leader))
-        acc += len(leader)
         construct_seqs.append(leader)
         for_viz.append(leader)
+        acc += len(leader)
+        gene_offset += len(leader)
     for region in ("fwr1", "cdr1", "fwr2", "cdr2", "fwr3", "cdr3", "fwr4"):
         region_seq = DNA(cdata[region], metadata={"id": region})
         region_seq.metadata["interval"] = (acc, acc + len(region_seq))
@@ -480,17 +511,26 @@ def get_construct_chain_regions(
     for g in genes:
         start, end = cdata.start_end(g)
         seq = full[start:end]
-        for_viz.append(
-            DNA(seq, metadata={"id": f"{g.upper()} gene", "interval": (start, end)})
-        )
+        call = cdata[f"{g}_call"]
+        meta = {
+            "id": f"{g.upper()} gene: {call}",
+            "interval": (start + gene_offset, end + gene_offset),
+        }
+        for_viz.append(DNA(seq, metadata=meta))
     if cfg.get("include_c", True):
         chain_name = get_chain_name_from_call(cdata["c_call"])
         c_gene = get_seq_from_cfg(
-            cfg.get("sequences", {}), ("c_gene", chain_name), "C gene", default=""
+            cfg.get("sequences", {}),
+            ("c_gene", chain_name),
+            "C gene",
+            prefix="C gene: ",
+            default="",
         )
         if not c_gene:
             c_gene = infer_air_endpoint(cdata, "c")
-            logger.info(f"Inferred C gene as {c_gene.metadata["id"]}")
+            c_allele = c_gene.metadata["description"].split("|")[1]
+            c_gene.metadata["id"] = f"C gene: {c_allele}"
+            logger.info(f"Inferred C gene as {c_allele}")
         c_gene.metadata["interval"] = (acc, acc + len(c_gene))
         acc += len(c_gene)
         construct_seqs.append(c_gene)
@@ -510,14 +550,41 @@ def construct_add_flanking(
         cfg.get("sequences", {}), ("flanking", flank), name, default=""
     )
     if flank_seq:
-        flank_seq.metadata["interval"] = (acc, len(flank_seq))
+        flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
         construct_seqs.append(flank_seq)
         for_viz.append(flank_seq)
         acc += len(flank_seq)
     return acc
 
 
-# def plot_construct(sequence: str, features: list[DNA]):
+def plot_construct(
+    sequence: str,
+    features: list[DNA],
+    ignored: Sequence = ("cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"),
+):
+    graphic_features = []
+    # TODO: make this configurable
+    colormap = {
+        "C gene": "#aaff32",
+        "J gene": "#c04e01",
+        "V gene": "#0485d1",
+        "D gene": "#ffd1df",
+        "V leader": "#bc13fe",
+        "cdr3": "#ff028d",
+        "linker": "#ff474c",
+    }
+    for feature in features:
+        start, end = feature.metadata["interval"]
+        label = feature.metadata["id"]
+        prefix = re.sub(":.*", "", label)
+        color = colormap.get(prefix, "#fac205")
+        if label not in ignored:
+            gf = GraphicFeature(
+                start=start + 1, end=end, label=label, strand=+1, color=color
+            )
+            graphic_features.append(gf)
+    record = GraphicRecord(sequence=sequence, features=graphic_features)
+    return record
 
 
 def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
@@ -525,20 +592,29 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
     for_viz = []
     acc = 0
     seq_cfg: dict = cfg.get("sequences", {})
-    acc = construct_add_flanking(cfg, "five_prime", tmp, for_viz, acc)
-    for chain in chains:
+    gene_offset = acc = construct_add_flanking(cfg, "five_prime", tmp, for_viz, acc)
+    for i, chain in enumerate(chains):
         cdata = ChainData(chain, airr_data)
-        cur_seqs, cur_viz, acc = get_construct_chain_regions(cdata, cfg, acc)
+        cur_seqs, cur_viz, acc = get_construct_chain_regions(
+            cdata, cfg, acc, gene_offset
+        )
         tmp.extend(cur_seqs)
         for_viz.extend(cur_viz)
-        linker = get_seq_from_cfg(seq_cfg, "linker", "linker sequence", default="")
-        if linker:
+        linker = get_seq_from_cfg(
+            seq_cfg, "linker", "linker", prefix="linker: ", default=""
+        )
+        if linker and i != len(chains) - 1:
             linker.metadata["interval"] = (acc, acc + len(linker))
             tmp.append(linker)
             for_viz.append(linker)
-    acc = construct_add_flanking(cfg, "three_prime", tmp, for_viz, acc)
+            acc += len(linker)
+        gene_offset = acc
+    construct_add_flanking(cfg, "three_prime", tmp, for_viz, acc)
     full_construct = "".join([str(seq) for seq in tmp])
-    return full_construct
+    for v in for_viz:
+        # BUG: still issue with aligning the gene sequences correctly
+        logger.debug(f"{v.metadata['id']}, {v.metadata['interval']}")
+    return full_construct, plot_construct(full_construct, for_viz)
 
 
 def create_construct_main(
@@ -588,29 +664,3 @@ def create_primers():
 
 if fn := globals().get(smk.rule):
     fn()
-
-
-@pytest.fixture
-def airr_data_test():
-    combined = md.read_h5mu(here("tests", "data", "airr_test.h5mu"))
-    return combined["airr"]
-
-
-def test_get_c(airr_data_test):
-    chain = "VJ_1"
-    df = pl.from_pandas(
-        ir.get.airr(airr_data_test, AIRR_WANTED_COLS, chain=chain),
-        include_index=True,
-    )
-    dct = next(df.iter_rows(named=True))
-    full = dct[f"{chain}_sequence"]
-    j_end = f"{chain}_j_sequence_end"
-    j_start = f"{chain}_j_sequence_start"
-    old_j = full[dct[j_start] : dct[j_end]]
-    old_c = full[dct[j_end] :]
-    new_c = infer_air_endpoint(dct, chain, c_try_match_allele=True)
-    print(f"Old: {old_c}\nNew: {new_c}")
-    print(f"Old full: {full}")
-    new_full = add_new_c(dct, chain, new_c)
-    print(f"New full: {new_full}")
-    assert old_j == new_full[dct[j_start] : dct[j_end]]
