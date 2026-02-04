@@ -63,7 +63,7 @@ rule cellranger_count:
         directory(f"{TMPDIR}/cellranger_{{sample}}_{{type}}"),
     resources:
         qos="cpu24h",
-        mem="50G",
+        mem="80G",
     threads: 4
     shell:
         f"""

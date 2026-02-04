@@ -1,0 +1,2 @@
+outdir: "/data/project/stemcell/shannc/output/HCC/SCRNASEQ"
+manifest: "/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/manifest.csv"
