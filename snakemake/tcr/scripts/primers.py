@@ -484,9 +484,12 @@ def get_construct_chain_regions(
     """
     construct_seqs = []
     for_viz = []
-    gene_offset -= cdata["v_sequence_start"]
+    gene_offset -= cdata.get("v_sequence_start", 0)
+    chain_name = get_chain_name_from_call(cdata["v_call"])
     if cfg.get("include_leader", False):
-        leader = get_seq_from_cfg(cfg["sequences"], "leader", "V leader", "V leader")
+        leader = get_seq_from_cfg(
+            cfg["sequences"], ("leader", chain_name), "V leader", "V leader"
+        )
         if not leader:
             leader = infer_air_endpoint(cdata, "leader")
             leader_allele = leader.metadata["description"].split("|")[1]
@@ -504,11 +507,13 @@ def get_construct_chain_regions(
         construct_seqs.append(region_seq)
         for_viz.append(region_seq)
 
-    full = cdata["sequence"]
+    full = cdata.get("sequence")
     genes = ["v", "j"]
     if cdata.chain.startswith("VDJ"):
         genes.insert(1, "d")
     for g in genes:
+        if not cdata.get(f"{g}_call") or not full:
+            continue
         start, end = cdata.start_end(g)
         seq = full[start:end]
         call = cdata[f"{g}_call"]
@@ -518,7 +523,6 @@ def get_construct_chain_regions(
         }
         for_viz.append(DNA(seq, metadata=meta))
     if cfg.get("include_c", True):
-        chain_name = get_chain_name_from_call(cdata["c_call"])
         c_gene = get_seq_from_cfg(
             cfg.get("sequences", {}),
             ("c_gene", chain_name),
@@ -560,10 +564,10 @@ def construct_add_flanking(
 def plot_construct(
     sequence: str,
     features: list[DNA],
+    cfg: dict,
     ignored: Sequence = ("cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"),
 ):
     graphic_features = []
-    # TODO: make this configurable
     colormap = {
         "C gene": "#aaff32",
         "J gene": "#c04e01",
@@ -573,6 +577,7 @@ def plot_construct(
         "cdr3": "#ff028d",
         "linker": "#ff474c",
     }
+    colormap.update(cfg.get("colormap", {}))
     for feature in features:
         start, end = feature.metadata["interval"]
         label = feature.metadata["id"]
@@ -611,10 +616,9 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
         gene_offset = acc
     construct_add_flanking(cfg, "three_prime", tmp, for_viz, acc)
     full_construct = "".join([str(seq) for seq in tmp])
-    for v in for_viz:
-        # BUG: still issue with aligning the gene sequences correctly
-        logger.debug(f"{v.metadata['id']}, {v.metadata['interval']}")
-    return full_construct, plot_construct(full_construct, for_viz)
+    # for v in for_viz:
+    #     logger.debug(f"{v.metadata['id']}, {v.metadata['interval']}")
+    return full_construct, plot_construct(full_construct, for_viz, cfg)
 
 
 def create_construct_main(
