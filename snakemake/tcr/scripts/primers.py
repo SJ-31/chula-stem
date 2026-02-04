@@ -474,7 +474,7 @@ def get_seq_from_cfg(
 
 
 def get_construct_chain_regions(
-    cdata: ChainData, cfg: dict, acc, gene_offset
+    cdata: ChainData, cfg: dict, acc, gene_offset, allow_stop: bool
 ) -> tuple[list, list, int]:
     """Combine sequences from ChainData object `cdata` into a construct
     Intended to be called by `create_one_construct`
@@ -516,7 +516,7 @@ def get_construct_chain_regions(
     if full:
         add_genes_to_viz(full, for_viz, genes, cdata, gene_offset)
     if cfg.get("include_c", True):
-        c_gene = get_c_gene(cdata, chain_name, cfg)
+        c_gene = get_c_gene(cdata, chain_name, cfg, allow_stop=allow_stop)
         c_gene.metadata["interval"] = (acc, acc + len(c_gene))
         acc += len(c_gene)
         construct_seqs.append(c_gene)
@@ -550,7 +550,7 @@ def get_leader(cdata, chain_name, cfg) -> DNA:
     return leader
 
 
-def get_c_gene(cdata, chain_name, cfg) -> DNA:
+def get_c_gene(cdata, chain_name, cfg, allow_stop: bool = False) -> DNA:
     c_gene: DNA = get_seq_from_cfg(
         cfg.get("sequences", {}),
         ("c_gene", chain_name),
@@ -563,8 +563,8 @@ def get_c_gene(cdata, chain_name, cfg) -> DNA:
         c_allele = c_gene.metadata["description"].split("|")[1]
         c_gene.metadata["id"] = f"C gene: {c_allele}"
         logger.info(f"Inferred C gene as {c_allele}")
-    last_codon = str(c_gene)
-    if str(c_gene).endswith("TAA"):
+    last_codon = str(c_gene)[-3:]
+    if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
         c_gene = c_gene[:-3]
     return c_gene
 
@@ -626,16 +626,17 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
     seq_cfg: dict = cfg.get("sequences", {})
     gene_offset = acc = construct_add_flanking(cfg, "five_prime", tmp, for_viz, acc)
     for i, chain in enumerate(chains):
+        is_final_chain = i == len(chains) - 1
         cdata = ChainData(chain, airr_data)
         cur_seqs, cur_viz, acc = get_construct_chain_regions(
-            cdata, cfg, acc, gene_offset
+            cdata, cfg, acc, gene_offset, allow_stop=is_final_chain
         )
         tmp.extend(cur_seqs)
         for_viz.extend(cur_viz)
         linker = get_seq_from_cfg(
             seq_cfg, "linker", "linker", prefix="linker: ", default=""
         )
-        if linker and i != len(chains) - 1:
+        if linker and not is_final_chain:
             linker.metadata["interval"] = (acc, acc + len(linker))
             tmp.append(linker)
             for_viz.append(linker)
