@@ -766,7 +766,6 @@ aucs <- tmp$auc
 ## ** Visualize results
 
 # TODO: redo this by instead stratifying patients by their hazard as obtained by the model
-# And you can check if there is a statistically significant difference with logrank test, but make sure if this is something valid
 # nah you should just learn how to properly interpret a cox model
 
 get_clustered_curves <- function(feature_subset, name, outdir, k = 8) {

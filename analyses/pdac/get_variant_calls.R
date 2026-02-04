@@ -30,7 +30,7 @@ pink_bams <- list.files(
   full.names = TRUE
 )
 
-wanted <- c(
+wanted <- list(
   KRAS = "12:25205246-25250936",
   TP53 = "17:7661779-7687546",
   MUC5B = "11:1223066-1262172",
@@ -40,6 +40,8 @@ wanted <- c(
   GLI3 = "7:41960949-42264100",
   CDKN2A = "9:21967752-21995301"
 )
+
+
 target_file <- here("analyses", "pdac", "target_gene_regions.txt")
 query_str <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/SOURCE"
 query_str_n <- "[%AD\t%AF\t%GT\t%PS]\t%INFO/DP\t%INFO/TOOL_SOURCE"
@@ -100,10 +102,9 @@ get_wanted_genes <- function(file, vep = TRUE) {
 }
 
 get_wanted_bam <- function(
-  file,
-  name_fn = utils$basename_no_ext,
-  target = target_file
-) {
+    file,
+    name_fn = utils$basename_no_ext,
+    target = target_file) {
   args <- c("view", "-b", "-h", glue("-L {target}"), file)
   pref <- name_fn(file)
   bam_out <- here(outdir, "bams", glue("{pref}.bam"))
@@ -236,7 +237,6 @@ combined_anno |>
 
 cur_symbol <- "KRAS"
 current <- combined_anno %>%
-
   filter(SYMBOL == cur_symbol) %>%
   distinct(subject, HGVSc, .keep_all = TRUE) |>
   group_by(HGVSc) |>

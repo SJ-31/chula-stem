@@ -3,6 +3,8 @@ process FASTP {
     
     publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+    errorStrategy "ignore" // BUG: [2025-07-24 Thu] a weird result for one sample causes
+    // this to fail
 
     input:
     tuple val(meta), val(reads)
