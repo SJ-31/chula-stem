@@ -60,6 +60,14 @@ class ChainData:
         self.data: str = data
         self.chain: str = chain
 
+    @property
+    def chain_name(self):
+        name = None
+        for gene in ("c", "v", "d", "j"):
+            if call := self.get(f"{gene}_call"):
+                return get_chain_name_from_call(call)
+        return name
+
     def __contains__(self, key):
         return f"{self.chain}_{key}" in self.data
 
@@ -134,15 +142,15 @@ def calc_tm(
 def get_chain_name_from_call(call: str) -> Literal["TRB", "TRA", "TRD", "TRG"]:
     "Calls are assumed to follow IMGT nomenclature"
     # https://imgt.org/IMGTScientificChart/Nomenclature/IMGTallelepolymorphism.html
-    if re.match("^TRB", call):
+    if call.startswith("TRB"):
         return "TRB"
-    if re.match("^TRG", call):
+    if call.startswith("TRG"):
         return "TRG"
-    if re.match("^TRD", call) or re.match(".*TRA.*DV.*", call):
+    if call.startswith("TRD") or re.match(".*TRA.*DV.*", call):
         return "TRD"
-    if re.match("^TRA", call):
+    if call.startswith("TRA"):
         return "TRA"
-    raise ValueError("Chain name couldn't be determined  from call")
+    raise ValueError(f"Chain name couldn't be determined from call {call}")
 
 
 def get_imgt_seqs(
@@ -201,11 +209,10 @@ def infer_air_endpoint(
         then return the first allele unless this is false.
         Otherwise, the sequence of the allele with the highest alignment score is returned
     """
-    call = cdata["c_call"] if endpoint == "c" else cdata["v_call"]
     data_dir: Path = Path(
         sp.run("stitchr -dd", shell=True, capture_output=True).stdout.decode().strip()
     )
-    chain_name: str = get_chain_name_from_call(call)
+    chain_name: str = cdata.chain_name
     seq_file = data_dir / "HUMAN" / f"{chain_name}.fasta"
     if not seq_file.exists():
         raise ValueError(f"{chain_name}.fasta not found in stitchr data directory")
@@ -216,7 +223,10 @@ def infer_air_endpoint(
         )
     if (endpoint == "c" and not c_try_match_allele) or len(candidates) == 1:
         return candidates[0]
-    full = cdata["sequence"]
+    try:
+        full = cdata["sequence"]
+    except KeyError:
+        raise ValueError("Cannot infer endpoint without the full TCR sequence")
     if endpoint == "c":
         seq = full[cdata["j_sequence_end"] :]
         free_ends = [True, False]
