@@ -10,10 +10,10 @@ from typing import Callable, Literal
 
 import anndata as ad
 import mudata as md
+import numpy as np
 import polars as pl
 import polars.selectors as cs
 import pydna.tm as tm
-import pytest
 import scirpy as ir
 from Bio import SeqIO
 from dna_features_viewer import GraphicFeature, GraphicRecord
@@ -21,8 +21,8 @@ from loguru import logger
 from pydna.design import Amplicon, pcr, primer_design
 from pydna.dseqrecord import Dseqrecord
 from pydna.primer import Primer
-from pyhere import here
 from skbio.alignment import pair_align
+from skbio.metadata import IntervalMetadata
 from skbio.sequence import DNA
 
 try:
@@ -468,7 +468,7 @@ def get_seq_from_cfg(
     val = val or default
     if (path := Path(val)).exists() and val != "":
         seq = DNA.read(path, "fasta")
-        seq.metadata["id"] = f"{prefix}{seq.metadata['id']}"
+        seq.metadata["id"] = f"{prefix}{seq.metadata['description']}"
         return seq
     return DNA(val, metadata={"id": name})
 
@@ -546,6 +546,7 @@ def get_leader(cdata, chain_name, cfg) -> DNA:
         leader = infer_air_endpoint(cdata, "leader")
         leader_allele = leader.metadata["description"].split("|")[1]
         leader.metadata["id"] = f"V leader: {leader_allele}"
+        leader.metadata["name"] = "v_leader"
         logger.info(f"Inferred leader sequence as {leader_allele}")
     return leader
 
@@ -562,6 +563,7 @@ def get_c_gene(cdata, chain_name, cfg, allow_stop: bool = False) -> DNA:
         c_gene = infer_air_endpoint(cdata, "c")
         c_allele = c_gene.metadata["description"].split("|")[1]
         c_gene.metadata["id"] = f"C gene: {c_allele}"
+        c_gene.metadata["name"] = "c_gene"
         logger.info(f"Inferred C gene as {c_allele}")
     last_codon = str(c_gene)[-3:]
     if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
@@ -582,6 +584,7 @@ def construct_add_flanking(
     )
     if flank_seq:
         flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
+        flank_seq.metadata["name"] = flank
         construct_seqs.append(flank_seq)
         for_viz.append(flank_seq)
         acc += len(flank_seq)
@@ -620,7 +623,7 @@ def plot_construct(
 
 
 def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
-    tmp = []
+    tmp: list[DNA] = []
     for_viz = []
     acc = 0
     seq_cfg: dict = cfg.get("sequences", {})
@@ -638,6 +641,7 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
         )
         if linker and not is_final_chain:
             linker.metadata["interval"] = (acc, acc + len(linker))
+            linker.metadata["name"] = "linker"
             tmp.append(linker)
             for_viz.append(linker)
             acc += len(linker)
@@ -646,7 +650,57 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
     full_construct = "".join([str(seq) for seq in tmp])
     # for v in for_viz:
     #     logger.debug(f"{v.metadata['id']}, {v.metadata['interval']}")
-    return full_construct, plot_construct(full_construct, for_viz, cfg)
+    with_names = {}
+    for i, seq in enumerate(tmp):
+        name = seq.metadata.get("name", seq.metadata["id"])
+        seq.interval_metadata = IntervalMetadata(len(seq))
+        seq.interval_metadata.add(bounds=[(0, len(seq))], metadata={"name": name})
+        with_names[f"{i}_{name}"] = seq
+    return {
+        "sequence": full_construct,
+        "plot": plot_construct(full_construct, for_viz, cfg),
+        "named": with_names,
+        "validation": validate_construct(with_names),
+    }
+
+
+def validate_construct(seqnames2seq: dict[str, DNA]):
+    """
+    Each of the keys prefixed with "check" in the results dictionary should be
+    True for the construct to pass
+    """
+    result = {}
+    dct_copy = {
+        k: v
+        for k, v in seqnames2seq.items()
+        if not k.endswith("five_prime") and not k.endswith("three_prime")
+    }
+    ordered = sorted(dct_copy.items(), key=lambda x: x[0].split("_")[0])
+    leaders = [x[1] for x in ordered if x[0].endswith("leader")]
+    tcr_block: DNA = DNA.concat([o[1] for o in ordered])
+    if leaders and not str(leaders[0][:3]) == "ATG":
+        result["check_leader_has_start"] = False
+    elif leaders:
+        result["check_leader_has_start"] = True
+    elif not leaders and str(tcr_block[:3]) != "ATG":
+        result["check_tcr_block_has_start"] = False
+    elif not leaders:
+        result["check_tcr_block_has_start"] = True
+    stops: np.ndarray = tcr_block.translate().stops()
+    result["check_has_terminal_stop"] = stops[-1].item()
+    has_inframe_stops = (stops.sum() > 1).item()
+    result["check_no_inframe_stop"] = not has_inframe_stops
+    if has_inframe_stops:
+        stop_indices = np.where(stops)[0]
+        result["inframe_stop_indices"] = []
+        for stop in (s.item() for s in stop_indices):
+            dna_bounds = (stop * 3, stop * 3 + 3)
+            query = list(tcr_block.interval_metadata.query([dna_bounds]))
+            if query:
+                stop_loc = f"{dna_bounds}, {query[0].metadata['name']}"
+                result["inframe_stop_indices"].append(stop_loc)
+                result["tcr_block"] = str(tcr_block)
+    return result
 
 
 def create_construct_main(
