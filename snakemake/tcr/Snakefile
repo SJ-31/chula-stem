@@ -360,14 +360,14 @@ rule assemble_constructs:
     output:
         report(
             directory(f"{OUT}/tcr_constructs"),
-            patterns=["cid{clone_id}_{sample}-{desc}.{ext}"],
             category="Constructs",
+            patterns=["cid{clone_id}_{sample}.{ext}"],
             labels={
                 "Sample": "{sample}",
                 "Clone ID": "{clone_id}",
-                "Item": "{desc}",
                 "File type": "{ext}",
             },
         ),
+        # BUG: these aren't showing up in the report
     script:
         "scripts/primers.py"

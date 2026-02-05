@@ -714,19 +714,17 @@ def assemble_constructs():
         airr, RCONFIG, extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"]
     )
     for row in df.iter_rows(named=True):
-        prefix = f"cid{row["Sample_Name"]}_{row["clone_id"]}"
+        prefix = f"cid{row["clone_id"]}_{row["Sample_Name"]}"
         result = assemble_one_construct(row, chains=["VJ_1", "VDJ_1"], cfg=RCONFIG)
-        with open(outdir / f"{prefix}-region_sequence.fasta", "w") as f:
-            text = "\n".join([f">{k}\n{str(v)}" for k, v in result["named"].items()])
-            f.write(text)
-        with open(outdir / f"{prefix}-sequence.fasta", "w") as f:
-            fasta_rep = f">{prefix}\n{result['sequence']}"
-            f.write(fasta_rep)
-        with open(outdir / f"{prefix}-validation.yaml", "w") as f:
+        to_fasta = [f">{prefix}_full_construct\n{result['sequence']}"]
+        to_fasta.extend([f">{k}\n{str(v)}" for k, v in result["named"].items()])
+        with open(outdir / f"{prefix}.fasta", "w") as f:
+            f.write("\n".join(to_fasta))
+        with open(outdir / f"{prefix}.yaml", "w") as f:
             yaml.safe_dump(result["validation"], f)
         ax, _ = result["plot"].plot(figure_width=RCONFIG.get("figure_width", 4))
         ax.figure.savefig(
-            outdir / f"{prefix}-diagram.png",
+            outdir / f"{prefix}.png",
             dpi=RCONFIG.get("dpi", 500),
             bbox_inches="tight",
         )
