@@ -677,8 +677,8 @@ def validate_construct(sequences: list[DNA]):
             seqs_copy.append(seq)
         if rname.endswith("leader"):
             leaders.append(seq)
-    tcr_block: DNA = DNA.concat([o[1] for o in seqs_copy])
-    if leaders and not str(leaders[:3]) == "ATG":
+    tcr_block: DNA = DNA.concat([o for o in seqs_copy])
+    if leaders and not str(leaders[0][:3]) == "ATG":
         result["check_leader_has_start"] = False
     elif leaders:
         result["check_leader_has_start"] = True
@@ -687,18 +687,21 @@ def validate_construct(sequences: list[DNA]):
     elif not leaders:
         result["check_tcr_block_has_start"] = True
     stops: np.ndarray = tcr_block.translate().stops()
-    result["check_has_terminal_stop"] = stops[-1].item()
-    has_inframe_stops = (stops.sum() > 1).item()
+    has_terminal_stop = stops[-1].item()
+    result["check_has_terminal_stop"] = has_terminal_stop
+    n_stops = stops.sum().item()
+    has_inframe_stops = (n_stops > 1) or (n_stops == 1 and not has_terminal_stop)
     result["check_no_inframe_stop"] = not has_inframe_stops
     if has_inframe_stops:
         stop_indices = np.where(stops)[0]
-        result["inframe_stop_indices"] = []
+        result["inframe_stop_indices"] = stop_indices.tolist()
+        result["inframe_stop_description"] = []
         for stop in (s.item() for s in stop_indices):
             dna_bounds = (stop * 3, stop * 3 + 3)
             query = list(tcr_block.interval_metadata.query([dna_bounds]))
             if query:
-                stop_loc = f"{dna_bounds}, {query[0].metadata['name']}"
-                result["inframe_stop_indices"].append(stop_loc)
+                stop_loc = f"{dna_bounds}, {query[0].metadata['id']}"
+                result["inframe_stop_description"].append(stop_loc)
                 result["tcr_block"] = str(tcr_block)
     return result
 
