@@ -116,6 +116,11 @@ if clone_primers := config["create_primers"].get("wanted_clones"):
 else:
     primer_out = {}
 
+if clone_constructs := config["create_primers"].get("wanted_clones"):
+    constructs_out = {"construct_outdir": f"{OUT}/tcr_constructs"}
+else:
+    constructs_out = {}
+
 # * Rules
 
 
@@ -128,6 +133,7 @@ rule all:
         *vdj_plots,
         *vdj_alignments,
         **REFS_TO_GET,
+        **constructs_out,
         **primer_out,
         **cell_annotation_results,
         **plots,
@@ -343,3 +349,25 @@ rule write_primer_tables:
         ),
     script:
         "scripts/primer_table.R"
+
+
+# ** TCR constructs
+rule assemble_constructs:
+    input:
+        rules.load_runs.output,
+    params:
+        outdir=Path(f"{OUT}/tcr_constructs"),
+    output:
+        report(
+            directory(f"{OUT}/tcr_constructs"),
+            patterns=["cid{clone_id}_{sample}-{desc}.{ext}"],
+            category="Constructs",
+            labels={
+                "Sample": "{sample}",
+                "Clone ID": "{clone_id}",
+                "Item": "{desc}",
+                "File type": "{ext}",
+            },
+        ),
+    script:
+        "scripts/primers.py"

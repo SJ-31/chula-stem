@@ -15,6 +15,7 @@ import polars as pl
 import polars.selectors as cs
 import pydna.tm as tm
 import scirpy as ir
+import yaml
 from Bio import SeqIO
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from loguru import logger
@@ -57,7 +58,7 @@ class ChainData:
     "Helper class for retrieving data following AIRR standards from a specific chain of a single clone"
 
     def __init__(self, chain: str, data: dict) -> None:
-        self.data: str = data
+        self.data: dict = data
         self.chain: str = chain
 
     @property
@@ -477,7 +478,7 @@ def get_construct_chain_regions(
     cdata: ChainData, cfg: dict, acc, gene_offset, allow_stop: bool
 ) -> tuple[list, list, int]:
     """Combine sequences from ChainData object `cdata` into a construct
-    Intended to be called by `create_one_construct`
+    Intended to be called by `assemble_one_construct`
 
     Parameters
     ----------
@@ -546,8 +547,9 @@ def get_leader(cdata, chain_name, cfg) -> DNA:
         leader = infer_air_endpoint(cdata, "leader")
         leader_allele = leader.metadata["description"].split("|")[1]
         leader.metadata["id"] = f"V leader: {leader_allele}"
-        leader.metadata["name"] = "v_leader"
         logger.info(f"Inferred leader sequence as {leader_allele}")
+    if leader:
+        leader.metadata["region_name"] = "v_leader"
     return leader
 
 
@@ -563,11 +565,12 @@ def get_c_gene(cdata, chain_name, cfg, allow_stop: bool = False) -> DNA:
         c_gene = infer_air_endpoint(cdata, "c")
         c_allele = c_gene.metadata["description"].split("|")[1]
         c_gene.metadata["id"] = f"C gene: {c_allele}"
-        c_gene.metadata["name"] = "c_gene"
         logger.info(f"Inferred C gene as {c_allele}")
-    last_codon = str(c_gene)[-3:]
-    if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
-        c_gene = c_gene[:-3]
+    if c_gene:
+        c_gene.metadata["region_name"] = "c_gene"
+        last_codon = str(c_gene)[-3:]
+        if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
+            c_gene = c_gene[:-3]
     return c_gene
 
 
@@ -584,7 +587,7 @@ def construct_add_flanking(
     )
     if flank_seq:
         flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
-        flank_seq.metadata["name"] = flank
+        flank_seq.metadata["region_name"] = flank
         construct_seqs.append(flank_seq)
         for_viz.append(flank_seq)
         acc += len(flank_seq)
@@ -607,7 +610,7 @@ def plot_construct(
         "cdr3": "#ff028d",
         "linker": "#ff474c",
     }
-    colormap.update(cfg.get("colormap", {}))
+    colormap.update(cfg.get("colormap", {}) or {})
     for feature in features:
         start, end = feature.metadata["interval"]
         label = feature.metadata["id"]
@@ -622,7 +625,7 @@ def plot_construct(
     return record
 
 
-def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
+def assemble_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
     tmp: list[DNA] = []
     for_viz = []
     acc = 0
@@ -641,7 +644,7 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
         )
         if linker and not is_final_chain:
             linker.metadata["interval"] = (acc, acc + len(linker))
-            linker.metadata["name"] = "linker"
+            linker.metadata["region_name"] = "linker"
             tmp.append(linker)
             for_viz.append(linker)
             acc += len(linker)
@@ -652,7 +655,7 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
     #     logger.debug(f"{v.metadata['id']}, {v.metadata['interval']}")
     with_names = {}
     for i, seq in enumerate(tmp):
-        name = seq.metadata.get("name", seq.metadata["id"])
+        name = seq.metadata.get("region_name", seq.metadata["id"])
         seq.interval_metadata = IntervalMetadata(len(seq))
         seq.interval_metadata.add(bounds=[(0, len(seq))], metadata={"name": name})
         with_names[f"{i}_{name}"] = seq
@@ -660,25 +663,25 @@ def create_one_construct(airr_data: dict, chains, cfg: dict) -> DNA:
         "sequence": full_construct,
         "plot": plot_construct(full_construct, for_viz, cfg),
         "named": with_names,
-        "validation": validate_construct(with_names),
+        "validation": validate_construct(tmp),
     }
 
 
-def validate_construct(seqnames2seq: dict[str, DNA]):
+def validate_construct(sequences: list[DNA]):
     """
     Each of the keys prefixed with "check" in the results dictionary should be
     True for the construct to pass
     """
     result = {}
-    dct_copy = {
-        k: v
-        for k, v in seqnames2seq.items()
-        if not k.endswith("five_prime") and not k.endswith("three_prime")
-    }
-    ordered = sorted(dct_copy.items(), key=lambda x: x[0].split("_")[0])
-    leaders = [x[1] for x in ordered if x[0].endswith("leader")]
-    tcr_block: DNA = DNA.concat([o[1] for o in ordered])
-    if leaders and not str(leaders[0][:3]) == "ATG":
+    seqs_copy, leaders = [], []
+    for seq in sequences:
+        rname = seq.metadata.get("region_name", seq.metadata["id"])
+        if not rname.endswith("five_prime") and not rname.endswith("three_prime"):
+            seqs_copy.append(seq)
+        if rname.endswith("leader"):
+            leaders.append(seq)
+    tcr_block: DNA = DNA.concat([o[1] for o in seqs_copy])
+    if leaders and not str(leaders[:3]) == "ATG":
         result["check_leader_has_start"] = False
     elif leaders:
         result["check_leader_has_start"] = True
@@ -703,12 +706,26 @@ def validate_construct(seqnames2seq: dict[str, DNA]):
     return result
 
 
-def create_construct_main(
-    airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict
-):
+def assemble_constructs():
+    airr = md.read_h5mu(smk.input[0])["airr"]
+    outdir: Path = smk.params["outdir"]
+    outdir.mkdir(exist_ok=True)
     df = filter_wanted_clones(
-        airr, cfg, extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"]
+        airr, RCONFIG, extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"]
     )
+    for row in df.iter_rows(named=True):
+        prefix = f"cid{row["Sample_Name"]}_{row["clone_id"]}"
+        result = assemble_one_construct(row, chains=["VJ_1", "VDJ_1"], cfg=RCONFIG)
+        with open(outdir / f"{prefix}-region_sequence.fasta", "w") as f:
+            text = "\n".join([f">{k}\n{str(v)}" for k, v in result["named"].items()])
+            f.write(text)
+        with open(outdir / f"{prefix}-sequence.fasta", "w") as f:
+            fasta_rep = f">{prefix}\n{result['sequence']}"
+            f.write(fasta_rep)
+        with open(outdir / f"{prefix}-validation.yaml", "w") as f:
+            yaml.safe_dump(result["validation"], f)
+        ax, _ = result["plot"].plot(figure_width=RCONFIG.get("figure_width", 4))
+        ax.figure.savefig(outdir / f"{prefix}-diagram.png")
 
 
 # ** Primer creation
