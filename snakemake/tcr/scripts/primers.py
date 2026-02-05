@@ -143,14 +143,11 @@ def calc_tm(
 def get_chain_name_from_call(call: str) -> Literal["TRB", "TRA", "TRD", "TRG"]:
     "Calls are assumed to follow IMGT nomenclature"
     # https://imgt.org/IMGTScientificChart/Nomenclature/IMGTallelepolymorphism.html
-    if call.startswith("TRB"):
-        return "TRB"
-    if call.startswith("TRG"):
-        return "TRG"
-    if call.startswith("TRD") or re.match(".*TRA.*DV.*", call):
-        return "TRD"
-    if call.startswith("TRA"):
-        return "TRA"
+    # WARNING: some alleles seem shared between TRA and TRD for the V and leaders
+    # e.g. TRAV14/DV4*01
+    for chain in ("TRB", "TRG", "TRD", "TRA"):
+        if call.startswith(chain):
+            return chain
     raise ValueError(f"Chain name couldn't be determined from call {call}")
 
 
@@ -481,10 +478,7 @@ def get_construct_chain_regions(
 ) -> tuple[list, list, int]:
     """Combine sequences from ChainData object `cdata` into a construct
     Intended to be called by `assemble_one_construct`
-
-    Parameters
-    ----------
-    param : argument
+    TODO: add configuration for custom V, J sequences
 
     Returns
     -------
@@ -498,7 +492,7 @@ def get_construct_chain_regions(
     construct_seqs = []
     for_viz = []
     gene_offset -= cdata.get("v_sequence_start", 0)
-    chain_name = get_chain_name_from_call(cdata["v_call"])
+    chain_name = get_chain_name_from_call(cdata["j_call"])
     if cfg.get("include_leader", False):
         leader = get_leader(cdata, chain_name, cfg)
         leader.metadata["interval"] = (acc, acc + len(leader))
@@ -673,6 +667,7 @@ def validate_construct(sequences: list[DNA]):
     """
     Each of the keys prefixed with "check" in the results dictionary should be
     True for the construct to pass
+    TODO: perform an alignment against consensus V and J sequences to check
     """
     result = {}
     seqs_copy, leaders = [], []
