@@ -1,2 +1,19 @@
-outdir: "/data/project/stemcell/shannc/output/HCC/SCRNASEQ"
-manifest: "/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/manifest.csv"
+__use_yte__: true
+__definitions__:
+  - from pathlib import Path
+  - home = str(Path.home())
+  - is_local = home.startswith("/home/shannc")
+  - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
+  - data_dir = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
+
+workdir: ?f"{proj_root}/analyses/scrnaseq_hcc"
+outdir: ?f"{data_dir}/output/HCC/SCRNASEQ"
+manifest: ?f"{this['workdir']}/manifest.csv"
+
+files:
+  combined: ?f"{this['outdir']}/combined.h5ad"
+  after_qc: ?f"{this['outdir']}/after_qc.h5ad"
+  extras: # | character separates sample type
+    HCC5|normal: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
+    HCCN22|normal: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
+    HCCN1|normal: ?f"{this['outdir']}/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
