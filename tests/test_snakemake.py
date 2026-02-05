@@ -92,8 +92,10 @@ def create_dummy_construct(
             )
             result[f"{chain}_{region}"] = cur
             seq.append(cur)
-        if c_gene:
+        if c_gene and (not c_gene.endswith("TAA") or i == 1):
             seq.append(c_gene)
+        elif c_gene:
+            seq.append(c_gene[:-3])
         if linker and i != 1:
             seq.append(linker)
     if three_prime:
@@ -110,12 +112,20 @@ def create_dummy_construct(
         (None, "CGATC", "TTGAC", None, "ACGTA"),
         ("GGCAT", "TCGAA", None, "ATCCG", None),
         ("GCTT", "GTTAC", "CAGGT", "TCGAG", "TACGG"),
+        ("GCTT", "GTTAC", "CAGGT", "TCGAGTAA", "TACGG"),  # Test for stop codon
     ],
 )
 def test_make_construct(five_prime, three_prime, leader, c_gene, linker):
     cfg, airr_data, full = create_dummy_construct(
         five_prime, three_prime, leader, c_gene, linker
     )
-    cons, _ = tcr_primers.create_one_construct(airr_data, ("VJ_1", "VDJ_1"), cfg)
+    res = tcr_primers.create_one_construct(airr_data, ("VJ_1", "VDJ_1"), cfg)
+    cons = res["sequence"]
     assert len(cons) == len(full)
     assert cons == full
+
+
+# TODO: finish this...
+@pytest.mark.parametrize("dct", [{}, {}])
+def test_validate_construct(dct):
+    tcr_primers.validate_construct()
