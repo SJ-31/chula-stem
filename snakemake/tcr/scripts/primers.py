@@ -468,8 +468,10 @@ def get_seq_from_cfg(
         val = cfg.get(key[0], {}).get(key[1])
     val = val or default
     if (path := Path(val)).exists() and val != "":
-        seq = DNA.read(path, "fasta")
-        seq.metadata["id"] = f"{prefix}{seq.metadata['description']}"
+        seq: DNA = DNA.read(path, "fasta")
+        seq.metadata["id"] = (
+            f"{prefix}{seq.metadata['id']} {seq.metadata['description']}"
+        )
         return seq
     return DNA(val, metadata={"id": name})
 
@@ -725,7 +727,11 @@ def assemble_constructs():
         with open(outdir / f"{prefix}-validation.yaml", "w") as f:
             yaml.safe_dump(result["validation"], f)
         ax, _ = result["plot"].plot(figure_width=RCONFIG.get("figure_width", 4))
-        ax.figure.savefig(outdir / f"{prefix}-diagram.png")
+        ax.figure.savefig(
+            outdir / f"{prefix}-diagram.png",
+            dpi=RCONFIG.get("dpi", 500),
+            bbox_inches="tight",
+        )
 
 
 # ** Primer creation
