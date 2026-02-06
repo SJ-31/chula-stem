@@ -55,8 +55,8 @@ def prepare_data(env: dict) -> ad.AnnData:
         adata = ad.concat(
             tmp, merge="first", index_unique="-", join="outer", uns_merge="same"
         )
+        adata = adata[:, ~adata.var["gene_ids"].isna()]
         annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
-        print(adata.var.columns)
         sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
         # TODO: should you change the grouping col?
         distance_by_mads(

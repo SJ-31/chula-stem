@@ -1,4 +1,7 @@
-import anndata
+from collections import defaultdict
+from collections.abc import Sequence
+from pathlib import Path
+
 import anndata as ad
 import click
 import numpy as np
@@ -198,12 +201,85 @@ def pca_to_leiden(
 
 
 def annotate_marker(
-    adata: ad.AnnData, marker_genes: list, gene_col: str = None
+    adata: ad.AnnData, marker_genes: list, gene_col: str = None, threshold: float = 0.0
 ) -> pd.DataFrame:
-    """Mark cells where the marker gene expression is nonzero"""
+    """Mark cells where the marker gene expression is above the threshold (0 by default)"""
     expr: pd.DataFrame = (
-        sc.get.obs_df(adata, keys=marker_genes, gene_symbols=gene_col) > 0
+        sc.get.obs_df(adata, keys=marker_genes, gene_symbols=gene_col) > threshold
     )
     for c in expr.columns:
         adata.obs[f"has_{c}"] = expr[c]
     return expr.agg("sum")
+
+
+def annotate_adata_vars(
+    adata: ad.AnnData,
+    gene_id_col: str = "gene_id",
+    savepath: Path | None = None,
+    **kws,
+) -> None:
+    if not adata.var[gene_id_col].is_unique:
+        raise ValueError(f"Can't pass a gene_id column '{gene_id_col}' with duplicates")
+    if savepath.exists():
+        metadata: pd.DataFrame = pd.read_csv(savepath)
+    else:
+        metadata = ut.get_ensembl_gene_data()
+        metadata.to_csv(savepath)
+    merged = (
+        adata.var.reset_index(names="index")
+        .merge(metadata, left_on=gene_id_col, right_on="ensembl_gene_id", how="left")
+        .drop_duplicates("index")
+        .set_index("index", drop=True)
+    )
+    adata.var = merged
+    adata.var.loc[:, "mito"] = (adata.var["chromosome_name"] == "MT").fillna(False)
+
+
+def distance_by_mads(
+    adata: ad.AnnData,
+    keys: Sequence | str | dict[str, str],
+    group_keys: Sequence | str | None = None,
+    inplace: bool = False,
+) -> tuple[pd.DataFrame, dict] | None:
+    """For each key, compute the distance of its values from the median in terms
+        of its MAD i.e. (x - median(x)) / MAD(x)
+
+    If `group_keys` is provided, by MAD and median are taken per group
+
+    Notes
+    ------
+    Inspired by scuttle::isOutlier
+    https://bioconductor.org/books/3.13/OSCA.basic/quality-control.html
+
+    """
+    if isinstance(keys, str):
+        keys = [keys]
+    result: dict = defaultdict(dict)
+
+    def helper(cur: pd.DataFrame, group=None):
+        tmp: dict = {}
+        for key in keys:
+            median = cur[key].median()
+            mad = np.median(np.abs(cur[key] - median))
+            if group:
+                result[group][key] = mad.item()
+            else:
+                result[key] = mad.item()
+            tmp[key] = (cur[key] - median) / mad
+        return pd.DataFrame(tmp, index=cur.index)
+
+    if group_keys is None:
+        df = helper(adata.obs)
+    else:
+        dfs = []
+        for group, idx in adata.obs.groupby(group_keys):
+            cur = adata[idx, :].obs
+            if cur.shape[0] > 0:
+                cur_df = helper(cur, group=group)
+                dfs.append(cur_df)
+        df = pd.concat(dfs).loc[adata.obs.index, :]
+    result = dict(result)
+    if not inplace:
+        return df, result
+    adata.uns["mads"] = result
+    adata.obsm["mads"] = df
