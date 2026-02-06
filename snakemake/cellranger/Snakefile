@@ -4,6 +4,7 @@ configfile: "env.yaml"
 import pandas as pd
 
 manifest = pd.read_csv(config["manifest"])
+manifest.loc[:, "suffix"] = manifest["type"] + "-" + manifest["treatment"]
 
 OUTDIR = Path(config["outdir"])
 TMPDIR = OUTDIR / ".tmp"
@@ -14,13 +15,13 @@ sample_outdirs = expand(
     f"{OUTDIR}/{{s}}/processed/cellranger_{{t}}",
     zip,
     s=manifest["sample_name"],
-    t=manifest["type"],
+    t=manifest["suffix"],
 )
 
 sample_fastq_lookup = {
     (n, t): p
     for n, t, p in zip(
-        manifest["sample_name"], manifest["type"], manifest["fastq_path"]
+        manifest["sample_name"], manifest["suffix"], manifest["fastq_path"]
     )
 }
 
@@ -57,10 +58,10 @@ def get_cellranger_kws() -> str:
 
 rule cellranger_count:
     input:
-        lambda wc: sample_fastq_lookup[(wc.get("sample"), wc.get("type"))],
+        lambda wc: sample_fastq_lookup[(wc.get("sample"), wc.get("suffix"))],
     output:
-        directory(f"{OUTDIR}/{{sample}}/processed/cellranger_{{type}}"),
-        directory(f"{TMPDIR}/cellranger_{{sample}}_{{type}}"),
+        directory(f"{OUTDIR}/{{sample}}/processed/cellranger_{{suffix}}"),
+        directory(f"{TMPDIR}/cellranger_{{sample}}_{{suffix}}"),
     resources:
         qos="cpu24h",
         mem="80G",
