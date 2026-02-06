@@ -52,7 +52,9 @@ def prepare_data(env: dict) -> ad.AnnData:
                 current.obs.loc[:, "type"] = stype
                 current.obs.loc[:, "treatment"] = treatment
                 tmp.append(current)
-        adata = ad.concat(tmp, merge="first", index_unique="-")
+        adata = ad.concat(
+            tmp, merge="first", index_unique="-", join="outer", uns_merge="same"
+        )
         annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
         print(adata.var.columns)
         sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
