@@ -13,8 +13,29 @@ gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
 files:
   combined: ?f"{this['outdir']}/cohort/combined.h5ad"
-  after_qc: ?f"{this['outdir']}/cohort/after_qc.h5ad"
+  passed_qc: ?f"{this['outdir']}/cohort/filtered.h5ad"
+  failed_qc: ?f"{this['outdir']}/cohort/failed_qc.h5ad"
   extras: # | character separates sample type
-    HCC5|normal: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
-    HCCN22|normal: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
-    HCCN1|normal: ?f"{this['outdir']}/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
+    HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
+    HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
+    HCCN1|normal|control: ?f"{this['outdir']}/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
+
+# * QC filtering
+# [2026-02-06 Fri] determined after looking at plots
+# Map below has the following structure: COLNAME: [<OUTLIER_LOW>, <OUTLIER_HIGH>]
+# A cell is determined to be an outlier if its distance from the median in terms of MADs
+# falls below OUTLIER_LOW or is greater than OUTLIER_HIGH. They can be set to null not
+# to do filtering in that direction
+mads_thresholds:
+  n_genes_by_counts: [-2, null]
+  pct_counts_mito: [null, 15]
+  total_counts: [-1, null]
+
+# * Gene group definitions
+
+markers:
+  main:
+    - LIN28
+    - GPC3 # glypican 3
+    - AFP # Alpha-fetoprotein
+
