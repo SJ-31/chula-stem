@@ -1,3 +1,14 @@
+# -*- eval: (jinx-mode -1) -*-
+* construct_sequences
+*Relative Path:* =analyses/pdac_tcr/construct_sequences=
+*Date Added:* <2026-02-05 Thu>
+*Source:* [[https://pmc.ncbi.nlm.nih.gov/articles/PMC11896752][External construct sequences]]
++ The following sequences were obtained from supplementary table 3 of the linked paper
+  * =furin_linker.fasta=
+  * =murinized_trac.fasta=
+  * =murinized_trbc.fasta=
+  * =gibson_assembly_3p.fasta=
+  * =gibson_assembly_5p.fasta=
 * u133a_mapping.tsv
 *Relative Path:* =analyses/data/u133a_mapping.tsv=
 *Date Added:* <2025-11-12 Wed>
@@ -418,7 +429,3 @@ Contains curated assignments of dosage sensitivity to genes and regions
 #+begin_src text
 "GENE/REGION","HGNC/ISCA","GRCh37","GRCh38","HAPLOINSUFFICIENCY","TRIPLOSENSITIVITY","ONLINE REPORT","DATE"
 #+end_src
-
-# Local Variables:
-# jinx-local-words: "SureSelectHumanAllExon"
-# End:

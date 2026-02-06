@@ -9,10 +9,11 @@ __definitions__:
 workdir: ?f"{proj_root}/analyses/scrnaseq_hcc"
 outdir: ?f"{data_dir}/output/HCC/SCRNASEQ"
 manifest: ?f"{this['workdir']}/manifest.csv"
+gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
 files:
-  combined: ?f"{this['outdir']}/combined.h5ad"
-  after_qc: ?f"{this['outdir']}/after_qc.h5ad"
+  combined: ?f"{this['outdir']}/cohort/combined.h5ad"
+  after_qc: ?f"{this['outdir']}/cohort/after_qc.h5ad"
   extras: # | character separates sample type
     HCC5|normal: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
     HCCN22|normal: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
