@@ -16,6 +16,7 @@ files:
   combined: ?f"{this['outdir']}/cohort/combined.h5ad"
   passed_qc: ?f"{this['outdir']}/cohort/filtered.h5ad"
   failed_qc: ?f"{this['outdir']}/cohort/failed_qc.h5ad"
+  test: ?f"{this['workdir']}/test.h5ad"
   extras: # | character separates sample type
     HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
     HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
@@ -27,15 +28,18 @@ rng: 4972
 DR:
   n_pcs: 50
   methods:
-    # TODO: determine what hyperparam to vary for each one
     umap:
-      vary: ?["n_neighbors", list(range(50, 2000, 100))]
+      vary: ?["n_neighbors", list(range(100, 5000, 500))]
       kws:
+        backend: null
+        init: "normal" # Default is "pca", but we pass in X PCA in the script already
     t-sne:
-      vary: ?["perplexity", list(range(5, 200, 10))]
+      vary: ?["perplexity", list(range(100, 5000, 500))]
       kws:
-    pacmap:
-    phate:
+        backend: null
+        init: "normal"
+    # pacmap:
+    # phate:
   outdir: ?f"{this['outdir']}/cohort/DR"
 
 # * QC filtering
