@@ -57,18 +57,31 @@ def prepare_data(file, env):
     adata = adata[:, ~adata.var["gene_ids"].isna()]
     annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
-    sc.pp.pca(adata, n_comps=100)
+    with_normalized_layers(adata, env=env)
+    sc.pp.pca(adata, n_comps=100, layer="X_scran_normalized")
     # TODO: should you change the grouping col?
+    # review after looking at the data unintegrated
     distance_by_mads(
         adata,
         ["total_counts", "n_genes_by_counts", "pct_counts_mito"],
         group_keys=None,
         inplace=True,
     )
-    print(adata.uns)
+    if env.get("test", False):
+        sc.pp.subsample(adata, fraction=0.1)
+        adata = adata[:, :1000]
     adata.write_h5ad(file)
     adata = ad.read_h5ad(file, backed=True)
     return adata
+
+
+def with_normalized_layers(adata: ad.AnnData, env: dict) -> None:
+    "Add additional normalization layers to `adata`, retaining the raw data in X"
+    cfg = env["normalization"]
+    pn = pooled_normalization(adata, inplace=False, **cfg["pooled_normalization"])
+    adata.layers["X_scran_normalized"] = pn
+    # TODO: think about doing it within batches
+    # if cfg["normalize_total"].get("within_batch", False):
 
 
 def data_import(env: dict) -> ad.AnnData:
