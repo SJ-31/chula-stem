@@ -24,7 +24,15 @@ logger.add(smk.log[0])
 def call_dr(
     x: np.ndarray, method: str, kws: dict
 ) -> Callable[[np.ndarray], np.ndarray]:
-    pass
+    import torchdr as tdr
+
+    if method == "umap":
+        dr_obj = tdr.UMAP
+    elif method == "t-sne":
+        dr_obj = tdr.TSNE
+    else:
+        raise ValueError(f"DR method {method} not supported")
+    return dr_obj.fit_transform(x, **kws)
 
 
 # * Rules

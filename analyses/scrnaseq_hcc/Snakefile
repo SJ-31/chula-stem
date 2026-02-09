@@ -5,6 +5,7 @@ configfile: "cellranger_config.yaml"
 
 
 combined_file = config["files"]["combined"]
+passed_qc = config["files"]["passed_qc"]
 logdir = config["logdir"]
 
 GPU_RES = {
@@ -25,6 +26,7 @@ for method, values in config[DR].items():
 rule all:
     input:
         **dr_results,
+        passed_qc,
 
 
 rule prepare_data:
@@ -34,9 +36,36 @@ rule prepare_data:
         "smk.py"
 
 
-rule do_dimensionality_reduction:
+rule qc_filter:
     input:
         combined_file,
+    output:
+        passed=passed_qc,
+        failed=config["files"]["failed_qc"],
+        test=config["files"]["test"],
+    log:
+        f"{logdir}/qc.log",
+    run:
+        import anndata as ad
+        import scanpy as sc
+        from functions import mads_filter_outliers
+
+        combined = ad.read_h5ad(input[0], backed=True)
+
+        passed, failed = mads_filter_outliers(
+            combined.to_memory(), filters=config["mads_thresholds"], reduction="all"
+        )
+        print("Original shape: {}".format(combined.shape))
+        print("Shape of filtered: {}".format(filtered.shape))
+        print("Shape of failed: {}".format(failed.shape))
+        passed.write_h5ad(output["passed"])
+        failed.write_h5ad(output["failed"])
+        sc.pp.subsample(passed, fraction=0.1).write_h5ad(output["test"])
+
+
+rule do_dimensionality_reduction:
+    input:
+        passed_qc,
     params:
         method=lambda wc: wc.get("method"),
         hp_value=lambda wc: wc.get("hp_value"),

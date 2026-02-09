@@ -6,14 +6,14 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
-    from yte import process_yaml
+    from pathlib import Path
 
     import anndata as ad
     import marimo as mo
-    from pathlib import Path
-    import scanpy as sc
     import plotnine as gg
+    import scanpy as sc
     from chula_stem.sc_rnaseq import pca_to_leiden
+    from yte import process_yaml
 
     with open("./cellranger_config.yaml", "r") as f:
         env = process_yaml(f)
@@ -27,12 +27,13 @@ def _():
 @app.cell
 def _():
     import functions as fn
+
     return (fn,)
 
 
 @app.cell
 def _(ad, env, fn):
-    combined: ad.AnnData = fn.prepare_data(env)
+    combined: ad.AnnData = fn.data_import(env)
     return (combined,)
 
 
@@ -70,15 +71,8 @@ def _(combined: "ad.AnnData", fn, plot_out):
 
 
 @app.cell
-def _(combined: "ad.AnnData", env, fn):
-    filtered, failed = fn.mads_filter_outliers(
-        combined.to_memory(), filters=env["mads_thresholds"], reduction="all"
-    )
-    print("Shape of filtered: {}".format(filtered))
-    print("Shape of failed: {}".format(failed))
-
-    filtered.write_h5ad(env["files"]["passed_qc"])
-    failed.write_h5ad(env["files"]["failed_qc"])
+def _(combined: "ad.AnnData", env, fn, ad):
+    filtered = ad.read_h5ad(env["files"]["passed_qc"])
     return
 
 
