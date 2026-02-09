@@ -5,10 +5,12 @@ from pathlib import Path
 from typing import Literal
 
 import anndata as ad
+import numpy as np
 import pandas as pd
 import plotnine as gg
 import polars as pl
 import scanpy as sc
+from chula_stem.r_utils import pooled_normalization
 from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger

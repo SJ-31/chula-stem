@@ -1,6 +1,3 @@
-import pandas as pd
-
-
 configfile: "cellranger_config.yaml"
 
 
@@ -14,19 +11,22 @@ GPU_RES = {
     "gres": "gpu:3g.20gb:1",
     "slurm_partition": "gpu",
 }
+if config["test"]:
+    GPU_RES = {}
 
 dr_results = {}
-for method, values in config[DR].items():
-    vary_by = items["vary"][1]
-    dr_results[f"dr_{method}"] = expand(
-        f"{config['DR']['outdir']}/{method}/{method}_{{i}}.npy", i=vary_by
-    )
+dr_cfg = config["DR"]
+for o, p in dr_cfg["outdirs"].items():
+    dr_results[o] = {}
+    for method, values in dr_cfg["methods"].items():
+        v = values["vary"][1]
+        dr_results[o][f"dr_{method}"] = expand(f"{p}/{method}/{method}_{{v}}.npy", v=v)
 
 
 rule all:
     input:
-        **dr_results,
         passed_qc,
+        **dr_results["unintegrated"],
 
 
 rule prepare_data:
@@ -36,13 +36,13 @@ rule prepare_data:
         "smk.py"
 
 
+# TODO: should also add doublet detection and removal
 rule qc_filter:
     input:
         combined_file,
     output:
         passed=passed_qc,
         failed=config["files"]["failed_qc"],
-        test=config["files"]["test"],
     log:
         f"{logdir}/qc.log",
     run:
@@ -60,20 +60,23 @@ rule qc_filter:
         print("Shape of failed: {}".format(failed.shape))
         passed.write_h5ad(output["passed"])
         failed.write_h5ad(output["failed"])
-        sc.pp.subsample(passed, fraction=0.1).write_h5ad(output["test"])
 
 
-rule do_dimensionality_reduction:
-    input:
-        passed_qc,
-    params:
-        method=lambda wc: wc.get("method"),
-        hp_value=lambda wc: wc.get("hp_value"),
-    log:
-        f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
-    resources:
-        **GPU_RES,
-    output:
-        f"{config['DR']['outdir']}/{{method}}/{{method}}_{{val}}.npy",
-    script:
-        "smk.py"
+for name, path in dr_cfg["outdirs"].items():
+
+    rule do_dimensionality_reduction:
+        input:
+            passed_qc,
+        name:
+            f"do_dimensionality_reduction_{name}"
+        params:
+            method=lambda wc: wc.get("method"),
+            hp_value=lambda wc: wc.get("hp_value"),
+        log:
+            f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
+        resources:
+            **GPU_RES,
+        output:
+            f"{path}/{{method}}/{{method}}_{{val}}.npy",
+        script:
+            "smk.py"

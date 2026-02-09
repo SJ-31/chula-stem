@@ -1,22 +1,28 @@
 __use_yte__: true
 __definitions__:
   - from pathlib import Path
+  - import sys
+  - args = sys.argv
   - home = str(Path.home())
+  - test = "test=True" in args
   - is_local = home.startswith("/home/shannc")
   - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
   - data_dir = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
+  - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
+  - outdir = f"{data_dir}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
 
-workdir: ?f"{proj_root}/analyses/scrnaseq_hcc"
-outdir: ?f"{data_dir}/output/HCC/SCRNASEQ"
+args: ?args
+workdir: ?workdir
+outdir: ?outdir
 logdir: ?f"{proj_root}/analyses/scrnaseq_hcc/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
 files:
-  combined: ?f"{this['outdir']}/cohort/combined.h5ad"
-  passed_qc: ?f"{this['outdir']}/cohort/filtered.h5ad"
-  failed_qc: ?f"{this['outdir']}/cohort/failed_qc.h5ad"
-  test: ?f"{this['workdir']}/test.h5ad"
+  combined: ?f"{this['outdir']}/combined.h5ad"
+  passed_qc: ?f"{this['outdir']}/filtered.h5ad"
+  failed_qc: ?f"{this['outdir']}/failed_qc.h5ad"
+  integrated: ?f"{this['outdir']}/integrated.h5ad"
   extras: # | character separates sample type
     HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
     HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
@@ -40,7 +46,9 @@ DR:
         init: "normal"
     # pacmap:
     # phate:
-  outdir: ?f"{this['outdir']}/cohort/DR"
+  outdirs:
+    unintegrated: ?f"{this['outdir']}/DR_unintegrated"
+    integrated: ?f"{this['outdir']}/DR_integrated"
 
 # * QC filtering
 # [2026-02-06 Fri] determined after looking at plots
@@ -52,6 +60,13 @@ mads_thresholds:
   n_genes_by_counts: [-2, null]
   pct_counts_mito: [null, 15]
   total_counts: [-1, null]
+
+# * Normalization
+normalization:
+  normalize_total:
+    within_batch: true
+  pooled_normalization:
+    cluster_method: "scran"
 
 # * Gene group definitions
 

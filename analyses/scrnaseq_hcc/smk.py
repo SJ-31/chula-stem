@@ -13,7 +13,6 @@ try:
 except ImportError:
     smk = type("snakemake", (), {"rule": None, "config": {}, "log": [0]})
 
-RCONFIG = smk.config(smk.rule)
 RNG: int = smk.config["rng"]
 
 logger.add(smk.log[0])
@@ -42,9 +41,9 @@ def prepare_data():
     _ = fn.prepare_data(smk.output[0], smk.config)
 
 
-def do_dimensionality_reduction(adata_path: ad.AnnData):
+def do_dimensionality_reduction():
     cfg = smk.config["DR"]
-    adata = ad.read_h5ad(adata_path)
+    adata = ad.read_h5ad(smk.input[0])
     x: np.ndarray = adata.obsm["X_pca"][: cfg["n_pcs"]]
     hp_value: int | float = smk.params["hp_value"]
     method = smk.params["method"]
@@ -61,5 +60,7 @@ if not (fn := globals().get(smk.rule)):
     raise ValueError(
         f"Function for rule Symbol’s value as variable is void: {smk.rule} not defined in this file"
     )
+elif smk.rule.startswith("do_dimensionality_reduction"):
+    do_dimensionality_reduction()
 else:
     fn()
