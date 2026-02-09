@@ -476,3 +476,54 @@ def read_existing(
         return
     else:
         return expr(filename)
+
+
+# * Ensembl annotations
+
+
+def get_valid_biomart_attributes() -> set:
+    return set((res.files("data") / "biomart_attributes.txt").read_text().splitlines())
+
+
+def construct_biomart_query(
+    attributes: Sequence, dataset_name="hsapiens_gene_ensembl"
+) -> tuple[list[str], str]:
+    """
+    Constructs a query for retrieving attributes from ensembl biomart
+
+    """
+    valid_all: set = get_valid_biomart_attributes()
+    valid_attrs: list = []
+    for attr in attributes:
+        if attr not in valid_all:
+            print(
+                f"WARNING: requested attribute {attr} is not a valid biomart attribute"
+            )
+        else:
+            valid_attrs.append(attr)
+    query = f"""<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE Query><Query  virtualSchemaName = "default" formatter = "TSV" header = "0" uniqueRows = "0" count = "" datasetConfigVersion = "0.6"><Dataset name = "{dataset_name}" interface="default">
+    """
+    for va in valid_attrs:
+        query = f'{query}<Attribute name = "{va}" />'
+    query = f"{query}</Dataset></Query>"
+    return valid_attrs, query
+
+
+def get_ensembl_gene_data(
+    attributes=(
+        "ensembl_gene_id",
+        "description",
+        "chromosome_name",
+        "start_position",
+        "end_position",
+        "gene_biotype",
+        "hgnc_symbol",
+    ),
+) -> pd.DataFrame:
+    attrs, query = construct_biomart_query(attributes)
+    url = "http://www.ensembl.org/biomart/martservice?query="
+    req = requests.get(f"{url}{query}")
+    req.raise_for_status()
+    tsv = StringIO(req.text)
+    df = pd.read_csv(tsv, sep="\t", names=attrs, header=None)
+    return df
