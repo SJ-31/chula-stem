@@ -1,16 +1,22 @@
 #!/usr/bin/env ipython
 
 import ast
-import itertools
-import re
+import importlib.resources as res
+from collections.abc import Sequence
 from functools import reduce
+from io import StringIO
 from pathlib import Path
 from subprocess import CompletedProcess, run
 from tempfile import TemporaryFile
-from typing import Any, Callable
+from typing import Callable
 
+import anndata as ad
 import click
+import numpy as np
+import pandas as pd
 import polars as pl
+import requests
+from scipy import sparse
 
 
 def str_split_unique(
@@ -446,6 +452,19 @@ def do_call(fn, pars: dict | None):
         return fn(**{})
     else:
         return fn(**pars)
+
+
+def xarray_if_sparse(
+    x: ad.AnnData, copy: bool = True, dtype: np.dtype = np.float32
+) -> np.ndarray:
+    was_sparse: bool = sparse.issparse(x.X)
+    if was_sparse:
+        arr = x.X.toarray()
+    elif copy:
+        arr = x.X.copy()
+    else:
+        arr = x.X
+    return arr.astype(dtype)
 
 
 def read_existing(
