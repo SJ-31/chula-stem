@@ -56,7 +56,7 @@ rule qc_filter:
             combined.to_memory(), filters=config["mads_thresholds"], reduction="all"
         )
         print("Original shape: {}".format(combined.shape))
-        print("Shape of filtered: {}".format(filtered.shape))
+        print("Shape of filtered: {}".format(passed.shape))
         print("Shape of failed: {}".format(failed.shape))
         passed.write_h5ad(output["passed"])
         failed.write_h5ad(output["failed"])
@@ -71,7 +71,7 @@ for name, path in dr_cfg["outdirs"].items():
             f"do_dimensionality_reduction_{name}"
         params:
             method=lambda wc: wc.get("method"),
-            hp_value=lambda wc: wc.get("hp_value"),
+            hp_value=lambda wc: wc.get("val"),
         log:
             f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
         resources:

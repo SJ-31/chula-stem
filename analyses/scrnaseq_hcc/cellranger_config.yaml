@@ -7,13 +7,16 @@ __definitions__:
   - test = "test=True" in args
   - is_local = home.startswith("/home/shannc")
   - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
-  - data_dir = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
+  - data_root = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
   - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
-  - outdir = f"{data_dir}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
+  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
+
+test: ?test
 
 args: ?args
 workdir: ?workdir
 outdir: ?outdir
+data_root: ?f"{data_root}/output/HCC/SCRNASEQ"
 logdir: ?f"{proj_root}/analyses/scrnaseq_hcc/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
@@ -64,7 +67,9 @@ mads_thresholds:
 # * Normalization
 normalization:
   normalize_total:
-    within_batch: true
+    # within_batch: true
+    target_sum: null
+    exclude_highly_expressed: false
   pooled_normalization:
     cluster_method: "scran"
 
