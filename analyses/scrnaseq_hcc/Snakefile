@@ -1,0 +1,50 @@
+import pandas as pd
+
+
+configfile: "cellranger_config.yaml"
+
+
+combined_file = config["files"]["combined"]
+logdir = config["logdir"]
+
+GPU_RES = {
+    "mem": "30G",
+    "qos": "gpu20gh",
+    "gres": "gpu:3g.20gb:1",
+    "slurm_partition": "gpu",
+}
+
+dr_results = {}
+for method, values in config[DR].items():
+    vary_by = items["vary"][1]
+    dr_results[f"dr_{method}"] = expand(
+        f"{config['DR']['outdir']}/{method}/{method}_{{i}}.npy", i=vary_by
+    )
+
+
+rule all:
+    input:
+        **dr_results,
+
+
+rule prepare_data:
+    output:
+        combined_file,
+    script:
+        "smk.py"
+
+
+rule do_dimensionality_reduction:
+    input:
+        combined_file,
+    params:
+        method=lambda wc: wc.get("method"),
+        hp_value=lambda wc: wc.get("hp_value"),
+    log:
+        f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
+    resources:
+        **GPU_RES,
+    output:
+        f"{config['DR']['outdir']}/{{method}}/{{method}}_{{val}}.npy",
+    script:
+        "smk.py"
