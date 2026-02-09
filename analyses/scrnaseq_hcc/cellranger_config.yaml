@@ -8,6 +8,7 @@ __definitions__:
 
 workdir: ?f"{proj_root}/analyses/scrnaseq_hcc"
 outdir: ?f"{data_dir}/output/HCC/SCRNASEQ"
+logdir: ?f"{proj_root}/analyses/scrnaseq_hcc/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
@@ -19,6 +20,23 @@ files:
     HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
     HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
     HCCN1|normal|control: ?f"{this['outdir']}/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
+
+rng: 4972
+
+# * Dimensionality reduction
+DR:
+  n_pcs: 50
+  methods:
+    # TODO: determine what hyperparam to vary for each one
+    umap:
+      vary: ?["n_neighbors", list(range(50, 2000, 100))]
+      kws:
+    t-sne:
+      vary: ?["perplexity", list(range(5, 200, 10))]
+      kws:
+    pacmap:
+    phate:
+  outdir: ?f"{this['outdir']}/cohort/DR"
 
 # * QC filtering
 # [2026-02-06 Fri] determined after looking at plots
@@ -35,7 +53,7 @@ mads_thresholds:
 
 markers:
   main:
-    - LIN28
+    - LIN28A
     - GPC3 # glypican 3
     - AFP # Alpha-fetoprotein
 
