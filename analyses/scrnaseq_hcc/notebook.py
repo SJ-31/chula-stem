@@ -6,13 +6,13 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    import sys
     from pathlib import Path
 
     import anndata as ad
     import marimo as mo
     import plotnine as gg
     import scanpy as sc
-    from chula_stem.sc_rnaseq import pca_to_leiden
     from yte import process_yaml
 
     with open("./cellranger_config.yaml", "r") as f:

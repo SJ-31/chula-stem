@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
+import re
 from functools import reduce
 from pathlib import Path
 from typing import Literal
 
 import anndata as ad
+import marimo as mo
 import numpy as np
 import pandas as pd
 import plotnine as gg
@@ -14,10 +16,11 @@ from chula_stem.r_utils import pooled_normalization
 from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
+from pandas.core.series import validate_all_hashable
 
 
 def prepare_data(file, env):
-    outdir = Path(env["outdir"])
+    droot = Path(env["data_root"])
     tmp = []
     manifest = pl.read_csv(env["manifest"])
     target = "filtered_feature_bc_matrix.h5"
@@ -26,7 +29,7 @@ def prepare_data(file, env):
         stype = row["type"]
         suffix = f"{row['type']}-{row['treatment']}"
         data_path: Path = (
-            outdir / patient / "processed" / f"cellranger_{suffix}/{target}"
+            droot / patient / "processed" / f"cellranger_{suffix}/{target}"
         )
         if not data_path.exists():
             logger.warning("The files for sample {} ({}) don't exist", patient, suffix)
@@ -57,8 +60,6 @@ def prepare_data(file, env):
     adata = adata[:, ~adata.var["gene_ids"].isna()]
     annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
-    with_normalized_layers(adata, env=env)
-    sc.pp.pca(adata, n_comps=100, layer="X_scran_normalized")
     # TODO: should you change the grouping col?
     # review after looking at the data unintegrated
     distance_by_mads(
@@ -167,6 +168,91 @@ def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha
                 xintercept=-threshold, alpha=line_alpha, linetype="dotted"
             )
     return plots[0] / plots[1] / plots[2], cplot
+
+
+def add_saved_dr(adata: ad.AnnData, env: dict, dir_key: str = "unintegrated") -> None:
+    dr_dir: Path = Path(env["DR"]["outdirs"][dir_key])
+    methods = env["DR"]["methods"].keys()
+    for d in dr_dir.iterdir():
+        if not d.is_dir() and d.stem not in methods:
+            continue
+        method: str = d.stem
+        for efile in d.iterdir():
+            embeddings = np.load(efile)
+            hp_val = efile.stem.split("_", 1)[1]
+            adata.obsm[f"X_{method}_{hp_val}"] = embeddings
+
+
+def plot_dr(
+    adata: ad.AnnData,
+    key: str,
+    color_by: list[str] | str | None = None,
+    prefix: str | None = None,
+    axis_suffixes=("1", "2"),
+    **theme_kws,
+) -> list[gg.ggplot] | gg.ggplot:
+    prefix = prefix or key
+    x, y = f"{prefix}{axis_suffixes[0]}", f"{prefix}{axis_suffixes[1]}"
+    vals = pd.DataFrame(adata.obsm[key], columns=[x, y], index=adata.obs_names)
+    color_by = [color_by] if isinstance(color_by, str) else color_by
+    if color_by is not None:
+        vals = pd.concat([vals, adata.obs.loc[:, color_by]], axis="columns")
+    plot = gg.ggplot(vals, gg.aes(x=x, y=y))
+    if color_by is None:
+        return plot + gg.geom_point()
+    plots = []
+    for col in color_by:
+        plots.append(plot + gg.geom_point(gg.aes(color=col)) + gg.theme(**theme_kws))
+    if len(plots) == 1:
+        return plots[0]
+    return plots
+
+
+def make_dr_slider(
+    adata: ad.AnnData,
+    dr_name: Literal["t-sne", "umap"],
+    outdir: Path,
+    color_by: list[str] | None = None,
+    theme_kws: dict | None = None,
+    ext: str = "pdf",
+    **save_kws,
+):
+    """
+    Return a slider object and image call
+    for displaying dimensionality reduction plots in marimo,
+    varying by a hyperparameter value
+    """
+    theme_kws = theme_kws or {}
+    hp_vals = []
+    val2keys, val2plots = {}, {}
+    for k in adata.obsm.keys():
+        if k.startswith(f"X_{dr_name}"):
+            val = int(re.findall("_([0-9]+$)", k)[0])
+            val2keys[val] = k
+            hp_vals.append(val)
+
+    outdir.mkdir(exist_ok=True)
+
+    for k, v in val2keys.items():
+        fname = outdir / f"{k}.{ext}"
+        if fname.exists():
+            continue
+        plots = plot_dr(
+            adata, key=v, prefix=dr_name.upper(), color_by=color_by, **theme_kws
+        )
+        if isinstance(plots, list):
+            plots = reduce(lambda x, y: x | y, plots)
+        val2plots[k] = plots
+        plots.save(fname, verbose=False, **save_kws)
+
+    slider = mo.ui.slider(steps=sorted(hp_vals), label=dr_name, show_value=True)
+
+    def display_call(v):
+        if ext == "pdf":
+            return mo.pdf(outdir / f"{v}.pdf")
+        return mo.image(outdir / f"{v}.{ext}")
+
+    return slider, display_call
 
 
 def mads_filter_outliers(
