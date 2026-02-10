@@ -123,7 +123,6 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(adata, fn, plot_out):
-    # TODO: add this to the main notebook
     umap_slider, display_umap = fn.make_dr_slider(
         adata,
         "umap",

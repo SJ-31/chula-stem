@@ -12,11 +12,9 @@ import pandas as pd
 import plotnine as gg
 import polars as pl
 import scanpy as sc
-from chula_stem.r_utils import pooled_normalization
-from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
+from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
-from pandas.core.series import validate_all_hashable
 
 
 def prepare_data(file, env):
@@ -79,8 +77,12 @@ def prepare_data(file, env):
 def with_normalized_layers(adata: ad.AnnData, env: dict) -> None:
     "Add additional normalization layers to `adata`, retaining the raw data in X"
     cfg = env["normalization"]
-    pn = pooled_normalization(adata, inplace=False, **cfg["pooled_normalization"])
-    adata.layers["X_scran_normalized"] = pn
+    # BUG: this wasn't working
+    lshift = sc.pp.normalize_total(adata, inplace=False, **cfg["normalize_total"])
+    adata.layers["lshift_normalized"] = lshift["X"]
+    sc.pp.log1p(adata, layer="lshift_normalized")
+    # pn = pooled_normalization(adata, inplace=False, **cfg["pooled_normalization"])
+    # adata.layers["scran_normalized"] = pn
     # TODO: think about doing it within batches
     # if cfg["normalize_total"].get("within_batch", False):
 
@@ -199,10 +201,13 @@ def plot_dr(
         vals = pd.concat([vals, adata.obs.loc[:, color_by]], axis="columns")
     plot = gg.ggplot(vals, gg.aes(x=x, y=y))
     if color_by is None:
-        return plot + gg.geom_point()
+        return plot + gg.geom_point(size=0.3)
     plots = []
-    for col in color_by:
-        plots.append(plot + gg.geom_point(gg.aes(color=col)) + gg.theme(**theme_kws))
+    for i, col in enumerate(color_by):
+        cur = plot + gg.geom_point(gg.aes(color=col), size=0.3) + gg.theme(**theme_kws)
+        if i > 0:
+            cur = cur + gg.theme(axis_title_y=gg.element_blank())
+        plots.append(cur)
     if len(plots) == 1:
         return plots[0]
     return plots
