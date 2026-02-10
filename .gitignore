@@ -171,3 +171,4 @@ docs
 /analyses/pdac_tcr/cellassign_markers_meta.csv
 /lightning_logs/
 /analyses/scrnaseq_hcc/__marimo__/
+/analyses/scrnaseq_hcc/test/
