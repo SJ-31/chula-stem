@@ -316,3 +316,28 @@ def mads_filter_outliers(
     filtered = adata[~is_outlier, :]
     failed = adata[is_outlier]
     return filtered, failed
+
+
+def add_cfs_community(
+    adata: ad.AnnData,
+    old_clusters: Path | str,
+    cfs_community_file: Path | str,
+    column: str = "cfs_community",
+):
+    """
+    Reassign clusters using the results of a previous call of ClusterFoldSimilarity
+    """
+    if isinstance(old_clusters, Path):
+        cells2old_clusters = pd.read_csv(
+            old_clusters, names=["cell_id", "tmp_cluster"]
+        ).set_index("cell_id")
+        old = cells2old_clusters[adata.obs_names]
+    else:
+        old = adata.obs[old_clusters]
+    communities = pd.read_csv(cfs_community_file)
+    lookup = {(s, g): c for s, g, c in communities.iterrows()}
+    adata.obs = adata.obs.merge(old, left_index=True, right_index=True)
+    reassigned = adata.obs["sample"].combine(
+        adata.obs["tmp_cluster"], lambda x, y: lookup[(x, y)]
+    )
+    adata.obs.loc[:, column] = reassigned
