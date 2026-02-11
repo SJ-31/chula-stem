@@ -57,7 +57,22 @@ DR:
 hgv:
 batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so that the hgv routine genes for hcc subtypes
 
-# * CFS
+# * Cluster fold similarity
+do_cfs:
+  exclude: # Exclude normals and treated samples since we're using CFS to find subtypes
+    - H19_tumor-iacs
+    - H8_tumor-iacs
+    - H8_tumor-oligomycin
+    - H8_tumor-pp
+    - HCCN1_normal-control
+    - HCCN22_normal-control
+    - HCC5_normal-control
+  setup_kws:
+    subset_hvgs: true
+    leiden:
+    pca:
+  cfs_kws:
+    parallel: true
 
 # * QC filtering
 # [2026-02-06 Fri] thresholds determined after looking at plots

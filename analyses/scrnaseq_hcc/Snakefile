@@ -6,14 +6,14 @@ passed_qc = config["files"]["passed_qc"]
 integrated = config["files"]["integrated"]
 logdir = config["logdir"]
 
-GPU_RES = {
+gpu_res = {
     "mem": "30G",
     "qos": "gpu20gh",
     "gres": "gpu:3g.20gb:1",
     "slurm_partition": "gpu",
 }
 if config["test"]:
-    GPU_RES = {}
+    gpu_res = {}
 
 dr_results = {}
 dr_cfg = config["DR"]
@@ -23,12 +23,19 @@ for o, p in dr_cfg["outdirs"].items():
         v = values["vary"][1]
         dr_results[o][f"dr_{method}"] = expand(f"{p}/{method}/{method}_{{v}}.npy", v=v)
 
+cfs_results = {
+    "similarity": f"{config["outdir"]}/cfs/similarity.csv",
+    "communities": f"{config["outdir"]}/cfs/communities.csv",
+    "independent_clustering": f"{config["outdir"]}/cfs/ind_clustering.csv",
+}
+
 
 rule all:
     input:
         passed_qc,
         integrated,
         **dr_results["unintegrated"],
+        **dr_results["integrated"],
 
 
 rule prepare_data:
@@ -77,21 +84,21 @@ for name, path in dr_cfg["outdirs"].items():
         log:
             f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
         resources:
-            **GPU_RES,
+            **gpu_res,
         output:
             f"{path}/{{method}}/{{method}}_{{val}}.npy",
         script:
             "smk.py"
 
 
-# TODO: try this out since you're unsure about batch
+# TODO: just need to test it
 rule cluster_fold_similarity:
     input:
         passed_qc,
     log:
         f"{logdir}/cluster_fold_similarity.log",
     output:
-        f"{config["outdir"]}/cfs_results.tsv",
+        **cfs_results,
     script:
         "smk.R"
 
