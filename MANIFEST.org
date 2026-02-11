@@ -1,4 +1,9 @@
 # -*- eval: (jinx-mode -1) -*-
+* disco_cell_types.csv
+*Relative Path:* =analyses/data/disco_cholangiocyte.csv=
+*Date Added:* <2026-02-11 Wed>
+*Source:* [[https://www.immunesinglecell.com/cell_type][Cell types from DISCO]]
+
 * construct_sequences
 *Relative Path:* =analyses/pdac_tcr/construct_sequences=
 *Date Added:* <2026-02-05 Thu>
