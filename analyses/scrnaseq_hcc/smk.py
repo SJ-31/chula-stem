@@ -4,6 +4,7 @@ from typing import Callable
 
 import anndata as ad
 import numpy as np
+import scanpy as sc
 from loguru import logger
 
 import functions as fn
@@ -38,17 +39,62 @@ def call_dr(
 # * Rules
 
 
+def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict | None = None):
+    """
+    1. Identify and subset to HVGs, accounting for batch
+    2. Integrate data across batches
+    3. Generate cell clusters
+    """
+    adata = adata or ad.read_h5ad(smk.input[0])
+    cfg = cfg or smk.config.get(smk.rule)
+
+    batch_key: str = cfg["batch_key"]
+    sc.pp.highly_variable_genes(
+        adata, inplace=True, layer="lshift_normalized", batch_key=batch_key, subset=True
+    )
+    # Integration method
+    i_kws = cfg["integration"]["kws"] or {}
+    i_method = cfg["integration"]["method"]
+    key = f"X_{i_method}"
+    if i_method == "scVI":
+        import scvi
+
+        scvi.model.SCVI.setup_anndata(adata, batch_key=batch_key)
+        model = scvi.model.SCVI(adata=adata, **i_kws)
+        model.train()
+        key = "X_scVI"
+        adata.obsm[key] = model.get_latent_representation()
+    elif i_method == "harmony":
+        key = "X_harmony"
+        sc.external.pp.harmony_integrate(
+            adata, key=[batch_key, "patient"], adjusted_basis=key
+        )
+    else:
+        raise NotImplementedError()
+    sc.external.pp.bbknn(adata, batch_key=batch_key)
+    if cfg["clustering"]["method"] == "leiden":
+        sc.pp.neighbors(adata, use_rep=key)
+        sc.tl.leiden(adata, **cfg["clustering"]["kws"])
+    else:
+        raise NotImplementedError()
+
+
 def prepare_data():
     _ = fn.prepare_data(smk.output[0], smk.config)
 
 
-def do_dimensionality_reduction():
+def do_dimensionality_reduction(unintegrated: bool = True):
+    # TODO: add a modification for X to get the integrated key e.g. "X_scVI"
     cfg = smk.config["DR"]
     adata = ad.read_h5ad(smk.input[0])
-    x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
-    hp_value: int | float = smk.params["hp_value"]
     method = smk.params["method"]
     kws: dict = cfg["methods"][method].get("kws", {}) or {}
+    if unintegrated:
+        x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
+        kws["init"] = "normal"
+    else:
+        x = adata.obsm[smk.config["integration_key"]]
+    hp_value: int | float = smk.params["hp_value"]
     hp_to_vary = cfg["methods"][method]["vary"][0]
     kws[hp_to_vary] = int(hp_value)
     result: np.ndarray = call_dr(x, method, kws)

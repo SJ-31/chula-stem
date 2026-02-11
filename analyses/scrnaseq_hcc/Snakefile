@@ -3,6 +3,7 @@ configfile: "cellranger_config.yaml"
 
 combined_file = config["files"]["combined"]
 passed_qc = config["files"]["passed_qc"]
+integrated = config["files"]["integrated"]
 logdir = config["logdir"]
 
 GPU_RES = {
@@ -26,6 +27,7 @@ for o, p in dr_cfg["outdirs"].items():
 rule all:
     input:
         passed_qc,
+        integrated,
         **dr_results["unintegrated"],
 
 
@@ -80,3 +82,28 @@ for name, path in dr_cfg["outdirs"].items():
             f"{path}/{{method}}/{{method}}_{{val}}.npy",
         script:
             "smk.py"
+
+
+# TODO: try this out since you're unsure about batch
+rule cluster_fold_similarity:
+    input:
+        passed_qc,
+    log:
+        f"{logdir}/cluster_fold_similarity.log",
+    output:
+        f"{config["outdir"]}/cfs_results.tsv",
+    script:
+        "smk.R"
+
+
+rule integrate_and_cluster:
+    input:
+        passed_qc,
+    log:
+        f"{logdir}/integration_and_cluster.log",
+    resources:
+        **GPU_RES,
+    output:
+        integrated,
+    script:
+        "smk.py"
