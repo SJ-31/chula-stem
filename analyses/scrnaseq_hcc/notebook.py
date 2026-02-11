@@ -14,6 +14,7 @@ def _():
     import plotnine as gg
     import scanpy as sc
     from yte import process_yaml
+
     return Path, ad, mo, process_yaml, sys
 
 
@@ -45,6 +46,7 @@ def _(Path, is_test, process_yaml, sys):
 @app.cell
 def _():
     import functions as fn
+
     return (fn,)
 
 
@@ -127,7 +129,7 @@ def _(adata, fn, plot_out):
         adata,
         "umap",
         plot_out / "umap_unintegrated",
-        ["patient", "type"],
+        ["patient", "flowcell"],
         ext="svg",
         theme_kws={"figure_size": (10, 5)},
     )
@@ -138,6 +140,14 @@ def _(adata, fn, plot_out):
 @app.cell
 def _(display_umap, umap_slider):
     display_umap(umap_slider.value)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    # Marker genes
+    """)
     return
 
 

@@ -31,6 +31,8 @@ def call_dr(
         dr_obj = tdr.UMAP(**kws)
     elif method == "t-sne":
         dr_obj = tdr.TSNE(**kws)
+    elif method == "pacmap":
+        dr_obj = tdr.PACMAP(**kws)
     else:
         raise ValueError(f"DR method {method} not supported")
     return dr_obj.fit_transform(x)

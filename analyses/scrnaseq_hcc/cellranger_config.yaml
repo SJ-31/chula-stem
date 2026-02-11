@@ -39,15 +39,15 @@ DR:
   n_pcs: 50
   methods:
     umap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500))]
+      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
       kws:
         backend: null
     t-sne:
-      vary: ?["perplexity", list(range(100, 5000, 500))]
+      vary: ?["perplexity", list(range(100, 5000, 500)) if not test else [100, 500]]
       kws:
         backend: null
     pacmap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500))]
+      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
       backend: null
   outdirs:
     unintegrated: ?f"{this['outdir']}/DR_unintegrated"

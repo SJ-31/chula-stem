@@ -36,6 +36,7 @@ rule all:
         integrated,
         **dr_results["unintegrated"],
         **dr_results["integrated"],
+        **cfs_results,
 
 
 rule prepare_data:
@@ -72,10 +73,14 @@ rule qc_filter:
 
 
 for name, path in dr_cfg["outdirs"].items():
+    if name == "unintegrated":
+        in_adata = passed_qc
+    else:
+        in_adata = integrated
 
     rule do_dimensionality_reduction:
         input:
-            passed_qc,
+            in_adata,
         name:
             f"do_dimensionality_reduction_{name}"
         params:
@@ -109,7 +114,7 @@ rule integrate_and_cluster:
     log:
         f"{logdir}/integration_and_cluster.log",
     resources:
-        **GPU_RES,
+        **gpu_res,
     output:
         integrated,
     script:
