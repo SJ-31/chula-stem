@@ -7,6 +7,7 @@ __definitions__:
   - test = "test=True" in args
   - is_local = home.startswith("/home/shannc")
   - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
+  - tpredict = f"{home}/Bio_SDD/too-predict" if is_local else f"{home}/too-predict"
   - data_root = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
   - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
   - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
@@ -41,20 +42,25 @@ DR:
       vary: ?["n_neighbors", list(range(100, 5000, 500))]
       kws:
         backend: null
-        init: "normal" # Default is "pca", but we pass in X PCA in the script already
     t-sne:
       vary: ?["perplexity", list(range(100, 5000, 500))]
       kws:
         backend: null
-        init: "normal"
-    # pacmap:
-    # phate:
+    pacmap:
+      vary: ?["n_neighbors", list(range(100, 5000, 500))]
+      backend: null
   outdirs:
     unintegrated: ?f"{this['outdir']}/DR_unintegrated"
     integrated: ?f"{this['outdir']}/DR_integrated"
 
+# * HGV identification
+hgv:
+batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so that the hgv routine genes for hcc subtypes
+
+# * CFS
+
 # * QC filtering
-# [2026-02-06 Fri] determined after looking at plots
+# [2026-02-06 Fri] thresholds determined after looking at plots
 # Map below has the following structure: COLNAME: [<OUTLIER_LOW>, <OUTLIER_HIGH>]
 # A cell is determined to be an outlier if its distance from the median in terms of MADs
 # falls below OUTLIER_LOW or is greater than OUTLIER_HIGH. They can be set to null not
@@ -70,8 +76,24 @@ normalization:
     # within_batch: true
     target_sum: null
     exclude_highly_expressed: false
-  pooled_normalization:
-    cluster_method: "scran"
+    pooled_normalization:
+  cluster_method: "scran"
+
+# * Integration
+integrate_and_cluster:
+  batch_key: null # TODO: this should be a key denoting the batch in which the samples were sent to the sequencing center
+  integration:
+    method: scVI
+    kws: # Recommended parameters from tutorial
+      n_layers: 2
+      n_latent: 30
+      gene_likelihood: nb
+  clustering:
+    method: leiden
+    kws:
+      random_state: ?this["rng"]
+
+integration_key: ?f"X_{this["integrate_and_cluster"]["integration"]["method"]}"
 
 # * Gene group definitions
 
@@ -80,4 +102,6 @@ markers:
     - LIN28A
     - GPC3 # glypican 3
     - AFP # Alpha-fetoprotein
-
+gene_sets:
+gene_set_files: ?[f"{proj_root}/analyses/data/hcc_reference/gene_sets.yaml"]
+marker_files: ?[f"{proj_root}/analyses/data/hcc_reference/cell_markers.yaml"]
