@@ -1,4 +1,10 @@
 # -*- eval: (jinx-mode -1) -*-
+* cell_markers.yaml, gene_sets.yaml
+*Relative Path:* =analyses/data/hcc_reference/cell_markers.yaml=
+*Date Added:* <2026-02-11 Wed>
+*Source:* Custom
+Cell markers and gene sets used for annotating HCC scRNA-seq data. Generated with =analyses/scrnaseq_hcc/get_markers.R=
+
 * disco_cell_types.csv
 *Relative Path:* =analyses/data/disco_cholangiocyte.csv=
 *Date Added:* <2026-02-11 Wed>

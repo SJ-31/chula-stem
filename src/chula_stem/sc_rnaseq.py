@@ -209,7 +209,6 @@ def annotate_marker(
     )
     for c in expr.columns:
         adata.obs[f"has_{c}"] = expr[c]
-    return expr.agg("sum")
 
 
 def annotate_adata_vars(

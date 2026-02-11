@@ -44,10 +44,13 @@ add_feature_info <- function(sce, db, keytype = "GENEID") {
   }
 
   anno_cols <- c("GENENAME", "GENEID", "GENEBIOTYPE", "SEQNAME")
-  anno <- AnnotationDbi::select(db,
-    keys = rownames(sce), keytype = keytype,
+  anno <- AnnotationDbi::select(
+    db,
+    keys = rownames(sce),
+    keytype = keytype,
     columns = anno_cols
-  ) |> as_tibble()
+  ) |>
+    as_tibble()
   tmp <- tibble(join = rownames(sce))
 
   anno$join <- anno[[keytype]]
@@ -68,7 +71,12 @@ add_feature_info <- function(sce, db, keytype = "GENEID") {
 #' Read count data into a SingleCellExperiment object,
 #' adding in feature information if provided and calculating QC metrics
 #'
-counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta = list()) {
+counts_to_sce <- function(
+  input,
+  separator = "\t",
+  feature_data = "",
+  cell_meta = list()
+) {
   data <- read.delim(input, sep = separator)
   sce <- SingleCellExperiment(assays = list(counts = data))
   db <- NULL
@@ -100,12 +108,17 @@ counts_to_sce <- function(input, separator = "\t", feature_data = "", cell_meta 
 #' @param subfields character vector passed to sub.fields
 #' @param batch_col column in the sce metadata containing batch information
 #'
-qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
-                    batch_col = NULL) {
+qc_mads <- function(
+  sce,
+  qc_spec = NULL,
+  subfields = "subsets_mito_percent",
+  batch_col = NULL
+) {
   subfields <- keep(subfields, \(x) x %in% colnames(colData(sce)))
   batch <- NULL
   if (!is.null(batch_col)) batch <- sce[[batch_col]]
-  reasons <- scuttle::perCellQCFilters(sce,
+  reasons <- scuttle::perCellQCFilters(
+    sce,
     sub.fields = subfields,
     batch = batch
   )
@@ -132,7 +145,8 @@ qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
     if (!is.null(t)) {
       tibble(metric = x, lower = t["lower"], higher = t["higher"])
     }
-  }) |> bind_rows()
+  }) |>
+    bind_rows()
   qc_cols <- colnames(reasons) |> discard(\(x) x == "discard")
   list(df = reasons, thresholds = thresholds, qc_applied = qc_cols)
 }
@@ -147,10 +161,14 @@ qc_mads <- function(sce, qc_spec = NULL, subfields = "subsets_mito_percent",
 #'  default takes unique values and collapses with comma delimiter
 #' @param numeric_agg function to aggregate numeric colData(). Mean by default
 #'
-sce2pseudobulk <- function(sce, cluster_col = "cluster", pb_method = "sum",
-                           aslot = "counts",
-                           numeric_agg = \(x) mean(x, na.rm = TRUE),
-                           char_agg = \(x) paste0(unique(sort(x)), collapse = ",")) {
+sce2pseudobulk <- function(
+  sce,
+  cluster_col = "cluster",
+  pb_method = "sum",
+  aslot = "counts",
+  numeric_agg = \(x) mean(x, na.rm = TRUE),
+  char_agg = \(x) paste0(unique(sort(x)), collapse = ",")
+) {
   cluster <- colData(sce)[[cluster_col]]
   meta <- group_by(as_tibble(colData(sce)), !!as.symbol(cluster_col)) |>
     summarize(
@@ -164,15 +182,17 @@ sce2pseudobulk <- function(sce, cluster_col = "cluster", pb_method = "sum",
   } else if (pb_method == "mean") {
     counts <- assay(sce, aslot)
     cells <- colnames(counts)
-    aggregate <- do.call(cbind, lapply(unique(cluster), \(c) {
-      current <- cells[cluster == c]
-      rowMeans(counts[, current])
-    }))
+    aggregate <- do.call(
+      cbind,
+      lapply(unique(cluster), \(c) {
+        current <- cells[cluster == c]
+        rowMeans(counts[, current])
+      })
+    )
   }
   pb <- DGEList(aggregate, genes = rowData(sce), samples = meta)
   pb
 }
-
 
 
 #' Specify exactly for what reasons a cell is being discarded
@@ -183,7 +203,12 @@ sce2pseudobulk <- function(sce, cluster_col = "cluster", pb_method = "sum",
 #' only if it is the sole reason - if a cell is discarded on 2+ reasons the number
 #' is given instead
 #'
-identify_reasons <- function(sce, qc_cols, show_full = FALSE, reason_col = "discard_reason") {
+identify_reasons <- function(
+  sce,
+  qc_cols,
+  show_full = FALSE,
+  reason_col = "discard_reason"
+) {
   get_reason <- function(qc_row) {
     failed_qc <- purrr::keep(qc_row, \(x) x)
     if (length(failed_qc) == 0) {
@@ -200,7 +225,6 @@ identify_reasons <- function(sce, qc_cols, show_full = FALSE, reason_col = "disc
   colData(sce)[[reason_col]] <- apply(qc, 1, \(x) get_reason(x))
   sce
 }
-
 
 
 #' Filter out cells with fixed thresholds
@@ -253,7 +277,12 @@ qc_thresholds <- function(sce_metrics, thresholds) {
 #' @param gene_spec A list where names are cell types or conditions and values are the
 #'    characteristic genes of that condition or type
 #' @return A ggplot object plotting log-FC (discarded/kept) over log average count
-diagnose_cell_loss <- function(sce, gene_spec, discard = NULL, identifier = "SYMBOL") {
+diagnose_cell_loss <- function(
+  sce,
+  gene_spec,
+  discard = NULL,
+  identifier = "SYMBOL"
+) {
   if (is.null(discard)) d <- sce$discard else d <- discard
   discarded <- calculateAverage(counts(sce)[, d])
   kept <- calculateAverage(counts(sce)[, !d])
@@ -261,7 +290,8 @@ diagnose_cell_loss <- function(sce, gene_spec, discard = NULL, identifier = "SYM
   id_vec <- rowData(sce)[[identifier]]
   log_fc <- logged[, 1] - logged[, 2] # Expression fold-change (discarded/kept)
   log_avg_counts <- rowMeans(logged)
-  tb <- tibble(!!as.symbol(identifier) := id_vec,
+  tb <- tibble(
+    !!as.symbol(identifier) := id_vec,
     log_fc = log_fc,
     log_avg_counts = log_avg_counts
   )
@@ -279,7 +309,14 @@ diagnose_cell_loss <- function(sce, gene_spec, discard = NULL, identifier = "SYM
     ylab("Log fold change (discarded/kept)")
 }
 
-plot_qc <- function(sce, y_axes, x_axis, titles = NULL, facet = NULL, discard_col = "discard") {
+plot_qc <- function(
+  sce,
+  y_axes,
+  x_axis,
+  titles = NULL,
+  facet = NULL,
+  discard_col = "discard"
+) {
   plots <- list()
   if (!discard_col %in% colnames(colData(sce))) {
     discard_col <- NULL
@@ -293,15 +330,21 @@ plot_qc <- function(sce, y_axes, x_axis, titles = NULL, facet = NULL, discard_co
     args <- list(x = x_axis, y = y, color_by = discard_col, show_violin = TRUE)
     if (!is.null(facet)) args$other_fields <- facet
     p <- do.call(\(...) plotColData(sce, ...), args) + ggtitle(title)
-    if (!is.null(discard_col)) p <- p + guides(color = guide_legend(title = "Discard"))
+    if (!is.null(discard_col)) {
+      p <- p + guides(color = guide_legend(title = "Discard"))
+    }
     if (!is.null(facet)) p <- p + facet_wrap(as.formula(paste("~", facet)))
-    if (i != 1 && !is.null(facet)) p <- p + theme(strip.text = element_blank(), strip.background = element_blank())
+    if (i != 1 && !is.null(facet)) {
+      p <- p +
+        theme(strip.text = element_blank(), strip.background = element_blank())
+    }
     if (i != length(y_axes)) {
-      p <- p + theme(
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()
-      )
+      p <- p +
+        theme(
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank()
+        )
     }
     plots[[i]] <- p
   }
@@ -346,14 +389,25 @@ main <- function(args) {
     colData(sce) <- cbind(colData(sce), qc)
   } else {
     qc_spec <- rjson::fromJSON(file = args$qc_spec)
-    qc <- qc_mads(sce, qc_spec, subfields = args$subfields, batch_col = args$batch)
+    qc <- qc_mads(
+      sce,
+      qc_spec,
+      subfields = args$subfields,
+      batch_col = args$batch
+    )
     colData(sce) <- cbind(colData(sce), qc$df)
     write_tsv(qc$thresholds, args$thresholds_output)
   }
   if (args$plot && !is.null(args$x_axis)) {
     y <- str_split_1(args$y_axes, ",")
     plot <- plot_qc(sce, y, args$x_axis, facet = args$facet)
-    ggsave(filename = args$plot_name, plot = plot, dpi = 500, height = 20, width = 20)
+    ggsave(
+      filename = args$plot_name,
+      plot = plot,
+      dpi = 500,
+      height = 20,
+      width = 20
+    )
   }
   if (!is.null(args$marker_genes)) {
     gs <- rjson::fromJSON(file = args$marker_genes)
@@ -370,71 +424,109 @@ main <- function(args) {
 
 
 add_quality_args <- function(parser) {
-  parser <- add_option(parser, c("-b", "--batch"),
+  parser <- add_option(
+    parser,
+    c("-b", "--batch"),
     default = NULL,
-    type = "character", help = "column containing batch data"
+    type = "character",
+    help = "column containing batch data"
   )
-  parser <- add_option(parser, "--subfields",
+  parser <- add_option(
+    parser,
+    "--subfields",
     default = "subsets_mito_percent",
     help = "Additional metric columns passed to the sub.fields argument of scuttle::perCellQCFilters"
   )
-  parser <- add_option(parser, c("-m", "--n_mads"),
-    default = 3, help = "Minimum number of MADs to consider a cell as an outlier"
+  parser <- add_option(
+    parser,
+    c("-m", "--n_mads"),
+    default = 3,
+    help = "Minimum number of MADs to consider a cell as an outlier"
   )
-  parser <- add_option(parser, c("-q", "--qc_spec"),
+  parser <- add_option(
+    parser,
+    c("-q", "--qc_spec"),
     type = "character",
     help = "A json file defining additional qc parameters passed to scuttle::isOutlier.
 Each key is the name of a column (metric) in the SingleCellExperiment object to operate on,
 and the value is a list of arguments passed to isOutlier for that metric",
     default = NULL
   )
-  parser <- add_option(parser, c("-t", "--thresholds_output"),
+  parser <- add_option(
+    parser,
+    c("-t", "--thresholds_output"),
     type = "character",
     help = "Name of tsv file containing output thresholds from scuttle::perCellQCFilters",
     default = "thresholds.tsv"
   )
-  parser <- add_option(parser, c("-s", "--simple_thresholds"),
+  parser <- add_option(
+    parser,
+    c("-s", "--simple_thresholds"),
     type = "character",
     help = "A json file defining the desired thresholds. If supplied, MAD thresholding is not carried out",
     default = NULL
   )
-  parser <- add_option(parser, c("-p", "--plot"),
-    type = "logical", default = TRUE,
+  parser <- add_option(
+    parser,
+    c("-p", "--plot"),
+    type = "logical",
+    default = TRUE,
     help = "Whether or not to produce diagnostic plots"
   )
-  parser <- add_option(parser, c("-x", "--x_axis"),
+  parser <- add_option(
+    parser,
+    c("-x", "--x_axis"),
     type = "character",
     help = "Metric to use as x axis",
     default = NULL
   )
-  parser <- add_option(parser, c("-g", "--marker_genes"),
+  parser <- add_option(
+    parser,
+    c("-g", "--marker_genes"),
     type = "character",
     help = "path to a json file containing marker genes to use for diagnosing cell type loss",
     default = NULL
   )
-  parser <- add_option(parser, c("-y", "--y_axes"),
+  parser <- add_option(
+    parser,
+    c("-y", "--y_axes"),
     type = "character",
     help = "Comma-delimited list of SCE metric columns to plot on y axes",
     default = "sum,detected,subsets_mito_percent"
   )
-  parser <- add_option(parser, c("-f", "--facet"), type = "character", help = "Facet of plot")
-  parser <- add_option(parser, c("-n", "--plot_name"),
+  parser <- add_option(
+    parser,
+    c("-f", "--facet"),
     type = "character",
-    help = "Name of plot output file", default = "diagnostics.png"
+    help = "Facet of plot"
   )
-  parser <- add_option(parser, c("-l", "--loss_plot_name"),
+  parser <- add_option(
+    parser,
+    c("-n", "--plot_name"),
     type = "character",
-    help = "Name of loss plot output file", default = "loss_diagnostics.png"
+    help = "Name of plot output file",
+    default = "diagnostics.png"
+  )
+  parser <- add_option(
+    parser,
+    c("-l", "--loss_plot_name"),
+    type = "character",
+    help = "Name of loss plot output file",
+    default = "loss_diagnostics.png"
   )
   parser
 }
 
 add_doublet_args <- function(parser) {
-  parser <- add_option(parser, c("-d", "--detect_doublets"),
+  parser <- add_option(
+    parser,
+    c("-d", "--detect_doublets"),
     type = "logical",
     help = "Whether or not to detect doublets"
   )
-  parser <- add_option(parser, c("-r", "--scDblFinder_params"),
+  parser <- add_option(
+    parser,
+    c("-r", "--scDblFinder_params"),
     type = "character",
     help = "json file of arguments to pass to scDblFinder::scDblFinder",
     default = NULL
@@ -445,18 +537,33 @@ add_doublet_args <- function(parser) {
 parse_args <- function() {
   library("optparse")
   parser <- OptionParser()
-  parser <- add_option(parser, c("-d", "--discard"),
+  parser <- add_option(
+    parser,
+    c("-d", "--discard"),
     type = "character",
     default = "none",
     action = "store_true",
     help = "Whether or not to remove cells based on the qc, or only flag them in metadata"
   )
-  parser <- add_option(parser, "--discard_suffix",
+  parser <- add_option(
+    parser,
+    "--discard_suffix",
     type = "character",
-    help = "Suffix for file containing discarded cells", default = "h5ad"
+    help = "Suffix for file containing discarded cells",
+    default = "h5ad"
   )
-  parser <- add_option(parser, c("-i", "--input"), type = "character", help = "Input filename")
-  parser <- add_option(parser, c("-o", "--output"), type = "character", help = "Output file name")
+  parser <- add_option(
+    parser,
+    c("-i", "--input"),
+    type = "character",
+    help = "Input filename"
+  )
+  parser <- add_option(
+    parser,
+    c("-o", "--output"),
+    type = "character",
+    help = "Output file name"
+  )
   parser <- add_quality_args(parser)
   parser <- add_doublet_args(parser)
   parse_args(parser)
