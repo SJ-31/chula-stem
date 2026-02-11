@@ -57,6 +57,7 @@ def prepare_data(file, env):
     )
     adata = adata[:, ~adata.var["gene_ids"].isna()]
     annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
+    annotate_marker(adata, marker_genes=env["markers"]["main"], gene_col="hgnc_symbol")
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
     # TODO: should you change the grouping col?
     # review after looking at the data unintegrated
@@ -69,6 +70,18 @@ def prepare_data(file, env):
     if env.get("test", False):
         sc.pp.subsample(adata, fraction=0.1)
         adata = adata[:, :1000]
+    with_normalized_layers(adata, env=env)
+    # PCA with permissive setting for HVGs to speed things up
+    hvgs: pd.DataFrame = sc.pp.highly_variable_genes(
+        adata,
+        inplace=False,
+        layer="lshift_normalized",
+        n_top_genes=5000,
+        batch_key="sample",
+    )
+    sc.pp.pca(
+        adata, n_comps=100, layer="lshift_normalized", mask_var=hvgs["highly_variable"]
+    )
     adata.write_h5ad(file)
     adata = ad.read_h5ad(file, backed=True)
     return adata
