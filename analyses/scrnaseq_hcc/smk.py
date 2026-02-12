@@ -1,10 +1,12 @@
 #!/usr/bin/env ipython
 
 from collections.abc import Callable
+from pathlib import Path
 
 import anndata as ad
 import chula_stem.sc_rnaseq as sc_utils
 import numpy as np
+import pandas as pd
 import scanpy as sc
 from loguru import logger
 
@@ -94,6 +96,22 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
 
 def prepare_data():
     _ = fn.prepare_data(smk.output[0], smk.config)
+
+
+def cellassign():
+    adata = ad.read_h5ad(smk.input[0])
+    _, markers = fn.get_gs_and_cell_markers(smk.config)
+    result = sc_utils.cell_assign_wrapper(
+        adata,
+        cell_markers=markers,
+        model_path=Path(smk.params["model"]),
+        **RCONFIG["kws"],
+    )
+    model = result["model"]
+    result["pred"].to_csv(smk.output["predictions"], index=False)
+    run_metrics = pd.concat([val for val in model.history.values()], axis=1)
+    model.save(smk.params["model"], save_anndata=True, overwrite=True)
+    run_metrics.reset_index().to_csv(smk.output["run_metrics"], index=False)
 
 
 def do_dimensionality_reduction(unintegrated: bool = True):

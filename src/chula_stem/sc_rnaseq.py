@@ -49,25 +49,54 @@ def make_marker_df(data: dict[str, list]) -> pd.DataFrame:
 
 def cell_assign_wrapper(
     adata: ad.AnnData,
-    marker_df: pd.DataFrame,
-    model_path: str,
-    type_key: str = "cell_type",
-    count_layer="counts",
+    cell_markers: pd.DataFrame | dict,
+    model_path: Path = None,
+    layer=None,
     size_factor_key="size_factors",
-) -> pd.DataFrame:
-    filtered = adata[:, adata.var.index.isin(marker_df.index)].copy()
-    try:
-        model = CellAssign.load(model_path)
-    except:
-        CellAssign.setup_anndata(
-            filtered, size_factor_key=size_factor_key, layer=count_layer
+    train_kws: dict | None = None,
+    **kws,
+) -> dict:
+    """Wrapper function for CellAssign from scvi
+
+    Parameters
+    ----------
+    cell_markers : pd.DataFrame | dict
+        Either a binary gene marker df of genes by cell types, or a dictionary mapping
+        cell type names to lists of marker genes
+    kws : kwargs
+        kws passed to CellAssign
+
+    Returns
+    -------
+    Dictionary of results for CellAssign
+    Includes
+
+
+    Notes
+    -----
+
+    """
+    from scvi.external import CellAssign
+
+    if isinstance(cell_markers, dict):
+        cell_markers = (
+            pd.DataFrame({"cell": cell_markers.keys(), "gene": cell_markers.values()})
+            .explode("gene")
+            .assign(value=1)
+            .pivot_table(index="gene", columns="cell", values="value", fill_value=0)
+            .astype(int)
         )
-        model = CellAssign(filtered, marker_df)
-    model.train()
-    model.save(model_path, save_anndata=True, overwrite=True)
+    filtered = adata[:, adata.var.index.isin(cell_markers.index)].copy()
+    if model_path and model_path.exists():
+        model = CellAssign.load(model_path)
+    else:
+        CellAssign.setup_anndata(filtered, size_factor_key=size_factor_key, layer=layer)
+        model = CellAssign(filtered, cell_markers, **kws)
+        model.train(**(train_kws or {}))
     predictions = model.predict()
-    adata.obs[type_key] = predictions.idxmax(axis=1).values
-    return predictions
+    predictions.loc[:, "PREDICTION"] = predictions.idxmax(axis=1)
+    results = {"pred": predictions, "model": model}
+    return results
 
 
 def scib_normalize(

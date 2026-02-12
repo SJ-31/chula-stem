@@ -5,6 +5,7 @@ combined_file = config["files"]["combined"]
 passed_qc = config["files"]["passed_qc"]
 integrated = config["files"]["integrated"]
 logdir = config["logdir"]
+outdir = config["outdir"]
 
 gpu_res = {
     "mem": "30G",
@@ -26,10 +27,22 @@ for o, p in dr_cfg["outdirs"].items():
         )
 
 cfs_results = {
-    "similarity": f"{config["outdir"]}/cfs/similarity.csv",
-    "communities": f"{config["outdir"]}/cfs/communities.csv",
-    "independent_clustering": f"{config["outdir"]}/cfs/ind_clustering.csv",
+    "similarity": f"{outdir}/cfs/similarity.csv",
+    "communities": f"{outdir}/cfs/communities.csv",
+    "independent_clustering": f"{outdir}/cfs/ind_clustering.csv",
 }
+
+
+if config["chosen_cluster_key"]:
+    anno_res = {
+        "cell_assign": {
+            "predictions": f"{outdir}/cellassign_predictions.csv",
+            "run_metrics": f"{outdir}/cellassign_metrics.csv",
+        },
+        "anno_dotplot": [],
+    }
+else:
+    anno_res = {}
 
 
 rule all:
@@ -119,5 +132,19 @@ rule integrate_and_cluster:
         **gpu_res,
     output:
         integrated,
+    script:
+        "smk.py"
+
+
+# * Cell type annotation
+
+
+rule cellassign:
+    input:
+        integrated,  # TODO: what layer to give it?
+    params:
+        model=f"{outdir}/cellassign",
+    output:
+        anno_res.get("cellassign"),
     script:
         "smk.py"
