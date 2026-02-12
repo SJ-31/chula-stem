@@ -12,9 +12,12 @@ import pandas as pd
 import plotnine as gg
 import polars as pl
 import scanpy as sc
+import yaml
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
+
+# * Data prep/retrieval
 
 
 def prepare_data(file, env):
@@ -88,12 +91,50 @@ def prepare_data(file, env):
     return adata
 
 
+def add_cfs_community(
+    adata: ad.AnnData,
+    old_clusters: Path | str,
+    cfs_community_file: Path | str,
+    column: str = "cfs_community",
+):
+    """
+    Reassign clusters using the results of a previous call of ClusterFoldSimilarity
+    """
+    if isinstance(old_clusters, Path):
+        cells2old_clusters = pd.read_csv(
+            old_clusters, names=["cell_id", "tmp_cluster"]
+        ).set_index("cell_id")
+        old = cells2old_clusters[adata.obs_names]
+    else:
+        old = adata.obs[old_clusters]
+    communities = pd.read_csv(cfs_community_file)
+    lookup = {(s, g): c for s, g, c in communities.iterrows()}
+    adata.obs = adata.obs.merge(old, left_index=True, right_index=True)
+    reassigned = adata.obs["sample"].combine(
+        adata.obs["tmp_cluster"], lambda x, y: lookup[(x, y)]
+    )
+    adata.obs.loc[:, column] = reassigned
+
+
+def get_gs_and_cell_markers(env: dict) -> tuple[dict, dict]:
+    cell_markers = env["markers"] or {}
+    gene_sets = env["gene_sets"] or {}
+    for update_to, file_list in zip(
+        (cell_markers, gene_sets), ("marker_files", "gene_set_files")
+    ):
+        for file in env[file_list]:
+            with open(file, "r") as f:
+                update_to.update(yaml.safe_load(f))
+    return gene_sets, cell_markers
+
+
 def with_normalized_layers(adata: ad.AnnData, env: dict) -> None:
     "Add additional normalization layers to `adata`, retaining the raw data in X"
     cfg = env["normalization"]
     # BUG: this wasn't working
     lshift = sc.pp.normalize_total(adata, inplace=False, **cfg["normalize_total"])
     adata.layers["lshift_normalized"] = lshift["X"]
+    adata.layers["lshift_size_factors"] = lshift["norm_factor"]
     sc.pp.log1p(adata, layer="lshift_normalized")
     # pn = pooled_normalization(adata, inplace=False, **cfg["pooled_normalization"])
     # adata.layers["scran_normalized"] = pn
@@ -109,6 +150,20 @@ def data_import(env: dict) -> ad.AnnData:
     )
     print(f"Samples present: {set(adata.obs["sample"])}")
     return adata
+
+
+# * Plotting
+
+
+def save_dotplots(
+    adata: ad.AnnData, markers, grouping_keys, outdir: Path, env: dict
+) -> None:
+    sc.pl.DotPlot.DEFAULT_COLORMAP = "Blues"
+    for key in grouping_keys:
+        plot = sc.pl.DotPlot(
+            adata, var_names=markers, groupby=key, **env["dotplot_kws"]
+        )
+        plot.fig.savefig(outdir / f"{key}.pdf")
 
 
 def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha=0.5):
@@ -274,6 +329,9 @@ def make_dr_slider(
     return slider, display_call
 
 
+# * QC
+
+
 def mads_filter_outliers(
     adata: ad.AnnData,
     filters: dict[str, tuple[float | None, float | None]],
@@ -317,28 +375,3 @@ def mads_filter_outliers(
     filtered = adata[~is_outlier, :]
     failed = adata[is_outlier]
     return filtered, failed
-
-
-def add_cfs_community(
-    adata: ad.AnnData,
-    old_clusters: Path | str,
-    cfs_community_file: Path | str,
-    column: str = "cfs_community",
-):
-    """
-    Reassign clusters using the results of a previous call of ClusterFoldSimilarity
-    """
-    if isinstance(old_clusters, Path):
-        cells2old_clusters = pd.read_csv(
-            old_clusters, names=["cell_id", "tmp_cluster"]
-        ).set_index("cell_id")
-        old = cells2old_clusters[adata.obs_names]
-    else:
-        old = adata.obs[old_clusters]
-    communities = pd.read_csv(cfs_community_file)
-    lookup = {(s, g): c for s, g, c in communities.iterrows()}
-    adata.obs = adata.obs.merge(old, left_index=True, right_index=True)
-    reassigned = adata.obs["sample"].combine(
-        adata.obs["tmp_cluster"], lambda x, y: lookup[(x, y)]
-    )
-    adata.obs.loc[:, column] = reassigned
