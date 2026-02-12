@@ -21,7 +21,9 @@ for o, p in dr_cfg["outdirs"].items():
     dr_results[o] = {}
     for method, values in dr_cfg["methods"].items():
         v = values["vary"][1]
-        dr_results[o][f"dr_{method}"] = expand(f"{p}/{method}/{method}_{{v}}.npy", v=v)
+        dr_results[o][f"dr_{o}_{method}"] = expand(
+            f"{p}/{method}/{method}_{{v}}.npy", v=v
+        )
 
 cfs_results = {
     "similarity": f"{config["outdir"]}/cfs/similarity.csv",
