@@ -37,6 +37,7 @@ def prepare_data(file, env):
         current.var_names_make_unique()
         current.obs.loc[:, "sample"] = f"{patient}_{suffix}"
         current.obs.loc[:, "patient"] = patient
+        current.obs.loc[:, "flowcell"] = row["flowcell"]
         current.obs.loc[:, "type"] = stype
         current.obs.loc[:, "treatment"] = row["treatment"]
         tmp.append(current)

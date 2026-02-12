@@ -42,16 +42,16 @@ def call_dr(
 # * Rules
 
 
-def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict | None = None):
+def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
     """
     1. Identify and subset to HVGs, accounting for batch
     2. Integrate data across batches
     3. Generate cell clusters with Leiden and assess
     """
     adata = adata or ad.read_h5ad(smk.input[0])
-    cfg = cfg or smk.config.get(smk.rule)
+    cfg = cfg or smk.config.get(smk.rule, {})
 
-    batch_key: str = cfg["batch_key"]
+    batch_key: str = cfg.get("batch_key") or smk.config["batch_key"]
     sc.pp.highly_variable_genes(
         adata, inplace=True, layer="lshift_normalized", batch_key=batch_key, subset=True
     )
@@ -75,18 +75,21 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict | None = No
     else:
         raise NotImplementedError()
     sc.external.pp.bbknn(adata, batch_key=batch_key)
-    if cfg["clustering"]["method"] == "leiden":
+    clst_cfg: dict = cfg["clustering"]
+    if clst_cfg["method"] == "leiden":
         sc.pp.neighbors(adata, use_rep=key)
         sc_utils.sweep_clustering(
             adata,
-            lambda adata, res, key: sc.tl.leiden(
-                adata, resolution=res, key_added=key, **cfg["clustering"]["kws"]
+            lambda x, res, key: sc.tl.leiden(
+                x, resolution=res, key_added=key, **clst_cfg["kws"]
             ),
+            values=clst_cfg["sweep"],
             prefix="leiden_res",
+            distances=adata.obsp["distances"],
         )
-        sc.tl.leiden(adata, **cfg["clustering"]["kws"])
     else:
         raise NotImplementedError()
+    adata.write_h5ad(smk.output[0])
 
 
 def prepare_data():

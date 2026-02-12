@@ -99,7 +99,7 @@ for name, path in dr_cfg["outdirs"].items():
 
 
 # TODO: just need to test it
-rule cluster_fold_similarity:
+rule do_cfs:
     input:
         passed_qc,
     log:

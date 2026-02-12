@@ -5,6 +5,10 @@ library(SingleCellExperiment)
 use_condaenv("stem-base")
 ad <- import("anndata")
 
+if ("rlang" %in% utils::installed.packages()[, 1]) {
+  options(error = rlang::entrace, rlang_backtrace_on_error = "full")
+}
+
 
 ## * Cluster-fold similarity
 
@@ -18,7 +22,7 @@ write_cfs_results <- function(sce_list, sim_table, communities) {
 
   sim_tb <- as_tibble(sim_table) |>
     mutate(
-      comparison = apply(res, 1, \(row) {
+      comparison = apply(sim_table, 1, \(row) {
         paste0(
           sort(c(
             paste0(row["datasetL"], row["clusterL"]),
@@ -36,26 +40,26 @@ write_cfs_results <- function(sce_list, sim_table, communities) {
   write_csv(communities, snakemake@output$communities)
 }
 
-cfs_setup <- function(adata, subset_hvgs = FALSE) {
+cfs_setup <- function(adata, subset_hvgs = FALSE, ...) {
   sc$pp$normalize_total(adata)
   sc$pp$log1p(adata)
   if (subset_hvgs) {
     sc$pp$highly_variable_genes(adata, subset = TRUE)
   }
-  sc_utils$pca_to_leiden(adata)
+  sc_utils$pca_to_leiden(adata, ...)
   sce <- AnnData2SCE(adata)
   assay(sce, "counts") <- assay(sce, "X")
   colLabels(sce) <- colData(sce)$leiden
   sce
 }
 
-do_cfs <- function(adata, kws, setup_kws) {
+do_cfs <- function(adata = NULL, kws = NULL, setup_kws = NULL) {
   library(ClusterFoldSimilarity)
 
   if (is.null(adata)) {
-    adata <- ad$read_h5ad()
+    adata <- ad$read_h5ad(snakemake@input[[1]])
   }
-  if (is.null(kws)) {
+  if (is.null(kws) && is.null(setup_kws)) {
     kws <- snakemake@config$do_cfs$cfs_kws
     setup_kws <- snakemake@config$do_cfs$setup_kws
   }
