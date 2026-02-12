@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import anndata as ad
@@ -7,6 +7,7 @@ import click
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import sklearn.metrics as sm
 from scipy import sparse
 
 from chula_stem import utils as ut
@@ -190,14 +191,20 @@ def scib_normalize(
 
 
 def pca_to_leiden(
-    adata, pca_pars=None, neighbor_pars=None, umap_pars=None, leiden_pars=None
+    adata,
+    pca_kws=None,
+    neighbor_kws=None,
+    umap_kws=None,
+    leiden_kws=None,
+    do_umap: bool = False,
 ):
     """Wrapper function for doing the standard PCA to leiden clustering in scanpy"""
     if "X_pca" not in adata.obsm:
-        ut.do_call(lambda **x: sc.pp.pca(adata, **x), pca_pars)
-    ut.do_call(lambda **x: sc.pp.neighbors(adata, **x), neighbor_pars)
-    ut.do_call(lambda **x: sc.tl.umap(adata, **x), umap_pars)
-    ut.do_call(lambda **x: sc.tl.leiden(adata, **x), leiden_pars)
+        ut.do_call(lambda **x: sc.pp.pca(adata, **x), pca_kws)
+    ut.do_call(lambda **x: sc.pp.neighbors(adata, **x), neighbor_kws)
+    if do_umap:
+        ut.do_call(lambda **x: sc.tl.umap(adata, **x), umap_kws)
+    ut.do_call(lambda **x: sc.tl.leiden(adata, **x), leiden_kws)
 
 
 def annotate_marker(
@@ -282,3 +289,93 @@ def distance_by_mads(
         return df, result
     adata.uns["mads"] = result
     adata.obsm["mads"] = df
+
+
+# * Clustering utils
+
+
+def neighbor_purity_from_distances(
+    adata: ad.AnnData,
+    cluster_key: str,
+    distance_key: str = "distances",
+    weight: bool = True,
+    n_neighbors: int | None = None,
+) -> np.ndarray:
+    """Compute neighbor purity
+
+    https://rdrr.io/bioc/bluster/man/neighborPurity.html
+    """
+    distances = adata.obsp[distance_key].astype(np.bool)
+    clustering = adata.obs[cluster_key].astype(int)
+
+    neighbor_assignments = distances.multiply(clustering.values).toarray()
+    if n_neighbors is None and "neighbors" in adata.uns:
+        n_neighbors = adata.uns["neighbors"]["params"]["n_neighbors"]
+    else:
+        raise ValueError("n_neighbors must be provided if not a key in adata.uns")
+
+    neigbors_are_same = clustering.values.reshape(-1, 1) == neighbor_assignments
+    n_in_cluster = neigbors_are_same.sum(axis=1)
+    purity = n_in_cluster / n_neighbors
+    if weight:
+        weights = 1 / clustering.value_counts()
+        weight_array = weights[clustering]
+        return purity * weight_array.values
+    return purity
+
+
+def sweep_clustering(
+    adata: ad.AnnData,
+    cluster_fn: Callable[[ad.AnnData, int | float], None],
+    prefix: str,
+    values: Sequence,
+    distances: None | np.ndarray = None,
+) -> None:
+    """
+    Perform a sweep over clustering parameter `param` across `values`,
+    and assess the results with unsupervised clustering metrics
+
+    Parameters
+    ----------
+    cluster_fn : Callable
+        A function that takes two arguments: the anndata object and the parameter value
+        and the name of the key in adata.obs to add the clustering results to
+        e.g. lambda adata, res, key: sc.tl.leiden(adata, resolution = res, key_added = key)
+        It must update the anndata object inplace
+
+    prefix : str
+        Prefix of clustering results key e.g. "leiden_res" for leiden_res1
+
+    distances : np.ndarray | None
+        Key in adata.obsp storing distances between cells e.g. `distances`
+        after a call to sc.pp.neighbors
+
+    TODO: would be nice if this were parallel
+    """
+    if distances is None:
+        sc.pp.neighbors(adata)
+        distances = adata.obsp["distances"]
+    purity_tracker, sil_tracker = {}, {}
+    for val in values:
+        key_added = f"{prefix}{val}"
+        cluster_fn(adata, val, key_added)
+        result = adata.obs[key_added]
+
+        purity = neighbor_purity_from_distances(adata, key_added, "distances", True)
+        sil = sm.silhouette_samples(X=distances, labels=result)
+        metrics = {
+            "silhouette_score": sil.mean(),
+            "mean_neighbor_purity": purity.mean(),
+        }
+        purity_tracker[key_added] = purity
+        sil_tracker[key_added] = sil
+        if key_added in adata.uns:
+            adata.uns[key_added].update(metrics)
+        else:
+            adata.uns[key_added] = metrics
+    adata.obsm[f"{prefix}_silhouette"] = pd.DataFrame(sil_tracker).set_index(
+        adata.obs_names
+    )
+    adata.obsm[f"{prefix}_neighbor_purity"] = pd.DataFrame(purity_tracker).set_index(
+        adata.obs_names
+    )

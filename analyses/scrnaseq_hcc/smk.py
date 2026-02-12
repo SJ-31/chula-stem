@@ -1,8 +1,9 @@
 #!/usr/bin/env ipython
 
-from typing import Callable
+from collections.abc import Callable
 
 import anndata as ad
+import chula_stem.sc_rnaseq as sc_utils
 import numpy as np
 import scanpy as sc
 from loguru import logger
@@ -45,7 +46,7 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict | None = No
     """
     1. Identify and subset to HVGs, accounting for batch
     2. Integrate data across batches
-    3. Generate cell clusters
+    3. Generate cell clusters with Leiden and assess
     """
     adata = adata or ad.read_h5ad(smk.input[0])
     cfg = cfg or smk.config.get(smk.rule)
@@ -76,6 +77,13 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict | None = No
     sc.external.pp.bbknn(adata, batch_key=batch_key)
     if cfg["clustering"]["method"] == "leiden":
         sc.pp.neighbors(adata, use_rep=key)
+        sc_utils.sweep_clustering(
+            adata,
+            lambda adata, res, key: sc.tl.leiden(
+                adata, resolution=res, key_added=key, **cfg["clustering"]["kws"]
+            ),
+            prefix="leiden_res",
+        )
         sc.tl.leiden(adata, **cfg["clustering"]["kws"])
     else:
         raise NotImplementedError()

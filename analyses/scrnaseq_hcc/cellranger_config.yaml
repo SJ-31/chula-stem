@@ -48,7 +48,8 @@ DR:
         backend: null
     pacmap:
       vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
-      backend: null
+      kws:
+        backend: null
   outdirs:
     unintegrated: ?f"{this['outdir']}/DR_unintegrated"
     integrated: ?f"{this['outdir']}/DR_integrated"
