@@ -12,6 +12,7 @@ import pandas as pd
 import plotnine as gg
 import polars as pl
 import scanpy as sc
+import snakemake.io
 import yaml
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
@@ -152,6 +153,42 @@ def data_import(env: dict) -> ad.AnnData:
     return adata
 
 
+# ** Specifying output
+
+
+def provide_output_from_fs(fs_name: str, env: dict) -> dict:
+    """
+    Specify all output paths downstream of feature (highly variable gene) selection
+
+    The keys are always prefixed with FEATURE_SELECTION_METHOD_NAME-
+    """
+    root: Path = Path(env["outdir"]) / fs_name
+    prefix = f"{fs_name}-"
+    outs = {}
+    integration_methods = list(
+        env["integrate_and_cluster"]["integration"]["methods"].keys()
+    )
+    integration_methods.append("unintegrated")
+    # Integration methods
+
+    # DR results
+    # Key format is FEATURE_SELECTION-INTEGRATION_dr_DR_NAME
+    for imethod in integration_methods:
+        outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
+        outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_clustering.h5ad"
+
+        for method, values in env["DR"]["methods"].items():
+            v = values["vary"][1]
+            outs[f"{prefix}{imethod}_dr_{method}"] = snakemake.io.expand(
+                f"{root}/DR_{imethod}/{method}/{method}_{{v}}.npy", v=v
+            )
+    # CFS (hvgs is done independently for each sample here)
+    for file in ("similarity", "communities", "ind_clustering"):
+        outs[f"{prefix}{file}"] = f"{root}/cfs/{file}.csv"
+
+    return outs
+
+
 # * Plotting
 
 
@@ -242,6 +279,7 @@ def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha
 
 
 def add_saved_dr(adata: ad.AnnData, env: dict, dir_key: str = "unintegrated") -> None:
+    # TODO: modify this for your new output structure
     dr_dir: Path = Path(env["DR"]["outdirs"][dir_key])
     methods = env["DR"]["methods"].keys()
     for d in dr_dir.iterdir():

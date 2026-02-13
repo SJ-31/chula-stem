@@ -7,6 +7,8 @@ integrated = config["files"]["integrated"]
 logdir = config["logdir"]
 outdir = config["outdir"]
 
+from functions import provide_output_from_fs
+
 gpu_res = {
     "mem": "30G",
     "qos": "gpu20gh",
@@ -15,22 +17,6 @@ gpu_res = {
 }
 if config["test"]:
     gpu_res = {}
-
-dr_results = {}
-dr_cfg = config["DR"]
-for o, p in dr_cfg["outdirs"].items():
-    dr_results[o] = {}
-    for method, values in dr_cfg["methods"].items():
-        v = values["vary"][1]
-        dr_results[o][f"dr_{o}_{method}"] = expand(
-            f"{p}/{method}/{method}_{{v}}.npy", v=v
-        )
-
-cfs_results = {
-    "similarity": f"{outdir}/cfs/similarity.csv",
-    "communities": f"{outdir}/cfs/communities.csv",
-    "independent_clustering": f"{outdir}/cfs/ind_clustering.csv",
-}
 
 
 if config["chosen_cluster_key"]:
@@ -44,14 +30,15 @@ if config["chosen_cluster_key"]:
 else:
     anno_res = {}
 
+other_outs = {}
+for fs_method in config["feature_selection"].keys():
+    other_outs.update(provide_output_from_fs(fs_method, config))
+
 
 rule all:
     input:
         passed_qc,
-        integrated,
-        **dr_results["unintegrated"],
-        **dr_results["integrated"],
-        **cfs_results,
+        **other_outs,
 
 
 rule prepare_data:
@@ -87,28 +74,25 @@ rule qc_filter:
         failed.write_h5ad(output["failed"])
 
 
-for name, path in dr_cfg["outdirs"].items():
-    if name == "unintegrated":
-        in_adata = passed_qc
-    else:
-        in_adata = integrated
-
-    rule do_dimensionality_reduction:
-        input:
-            in_adata,
-        name:
-            f"do_dimensionality_reduction_{name}"
-        params:
-            method=lambda wc: wc.get("method"),
-            hp_value=lambda wc: wc.get("val"),
-        log:
-            f"{logdir}/DR/{{method}}/{{method}}_{{val}}.log",
-        resources:
-            **gpu_res,
-        output:
-            f"{path}/{{method}}/{{method}}_{{val}}.npy",
-        script:
-            "smk.py"
+rule do_dimensionality_reduction:
+    input:
+        lambda wc: (
+            other_outs[f"{wc.get('fs_name')}-{wc.get('integration')}"]
+            if wc.get("integration") != "unintegrated"
+            else passed_qc
+        ),
+    params:
+        dr_method=lambda wc: wc.get("method"),
+        integration_method=lambda wc: wc.get("integration"),
+        hp_value=lambda wc: wc.get("val"),
+    log:
+        f"{logdir}/{{fs_name}}_DR_{{integration}}/{{method}}/{{method}}_{{val}}.log",
+    resources:
+        **gpu_res,
+    output:
+        f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
+    script:
+        "smk.py"
 
 
 # TODO: just need to test it
@@ -116,9 +100,11 @@ rule do_cfs:
     input:
         passed_qc,
     log:
-        f"{logdir}/cluster_fold_similarity.log",
+        f"{logdir}/cfs/{{fs_name}}.log",
     output:
-        **cfs_results,
+        similarity=f"{outdir}/{{fs_name}}/cfs/similarity.csv",
+        communities=f"{outdir}/{{fs_name}}/cfs/communities.csv",
+        ind_clustering=f"{outdir}/{{fs_name}}/cfs/ind_clustering.csv",
     script:
         "smk.R"
 
@@ -127,24 +113,31 @@ rule integrate_and_cluster:
     input:
         passed_qc,
     log:
-        f"{logdir}/integration_and_cluster.log",
+        f"{logdir}/{{fs_name}}-integration_and_cluster_{{integration}}.log",
+    params:
+        feature_selection=lambda wc: wc.get("fs_name"),
+        integration=lambda wc: wc.get("integration"),
     resources:
         **gpu_res,
     output:
-        integrated,
+        integrated=f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
+        clustering=f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
     script:
         "smk.py"
 
 
 # * Cell type annotation
 
+# NOTE: don't need feature selection for cell assign because it will automatically
+# subset features
+
 
 rule cellassign:
     input:
-        integrated,  # TODO: what layer to give it?
+        passed_qc,
     params:
         model=f"{outdir}/cellassign",
     output:
-        anno_res.get("cellassign"),
+        **anno_res.get("cellassign", {}),
     script:
         "smk.py"
