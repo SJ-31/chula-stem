@@ -94,33 +94,38 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
     3. Generate cell clusters with Leiden and assess
     """
     adata = adata or ad.read_h5ad(smk.input[0])
-    cfg = cfg or smk.config.get(smk.rule, {})
+    cfg = cfg or RCONFIG
 
     batch_key: str = cfg.get("batch_key") or smk.config["batch_key"]
-    sc.pp.highly_variable_genes(
-        adata, inplace=True, layer="lshift_normalized", batch_key=batch_key, subset=True
+    fs_name = smk.params["feature_selection"]
+    adata = select_features(
+        name=fs_name,
+        adata=adata,
+        env=smk.config,
+        layer="lshift_normalized",
+        batch_key=batch_key,
     )
-    # Integration method
-    i_kws = cfg["integration"]["kws"] or {}
-    i_method = cfg["integration"]["method"]
-    key = f"X_{i_method}"
-    if i_method == "scVI":
-        import scvi
 
-        scvi.model.SCVI.setup_anndata(adata, batch_key=batch_key)
-        model = scvi.model.SCVI(adata=adata, **i_kws)
-        model.train()
-        key = "X_scVI"
-        adata.obsm[key] = model.get_latent_representation()
-    elif i_method == "harmony":
-        key = "X_harmony"
-        sc.external.pp.harmony_integrate(
-            adata, key=[batch_key, "patient"], adjusted_basis=key
-        )
-    else:
-        raise NotImplementedError()
+    integration_name = smk.params["integration"]
+    params = smk.config["integration"][integration_name]
+    method = params.get("method", integration_name)
+    kws = params.get("kws") or {}
+    key = integrate_data(adata, method=method, batch_key=batch_key, **kws)
+    integrated = ad.AnnData(obs=adata.obs, obsm={key: adata.obsm[key]})
+    del integrated.obs
+    integrated.write_h5ad(smk.output["integrated"])
+
+    if to_exclude := cfg.get("cluster_exclude"):
+        adata = adata[~adata.obs["sample"].isin(to_exclude), :]
+
+    old_obs_cols = list(adata.obs.columns)
+    old = {}
+    for slot in ("obs", "uns", "varp", "obsm"):
+        old[slot] = list(getattr(adata, slot).keys())
+
     sc.external.pp.bbknn(adata, batch_key=batch_key)
-    clst_cfg: dict = cfg["clustering"]
+    clst_cfg: dict = smk.config["clustering"]
+
     if clst_cfg["method"] == "leiden":
         sc.pp.neighbors(adata, use_rep=key)
         sc_utils.sweep_clustering(
@@ -134,7 +139,14 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
         )
     else:
         raise NotImplementedError()
-    adata.write_h5ad(smk.output[0])
+    for slot, key_list in old.items():
+        dct = getattr(adata, slot)
+        for key in key_list:
+            del dct[key]
+    adata.obs.drop(old_obs_cols, inplace=True, axis="columns")
+    del adata.X
+    del adata.var
+    adata.write_h5ad(smk.output["clustering"])
 
 
 def prepare_data():
