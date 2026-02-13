@@ -36,7 +36,6 @@ files:
   combined: ?f"{this['outdir']}/combined.h5ad"
   passed_qc: ?f"{this['outdir']}/filtered.h5ad"
   failed_qc: ?f"{this['outdir']}/failed_qc.h5ad"
-  integrated: ?f"{this['outdir']}/integrated.h5ad"
   extras: # | character separates sample type
     HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
     HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
@@ -49,11 +48,11 @@ DR:
   n_pcs: 50
   methods:
     umap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
+      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
     t-sne:
-      vary: ?["perplexity", list(range(100, 5000, 500)) if not test else [100, 500]]
+      vary: ?["perplexity", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
     pacmap:
@@ -74,9 +73,9 @@ feature_selection:
 do_cfs:
   cluster_exclude: ?this["exclude_from_clustering"]
   setup_kws:
-    subset_hvgs: true
-    leiden:
-    pca:
+    subset_hvgs: ?not test
+    leiden_kws:
+    pca_kws:
   cfs_kws:
     parallel: true
 
@@ -100,13 +99,38 @@ normalization:
     pooled_normalization:
   cluster_method: "scran"
 
+# * DE analyses
+de_analysis: # Takes the filtered data as input
+  scVI_subtype:
+    method: scVI
+    query: type == 'tumor' & treatment == 'control'
+    # Use query to filter samples beforehand
+    kws:
+      groupby: "patient"
+      mode: "change" # Either "vanilla" or "change". Latter relies on delta
+      batch_correction: true
+      delta: 0.25 # Default delta
+      fdr_target: 0.05 # Default fdr target
+  scVI_tumor_vs_normal:
+    query: treatment == 'control'
+    method: scVI
+    kws:
+      idx1: type == 'tumor'
+      idx2: type == 'normal'
+      mode: "change"
+      batch_correction: true
+
+  # TODO: add
+
 # * Integration
 integration:
-  scVI:
+  scVI: # https://docs.scvi-tools.org/en/stable/faq.html#what-is-the-difference-between-batch-key-and-categorical-covariate-keys
     kws:
       n_layers: 2
       n_latent: 30
       gene_likelihood: nb
+      train_kws:
+        max_epochs: null # Rely on heuristic
   harmony:
     kws:
     # method:
