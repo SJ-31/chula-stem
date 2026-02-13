@@ -69,16 +69,17 @@ def select_features(
     cur_cfg = env["feature_selection"][name] or {}
     method = cur_cfg.get("method", name)
     kws = cur_cfg.get("kws") or {}
+    selection_fn = fn.fs_dispatch(method, adata)
     if method == "seurat":
-        sc.pp.highly_variable_genes(
-            adata,
-            inplace=True,
-            layer=layer,
-            batch_key=batch_key,
-            subset=True,
-            flavor="seurat",
-            **kws,
+        kws.update(
+            {
+                "inplace": True,
+                "layer": layer,
+                "batch_key": batch_key,
+                "subset": True,
+            }
         )
+        selection_fn(**kws)
     else:
         raise NotImplementedError()
     return adata
