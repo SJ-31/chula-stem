@@ -174,7 +174,7 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
     for imethod in integration_methods:
         if imethod != "unintegrated":
             outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
-            outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_clustering.h5ad"
+            outs[f"{prefix}{imethod}_clustering"] = f"{root}/{imethod}_clustering.h5ad"
 
         for method, values in env["DR"]["methods"].items():
             v = values["vary"][1]
