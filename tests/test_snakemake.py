@@ -1,7 +1,5 @@
 #!/usr/bin/env ipython
 
-from importlib import util
-from os import link
 
 import mudata as md
 import numpy as np
@@ -12,6 +10,8 @@ from pyhere import here
 
 
 def load_file_as_module(name, location):
+    from importlib import util
+
     spec = util.spec_from_file_location(name, location)
     module = util.module_from_spec(spec)
     spec.loader.exec_module(module)

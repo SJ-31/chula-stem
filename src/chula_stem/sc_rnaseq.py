@@ -402,9 +402,7 @@ def sweep_clustering(
             adata.uns[key_added].update(metrics)
         else:
             adata.uns[key_added] = metrics
-    adata.obsm[f"{prefix}_silhouette"] = pd.DataFrame(sil_tracker).set_index(
-        adata.obs_names
-    )
-    adata.obsm[f"{prefix}_neighbor_purity"] = pd.DataFrame(purity_tracker).set_index(
-        adata.obs_names
-    )
+    sil_df = pd.DataFrame(sil_tracker).set_index(adata.obs_names)
+    purity_df = pd.DataFrame(purity_tracker).set_index(adata.obs_names)
+    adata.obsm[f"{prefix}_silhouette"] = sil_df
+    adata.obsm[f"{prefix}_neighbor_purity"] = purity_df

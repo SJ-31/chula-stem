@@ -72,6 +72,30 @@ def _(mo):
 
 
 @app.cell
+def _(mo, env):
+    mo.md(r"""
+    Choose feature selection method
+    """)
+    fs_choice = mo.ui.dropdown(
+        ["unintegrated"] + list(env["feature_selection"].keys()),
+        label="Integration",
+    )
+    return
+
+
+@app.cell
+def _(mo, env):
+    mo.md(r""""
+    Choose integration method
+    """)
+    integration_choice = mo.ui.dropdown(
+        ["unintegrated"] + list(env["integration"].keys()),
+        label="Integration",
+    )
+    return
+
+
+@app.cell
 def _(ad, env, fn):
     adata = ad.read_h5ad(env["files"]["passed_qc"])
     fn.add_saved_dr(adata, env)
@@ -150,6 +174,9 @@ def _(mo):
     """)
     return
 
+
+# TODO: wanna visualize training metrics for cellassign
+# TODO: add a call to `save_dotplots` and make a slider to display it
 
 if __name__ == "__main__":
     app.run()
