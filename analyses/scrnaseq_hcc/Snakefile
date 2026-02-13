@@ -2,8 +2,8 @@ configfile: "cellranger_config.yaml"
 
 
 combined_file = config["files"]["combined"]
+permissive_features = config["files"]["permissive_features"]
 passed_qc = config["files"]["passed_qc"]
-integrated = config["files"]["integrated"]
 logdir = config["logdir"]
 outdir = config["outdir"]
 
@@ -44,6 +44,7 @@ rule all:
 rule prepare_data:
     output:
         combined_file,
+        permissive_features,
     script:
         "smk.py"
 

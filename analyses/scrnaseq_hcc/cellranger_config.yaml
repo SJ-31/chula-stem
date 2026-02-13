@@ -34,6 +34,7 @@ exclude_from_clustering: # We're excluding normals and treated samples from clus
 
 files:
   combined: ?f"{this['outdir']}/combined.h5ad"
+  permissive_features: ?f"{this['outdir']}/permissive_features.txt"
   passed_qc: ?f"{this['outdir']}/filtered.h5ad"
   failed_qc: ?f"{this['outdir']}/failed_qc.h5ad"
   extras: # | character separates sample type
@@ -64,6 +65,14 @@ batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so 
 # TODO: this should be a key denoting the batch in which the samples were sent to the sequencing center. Probably set to flowcell for now
 
 # * Feature selection
+permissive_fs:
+  method: seurat
+  kws:
+    layer: "lshift_normalized"
+    inplace: false
+    subset: false
+    n_top_genes: 6000,
+
 feature_selection:
   seurat:
   # method:

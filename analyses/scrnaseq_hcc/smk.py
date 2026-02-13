@@ -150,7 +150,7 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
 
 
 def prepare_data():
-    _ = fn.prepare_data(smk.output[0], smk.config)
+    _ = fn.prepare_data(smk.output[0], smk.output[1], smk.config)
 
 
 def cellassign():

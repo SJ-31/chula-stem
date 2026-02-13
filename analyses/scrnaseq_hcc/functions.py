@@ -3,7 +3,7 @@
 import re
 from functools import reduce
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 import anndata as ad
 import marimo as mo
@@ -21,7 +21,7 @@ from loguru import logger
 # * Data prep/retrieval
 
 
-def prepare_data(file, env):
+def prepare_data(file, feature_file, env):
     droot = Path(env["data_root"])
     tmp = []
     manifest = pl.read_csv(env["manifest"])
@@ -77,19 +77,36 @@ def prepare_data(file, env):
         adata = adata[:, :1000]
     with_normalized_layers(adata, env=env)
     # PCA with permissive setting for HVGs to speed things up
-    hvgs: pd.DataFrame = sc.pp.highly_variable_genes(
-        adata,
-        inplace=False,
-        layer="lshift_normalized",
-        n_top_genes=5000,
-        batch_key="sample",
-    )
-    sc.pp.pca(
-        adata, n_comps=100, layer="lshift_normalized", mask_var=hvgs["highly_variable"]
-    )
+    hvgs = permissive_feature_selection(adata, env)
+    sc.pp.pca(adata, n_comps=100, layer="lshift_normalized", mask_var=hvgs["mask"])
+    with open(feature_file) as f:
+        f.write("\n".join(hvgs["index"]))
     adata.write_h5ad(file)
     adata = ad.read_h5ad(file, backed=True)
     return adata
+
+
+def fs_dispatch(method: str, adata: ad.AnnData) -> Callable:
+    if method == "seurat":
+        return lambda **kws: sc.pp.highly_variable_genes(
+            adata=adata, flavor="seurat", **kws
+        )
+    raise NotImplementedError()
+
+
+def permissive_feature_selection(adata: ad.AnnData, env: dict) -> dict:
+    cfg = env["permissive_fs"]
+    kws = cfg.get("kws") or {}
+    result = {}
+    method = cfg["method"]
+    selection_fn = fs_dispatch(method, adata)
+    features = selection_fn(**kws)
+    if method in {"seurat", "cellranger"}:
+        result["mask"] = features["highly_variable"]
+        result["index"] = features.query("highly_variable").tolist()
+    else:
+        raise NotImplementedError()
+    return result
 
 
 def add_cfs_community(
