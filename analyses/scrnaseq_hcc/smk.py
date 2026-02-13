@@ -18,11 +18,17 @@ except ImportError:
     smk = type("snakemake", (), {"rule": None, "config": {}, "log": [0]})
 
 RNG: int = smk.config["rng"]
+RCONFIG: dict = smk.config.get(smk.rule) or {}
 
 if len(smk.log) == 1:
     logger.add(smk.log[0])
 
-# * Functions
+
+# * Utility functions
+
+
+def get_integration_key(integration_method: str) -> str:
+    return f"X_{integration_method}"
 
 
 def call_dr(

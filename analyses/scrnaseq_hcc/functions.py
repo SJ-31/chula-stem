@@ -165,17 +165,16 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
     root: Path = Path(env["outdir"]) / fs_name
     prefix = f"{fs_name}-"
     outs = {}
-    integration_methods = list(
-        env["integrate_and_cluster"]["integration"]["methods"].keys()
-    )
+    integration_methods = list(env["integration"].keys())
     integration_methods.append("unintegrated")
     # Integration methods
 
     # DR results
     # Key format is FEATURE_SELECTION-INTEGRATION_dr_DR_NAME
     for imethod in integration_methods:
-        outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
-        outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_clustering.h5ad"
+        if imethod != "unintegrated":
+            outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
+            outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_clustering.h5ad"
 
         for method, values in env["DR"]["methods"].items():
             v = values["vary"][1]
@@ -278,18 +277,19 @@ def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha
     return plots[0] / plots[1] / plots[2], cplot
 
 
-def add_saved_dr(adata: ad.AnnData, env: dict, dir_key: str = "unintegrated") -> None:
-    # TODO: modify this for your new output structure
-    dr_dir: Path = Path(env["DR"]["outdirs"][dir_key])
-    methods = env["DR"]["methods"].keys()
-    for d in dr_dir.iterdir():
-        if not d.is_dir() and d.stem not in methods:
-            continue
-        method: str = d.stem
-        for efile in d.iterdir():
-            embeddings = np.load(efile)
-            hp_val = efile.stem.split("_", 1)[1]
-            adata.obsm[f"X_{method}_{hp_val}"] = embeddings
+def add_saved_dr(
+    adata: ad.AnnData, env: dict, fs_name: str, integration: str = "unintegrated"
+) -> None:
+    outs = provide_output_from_fs(fs_name, env)
+    for method in env["DR"]["methods"].keys():
+        key = f"{fs_name}-{integration}_dr_{method}"
+        directory = Path(outs[key])
+        if directory.exists():
+            for efile in directory.iterdir():
+                if efile.suffix == ".npy":
+                    embeddings = np.load(efile)
+                    hp_val = efile.stem.split("_", 1)[1]
+                    adata.obsm[f"X_{method}_{hp_val}"] = embeddings
 
 
 def plot_dr(

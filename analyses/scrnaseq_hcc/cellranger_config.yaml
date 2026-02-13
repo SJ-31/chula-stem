@@ -60,9 +60,6 @@ DR:
       vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
       kws:
         backend: null
-  outdirs:
-    unintegrated: "DR_unintegrated"
-    integrated: "DR_integrated"
 
 batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so that the hgv routine genes for hcc subtypes
 # TODO: this should be a key denoting the batch in which the samples were sent to the sequencing center. Probably set to flowcell for now
@@ -70,7 +67,7 @@ batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so 
 # * Feature selection
 feature_selection:
   seurat:
-    # method:
+  # method:
   # cellranger:
 
 # * Cluster fold similarity
@@ -104,23 +101,25 @@ normalization:
   cluster_method: "scran"
 
 # * Integration
+integration:
+  scVI:
+    kws:
+      n_layers: 2
+      n_latent: 30
+      gene_likelihood: nb
+  harmony:
+    kws:
+    # method:
+
 integrate_and_cluster:
   cluster_exclude: ?this["exclude_from_clustering"]
-  integration:
-    methods:
-      scVI:
-        kws:
-          n_layers: 2
-          n_latent: 30
-          gene_likelihood: nb
-      harmony:
-        kws:
-        method:
-  clustering:
-    method: leiden
-    sweep: [1, 3, 5]
-    kws:
-      random_state: ?this["rng"]
+
+  # * Clustering
+clustering:
+  method: leiden
+  sweep: [1, 3, 5]
+  kws:
+    random_state: ?this["rng"]
 
 # * Marker gene resources
 
