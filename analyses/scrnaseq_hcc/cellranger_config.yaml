@@ -57,7 +57,7 @@ DR:
       kws:
         backend: null
     pacmap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [100, 500]]
+      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
 
@@ -71,7 +71,7 @@ permissive_fs:
     layer: "lshift_normalized"
     inplace: false
     subset: false
-    n_top_genes: 6000,
+    n_top_genes: 6000
 
 feature_selection:
   seurat:
@@ -105,7 +105,7 @@ normalization:
     # within_batch: true
     target_sum: null
     exclude_highly_expressed: false
-    pooled_normalization:
+  pooled_normalization:
   cluster_method: "scran"
 
 # * DE analyses
@@ -114,7 +114,9 @@ de_analysis: # Takes the filtered data as input
     method: scVI
     query: type == 'tumor' & treatment == 'control'
     # Use query to filter samples beforehand
+    setup_name: scVI
     kws:
+      setup_name: "" # name of a key in integration with scVI parameters
       groupby: "patient"
       mode: "change" # Either "vanilla" or "change". Latter relies on delta
       batch_correction: true
@@ -129,7 +131,7 @@ de_analysis: # Takes the filtered data as input
       mode: "change"
       batch_correction: true
 
-  # TODO: add
+  # TODO: add edgeR
 
 # * Integration
 integration:
@@ -139,8 +141,9 @@ integration:
       n_latent: 30
       gene_likelihood: nb
       train_kws:
-        max_epochs: null # Rely on heuristic
+        max_epochs: ?None if not test else 40 # Rely on heuristic
   harmony:
+    layer: "lshift_normalized"
     kws:
     # method:
 
