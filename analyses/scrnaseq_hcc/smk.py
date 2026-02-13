@@ -47,17 +47,27 @@ def call_dr(
     return dr_obj.fit_transform(x)
 
 
-def integrate_data(adata: ad.AnnData, batch_key, method: str, **kws) -> str:
+def integrate_data(adata: ad.AnnData, batch_key, name: str, extras: dict, env) -> str:
+    params = env["integration"][name]
+    method = params.get("method", name)
     key = get_integration_key(method)
+    kws = params.get("kws") or {}
     if method == "scVI":
         import scvi
 
         scvi.model.SCVI.setup_anndata(adata, batch_key=batch_key)
+        train_kws = kws.pop("train_kws", {})
         model = scvi.model.SCVI(adata=adata, **kws)
-        model.train()
+        model.train(**train_kws)
         adata.obsm[key] = model.get_latent_representation()
+        extras["model"] = model
     elif method == "harmony":
-        sc.external.pp.harmony_integrate(adata, key=batch_key, adjusted_basis=key)
+        import harmonypy as hm
+
+        # Re-run PCA with a different feature set
+        sc.pp.pca(adata, layer=params.get("layer"))
+        harmony_out = hm.run_harmony(adata.obsm["X_pca"], adata.obs, vars_use=batch_key)
+        adata.obsm[key] = harmony_out.Z_corr
     else:
         raise NotImplementedError()
     return key
@@ -108,18 +118,22 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
     )
 
     integration_name = smk.params["integration"]
-    params = smk.config["integration"][integration_name]
-    method = params.get("method", integration_name)
-    kws = params.get("kws") or {}
-    key = integrate_data(adata, method=method, batch_key=batch_key, **kws)
-    integrated = ad.AnnData(obs=adata.obs, obsm={key: adata.obsm[key]})
+    extras = {}
+    key = integrate_data(
+        adata, batch_key, name=integration_name, extras=extras, env=smk.config
+    )
+    if "model" in extras:
+        extras["model"].save(
+            **fn.get_scvi_model_path(fs_name, integration_name, smk.config)
+        )
+    integrated = ad.AnnData(obs=adata.obs, obsm={key: adata.obsm[key]}, var=adata.var)
     del integrated.obs
+    del integrated.var
     integrated.write_h5ad(smk.output["integrated"])
 
     if to_exclude := cfg.get("cluster_exclude"):
         adata = adata[~adata.obs["sample"].isin(to_exclude), :]
 
-    old_obs_cols = list(adata.obs.columns)
     old = {}
     for slot in ("obs", "uns", "varp", "obsm"):
         old[slot] = list(getattr(adata, slot).keys())
@@ -144,7 +158,7 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
         dct = getattr(adata, slot)
         for key in key_list:
             del dct[key]
-    adata.obs.drop(old_obs_cols, inplace=True, axis="columns")
+
     del adata.X
     del adata.var
     adata.write_h5ad(smk.output["clustering"])
@@ -170,17 +184,17 @@ def cellassign():
     run_metrics.reset_index().to_csv(smk.output["run_metrics"], index=False)
 
 
-def do_dimensionality_reduction(unintegrated: bool = True):
-    # TODO: add a modification for X to get the integrated key e.g. "X_scVI"
+def do_dimensionality_reduction():
     cfg = smk.config["DR"]
     adata = ad.read_h5ad(smk.input[0])
-    method = smk.params["method"]
+    method = smk.params["dr_method"]
+    imethod = smk.params["integration_method"]
     kws: dict = cfg["methods"][method].get("kws", {}) or {}
-    if unintegrated:
+    if imethod == "unintegrated":
         x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
         kws["init"] = "normal"
     else:
-        x = adata.obsm[smk.config["integration_key"]]
+        x = adata.obsm[get_integration_key(imethod)]
     hp_value: int | float = smk.params["hp_value"]
     hp_to_vary = cfg["methods"][method]["vary"][0]
     kws[hp_to_vary] = int(hp_value)
