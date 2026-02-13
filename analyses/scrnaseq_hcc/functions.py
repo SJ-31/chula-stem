@@ -78,8 +78,13 @@ def prepare_data(file, feature_file, env):
     with_normalized_layers(adata, env=env)
     # PCA with permissive setting for HVGs to speed things up
     hvgs = permissive_feature_selection(adata, env)
-    sc.pp.pca(adata, n_comps=100, layer="lshift_normalized", mask_var=hvgs["mask"])
-    with open(feature_file) as f:
+    sc.pp.pca(
+        adata,
+        n_comps=100,
+        layer="lshift_normalized",
+        mask_var=hvgs["mask"],
+    )
+    with open(feature_file, "w") as f:
         f.write("\n".join(hvgs["index"]))
     adata.write_h5ad(file)
     adata = ad.read_h5ad(file, backed=True)
@@ -102,8 +107,8 @@ def permissive_feature_selection(adata: ad.AnnData, env: dict) -> dict:
     selection_fn = fs_dispatch(method, adata)
     features = selection_fn(**kws)
     if method in {"seurat", "cellranger"}:
-        result["mask"] = features["highly_variable"]
-        result["index"] = features.query("highly_variable").tolist()
+        result["mask"] = features["highly_variable"].values
+        result["index"] = features.query("highly_variable").index.tolist()
     else:
         raise NotImplementedError()
     return result
@@ -152,7 +157,7 @@ def with_normalized_layers(adata: ad.AnnData, env: dict) -> None:
     # BUG: this wasn't working
     lshift = sc.pp.normalize_total(adata, inplace=False, **cfg["normalize_total"])
     adata.layers["lshift_normalized"] = lshift["X"]
-    adata.layers["lshift_size_factors"] = lshift["norm_factor"]
+    adata.obs["lshift_size_factors"] = lshift["norm_factor"]
     sc.pp.log1p(adata, layer="lshift_normalized")
     # pn = pooled_normalization(adata, inplace=False, **cfg["pooled_normalization"])
     # adata.layers["scran_normalized"] = pn

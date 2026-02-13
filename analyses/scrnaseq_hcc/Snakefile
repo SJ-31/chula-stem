@@ -38,6 +38,7 @@ for fs_method in config["feature_selection"].keys():
 rule all:
     input:
         passed_qc,
+        permissive_features,
         **other_outs,
 
 
