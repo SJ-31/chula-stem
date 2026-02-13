@@ -1,14 +1,24 @@
-library(reticulate)
-library(tidyverse)
-library(zellkonverter)
-library(SingleCellExperiment)
-use_condaenv("stem-base")
-ad <- import("anndata")
+suppressMessages({
+  library(reticulate)
+  library(tidyverse)
+  library(zellkonverter)
+  library(SingleCellExperiment)
+  if (exists("snakemake")) {
+    use_condaenv(snakemake@config$conda)
+  } else {
+    use_condaenv("stem-base")
+  }
+  ad <- import("anndata")
+  sc <- import("scanpy")
+  sc_utils <- import("chula_stem.sc_rnaseq")
+})
+
 
 if ("rlang" %in% utils::installed.packages()[, 1]) {
   options(error = rlang::entrace, rlang_backtrace_on_error = "full")
 }
 
+## * DE analysis
 
 ## * Cluster-fold similarity
 
@@ -18,7 +28,7 @@ write_cfs_results <- function(sce_list, sim_table, communities) {
     \(x) tibble(cell_id = colnames(x), cluster = colLabels(x))
   ) |>
     bind_rows()
-  write_csv(old_clusters, snakemake@output$independent_clustering)
+  write_csv(old_clusters, snakemake@output$ind_clustering)
 
   sim_tb <- as_tibble(sim_table) |>
     mutate(
@@ -63,6 +73,7 @@ do_cfs <- function(adata = NULL, kws = NULL, setup_kws = NULL) {
     kws <- snakemake@config$do_cfs$cfs_kws
     setup_kws <- snakemake@config$do_cfs$setup_kws
   }
+  adata <- adata[!adata$obs$sample %in% kws$cluster_exclude, ]
   samples <- unique(adata$obs$sample)
   sces <- lapply(
     samples,
