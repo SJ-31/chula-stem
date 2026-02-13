@@ -47,6 +47,43 @@ def call_dr(
     return dr_obj.fit_transform(x)
 
 
+def integrate_data(adata: ad.AnnData, batch_key, method: str, **kws) -> str:
+    key = get_integration_key(method)
+    if method == "scVI":
+        import scvi
+
+        scvi.model.SCVI.setup_anndata(adata, batch_key=batch_key)
+        model = scvi.model.SCVI(adata=adata, **kws)
+        model.train()
+        adata.obsm[key] = model.get_latent_representation()
+    elif method == "harmony":
+        sc.external.pp.harmony_integrate(adata, key=batch_key, adjusted_basis=key)
+    else:
+        raise NotImplementedError()
+    return key
+
+
+def select_features(
+    name: str, adata: ad.AnnData, batch_key: str, layer: str, env: dict
+):
+    cur_cfg = env["feature_selection"][name] or {}
+    method = cur_cfg.get("method", name)
+    kws = cur_cfg.get("kws") or {}
+    if method == "seurat":
+        sc.pp.highly_variable_genes(
+            adata,
+            inplace=True,
+            layer=layer,
+            batch_key=batch_key,
+            subset=True,
+            flavor="seurat",
+            **kws,
+        )
+    else:
+        raise NotImplementedError()
+    return adata
+
+
 # * Rules
 
 
