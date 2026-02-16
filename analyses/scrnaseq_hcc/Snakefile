@@ -10,7 +10,7 @@ outdir = config["outdir"]
 from functions import provide_output_from_fs
 
 gpu_res = {
-    "mem": "30G",
+    "mem": "50G",
     "qos": "gpu20gh",
     "gres": "gpu:3g.20gb:1",
     "slurm_partition": "gpu",
@@ -23,8 +23,9 @@ annotations = {
         "predictions": f"{outdir}/cellassign_predictions.csv",
         "run_metrics": f"{outdir}/cellassign_metrics.csv",
     }
-else:
-    anno_res = {}
+}
+# if config["chosen_cluster_key"]:
+# "anno_dotplot": [],
 
 other_outs = {}
 for fs_method in config["feature_selection"].keys():
@@ -35,6 +36,7 @@ rule all:
     input:
         passed_qc,
         permissive_features,
+        f"{outdir}/qc",
         **annotations["cellassign"],
         **other_outs,
 
@@ -45,6 +47,25 @@ rule prepare_data:
         permissive_features,
     script:
         "smk.py"
+
+
+rule qc_plots:
+    input:
+        combined_file,
+    output:
+        directory(f"{outdir}/qc"),
+    run:
+        from functions import qc_plot_patient
+        from pathlib import Path
+        import anndata as ad
+
+        outdir = Path(output[0])
+        outdir.mkdir(exist_ok=True)
+
+        combined = ad.read_h5ad(input[0])
+        for patient in combined.obs["patient"].unique():
+            qc_mads, mads_compare = qc_plot_patient(combined, patient)
+            (qc_mads / mads_compare).save(outdir / f"{patient}.pdf")
 
 
 # TODO: should also add doublet detection and removal
@@ -136,6 +157,8 @@ rule cellassign:
         passed_qc,
     params:
         model=f"{outdir}/cellassign",
+    resources:
+        **gpu_res,
     output:
         **annotations["cellassign"],
     script:

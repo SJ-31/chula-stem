@@ -180,9 +180,9 @@ chosen_cluster_key: null
 dotplot_markers:
 
 cellassign:
-  layer: null
-  # Cellassign counts
-  size_factor_key:
-  train_kws:
-    batch_size: 1024
-    max_epochs: 200
+  kws:
+    layer: null # Cellassign uses counts
+    size_factor_key: lshift_size_factors
+    train_kws:
+      batch_size: 1024
+      max_epochs: ?50 if test else 400
