@@ -3,6 +3,7 @@
 import re
 from functools import reduce
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Callable, Literal
 
 import anndata as ad
@@ -11,12 +12,14 @@ import numpy as np
 import pandas as pd
 import plotnine as gg
 import polars as pl
+import pymupdf
 import scanpy as sc
 import snakemake.io
 import yaml
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
+from pymupdf import Document
 
 # * Data prep/retrieval
 
@@ -227,7 +230,6 @@ def make_cluster_dotplots(
     markers: dict | list,
     env: dict,
     additional_groups: list | None = None,
-    transpose: bool = True,
     group_rotation: int = 0,
 ) -> None:
     """Save a dotplot for each clustering sweep for a specified combination of
@@ -243,8 +245,6 @@ def make_cluster_dotplots(
         vars to plot
     additional_groups : list | None
         Additional groupings to show on dotplots e.g. cellassign labels
-    transpose : bool
-        Whether to show groupings on the x axis and vars on the y
     group_rotation : int
         Rotation for group labels when on the x axis
     """
@@ -260,9 +260,11 @@ def make_cluster_dotplots(
         group_cols = additional_groups + group_cols
     cfg: dict = env.get("dotplot") or {}
     kws = cfg.get("kws") or {}
+    totals_kws = cfg.get("totals_kws") or {}
     if isinstance(markers, dict):
         markers.update(cfg.get("markers"))
     doc: Document = pymupdf.open()
+    transpose = kws.get("swap_axes", False)
     with TemporaryDirectory() as tmp:
         for i, col in enumerate(group_cols):
             save_to = f"{tmp}/{i}.pdf"
@@ -271,15 +273,13 @@ def make_cluster_dotplots(
                 "title": f"Groups: {col}",
                 "groupby": col,
                 "var_names": markers,
+                "show": False,
+                "return_fig": True,
                 **kws,
             }
-            if transpose:
-                plot = sc.pl.DotPlot(**call).add_totals().swap_axes()
-            else:
-                plot = sc.pl.DotPlot(**call).add_totals()
+            plot = sc.pl.dotplot(**call).add_totals(**totals_kws)
             plot.make_figure()
             if transpose:
-                plot.make_figure()
                 axes: dict = plot.get_axes()
                 main = axes["mainplot_ax"]
                 for label in main.get_xticklabels():

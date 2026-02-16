@@ -178,6 +178,15 @@ chosen_cluster_key: null
 
 dotplot:
   markers:
+  kws:
+    gene_symbols: hgnc_symbol
+    cmap: "Greens"
+    layer: null
+    # layer: lshift_normalized
+    log: false
+    swap_axes: True
+  totals_kws:
+    color: "green"
 
 cellassign:
   kws:
