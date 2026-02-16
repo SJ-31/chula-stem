@@ -10,7 +10,8 @@ __definitions__:
   - tpredict = f"{home}/Bio_SDD/too-predict" if is_local else f"{home}/too-predict"
   - data_root = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
   - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
-  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
+  # - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
+  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort_sct" if not test else f"{workdir}/test" # NOTE: [2026-02-16 Mon] wanna check if the normals were SCTransformed
 
 test: ?test
 
@@ -19,9 +20,11 @@ args: ?args
 workdir: ?workdir
 outdir: ?outdir
 data_root: ?f"{data_root}/output/HCC/SCRNASEQ"
-logdir: ?f"{proj_root}/analyses/scrnaseq_hcc/logs"
+logdir: ?f"{workdir}/logs" if not test else f"{workdir}/test/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
+
+manifest_file_key: sct # Set to null to take from the cellranger directory
 
 exclude_from_clustering: # We're excluding normals and treated samples from clustering routines since the goal in those is to find tumor subtypes. Cells from these samples will have their cluster values set to NA
   - H19_tumor-iacs
@@ -38,9 +41,9 @@ files:
   passed_qc: ?f"{this['outdir']}/filtered.h5ad"
   failed_qc: ?f"{this['outdir']}/failed_qc.h5ad"
   extras: # | character separates sample type
-    HCC5|normal|control: ?f"{this['outdir']}/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
-    HCCN22|normal|control: ?f"{this['outdir']}/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
-    HCCN1|normal|control: ?f"{this['outdir']}/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
+    HCC5|normal|control: ?f"{data_root}/output/HCC/SCRNASEQ/HCC5/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N5_normal.h5ad"
+    HCCN22|normal|control: ?f"{data_root}/output/HCC/SCRNASEQ/HCCN22/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N22_normal.h5ad"
+    HCCN1|normal|control: ?f"{data_root}/output/HCC/SCRNASEQ/HCCN1/processed/mnt-nas-thanakornj-liverOrganoid-SCTmatrix-HCC_N1_normal.h5ad"
 
 rng: 4972
 
@@ -49,15 +52,18 @@ DR:
   n_pcs: 50
   methods:
     umap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
+      vary: ["n_neighbors", []]
+      # vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
     t-sne:
-      vary: ?["perplexity", list(range(100, 5000, 500)) if not test else []]
+      vary: ["perplexity", []]
+      # vary: ?["perplexity", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
     pacmap:
-      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
+      vary: ["n_neighbors", []]
+      # vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [50, 100]]
       kws:
         backend: null
 

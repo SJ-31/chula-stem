@@ -30,13 +30,18 @@ def prepare_data(file, feature_file, env):
         patient = row["sample_name"]
         stype = row["type"]
         suffix = f"{row['type']}-{row['treatment']}"
-        data_path: Path = (
-            droot / patient / "processed" / f"cellranger_{suffix}/{target}"
-        )
-        if not data_path.exists():
-            logger.warning("The files for sample {} ({}) don't exist", patient, suffix)
-            continue
-        current: ad.AnnData = sc.read_10x_h5(data_path)
+        if not (file_key := env.get("manifest_file_key")):
+            data_path: Path = (
+                droot / patient / "processed" / f"cellranger_{suffix}/{target}"
+            )
+            if not data_path.exists():
+                logger.warning(
+                    "The files for sample {} ({}) don't exist", patient, suffix
+                )
+                continue
+            current: ad.AnnData = sc.read_10x_h5(data_path)
+        else:
+            current = ad.read_h5ad(row[file_key])
         current.obs_names_make_unique()
         current.var_names_make_unique()
         current.obs.loc[:, "sample"] = f"{patient}_{suffix}"
