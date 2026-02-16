@@ -14,7 +14,6 @@ def _():
     import plotnine as gg
     import scanpy as sc
     from yte import process_yaml
-
     return Path, ad, mo, process_yaml, sys
 
 
@@ -39,14 +38,14 @@ def _(Path, is_test, process_yaml, sys):
         env = process_yaml(f)
         print(env)
 
+    outdir = Path(env["outdir"])
     plot_out = Path(env["outdir"]) / "plots"
-    return env, plot_out
+    return env, outdir, plot_out
 
 
 @app.cell
 def _():
     import functions as fn
-
     return (fn,)
 
 
@@ -72,7 +71,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo, env):
+def _(env, mo):
     mo.md(r"""
     Choose feature selection method
     """)
@@ -84,7 +83,7 @@ def _(mo, env):
 
 
 @app.cell
-def _(mo, env):
+def _(env, mo):
     mo.md(r""""
     Choose integration method
     """)
@@ -96,9 +95,8 @@ def _(mo, env):
 
 
 @app.cell
-def _(ad, env, fn):
-    adata = ad.read_h5ad(env["files"]["passed_qc"])
-    fn.add_saved_dr(adata, env)
+def _(ad, env):
+    adata = ad.read_h5ad(env["files"]["passed_qc"], backed=True)
     return (adata,)
 
 
@@ -167,7 +165,7 @@ def _(display_umap, umap_slider):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Marker genes
@@ -175,8 +173,31 @@ def _(mo):
     return
 
 
-# TODO: wanna visualize training metrics for cellassign
-# TODO: add a call to `save_dotplots` and make a slider to display it
+@app.cell
+def _(mo):
+    redo_dotplots = mo.ui.dropdown(["yes", "no"], label="Redo dot plots?")
+    redo_dotplots
+    return (redo_dotplots,)
+
+
+@app.cell
+def _(adata, env, fn, outdir, redo_dotplots):
+    if redo_dotplots.value == "yes":
+        for fs_method in env["feature_selection"].keys():
+            for integration in env["integration"].keys():
+                cluster_file = outdir / fs_method / f"{integration}_clustering.h5ad"
+                if cluster_file.exists():
+                    fn.make_cluster_dotplots(
+                        adata.to_memory(),
+                        filename=outdir
+                        / fs_method
+                        / f"{integration}_clustering.pdf",
+                        cluster_results=cluster_file,
+                        markers={},
+                        env=env,
+                    )
+    return
+
 
 if __name__ == "__main__":
     app.run()
