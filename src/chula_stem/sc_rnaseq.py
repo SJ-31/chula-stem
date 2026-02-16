@@ -95,6 +95,7 @@ def cell_assign_wrapper(
         model.train(**(train_kws or {}))
     predictions = model.predict()
     predictions.loc[:, "PREDICTION"] = predictions.idxmax(axis=1)
+    predictions.index = adata.obs.index
     results = {"pred": predictions, "model": model}
     return results
 
@@ -255,7 +256,7 @@ def annotate_adata_vars(
 ) -> None:
     if not adata.var[gene_id_col].is_unique:
         raise ValueError(f"Can't pass a gene_id column '{gene_id_col}' with duplicates")
-    if savepath.exists():
+    if savepath and savepath.exists():
         metadata: pd.DataFrame = pd.read_csv(savepath)
     else:
         metadata = ut.get_ensembl_gene_data()

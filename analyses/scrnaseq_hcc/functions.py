@@ -61,6 +61,7 @@ def prepare_data(file, feature_file, env):
             current.obs.loc[:, "sample"] = f"{patient}_{stype}-{treatment}"
             current.obs.loc[:, "type"] = stype
             current.obs.loc[:, "treatment"] = treatment
+            current.obs.loc[:, "flowcell"] = "unknown"
             tmp.append(current)
     adata = ad.concat(
         tmp, merge="first", index_unique="-", join="outer", uns_merge="same"
@@ -218,15 +219,74 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
 # * Plotting
 
 
-def save_dotplots(
-    adata: ad.AnnData, markers, grouping_keys, outdir: Path, env: dict
+def make_cluster_dotplots(
+    adata: ad.AnnData,
+    filename: str | Path,
+    fs_name: str,
+    integration: str,
+    markers: dict | list,
+    env: dict,
+    additional_groups: list | None = None,
+    transpose: bool = True,
+    group_rotation: int = 0,
 ) -> None:
-    sc.pl.DotPlot.DEFAULT_COLORMAP = "Blues"
-    for key in grouping_keys:
-        plot = sc.pl.DotPlot(
-            adata, var_names=markers, groupby=key, **env["dotplot_kws"]
-        )
-        plot.fig.savefig(outdir / f"{key}.pdf")
+    """Save a dotplot for each clustering sweep for a specified combination of
+    (feature selection method, integration_method) to a single file
+
+    Parameters
+    ----------
+    fs_name : str
+        feature selection method
+    integration : str
+        integration method
+    markers : dict | list
+        vars to plot
+    additional_groups : list | None
+        Additional groupings to show on dotplots e.g. cellassign labels
+    transpose : bool
+        Whether to show groupings on the x axis and vars on the y
+    group_rotation : int
+        Rotation for group labels when on the x axis
+    """
+    clustering_results: Path = (
+        Path(env["outdir"]) / fs_name / f"{integration}_clustering.h5ad"
+    )
+    loaded: ad.AnnData = ad.read_h5ad(clustering_results, backed=True)
+    adata.obs = adata.obs.merge(
+        loaded.obs, left_index=True, right_index=True, how="left"
+    )
+    group_cols = loaded.obs.columns
+    if additional_groups is not None:  # Can put cellassign in here
+        group_cols = additional_groups + group_cols
+    cfg: dict = env.get("dotplot") or {}
+    kws = cfg.get("kws") or {}
+    if isinstance(markers, dict):
+        markers.update(cfg.get("markers"))
+    doc: Document = pymupdf.open()
+    with TemporaryDirectory() as tmp:
+        for i, col in enumerate(group_cols):
+            save_to = f"{tmp}/{i}.pdf"
+            call = {
+                "adata": adata[adata.obs[col].notnull(), :],
+                "title": f"Groups: {col}",
+                "groupby": col,
+                "var_names": markers,
+                **kws,
+            }
+            if transpose:
+                plot = sc.pl.DotPlot(**call).add_totals().swap_axes()
+            else:
+                plot = sc.pl.DotPlot(**call).add_totals()
+            plot.make_figure()
+            if transpose:
+                plot.make_figure()
+                axes: dict = plot.get_axes()
+                main = axes["mainplot_ax"]
+                for label in main.get_xticklabels():
+                    label.set_rotation(group_rotation)
+            plot.fig.savefig(save_to, bbox_inches="tight")
+            doc.insert_file(save_to)
+    doc.save(filename)
 
 
 def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha=0.5):
