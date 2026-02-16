@@ -1,7 +1,18 @@
+__use_yte__: true
+__definitions__:
+  - from pathlib import Path
+  - import sys
+  - args = sys.argv
+  - home = str(Path.home())
+  - is_local = home.startswith("/home/shannc")
+  - test = "test=True" in args
+  - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
+  - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
 cores: 1
 jobs: 10
 executor: slurm
-slurm-logdir: "/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/slurm_logs"
+slurm-logdir: ?f"{workdir}/slurm_logs" if not test else f"{workdir}/test/slurm_logs"
+# slurm-logdir: ?"/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/slurm_logs"
 default-resources:
   mem: 40G
   qos: cpu24h
