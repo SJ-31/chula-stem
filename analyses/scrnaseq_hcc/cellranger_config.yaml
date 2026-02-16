@@ -10,11 +10,11 @@ __definitions__:
   - tpredict = f"{home}/Bio_SDD/too-predict" if is_local else f"{home}/too-predict"
   - data_root = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
   - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
-  # - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
-  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort_sct" if not test else f"{workdir}/test" # NOTE: [2026-02-16 Mon] wanna check if the normals were SCTransformed
+  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
 
 test: ?test
 
+manifest_file_key: null # Set to null to take from the cellranger directory
 conda: stem-base
 args: ?args
 workdir: ?workdir
@@ -23,8 +23,6 @@ data_root: ?f"{data_root}/output/HCC/SCRNASEQ"
 logdir: ?f"{workdir}/logs" if not test else f"{workdir}/test/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
-
-manifest_file_key: sct # Set to null to take from the cellranger directory
 
 exclude_from_clustering: # We're excluding normals and treated samples from clustering routines since the goal in those is to find tumor subtypes. Cells from these samples will have their cluster values set to NA
   - H19_tumor-iacs
@@ -67,7 +65,7 @@ DR:
       kws:
         backend: null
 
-batch_key: "patient" # NOTE: it's called batch key, but we pass in "patient" so that the hgv routine genes for hcc subtypes
+batch_key: "flowcell" # NOTE: it's called batch key, but we pass in "patient" so that the hgv routine genes for hcc subtypes
 # TODO: this should be a key denoting the batch in which the samples were sent to the sequencing center. Probably set to flowcell for now
 
 # * Feature selection
@@ -177,7 +175,9 @@ marker_files: ?[f"{proj_root}/analyses/data/hcc_reference/cell_markers.yaml"]
 # * Cell type annotation
 chosen_cluster_key: null
 # Set this once clusters have been evaluated and a specific clustering is chosen
-dotplot_markers:
+
+dotplot:
+  markers:
 
 cellassign:
   kws:

@@ -5,11 +5,13 @@
 # It's probably SCTransform from the filenames, and the fact that SCTransform does
 # feature selection, reducing the number of available features. You checked
 # and confirmed that the normal files do indeed have fewer features than the raw read in with scanpy
+options(future.globals.maxSize = 891289600)
 
 library(tidyverse)
 library(reticulate)
 library(glue)
 library(Seurat)
+library(here)
 use_condaenv("stem-base")
 ad <- import("anndata")
 sc <- import("scanpy")
@@ -23,6 +25,9 @@ env <- yte$process_yaml(paste0(
   read_lines(here(workdir, "cellranger_config.yaml")),
   collapse = "\n"
 ))
+
+# [2026-02-16 Mon] tried version 2 (v2), it didn't look similar
+sct_version <- "v1"
 
 sc_transform_to_regress <- c("S.Score", "G2M.Score", "percent.mt")
 
@@ -67,7 +72,11 @@ load_and_process <- function(h5_file_path) {
     set.ident = TRUE
   )
 
-  obj <- SCTransform(obj, vars.to.regress = sc_transform_to_regress)
+  obj <- SCTransform(
+    obj,
+    vars.to.regress = sc_transform_to_regress,
+    vst.flavor = sct_version
+  )
   convert_to_adata(obj, cols_keep = var_cols_keep)
 }
 
@@ -82,7 +91,7 @@ cr_target <- "filtered_feature_bc_matrix.h5"
   suffix <- glue("{row['type']}-{row['treatment']}")
   outdir <- glue("{env$data_root}/{sn}/processed")
   h5_file <- glue("{outdir}/cellranger_{suffix}/{cr_target}")
-  save_file <- glue("{outdir}/{sn}_{suffix}_SCT.h5ad")
-  adata <- load_and_process(h5_file_path)
+  save_file <- glue("{outdir}/{sn}_{suffix}_SCT_{sct_version}.h5ad")
+  adata <- load_and_process(h5_file)
   adata$write_h5ad(save_file)
 })
