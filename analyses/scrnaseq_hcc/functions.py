@@ -133,17 +133,17 @@ def add_cfs_community(
     Reassign clusters using the results of a previous call of ClusterFoldSimilarity
     """
     if isinstance(old_clusters, Path):
-        cells2old_clusters = pd.read_csv(
-            old_clusters, names=["cell_id", "tmp_cluster"]
-        ).set_index("cell_id")
-        old = cells2old_clusters[adata.obs_names]
+        tmp = pd.read_csv(old_clusters).rename(columns={"cluster": "tmp_cluster"})
+        cells2old_clusters = pd.Series(tmp["tmp_cluster"])
+        cells2old_clusters.index = tmp["cell_id"]
+        old = cells2old_clusters[adata.obs_names.tolist()]
     else:
         old = adata.obs[old_clusters]
     communities = pd.read_csv(cfs_community_file)
-    lookup = {(s, g): c for s, g, c in communities.iterrows()}
+    lookup = {(s, g): c for _, (s, g, c) in communities.iterrows()}
     adata.obs = adata.obs.merge(old, left_index=True, right_index=True)
     reassigned = adata.obs["sample"].combine(
-        adata.obs["tmp_cluster"], lambda x, y: lookup[(x, y)]
+        adata.obs["tmp_cluster"], lambda x, y: lookup.get((x, y))
     )
     adata.obs.loc[:, column] = reassigned
 
