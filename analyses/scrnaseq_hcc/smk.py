@@ -7,6 +7,7 @@ import anndata as ad
 import chula_stem.sc_rnaseq as sc_utils
 import numpy as np
 import pandas as pd
+import plotnine as gg
 import scanpy as sc
 from loguru import logger
 
@@ -182,10 +183,10 @@ def cellassign():
         adata,
         cell_markers=markers,
         model_path=Path(smk.params["model"]),
-        **RCONFIG["kws"],
+        **(RCONFIG.get("kws") or {}),
     )
     model = result["model"]
-    result["pred"].to_csv(smk.output["predictions"], index=False)
+    result["pred"].reset_index().to_csv(smk.output["predictions"], index=False)
     run_metrics = pd.concat([val for val in model.history.values()], axis=1)
     model.save(smk.params["model"], save_anndata=True, overwrite=True)
     run_metrics.reset_index().to_csv(smk.output["run_metrics"], index=False)
