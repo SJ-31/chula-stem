@@ -98,7 +98,7 @@ def select_features(
 # * Rules
 
 
-def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
+def integrate(adata: ad.AnnData | None = None, cfg: dict = None):
     """
     1. Identify and subset to HVGs, accounting for batch
     2. Integrate data across batches
@@ -129,26 +129,33 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
     integrated = ad.AnnData(obs=adata.obs, obsm={key: adata.obsm[key]}, var=adata.var)
     del integrated.obs
     del integrated.var
-    integrated.write_h5ad(smk.output["integrated"])
+    integrated.write_h5ad(smk.output[0])
 
-    if to_exclude := cfg.get("cluster_exclude"):
+
+def cluster_cells(cfg: dict = None):
+    adata = ad.read_h5ad(smk.input[0])
+    integration_layer = ad.read_h5ad(smk.input[1])
+    adata.obsm.update(integration_layer.obsm)
+    cfg = cfg or RCONFIG
+    batch_key: str = cfg.get("batch_key") or smk.config["batch_key"]
+    if to_exclude := cfg.get("exclude"):
         adata = adata[~adata.obs["sample"].isin(to_exclude), :]
 
     old = {}
     for slot in ("obs", "uns", "varp", "obsm"):
         old[slot] = list(getattr(adata, slot).keys())
 
+    key = get_integration_key(smk.params["integration"])
     sc.external.pp.bbknn(adata, batch_key=batch_key)
-    clst_cfg: dict = smk.config["clustering"]
 
-    if clst_cfg["method"] == "leiden":
+    if cfg["method"] == "leiden":
         sc.pp.neighbors(adata, use_rep=key)
         sc_utils.sweep_clustering(
             adata,
             lambda x, res, key: sc.tl.leiden(
-                x, resolution=res, key_added=key, **clst_cfg["kws"]
+                x, resolution=res, key_added=key, **cfg["kws"]
             ),
-            values=clst_cfg["sweep"],
+            values=cfg["sweep"],
             prefix="leiden_res",
             distances=adata.obsp["distances"],
         )
@@ -161,7 +168,7 @@ def integrate_and_cluster(adata: ad.AnnData | None = None, cfg: dict = None):
 
     del adata.X
     del adata.var
-    adata.write_h5ad(smk.output["clustering"])
+    adata.write_h5ad(smk.output[0])
 
 
 def prepare_data():
