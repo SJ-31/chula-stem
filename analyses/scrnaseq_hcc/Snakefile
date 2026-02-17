@@ -9,14 +9,22 @@ outdir = config["outdir"]
 
 from functions import provide_output_from_fs
 
-gpu_res = {
+gpu_res20 = {
     "mem": "50G",
     "qos": "gpu20gh",
     "gres": "gpu:3g.20gb:1",
     "slurm_partition": "gpu",
 }
+gpu_res40 = {
+    "mem": "64G",
+    "qos": "gpu40g",
+    "gres": "gpu:7g.40gb:1",
+    "slurm_partition": "gpu",
+}
+
 if config["test"]:
-    gpu_res = {}
+    gpu_res20 = {}
+    gpu_res40 = {}
 
 annotations = {
     "cellassign": {
@@ -49,7 +57,7 @@ rule prepare_data:
         "smk.py"
 
 
-rule qc_plots:
+rule save_qc_plots:
     input:
         combined_file,
     output:
@@ -82,10 +90,10 @@ rule qc_filter:
         import scanpy as sc
         from functions import mads_filter_outliers
 
-        combined = ad.read_h5ad(input[0], backed=True)
+        combined = ad.read_h5ad(input[0])
 
         passed, failed = mads_filter_outliers(
-            combined.to_memory(), filters=config["mads_thresholds"], reduction="all"
+            combined, filters=config["mads_thresholds"], reduction="all"
         )
         print("Original shape: {}".format(combined.shape))
         print("Shape of filtered: {}".format(passed.shape))
@@ -108,14 +116,13 @@ rule do_dimensionality_reduction:
     log:
         f"{logdir}/{{fs_name}}_DR_{{integration}}/{{method}}/{{method}}_{{val}}.log",
     resources:
-        **gpu_res,
+        **gpu_res20,
     output:
         f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
     script:
         "smk.py"
 
 
-# TODO: just need to test it
 rule do_cfs:
     input:
         passed_qc,
@@ -129,7 +136,7 @@ rule do_cfs:
         "smk.R"
 
 
-rule integrate_and_cluster:
+rule integrate:
     input:
         passed_qc,
     log:
@@ -138,7 +145,24 @@ rule integrate_and_cluster:
         feature_selection=lambda wc: wc.get("fs_name"),
         integration=lambda wc: wc.get("integration"),
     resources:
-        **gpu_res,
+        **gpu_res20,
+    output:
+        f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
+    script:
+        "smk.py"
+
+
+rule cluster_cells:
+    input:
+        passed_qc,
+        f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
+    params:
+        integration=lambda wc: wc.get("integration"),
+    output:
+        f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
+    script:
+        "smk.py"
+
     output:
         integrated=f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
         clustering=f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
@@ -158,7 +182,7 @@ rule cellassign:
     params:
         model=f"{outdir}/cellassign",
     resources:
-        **gpu_res,
+        **gpu_res40,
     output:
         **annotations["cellassign"],
     script:
