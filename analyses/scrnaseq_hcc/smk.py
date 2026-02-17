@@ -210,6 +210,46 @@ def do_dimensionality_reduction():
     np.save(smk.output[0], result, allow_pickle=True)
 
 
+
+def save_other_dotplots():
+    adata = ad.read_h5ad(smk.input["adata"])
+    cols_plot = ["cfs_community", "cellassign_prediction", "patient", "sample"]
+    fn.add_cfs_community(
+        adata,
+        old_clusters=Path(smk.input["ind_clustering"]),
+        cfs_community_file=Path(smk.input["communities"]),
+        column="cfs_community",
+    )
+    cellassign_predictions: pd.DataFrame = pd.read_csv(smk.input["predictions"])
+    cellassign_metrics: pd.DataFrame = (
+        pd.read_csv(smk.input["run_metrics"])
+        .melt(id_vars="epoch")
+        .rename(columns={"variable": "metric"})
+    )
+    metrics_plot = (
+        gg.ggplot(cellassign_metrics, gg.aes(x="epoch", y="value"))
+        + gg.geom_line()
+        + gg.facet_wrap("metric", scales="free", ncol=2)
+        + gg.ggtitle("Cellassign training metrics")
+        + gg.theme(figure_size=(15, 20))
+    )
+    metrics_plot.save(smk.output[1])
+
+    adata.obs = adata.obs.merge(
+        cellassign_predictions.loc[:, ["index", "PREDICTION"]],
+        left_index=True,
+        right_on="index",
+        how="left",
+    ).rename(columns={"PREDICTION": "cellassign_prediction"})
+    fn.make_cluster_dotplots(
+        adata,
+        filename=smk.output[0],
+        markers={},
+        env=smk.config,
+        additional_groups=cols_plot,
+        group_rotation=90,
+    )
+
 # * Entry
 if rule_fn := globals().get(smk.rule):
     rule_fn()

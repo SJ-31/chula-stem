@@ -50,16 +50,16 @@ DR:
   n_pcs: 50
   methods:
     umap:
-      vary: ["n_neighbors", []]
-      # vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
+      # vary: ["n_neighbors", []]
+      vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else []]
       kws:
-        backend: null
-    t-sne:
+        random_state: ?this['rng']
+    t-sne_tdr:
       vary: ["perplexity", []]
       # vary: ?["perplexity", list(range(100, 5000, 500)) if not test else []]
       kws:
         backend: null
-    pacmap:
+    pacmap_tdr:
       vary: ["n_neighbors", []]
       # vary: ?["n_neighbors", list(range(100, 5000, 500)) if not test else [50, 100]]
       kws:
