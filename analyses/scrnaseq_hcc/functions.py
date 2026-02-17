@@ -225,22 +225,20 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
 def make_cluster_dotplots(
     adata: ad.AnnData,
     filename: str | Path,
-    fs_name: str,
-    integration: str,
     markers: dict | list,
     env: dict,
-    additional_groups: list | None = None,
+    cluster_results: str | Path | None = None,
     group_rotation: int = 0,
+    additional_groups: list | None = None,
 ) -> None:
     """Save a dotplot for each clustering sweep for a specified combination of
     (feature selection method, integration_method) to a single file
 
     Parameters
     ----------
-    fs_name : str
-        feature selection method
-    integration : str
-        integration method
+    cluster_results : str | Path
+        Path to a h5ad file containing the clustering results in obs. Must have the same
+        index as adata
     markers : dict | list
         vars to plot
     additional_groups : list | None
@@ -248,21 +246,28 @@ def make_cluster_dotplots(
     group_rotation : int
         Rotation for group labels when on the x axis
     """
-    clustering_results: Path = (
-        Path(env["outdir"]) / fs_name / f"{integration}_clustering.h5ad"
-    )
-    loaded: ad.AnnData = ad.read_h5ad(clustering_results, backed=True)
-    adata.obs = adata.obs.merge(
-        loaded.obs, left_index=True, right_index=True, how="left"
-    )
-    group_cols = loaded.obs.columns
-    if additional_groups is not None:  # Can put cellassign in here
+    if cluster_results:
+        loaded: ad.AnnData = ad.read_h5ad(cluster_results, backed=True)
+        adata.obs = adata.obs.merge(
+            loaded.obs, left_index=True, right_index=True, how="left"
+        )
+        group_cols = loaded.obs.columns
+    else:
+        group_cols = []
+    if groups_from_env := env.get("additional_groups"):  # Can put cellassign in here
+        additional_groups = additional_groups + groups_from_env
+    if additional_groups:
         group_cols = additional_groups + group_cols
+    if len(group_cols) == 0:
+        raise ValueError("No grouping columns could be specified")
     cfg: dict = env.get("dotplot") or {}
     kws = cfg.get("kws") or {}
     totals_kws = cfg.get("totals_kws") or {}
-    if isinstance(markers, dict):
-        markers.update(cfg.get("markers"))
+    if isinstance(markers, dict) and (from_cfg := cfg.get("markers")):
+        logger.info(
+            "Adding additional markers from dotplot configuration: {}", from_cfg
+        )
+        markers.update(from_cfg)
     doc: Document = pymupdf.open()
     transpose = kws.get("swap_axes", False)
     with TemporaryDirectory() as tmp:
@@ -284,6 +289,13 @@ def make_cluster_dotplots(
                 main = axes["mainplot_ax"]
                 for label in main.get_xticklabels():
                     label.set_rotation(group_rotation)
+                # BUG: the rotation works, but you need to shift the text a bit and
+                # and there's an issue that scanpy will automatically truncate the labels
+                # if gene_groups := axes.get("gene_group_ax"):
+                #     for child in gene_groups.get_children():
+                #         if isinstance(child, Text):
+                #             if child.get_text():
+                #                 child.set_rotation(0)
             plot.fig.savefig(save_to, bbox_inches="tight")
             doc.insert_file(save_to)
     doc.save(filename)
