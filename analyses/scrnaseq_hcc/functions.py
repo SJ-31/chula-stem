@@ -19,6 +19,7 @@ import yaml
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
+from matplotlib.text import Text
 from pymupdf import Document
 
 # * Data prep/retrieval
@@ -199,6 +200,8 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
     integration_methods = list(env["integration"].keys())
     integration_methods.append("unintegrated")
     # Integration methods
+    outs[f"{prefix}_dotplots_PLOT"] = f"{root}/dotplots.pdf"
+    outs[f"{prefix}_cellassign_PLOT"] = f"{root}/cellassign_metrics.pdf"
 
     # DR results
     # Key format is FEATURE_SELECTION-INTEGRATION_dr_DR_NAME
@@ -206,6 +209,9 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
         if imethod != "unintegrated":
             outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
             outs[f"{prefix}{imethod}_clustering"] = f"{root}/{imethod}_clustering.h5ad"
+            outs[f"{prefix}{imethod}_clustering_PLOT"] = (
+                f"{root}/{imethod}_clustering.pdf"
+            )
 
         for method, values in env["DR"]["methods"].items():
             v = values["vary"][1]
