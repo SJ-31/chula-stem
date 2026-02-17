@@ -26,6 +26,8 @@ if config["test"]:
     gpu_res20 = {}
     gpu_res40 = {}
 
+dr_use_cpu = {"umap", "t-sne"}
+
 annotations = {
     "cellassign": {
         "predictions": f"{outdir}/cellassign_predictions.csv",
@@ -116,7 +118,10 @@ rule do_dimensionality_reduction:
     log:
         f"{logdir}/{{fs_name}}_DR_{{integration}}/{{method}}/{{method}}_{{val}}.log",
     resources:
-        **gpu_res20,
+        gres=lambda wc: None if wc.get("method") in dr_use_cpu else "gpu:7g.40gb:1",
+        slurm_partition=lambda wc: "cpu" if wc.get("method") in dr_use_cpu else "gpu",
+        mem=lambda wc: "80G" if wc.get("method") in dr_use_cpu else "64G",
+        qos=lambda wc: "cpu24h" if wc.get("method") in dr_use_cpu else "gpu40g",
     output:
         f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
     script:

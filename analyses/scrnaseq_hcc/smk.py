@@ -32,20 +32,45 @@ def get_integration_key(integration_method: str) -> str:
     return f"X_{integration_method}"
 
 
-def call_dr(
-    x: np.ndarray, method: str, kws: dict
+def dr_dispatch(
+    adata: ad.AnnData, method: str, integration_method: str, kws: dict
 ) -> Callable[[np.ndarray], np.ndarray]:
-    import torchdr as tdr
+    if method.endswith("_tdr"):
+        import torchdr as tdr
 
-    if method == "umap":
-        dr_obj = tdr.UMAP(**kws)
-    elif method == "t-sne":
-        dr_obj = tdr.TSNE(**kws)
-    elif method == "pacmap":
-        dr_obj = tdr.PACMAP(**kws)
+        if integration_method == "unintegrated":
+            x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
+            kws["init"] = "normal"
+        else:
+            x = adata.obsm[get_integration_key(integration_method)]
+        if method == "umap_tdr":
+            dr_obj = tdr.UMAP(**kws)
+        elif method == "t-sne_tdr":
+            dr_obj = tdr.TSNE(**kws)
+        elif method == "pacmap_tdr":
+            dr_obj = tdr.PACMAP(**kws)
+
+        else:
+            raise ValueError(f"DR method {method} not supported")
+        return dr_obj.fit_transform(x)
     else:
-        raise ValueError(f"DR method {method} not supported")
-    return dr_obj.fit_transform(x)
+        pass
+    if integration_method == "unintegrated":
+        key = None
+    else:
+        key = get_integration_key(integration_method)
+    if method == "umap":
+        neighbor_args = {"n_neighbors", "n_pcs", "knn", "method"}
+        keys = list(kws.keys())
+        neighbor_kws = {k: kws.pop(k) for k in keys if k in neighbor_args}
+        sc.pp.neighbors(adata, use_rep=key, **neighbor_kws)
+        sc.tl.umap(adata, **kws)
+        return adata.obsm["X_umap"]
+    elif method == "t-sne":
+        sc.tl.tsne(adata, use_rep=key, use_fast_tsne=True, **kws)
+        return adata.obsm["X_tsne"]
+    else:
+        raise ValueError(f"Method {method} not recognized")
 
 
 def integrate_data(adata: ad.AnnData, batch_key, name: str, extras: dict, env) -> str:
@@ -198,15 +223,10 @@ def do_dimensionality_reduction():
     method = smk.params["dr_method"]
     imethod = smk.params["integration_method"]
     kws: dict = cfg["methods"][method].get("kws", {}) or {}
-    if imethod == "unintegrated":
-        x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
-        kws["init"] = "normal"
-    else:
-        x = adata.obsm[get_integration_key(imethod)]
     hp_value: int | float = smk.params["hp_value"]
     hp_to_vary = cfg["methods"][method]["vary"][0]
     kws[hp_to_vary] = int(hp_value)
-    result: np.ndarray = call_dr(x, method, kws)
+    result: np.ndarray = dr_dispatch(adata, method, integration_method=imethod, kws=kws)
     np.save(smk.output[0], result, allow_pickle=True)
 
 
@@ -249,6 +269,7 @@ def save_other_dotplots():
         additional_groups=cols_plot,
         group_rotation=90,
     )
+
 
 # * Entry
 if rule_fn := globals().get(smk.rule):
