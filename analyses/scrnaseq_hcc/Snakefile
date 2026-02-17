@@ -163,9 +163,40 @@ rule cluster_cells:
     script:
         "smk.py"
 
+
+rule save_cluster_plots:
+    input:
+        passed_qc,
+        f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
     output:
-        integrated=f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
-        clustering=f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
+        f"{outdir}/{{fs_name}}/{{integration}}_clustering.pdf",
+    params:
+        fs_name=lambda wc: wc.get("fs_name"),
+        integration=lambda wc: wc.get("integration"),
+    run:
+        import anndata as ad
+        import functions as fn
+
+        adata = ad.read_h5ad(input[0])
+        fn.make_cluster_dotplots(
+            adata,
+            filename=output[0],
+            cluster_results=input[1],
+            markers={},
+            env=config,
+        )
+
+
+rule save_other_dotplots:
+    input:
+        **rules.do_cfs.output,
+        **annotations["cellassign"],
+        adata=passed_qc,
+    params:
+        feature_selection=lambda wc: wc.get("fs_name"),
+    output:
+        f"{outdir}/{{fs_name}}/dotplots.pdf",
+        f"{outdir}/{{fs_name}}/cellassign_metrics.pdf",
     script:
         "smk.py"
 
