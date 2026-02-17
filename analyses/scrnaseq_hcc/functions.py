@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Literal
 
 import anndata as ad
+import decoupler
 import marimo as mo
 import numpy as np
 import pandas as pd
@@ -302,8 +303,13 @@ def make_cluster_dotplots(
                 #         if isinstance(child, Text):
                 #             if child.get_text():
                 #                 child.set_rotation(0)
-            plot.fig.savefig(save_to, bbox_inches="tight")
-            doc.insert_file(save_to)
+            plot.fig.savefig(save_to_1, bbox_inches="tight")
+            doc.insert_file(save_to_1)
+            cluster_counts = plot_clusters_in_samples(adata, col, ncol=2) + gg.theme(
+                figure_size=(15, 10)
+            )
+            cluster_counts.save(save_to_2)
+            doc.insert_file(save_to_2)
     doc.save(filename)
 
 
