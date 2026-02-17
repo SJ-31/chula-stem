@@ -24,7 +24,8 @@ logdir: ?f"{workdir}/logs" if not test else f"{workdir}/test/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
-exclude_from_clustering: # We're excluding normals and treated samples from clustering routines since the goal in those is to find tumor subtypes. Cells from these samples will have their cluster values set to NA
+exclude_from_clustering: # We're excluding normals and treated samples from clustering routines since the goal in those is to find tumor subtypes/tumor-specific cell types
+  # Cells from these samples will have their cluster values set to NA
   - H19_tumor-iacs
   - H8_tumor-iacs
   - H8_tumor-oligomycin
@@ -93,7 +94,7 @@ do_cfs:
     parallel: true
 
 # * QC filtering
-# [2026-02-06 Fri] thresholds determined after looking at plots
+# NOTE: determine these after looking at QC plots
 # Map below has the following structure: COLNAME: [<OUTLIER_LOW>, <OUTLIER_HIGH>]
 # A cell is determined to be an outlier if its distance from the median in terms of MADs
 # falls below OUTLIER_LOW or is greater than OUTLIER_HIGH. They can be set to null not
@@ -151,23 +152,18 @@ integration:
     kws:
     # method:
 
-integrate_and_cluster:
-  cluster_exclude: ?this["exclude_from_clustering"]
-
-  # * Clustering
-clustering:
+# * Clustering
+cluster_cells:
+  exclude: ?this["exclude_from_clustering"]
   method: leiden
-  sweep: [1, 3, 5]
+  sweep: [0.01, 0.5, 1, 3]
   kws:
     random_state: ?this["rng"]
 
-# * Marker gene resources
+# * Gene set & marker resources
 
 markers:
-  main:
-    - LIN28A
-    - GPC3 # glypican 3
-    - AFP # Alpha-fetoprotein
+
 gene_sets:
 gene_set_files: ?[f"{proj_root}/analyses/data/hcc_reference/gene_sets.yaml"]
 marker_files: ?[f"{proj_root}/analyses/data/hcc_reference/cell_markers.yaml"]
@@ -178,9 +174,32 @@ chosen_cluster_key: null
 
 dotplot:
   markers:
+    main:
+      - LIN28A
+      - LIN28B
+      - GPC3 # glypican 3
+      - AFP # Alpha-fetoprotein
+      - MAGEA1
+      - MAGEA2
+      - MAGEA3
+    stemness_tfs:
+      - SOX2
+      - NANOG
+      - EPCAM
+      - SALL4
+      - POU5F1 # Oct4
+      - KLF4
+      - MYC # c-Myc
+    disco_cholangiocyte:
+      - KRT7
+      - KRT19
+      - SPP1
+      - ALB
+      - SERPINA1
   kws:
     gene_symbols: hgnc_symbol
     cmap: "Greens"
+    var_group_rotation: 90
     layer: null
     # layer: lshift_normalized
     log: false
@@ -195,3 +214,18 @@ cellassign:
     train_kws:
       batch_size: 1024
       max_epochs: ?50 if test else 400
+# * Marker gene identification
+
+# * Enrichment analyses
+# Only specified clusterings are used as input to the routine, determine by reviewing
+# the cluster plots
+enrich_clusters:
+  to_enrich: # List of lists: [feature_selection, integration, cluster_name]
+    leiden_res0.5: [seurat, scVI, leiden_res0.5]
+  decouple_kws:
+    methods: [ulm, ora, mlm]
+    layer: lshift_normalized
+# mlm probably works like this:
+# let feature i be the AFP gene. We model the observed statistic e.g. expression of AFP
+# as expr(AFP) = intercept + beta_1x1 + beta_2x2 ...  + beta_px_p + error
+# If x_i is 0 if AFP is not present in the ith feature set and 1 otherwise
