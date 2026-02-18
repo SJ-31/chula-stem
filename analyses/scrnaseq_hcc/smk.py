@@ -271,6 +271,17 @@ def save_other_dotplots():
     )
 
 
+def enrich_single_cell():
+    adata = ad.read_h5ad(smk.input[0])
+    fn.enrich_single_cell(
+        adata,
+        cfg=RCONFIG,
+        env=smk.config,
+        gs_out=smk.output[0],
+        marker_out=smk.output[1],
+    )
+
+
 # * Entry
 if rule_fn := globals().get(smk.rule):
     rule_fn()

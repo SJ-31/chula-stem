@@ -169,6 +169,19 @@ rule cluster_cells:
         "smk.py"
 
 
+rule mark_cluster_complete:
+    input:
+        expand(
+            f"{outdir}/{{f}}/{{i}}_clustering.h5ad",
+            f=feature_selection_methods,
+            i=smk.config["integration"].keys(),
+        ),
+    output:
+        f"{outdir}/.clustering_complete",
+    shell:
+        "touch {output}"
+
+
 rule save_cluster_plots:
     input:
         passed_qc,
@@ -221,5 +234,16 @@ rule cellassign:
         **gpu_res40,
     output:
         **annotations["cellassign"],
+    script:
+        "smk.py"
+
+
+rule enrich_single_cell:
+    input:
+        passed_qc,
+        f"{outdir}/.clustering_complete",
+    output:
+        f"{outdir}/annotations/gene_set_activity.csv",
+        f"{outdir}/annotations/marker_gene_activity.csv",
     script:
         "smk.py"

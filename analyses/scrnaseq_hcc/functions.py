@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Literal
 
 import anndata as ad
-import decoupler
+import decoupler as dc
 import marimo as mo
 import numpy as np
 import pandas as pd
@@ -147,18 +147,40 @@ def add_cfs_community(
     reassigned = adata.obs["sample"].combine(
         adata.obs["tmp_cluster"], lambda x, y: lookup.get((x, y))
     )
-    adata.obs.loc[:, column] = reassigned
+    adata.obs.loc[:, column] = reassigned.astype(str)
 
 
-def get_gs_and_cell_markers(env: dict) -> tuple[dict, dict]:
+def get_gs_and_cell_markers(
+    env: dict,
+    min_count: tuple[int | None, int | None] | None = None,
+    as_df: bool = False,
+    df_names=("set", "symbol"),
+) -> tuple[dict | pd.DataFrame, dict | pd.DataFrame]:
     cell_markers = env["markers"] or {}
     gene_sets = env["gene_sets"] or {}
-    for update_to, file_list in zip(
-        (cell_markers, gene_sets), ("marker_files", "gene_set_files")
+    min_count = min_count or (None, None)
+    for update_to, file_list, minimum in zip(
+        (gene_sets, cell_markers), ("gene_set_files", "marker_files"), min_count
     ):
         for file in env[file_list]:
             with open(file, "r") as f:
-                update_to.update(yaml.safe_load(f))
+                tmp = yaml.safe_load(f)
+                if minimum is not None:
+                    tmp = {
+                        k: v
+                        for k, v in tmp.items()
+                        if (isinstance(v, list) and len(v) > minimum)
+                        or (minimum <= 1 and isinstance(v, str))
+                    }
+                update_to.update(tmp)
+    if as_df:
+        result = [
+            pd.DataFrame({df_names[0]: dct.keys(), df_names[1]: dct.values()})
+            .explode(df_names[1])
+            .drop_duplicates()
+            for dct in [gene_sets, cell_markers]
+        ]
+        gene_sets, cell_markers = result
     return gene_sets, cell_markers
 
 
@@ -279,7 +301,8 @@ def make_cluster_dotplots(
     transpose = kws.get("swap_axes", False)
     with TemporaryDirectory() as tmp:
         for i, col in enumerate(group_cols):
-            save_to = f"{tmp}/{i}.pdf"
+            save_to_1 = f"{tmp}/{i}_1.pdf"
+            save_to_2 = f"{tmp}/{i}_2.pdf"
             call = {
                 "adata": adata[adata.obs[col].notnull(), :],
                 "title": f"Groups: {col}",
@@ -476,6 +499,72 @@ def make_dr_slider(
         return mo.image(outdir / f"{v}.{ext}")
 
     return slider, display_call
+
+
+# * Enrichment analyses
+
+
+def add_clusterings(adata, clusters_to_add: dict[str, list], env: dict) -> list:
+    outdir = Path(env["outdir"])
+    previously_read: dict = {}
+    added = []
+    for name, (fs_name, integration, cluster_name) in clusters_to_add.items():
+        if integration is None and cluster_name == "cfs":
+            add_cfs_community(
+                adata,
+                old_clusters=outdir / fs_name / "cfs/ind_clustering.csv",
+                cfs_community_file=outdir / fs_name / "cfs/communities.csv",
+                column=name,
+            )
+            added.append(name)
+            continue
+        cluster_results: pd.DataFrame | None = previously_read.get(
+            (fs_name, integration)
+        )
+        if not cluster_results:
+            path = outdir / fs_name / f"{integration}_clustering.h5ad"
+            obs = ad.read_h5ad(path).obs
+            cluster_results = adata.obs.iloc[:, 0].merge(
+                obs, left_index=True, right_index=True, how="left"
+            )
+            previously_read[(fs_name, integration)] = cluster_results
+        adata.obs.loc[:, name] = cluster_results[cluster_name]
+        added.append(name)
+    return added
+
+
+def enrich_single_cell(
+    adata,
+    cfg: dict,
+    env: dict,
+    gs_out: str,
+    marker_out: str,
+):
+    """Determine which clusters are enriched in the gene sets
+    specified in `gene_set_files` and `gene_sets`
+
+    Notes
+    -----
+    Routine steps
+    1. Compute per-cell enrichment scores for the specified gene sets
+    2. Use dc to get a consensus score
+    3. For each cluster, rank the activity of each gene set using t-test against
+    the the activity in all other clusters combined
+    """
+    gs_df, marker_df = get_gs_and_cell_markers(env, None, True, ("source", "target"))
+    cluster_names = add_clusterings(adata, clusters_to_add=cfg["to_enrich"], env=env)
+    kws = cfg.get("decouple_kws") or {}
+    cutoff = cfg.get("cutoff", 0.0001)
+    for out, df in zip((gs_out, marker_out), (gs_df, marker_df)):
+        ranked_dfs = []
+        dc.mt.decouple(adata, df, **kws)
+        dc.mt.consensus(adata)
+        scores: ad.AnnData = dc.pp.get_obsm(adata, key="score_consensus")
+        for clst in cluster_names:
+            ranked = dc.tl.rankby_group(scores, groupby=clst)
+            ranked = ranked.loc[ranked["pval"] <= cutoff, :].assign(clustering=clst)
+            ranked_dfs.append(ranked)
+        pd.concat(ranked_dfs).to_csv(out, index=False)
 
 
 # * QC
