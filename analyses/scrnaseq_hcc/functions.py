@@ -255,6 +255,7 @@ def plot_clusters_in_samples(
     adata, cluster_col: str, sample_col: str = "sample", ncol: int = 3
 ) -> gg.ggplot:
     """Visualize the size of each cluster within each sample"""
+    adata = adata[~adata.obs[cluster_col].isna(), :]
     cells_per_sample = adata.obs[sample_col].value_counts()
     bulked = dc.pp.pseudobulk(
         adata, sample_col=sample_col, groups_col=cluster_col, layer=None, mode="sum"
