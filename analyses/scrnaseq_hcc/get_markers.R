@@ -1,6 +1,9 @@
 library(tidyverse)
 library(glue)
+library(reticulate)
 library(here)
+use_condaenv("stem-base")
+dc <- import("decoupler")
 
 cell_markers <- list()
 
@@ -8,20 +11,20 @@ outdir <- here("analyses", "data", "hcc_reference")
 
 ## * Markers from previous project
 wanted_cellmarker2 <- list(
-  "t_helper_17_cell",
+  ## "t_helper_17_cell",
   "gamma_delta_t_cell",
   "m1_macrophage",
   "t_helper_1_cell",
   "m2_macrophage",
   "exhausted_t_cell",
-  "stromal_cell",
+  ## "stromal_cell",
   "natural_killer_cell",
   "cancer_cell",
   "neutrophil",
-  "exhausted_cd8+_t_cell",
-  "macrophage",
-  "monocyte",
-  "hepatocyte"
+  "exhausted_cd8+_t_cell"
+  ## "macrophage"
+  ## "monocyte",
+  ## "hepatocyte"
 )
 # Set up path
 too_predict <- file.path(dirname(here()), "too-predict")
@@ -128,14 +131,30 @@ liver_cell2rx <- list(
   liver_rsident_nkt = "NK_NKT_CELLS",
   liver_resident_b_cell = "RESIDENT_B_CELLS"
 )
-for (n in names(liver_cell2rx)) {
-  cell_markers[[glue("msigdb_aizarani-{n}")]] <- from_liver |>
-    filter(grepl(liver_cell2rx[[n]], gs_name)) |>
-    pluck("gene_symbol") |>
-    unique()
+## for (n in names(liver_cell2rx)) {
+##   cell_markers[[glue("msigdb_aizarani-{n}")]] <- from_liver |>
+##     filter(grepl(liver_cell2rx[[n]], gs_name)) |>
+##     pluck("gene_symbol") |>
+##     unique()
+## }
+
+## * PanglaoDB
+
+pgdb <- dc$op$resource("PanglaoDB")
+pgdb_liver <- pgdb |>
+  filter(organ == "Liver" & canonical_marker) |>
+  select(cell_type, genesymbol) |>
+  group_by(cell_type) |>
+  summarise(genesymbol = list(genesymbol)) |>
+  deframe()
+for (n in names(pgdb_liver)) {
+  cell_markers[[glue("PanglaoDB-{n}")]] <- pgdb_liver[[n]]
 }
 
 ## * Write reference files
 
 yaml::write_yaml(cell_markers, here(outdir, "cell_markers.yaml"))
 yaml::write_yaml(gene_sets, here(outdir, "gene_sets.yaml"))
+
+# [2026-02-18 Wed] TODO: the number of cell markers should be more balanced between
+# cell types
