@@ -569,7 +569,7 @@ def add_clusterings(adata, clusters_to_add: dict[str, list], env: dict) -> list:
     return added
 
 
-def enrich_single_cell(
+def enrich_clusters(
     adata,
     cfg: dict,
     env: dict,
@@ -577,7 +577,7 @@ def enrich_single_cell(
     marker_out: str,
 ):
     """Determine which clusters are enriched in the gene sets
-    specified in `gene_set_files` and `gene_sets`
+        specified in `gene_set_files` and `gene_sets`
 
     Notes
     -----
@@ -586,8 +586,16 @@ def enrich_single_cell(
     2. Use dc to get a consensus score
     3. For each cluster, rank the activity of each gene set using t-test against
     the the activity in all other clusters combined
+
+    Test statistic by default is T statistic, (mean1-mean2)/se,
+    Which you should be able to safely interpret as the magnitude of the score
+    They use two-sided test, so convert to absolute
+    Positive means gene set under `name` has high expression and vice-versa
+
     """
     gs_df, marker_df = get_gs_and_cell_markers(env, None, True, ("source", "target"))
+    if exclude := env["cluster_cells"].get("exclude"):
+        adata = adata[~adata.obs["sample"].isin(exclude), :]
     cluster_names = add_clusterings(adata, clusters_to_add=cfg["to_enrich"], env=env)
     kws = cfg.get("decouple_kws") or {}
     cutoff = cfg.get("cutoff", 0.0001)
@@ -601,6 +609,36 @@ def enrich_single_cell(
             ranked = ranked.loc[ranked["pval"] <= cutoff, :].assign(clustering=clst)
             ranked_dfs.append(ranked)
         pd.concat(ranked_dfs).to_csv(out, index=False)
+
+
+def do_de_clusters(
+    adata: ad.AnnData, cfg: dict, env: dict
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Perform DE analysis between clusters (OVR) using edgeR"""
+    if exclude := env["cluster_cells"].get("exclude"):
+        adata = adata[~adata.obs["sample"].isin(exclude), :]
+    cluster_names = add_clusterings(adata, clusters_to_add=cfg["to_enrich"], env=env)
+    extra_contrasts = cfg.get("extra_contrasts")
+    de_counts = []
+    all_top = []
+    kws = cfg.get("kws") or {}
+    for clst in cluster_names:
+        bulked = dc.pp.pseudobulk(
+            adata[~adata.obs[clst].isna()], "sample", groups_col=clst
+        )
+        sc.pp.filter_cells(bulked, min_counts=15)
+        sc.pp.filter_genes(bulked, min_counts=50)
+        n_de, top_de = edgeR_ovr(
+            bulked, clst, extra_contrasts=extra_contrasts.get(clst), **kws
+        )
+        de_counts.append(
+            n_de.reset_index(names="direction")
+            .melt("direction")
+            .rename({"variable": "cluster", "value": "count"})
+            .assign(clustering=clst)
+        )
+        all_top.append(top_de.assign(clustering=clst))
+    return de_counts, all_top
 
 
 # * QC

@@ -271,15 +271,23 @@ def save_other_dotplots():
     )
 
 
-def enrich_single_cell():
+def enrich_clusters():
     adata = ad.read_h5ad(smk.input[0])
-    fn.enrich_single_cell(
+    fn.enrich_clusters(
         adata,
         cfg=RCONFIG,
         env=smk.config,
         gs_out=smk.output[0],
         marker_out=smk.output[1],
     )
+
+
+def do_de_clusters():
+    de_counts, top_de = fn.do_de_clusters(
+        ad.read_h5ad(smk.input[0], RCONFIG, smk.config)
+    )
+    de_counts.to_csv(smk.output[0], index=False)
+    top_de.to_csv(smk.output[1], index=False)
 
 
 # * Entry
