@@ -320,3 +320,36 @@ def pooled_normalization(
     adata.X = sparse.csc_array(sc.pp.log1p(normalized))
     if not inplace:
         return adata.X
+
+
+def edgeR_ovr(
+    adata: ad.AnnData,
+    group,
+    id_col="hgnc_symbol",
+    fc_cutoff=1.5,
+    p_value=0.05,
+    treat=True,
+    intercept=False,
+    extra_contrasts=None,
+):
+    source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
+    adata_to_r(adata, r_symbol="dge", object="dge")
+    kws = ("fc_cutoff", "p_value", "treat", "intercept", "extra_contrasts")
+    namespace = locals()
+    for kw in kws:
+        val = namespace[kw]
+        ro.globalenv[kw] = ro.NULL if val is None else val
+    run = f"""
+    result <- edgeR_ovr(dge, '{group}', id_col = '{id_col}',
+        fc_cutoff = fc_cutoff,
+        p_value = p_value,
+        treat = treat,
+        intercept = intercept,
+        extra_contrasts = extra_contrasts)
+    """
+    ro.r(run)
+    num_de = pd.DataFrame(
+        np.array(ro.r("result$num_de")), index=("Down", "NotSig", "Up")
+    )
+    top = df_from_r(ro.r("result$top"))
+    return num_de, top
