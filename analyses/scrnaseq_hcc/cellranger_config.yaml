@@ -216,12 +216,23 @@ cellassign:
       max_epochs: ?50 if test else 400
 # * Marker gene identification
 
-# * Enrichment analyses
+# * Cluster annotation
 # Only specified clusterings are used as input to the routine, determine by reviewing
 # the cluster plots
+chosen_clusters: # List of lists: [feature_selection, integration, cluster_name]
+  leiden_res0.5: [seurat, scVI, leiden_res0.5]
+  leiden_res0.1: [seurat, scVI, leiden_res0.1]
+
+do_de_clusters:
+  kws:
+    p_value: 0.0001
+    fc_cutoff: 1.2
+  extra_contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
+    leiden_res0.5:
+      - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
+
 enrich_clusters:
-  to_enrich: # List of lists: [feature_selection, integration, cluster_name]
-    leiden_res0.5: [seurat, scVI, leiden_res0.5]
+  cutoff: 0.0001
   decouple_kws:
     methods: [ulm, ora, mlm]
     layer: lshift_normalized

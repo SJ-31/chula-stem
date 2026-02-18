@@ -284,7 +284,7 @@ def enrich_clusters():
 
 def do_de_clusters():
     de_counts, top_de = fn.do_de_clusters(
-        ad.read_h5ad(smk.input[0], RCONFIG, smk.config)
+        ad.read_h5ad(smk.input[0]), RCONFIG, smk.config
     )
     de_counts.to_csv(smk.output[0], index=False)
     top_de.to_csv(smk.output[1], index=False)
