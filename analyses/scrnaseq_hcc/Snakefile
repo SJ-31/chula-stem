@@ -34,12 +34,23 @@ annotations = {
         "run_metrics": f"{outdir}/cellassign_metrics.csv",
     }
 }
-# if config["chosen_cluster_key"]:
-# "anno_dotplot": [],
 
 other_outs = {}
-for fs_method in config["feature_selection"].keys():
-    other_outs.update(provide_output_from_fs(fs_method, config))
+feature_selection_methods = config["feature_selection"].keys()
+for fs in feature_selection_methods:
+    other_outs.update(provide_output_from_fs(fs, config))
+
+if config.get("chosen_clusters", {}):
+    for csv in (
+        "gene_set_activity",
+        "marker_gene_activity",
+        "edgeR_de_gene_counts",
+        "edgeR_de_genes",
+    ):
+        other_outs[csv] = f"{outdir}/annotations/{csv}.csv"
+
+if config.get("only_plots", False):
+    other_outs = {k: v for k, v in other_outs.items() if k.endswith("PLOT")}
 
 
 rule all:
@@ -120,7 +131,7 @@ rule do_dimensionality_reduction:
     resources:
         gres=lambda wc: None if wc.get("method") in dr_use_cpu else "gpu:7g.40gb:1",
         slurm_partition=lambda wc: "cpu" if wc.get("method") in dr_use_cpu else "gpu",
-        mem=lambda wc: "80G" if wc.get("method") in dr_use_cpu else "64G",
+        mem=lambda wc: "100G" if wc.get("method") in dr_use_cpu else "64G",
         qos=lambda wc: "cpu24h" if wc.get("method") in dr_use_cpu else "gpu40g",
     output:
         f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
@@ -174,7 +185,7 @@ rule mark_cluster_complete:
         expand(
             f"{outdir}/{{f}}/{{i}}_clustering.h5ad",
             f=feature_selection_methods,
-            i=smk.config["integration"].keys(),
+            i=config["integration"].keys(),
         ),
     output:
         f"{outdir}/.clustering_complete",
@@ -238,7 +249,7 @@ rule cellassign:
         "smk.py"
 
 
-rule enrich_single_cell:
+rule enrich_clusters:
     input:
         passed_qc,
         f"{outdir}/.clustering_complete",
