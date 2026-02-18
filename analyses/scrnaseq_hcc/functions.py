@@ -251,6 +251,41 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
 # * Plotting
 
 
+def plot_clusters_in_samples(
+    adata, cluster_col: str, sample_col: str = "sample", ncol: int = 3
+) -> gg.ggplot:
+    """Visualize the size of each cluster within each sample"""
+    cells_per_sample = adata.obs[sample_col].value_counts()
+    bulked = dc.pp.pseudobulk(
+        adata, sample_col=sample_col, groups_col=cluster_col, layer=None, mode="sum"
+    )
+    bulked.obs.loc[:, "psbulk_cells_prop"] = (
+        bulked.obs["psbulk_cells"].values
+        / cells_per_sample[bulked.obs[sample_col]].values
+    )
+    plot = (
+        gg.ggplot(
+            bulked.obs,
+            gg.aes(
+                x=cluster_col,
+                y="psbulk_cells_prop",
+                fill="psbulk_counts",
+            ),
+        )
+        + gg.geom_bar(stat="identity")
+        + gg.facet_wrap(sample_col, drop=False, dir="v", ncol=ncol)
+        + gg.guides(
+            fill=gg.guide_legend(title="Total count"),
+        )
+        + gg.ylab("Proportion in sample")
+        + gg.theme_bw()
+        + gg.theme(
+            panel_grid_major=gg.element_blank(), panel_grid_minor=gg.element_blank()
+        )
+    )
+    return plot
+
+
 def make_cluster_dotplots(
     adata: ad.AnnData,
     filename: str | Path,
@@ -328,11 +363,12 @@ def make_cluster_dotplots(
                 #                 child.set_rotation(0)
             plot.fig.savefig(save_to_1, bbox_inches="tight")
             doc.insert_file(save_to_1)
-            cluster_counts = plot_clusters_in_samples(adata, col, ncol=2) + gg.theme(
-                figure_size=(15, 10)
-            )
-            cluster_counts.save(save_to_2)
-            doc.insert_file(save_to_2)
+            if col != "sample":
+                cluster_counts = plot_clusters_in_samples(
+                    adata, col, ncol=2
+                ) + gg.theme(figure_size=(15, 10))
+                cluster_counts.save(save_to_2)
+                doc.insert_file(save_to_2)
     doc.save(filename)
 
 
