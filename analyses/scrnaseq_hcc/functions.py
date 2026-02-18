@@ -454,13 +454,16 @@ def add_saved_dr(
     outs = provide_output_from_fs(fs_name, env)
     for method in env["DR"]["methods"].keys():
         key = f"{fs_name}-{integration}_dr_{method}"
-        directory = Path(outs[key])
-        if directory.exists():
-            for efile in directory.iterdir():
-                if efile.suffix == ".npy":
-                    embeddings = np.load(efile)
-                    hp_val = efile.stem.split("_", 1)[1]
-                    adata.obsm[f"X_{method}_{hp_val}"] = embeddings
+        files = outs[key]
+        if files:
+            directory = Path(files[0]).parent
+            print(directory)
+            if directory.exists():
+                for efile in directory.iterdir():
+                    if efile.suffix == ".npy":
+                        embeddings = np.load(efile)
+                        hp_val = efile.stem.split("_", 1)[1]
+                        adata.obsm[f"X_{method}_{hp_val}"] = embeddings
 
 
 def plot_dr(
