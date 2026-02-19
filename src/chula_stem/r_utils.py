@@ -334,7 +334,7 @@ def edgeR_ovr(
     intercept=False,
     extra_contrasts=None,
     batch_factors: list | None = None,
-):
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
     adata_to_r(adata, r_symbol="dge", object="dge")
     r_null_if_none(

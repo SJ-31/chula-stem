@@ -10,12 +10,13 @@ __definitions__:
   - workdir = f"{proj_root}/analyses/scrnaseq_hcc"
 cores: 1
 jobs: 10
-executor: slurm
-slurm-logdir: ?f"{workdir}/slurm_logs" if not test else f"{workdir}/test/slurm_logs"
-# slurm-logdir: ?"/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/slurm_logs"
-default-resources:
-  mem: 40G
-  qos: cpu24h
+?if not is_local:
+  executor: slurm
+  slurm-logdir: ?f"{workdir}/slurm_logs" if not test else f"{workdir}/test/slurm_logs"
+  # slurm-logdir: ?"/data/home/shannc/chula-stem/analyses/scrnaseq_hcc/slurm_logs"
+  default-resources:
+    mem: 40G
+    qos: cpu24h
 rerun-triggers: mtime
 keep-incomplete: True
 delete-all-output: False

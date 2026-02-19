@@ -21,8 +21,10 @@ from chula_stem.r_utils import edgeR_ovr
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
-from matplotlib.text import Text
 from pymupdf import Document
+
+logger.disable("snakemake")
+logger.disable("rpy2.rinterface")
 
 # * Data prep/retrieval
 
@@ -74,7 +76,9 @@ def prepare_data(file, feature_file, env):
     )
     adata = adata[:, ~adata.var["gene_ids"].isna()]
     annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
-    annotate_marker(adata, marker_genes=env["markers"]["main"], gene_col="hgnc_symbol")
+    marker_genes = env.get("obs_markers_annotate")
+    if marker_genes:
+        annotate_marker(adata, marker_genes=marker_genes, gene_col="hgnc_symbol")
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
     # TODO: should you change the grouping col?
     # review after looking at the data unintegrated
@@ -241,9 +245,10 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
         if imethod != "unintegrated":
             outs[f"{prefix}{imethod}"] = f"{root}/{imethod}_integrated.h5ad"
             outs[f"{prefix}{imethod}_clustering"] = f"{root}/{imethod}_clustering.h5ad"
-            outs[f"{prefix}{imethod}_clustering_PLOT"] = (
-                f"{root}/{imethod}_clustering.pdf"
-            )
+            if not env["test"]:
+                outs[f"{prefix}{imethod}_clustering_PLOT"] = (
+                    f"{root}/{imethod}_clustering.pdf"
+                )
 
         for method, values in env["DR"]["methods"].items():
             v = values["vary"][1]
@@ -272,13 +277,13 @@ def provide_annotation_output(env) -> dict:
     for csv in (
         "gene_set_activity",
         "marker_gene_activity",
-        # TODO: uncomment this after you've set up scVI
-        # "edgeR_de_gene_counts",
-        # "edgeR_de_genes",
-        # "scVI_de_genes",
+        "edgeR_de",
+        "scVI_de",
     ):
-        if "de_genes" in csv:
-            for level in ("clusters", "samples"):
+        if csv.endswith("de"):
+            # for level in ("clusters", "samples"): # TODO: uncomment after
+            # setting up samples
+            for level in ("clusters",):
                 result[csv] = f"{root}/{level}-{csv}.csv"
         else:
             result[csv] = f"{root}/{csv}.csv"
@@ -494,7 +499,6 @@ def add_saved_dr(
         files = outs[key]
         if files:
             directory = Path(files[0]).parent
-            print(directory)
             if directory.exists():
                 for efile in directory.iterdir():
                     if efile.suffix == ".npy":
