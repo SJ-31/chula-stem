@@ -356,7 +356,7 @@ def neighbor_purity_from_distances(
 
 def sweep_clustering(
     adata: ad.AnnData,
-    cluster_fn: Callable[[ad.AnnData, int | float], None],
+    cluster_fn: Callable,
     prefix: str,
     values: Sequence,
     distances: None | np.ndarray = None,
@@ -392,9 +392,13 @@ def sweep_clustering(
         result = adata.obs[key_added]
 
         purity = neighbor_purity_from_distances(adata, key_added, "distances", True)
-        sil = sm.silhouette_samples(X=distances, labels=result)
+        try:
+            sil = sm.silhouette_samples(X=distances, labels=result)
+            sil_mean = sil.mean()
+        except ValueError:
+            sil = sil_mean = np.nan
         metrics = {
-            "silhouette_score": sil.mean(),
+            "silhouette_score": sil_mean,
             "mean_neighbor_purity": purity.mean(),
         }
         purity_tracker[key_added] = purity

@@ -9,10 +9,6 @@ outdir = config["outdir"]
 anno_out = f"{outdir}/annotations"
 
 from functions import provide_output_from_fs, provide_annotation_output
-from loguru import logger
-
-logger.disable("snakemake")
-logger.disable("rpy2")
 
 gpu_res20 = {
     "mem": "50G",
