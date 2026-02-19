@@ -6,8 +6,13 @@ permissive_features = config["files"]["permissive_features"]
 passed_qc = config["files"]["passed_qc"]
 logdir = config["logdir"]
 outdir = config["outdir"]
+anno_out = f"{outdir}/annotations"
 
-from functions import provide_output_from_fs
+from functions import provide_output_from_fs, provide_annotation_output
+from loguru import logger
+
+logger.disable("snakemake")
+logger.disable("rpy2")
 
 gpu_res20 = {
     "mem": "50G",
@@ -28,26 +33,11 @@ if config["test"]:
 
 dr_use_cpu = {"umap", "t-sne"}
 
-annotations = {
-    "cellassign": {
-        "predictions": f"{outdir}/cellassign_predictions.csv",
-        "run_metrics": f"{outdir}/cellassign_metrics.csv",
-    }
-}
-
 other_outs = {}
 feature_selection_methods = config["feature_selection"].keys()
 for fs in feature_selection_methods:
     other_outs.update(provide_output_from_fs(fs, config))
-
-if config.get("chosen_clusters", {}):
-    for csv in (
-        "gene_set_activity",
-        "marker_gene_activity",
-        "edgeR_de_gene_counts",
-        "edgeR_de_genes",
-    ):
-        other_outs[csv] = f"{outdir}/annotations/{csv}.csv"
+other_outs.update(provide_annotation_output(config))
 
 if config.get("only_plots", False):
     other_outs = {k: v for k, v in other_outs.items() if k.endswith("PLOT")}
@@ -58,7 +48,6 @@ rule all:
         passed_qc,
         permissive_features,
         f"{outdir}/qc",
-        **annotations["cellassign"],
         **other_outs,
 
 
@@ -68,25 +57,6 @@ rule prepare_data:
         permissive_features,
     script:
         "smk.py"
-
-
-rule save_qc_plots:
-    input:
-        combined_file,
-    output:
-        directory(f"{outdir}/qc"),
-    run:
-        from functions import qc_plot_patient
-        from pathlib import Path
-        import anndata as ad
-
-        outdir = Path(output[0])
-        outdir.mkdir(exist_ok=True)
-
-        combined = ad.read_h5ad(input[0])
-        for patient in combined.obs["patient"].unique():
-            qc_mads, mads_compare = qc_plot_patient(combined, patient)
-            (qc_mads / mads_compare).save(outdir / f"{patient}.pdf")
 
 
 # TODO: should also add doublet detection and removal
@@ -137,6 +107,9 @@ rule do_dimensionality_reduction:
         f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
     script:
         "smk.py"
+
+
+# * Clustering and integration
 
 
 rule do_cfs:
@@ -193,6 +166,96 @@ rule mark_cluster_complete:
         "touch {output}"
 
 
+rule train_scvi_permissive:
+    input:
+        passed_qc,
+        permissive_features,
+    resources:
+        **gpu_res40,
+    output:
+        path=directory(f"{outdir}/scVI_permissive"),
+    script:
+        "smk.py"
+
+
+# * DE analysis
+
+
+rule do_de:
+    input:
+        adata=passed_qc,
+        features=permissive_features,
+    params:
+        de_method=lambda wc: wc.get("de_method"),
+    output:
+        f"{outdir}/DE/{{de_method}}.csv",
+    script:
+        "smk.R"
+
+
+# * Annotation routines
+
+# NOTE: don't need feature selection for cell assign because it will automatically
+# subset features
+
+
+rule cellassign:
+    input:
+        passed_qc,
+    params:
+        model=f"{outdir}/cellassign",
+    resources:
+        **gpu_res40,
+    output:
+        predictions=other_outs["cellassign_predictions"],
+        run_metrics=other_outs["cellassign_run_metrics"],
+    script:
+        "smk.py"
+
+
+rule enrich_clusters:
+    input:
+        passed_qc,
+        f"{outdir}/.clustering_complete",
+    output:
+        f"{outdir}/annotations/gene_set_activity.csv",
+        f"{outdir}/annotations/marker_gene_activity.csv",
+    script:
+        "smk.py"
+
+
+rule do_de_clusters:
+    input:
+        adata=passed_qc,
+        check=f"{outdir}/.clustering_complete",
+        features=permissive_features,
+        model=lambda wc: (
+            f"{outdir}/scVI_permissive" if wc.get("method") == "scVI" else []
+        ),
+    params:
+        method=lambda wc: wc.get("method"),
+        outdir=anno_out,
+    output:
+        f"{outdir}/annotations/cluster-{{method}}_de_genes.csv",
+    script:
+        "smk.py"
+
+
+# * Plotting
+rule save_other_dotplots:
+    input:
+        **rules.do_cfs.output,
+        **rules.cellassign.output,
+        adata=passed_qc,
+    params:
+        feature_selection=lambda wc: wc.get("fs_name"),
+    output:
+        f"{outdir}/{{fs_name}}/dotplots.pdf",
+        f"{outdir}/{{fs_name}}/cellassign_metrics.pdf",
+    script:
+        "smk.py"
+
+
 rule save_cluster_plots:
     input:
         passed_qc,
@@ -216,45 +279,20 @@ rule save_cluster_plots:
         )
 
 
-rule save_other_dotplots:
+rule save_qc_plots:
     input:
-        **rules.do_cfs.output,
-        **annotations["cellassign"],
-        adata=passed_qc,
-    params:
-        feature_selection=lambda wc: wc.get("fs_name"),
+        combined_file,
     output:
-        f"{outdir}/{{fs_name}}/dotplots.pdf",
-        f"{outdir}/{{fs_name}}/cellassign_metrics.pdf",
-    script:
-        "smk.py"
+        directory(f"{outdir}/qc"),
+    run:
+        from functions import qc_plot_patient
+        from pathlib import Path
+        import anndata as ad
 
+        outdir = Path(output[0])
+        outdir.mkdir(exist_ok=True)
 
-# * Cell type annotation
-
-# NOTE: don't need feature selection for cell assign because it will automatically
-# subset features
-
-
-rule cellassign:
-    input:
-        passed_qc,
-    params:
-        model=f"{outdir}/cellassign",
-    resources:
-        **gpu_res40,
-    output:
-        **annotations["cellassign"],
-    script:
-        "smk.py"
-
-
-rule enrich_clusters:
-    input:
-        passed_qc,
-        f"{outdir}/.clustering_complete",
-    output:
-        f"{outdir}/annotations/gene_set_activity.csv",
-        f"{outdir}/annotations/marker_gene_activity.csv",
-    script:
-        "smk.py"
+        combined = ad.read_h5ad(input[0])
+        for patient in combined.obs["patient"].unique():
+            qc_mads, mads_compare = qc_plot_patient(combined, patient)
+            (qc_mads / mads_compare).save(outdir / f"{patient}.pdf")
