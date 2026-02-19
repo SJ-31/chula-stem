@@ -17,6 +17,7 @@ import pymupdf
 import scanpy as sc
 import snakemake.io
 import yaml
+from chula_stem.r_utils import edgeR_ovr
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
@@ -209,6 +210,14 @@ def data_import(env: dict) -> ad.AnnData:
 
 
 # ** Specifying output
+
+
+def get_scvi_model_path(fs_name: str, prefix: str, env: dict) -> dict:
+    return {
+        "dir_path": f"{env['outdir']}/{fs_name}/.scvi",
+        "prefix": f"{prefix}_",
+        "overwrite": True,
+    }
 
 
 def provide_output_from_fs(fs_name: str, env: dict) -> dict:
@@ -561,10 +570,10 @@ def add_clusterings(adata, clusters_to_add: dict[str, list], env: dict) -> list:
         cluster_results: pd.DataFrame | None = previously_read.get(
             (fs_name, integration)
         )
-        if not cluster_results:
+        if cluster_results is None:
             path = outdir / fs_name / f"{integration}_clustering.h5ad"
             obs = ad.read_h5ad(path).obs
-            cluster_results = adata.obs.iloc[:, 0].merge(
+            cluster_results = adata.obs.merge(
                 obs, left_index=True, right_index=True, how="left"
             )
             previously_read[(fs_name, integration)] = cluster_results
