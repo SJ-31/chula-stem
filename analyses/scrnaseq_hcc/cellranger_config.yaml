@@ -113,15 +113,31 @@ normalization:
   pooled_normalization:
   cluster_method: "scran"
 
+# * Sample clustering
+cluster_samples:
+  features: # The value can be a file, or list of features to use.
+    # The special key `default` means to use `permissive_features` from the pipeline
+    default: null
+  consensus_palette: null
+  kws:
+    maxK: 8
+    reps: 1000
+    distance: pearson # 1-Pearson correlation
+
 # * DE analyses
-de_analysis: # Takes the filtered data as input
+do_de_samples: # Takes the filtered data as input
+  edgeR_subtype:
+    method: edgeR # TODO: need to cluster beforehand so that you can specify
+    # the groupby key correctly
+    query: type == 'tumor' & treatment == 'control'
+    kws:
+      groupby: "default_3"
+      batch_factors: ?this['batch_key']
   scVI_subtype:
     method: scVI
     query: type == 'tumor' & treatment == 'control'
     # Use query to filter samples beforehand
-    setup_name: scVI
     kws:
-      setup_name: "" # name of a key in integration with scVI parameters
       groupby: "patient"
       mode: "change" # Either "vanilla" or "change". Latter relies on delta
       batch_correction: true
@@ -135,8 +151,6 @@ de_analysis: # Takes the filtered data as input
       idx2: type == 'normal'
       mode: "change"
       batch_correction: true
-
-  # TODO: add edgeR
 
 # * Integration
 integration:
@@ -152,16 +166,23 @@ integration:
     kws:
     # method:
 
-# * Clustering
+train_scvi_permissive: ?this["integration"]["scVI"]
+
+# * Cell clustering
+
 cluster_cells:
   exclude: ?this["exclude_from_clustering"]
   method: leiden
-  sweep: [0.01, 0.5, 1, 3]
+  sweep: [0.01, 0.1, 0.5, 1]
   kws:
     random_state: ?this["rng"]
 
 # * Gene set & marker resources
 
+obs_markers_annotate:
+  - LIN28B
+  - GPC3
+  - AFP
 markers:
 
 gene_sets:
@@ -213,28 +234,30 @@ cellassign:
     size_factor_key: lshift_size_factors
     train_kws:
       batch_size: 1024
-      max_epochs: ?50 if test else 400
-# * Marker gene identification
+      max_epochs: ?30 if test else 400
 
 # * Cluster annotation
 # Only specified clusterings are used as input to the routine, determine by reviewing
 # the cluster plots
 chosen_clusters: # List of lists: [feature_selection, integration, cluster_name]
   leiden_res0.5: [seurat, scVI, leiden_res0.5]
-  leiden_res0.1: [seurat, scVI, leiden_res0.1]
+  leiden_res0.01: [seurat, scVI, leiden_res0.01]
 
 do_de_clusters:
-  kws:
-    p_value: 0.0001
-    fc_cutoff: 1.2
-  extra_contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
-    leiden_res0.5:
-      - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
+  # scVI:
+  edgeR:
+    kws:
+      p_value: 0.0001
+      fc_cutoff: 1.2
+      batch_factors: ["flowcell"]
+    extra_contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
+      leiden_res0.5:
+        - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
 
 enrich_clusters:
   cutoff: 0.0001
   decouple_kws:
-    methods: [ulm, ora, mlm]
+    methods: [ulm]
     layer: lshift_normalized
 # mlm probably works like this:
 # let feature i be the AFP gene. We model the observed statistic e.g. expression of AFP

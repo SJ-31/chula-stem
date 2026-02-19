@@ -211,16 +211,35 @@ rule gather_sample_clusters:
         "smk.py"
 
 
-rule do_de:
+rule do_de_samples:
     input:
         adata=passed_qc,
         features=permissive_features,
+        clusters=f"{outdir}/sample_clusters.csv",
     params:
-        de_method=lambda wc: wc.get("de_method"),
+        spec=lambda wc: wc.get("spec"),
     output:
-        f"{outdir}/DE/{{de_method}}.csv",
+        f"{anno_out}/.sample_de-{{spec}}.csv",
     script:
         "smk.R"
+
+
+rule gather_de_samples:
+    input:
+        expand(
+            f"{anno_out}/.sample_de-{{spec}}.csv",
+            spec=config["de_analysis"].keys(),
+        ),
+    output:
+        f"{anno_out}/samples_de.csv",
+    run:
+        import pandas as pd
+
+        tmp = []
+        for csv in input:
+            spec = Path(csv).stem.replace(".sample_de-", "")
+            tmp.append(pd.read_csv(csv).assign(analysis_group=spec))
+        pd.concat(tmp).to_csv(output[0], index=False)
 
 
 # * Annotation routines

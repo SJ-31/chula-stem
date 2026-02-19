@@ -277,16 +277,15 @@ def provide_annotation_output(env) -> dict:
     for csv in (
         "gene_set_activity",
         "marker_gene_activity",
-        "edgeR_de",
-        "scVI_de",
+        "clusters-edgeR_de",
+        "clusters-scVI_de",
+        "samples_de.csv",
     ):
-        if csv.endswith("de"):
-            # for level in ("clusters", "samples"): # TODO: uncomment after
-            # setting up samples
-            for level in ("clusters",):
-                result[csv] = f"{root}/{level}-{csv}.csv"
-        else:
-            result[csv] = f"{root}/{csv}.csv"
+        if csv.startswith("clusters") and not env.get("chosen_clusters"):
+            continue
+        elif csv.startswith("samples_de") and not env.get("do_de_samples"):
+            continue
+        result[csv] = f"{root}/{csv}.csv"
     return result
 
 
