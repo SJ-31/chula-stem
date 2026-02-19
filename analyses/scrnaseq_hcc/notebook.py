@@ -39,8 +39,7 @@ def _(Path, is_test, process_yaml, sys):
         print(env)
 
     outdir = Path(env["outdir"])
-    plot_out = Path(env["outdir"]) / "plots"
-    return env, outdir, plot_out
+    return env, outdir
 
 
 @app.cell
@@ -63,23 +62,15 @@ def _(combined: "ad.AnnData"):
 
 
 @app.cell
-def _(mo):
-    mo.md(r"""
-    # Quality control
-    """)
-    return
-
-
-@app.cell
 def _(env, mo):
     mo.md(r"""
     Choose feature selection method
     """)
-    fs_choice = mo.ui.dropdown(
-        ["unintegrated"] + list(env["feature_selection"].keys()),
-        label="Integration",
+    fs_choice = mo.ui.dropdown(list(env["feature_selection"].keys()),
+        label="Feature selection", value="seurat"
     )
-    return
+    fs_choice
+    return (fs_choice,)
 
 
 @app.cell
@@ -89,15 +80,20 @@ def _(env, mo):
     """)
     integration_choice = mo.ui.dropdown(
         ["unintegrated"] + list(env["integration"].keys()),
-        label="Integration",
+        label="Integration", value="unintegrated"
     )
-    return
+    integration_choice
+    return (integration_choice,)
 
 
 @app.cell
-def _(ad, env):
-    adata = ad.read_h5ad(env["files"]["passed_qc"], backed=True)
-    return (adata,)
+def _(ad, env, fn, fs_choice, integration_choice, outdir):
+    plot_out = outdir / fs_choice.value / f"DR_{integration_choice.value}"
+    adata = ad.read_h5ad(env["files"]["passed_qc"])
+    fn.add_saved_dr(
+        adata, env, fs_name=fs_choice.value, integration=integration_choice.value
+    )
+    return adata, plot_out
 
 
 @app.cell
@@ -145,14 +141,14 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(adata, fn, plot_out):
     umap_slider, display_umap = fn.make_dr_slider(
         adata,
         "umap",
-        plot_out / "umap_unintegrated",
+        plot_out / "umap",
         ["patient", "flowcell"],
-        ext="svg",
+        ext="pdf",
         theme_kws={"figure_size": (10, 5)},
     )
     umap_slider
