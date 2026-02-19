@@ -332,15 +332,23 @@ def enrich_clusters():
 
 
 def do_de_clusters():
-    de_counts, top_de = fn.do_de_clusters(
-        ad.read_h5ad(smk.input[0]), RCONFIG, smk.config
+    method = smk.params["method"]
+    cfg = RCONFIG.get(method)
+    adata = ad.read_h5ad(smk.input["adata"])
+    res = fn.do_de_clusters(method, adata, cfg, smk.config)
+    if method == "edgeR":
+        res["de_counts"].to_csv(
+            f"{smk.params['outdir']}/edgeR_de_gene_counts.csv", index=False
+        )
+    res["top_de"].to_csv(smk.output[0], index=False)
+
 
 def gather_sample_clusters():
     clst_df: pd.DataFrame = reduce(
         lambda x, y: x.merge(y, on="sample", how="outer"),
         [pd.read_csv(f) for f in smk.input[0]],
     )
-    clst_df.to_csv(smk.output[0])
+    clst_df.to_csv(smk.output[0], index=False)
     adata = ad.read_h5ad(smk.input["adata"])
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
     fn.make_cluster_dotplots(
