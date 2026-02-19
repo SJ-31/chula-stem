@@ -155,7 +155,8 @@ make_consensus_plot <- function(obj, palette = NULL) {
     xlab("Sample") +
     ylab("Consensus score") +
     guides(fill = guide_legend(title = "Cluster assignment")) +
-    facet_wrap(~k)
+    facet_wrap(~k) +
+    ggtitle(glue("Features: {prefix}"))
   if (!is.null(palette)) {
     plot <- plot + scale_fill_paletteer_d(palette)
   }

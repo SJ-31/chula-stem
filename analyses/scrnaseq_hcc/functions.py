@@ -337,6 +337,7 @@ def make_cluster_dotplots(
     cluster_results: str | Path | None = None,
     group_rotation: int = 0,
     additional_groups: list | None = None,
+    with_samples: bool = True,
 ) -> None:
     """Save a dotplot for each clustering sweep for a specified combination of
     (feature selection method, integration_method) to a single file
@@ -406,10 +407,12 @@ def make_cluster_dotplots(
                 #                 child.set_rotation(0)
             plot.fig.savefig(save_to_1, bbox_inches="tight")
             doc.insert_file(save_to_1)
-            if col != "sample":
+            if col != "sample" and with_samples:
                 cluster_counts = plot_clusters_in_samples(
                     adata, col, ncol=2
-                ) + gg.theme(figure_size=(15, 10))
+                ) + gg.theme(
+                    figure_size=(15, 10), axis_text_x=gg.element_text(rotation=90)
+                )
                 cluster_counts.save(save_to_2)
                 doc.insert_file(save_to_2)
     doc.save(filename)
