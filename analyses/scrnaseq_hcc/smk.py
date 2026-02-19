@@ -73,9 +73,26 @@ def dr_dispatch(
         raise ValueError(f"Method {method} not recognized")
 
 
-def integrate_data(adata: ad.AnnData, batch_key, name: str, extras: dict, env) -> str:
-    params = env["integration"][name]
-    method = params.get("method", name)
+def integrate_data(
+    adata: ad.AnnData,
+    batch_key,
+    name: str,
+    extras: dict,
+    env,
+    params: dict | None = None,
+    method: str | None = None,
+) -> str:
+    """
+    Parameters
+    ----------
+    name : str
+        Key in `integration` section of configuration providing parameters for an
+        integration method
+    extras : dict
+        Dictionary for retrieving any intermediate output
+    """
+    params = params or env["integration"][name]
+    method = method or params.get("method", name)
     key = get_integration_key(method)
     kws = params.get("kws") or {}
     if method == "scVI":
@@ -229,6 +246,29 @@ def do_dimensionality_reduction():
     result: np.ndarray = dr_dispatch(adata, method, integration_method=imethod, kws=kws)
     np.save(smk.output[0], result, allow_pickle=True)
 
+
+
+def train_scvi_permissive(
+    adata_file: str = smk.input[0],
+    feature_idx_file: str = smk.input[1],
+    params=RCONFIG,
+    env=smk.config,
+):
+    """Helper function for training scVI model after reducing adata to the
+    permissive feature set
+    Input anndata object is `passed_qc`
+    """
+    import scvi
+
+    adata = ad.read_h5ad(adata_file)
+    with open(feature_idx_file, "r") as f:
+        features = f.read().splitlines()
+    adata = adata[:, adata.var.index.isin(features)]
+    batch_key = env["batch_key"]
+    tmp = {}
+    integrate_data(adata, batch_key, "", tmp, env, params=params, method="scVI")
+    model: scvi.model.SCVI = tmp["model"]
+    model.save(smk.output["path"], save_anndata=False, overwrite=True)
 
 
 def save_other_dotplots():
