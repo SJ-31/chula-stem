@@ -582,7 +582,10 @@ def make_dr_slider(
     return slider, display_call
 
 
-# * Enrichment analyses
+# * Sample-level DE
+
+
+# * Cluster analysis
 
 
 def add_clusterings(adata, clusters_to_add: dict[str, list], env: dict) -> list:
@@ -612,6 +615,9 @@ def add_clusterings(adata, clusters_to_add: dict[str, list], env: dict) -> list:
         adata.obs.loc[:, name] = cluster_results[cluster_name]
         added.append(name)
     return added
+
+
+# ** Enrichment
 
 
 def enrich_clusters(
@@ -663,17 +669,55 @@ def enrich_clusters(
         pd.concat(ranked_dfs).to_csv(out, index=False)
 
 
-def do_de_clusters(
-    adata: ad.AnnData, cfg: dict, env: dict
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Perform DE analysis between clusters (OVR) using edgeR"""
+# ** DE
+
+
+def do_de_clusters(method: str, adata: ad.AnnData, cfg: dict, env: dict, **kws) -> dict:
     if exclude := env["cluster_cells"].get("exclude"):
         adata = adata[~adata.obs["sample"].isin(exclude), :]
-    cluster_names = add_clusterings(adata, clusters_to_add=cfg["to_enrich"], env=env)
+    cluster_names = add_clusterings(
+        adata, clusters_to_add=env["chosen_clusters"], env=env
+    )
     extra_contrasts = cfg.get("extra_contrasts")
+    cluster_kws = cfg.get("kws") or {}
+    if method == "edgeR":
+        return de_clusters_edgeR(adata, cluster_names, extra_contrasts, cluster_kws)
+    elif method == "scVI":
+        return de_clusters_scVI(
+            adata, cluster_names, extra_contrasts, cluster_kws, **kws
+        )
+    raise ValueError(f"unsupported method {method}")
+
+
+def de_clusters_scVI(
+    adata: ad.AnnData,
+    cluster_names,
+    extra_contrasts: list | None,
+    kws: dict,
+    model_file,
+    feature_file,
+) -> dict:
+    import scvi
+
+    with open(feature_file, "r") as f:
+        features = f.read().splitlines()
+    adata = adata[:, features]
+    model: scvi.model.SCVI = scvi.model.SCVI.load(model_file, adata)
+    top_de = []
+    for clst in cluster_names:
+        result = model.differential_expression(groupby="clst", **kws)
+        top_de.append(result.assign(contrast=clst))
+    if extra_contrasts:
+        for contrast in extra_contrasts:
+            result = model.differential_expression(**contrast, **kws)
+            top_de.append(result.assign(contrast=contrast))
+    return {"top_de": pd.concat(top_de)}
+
+
+def de_clusters_edgeR(adata: ad.AnnData, cluster_names, extra_contrasts, kws) -> dict:
+    """Perform DE analysis between clusters (OVR) using edgeR"""
     de_counts = []
     all_top = []
-    kws = cfg.get("kws") or {}
     for clst in cluster_names:
         bulked = dc.pp.pseudobulk(
             adata[~adata.obs[clst].isna()], "sample", groups_col=clst
@@ -690,7 +734,7 @@ def do_de_clusters(
             .assign(clustering=clst)
         )
         all_top.append(top_de.assign(clustering=clst))
-    return de_counts, all_top
+    return {"de_counts": pd.concat(de_counts), "top_de": pd.concat(all_top)}
 
 
 # * QC
