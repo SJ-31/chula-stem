@@ -35,6 +35,13 @@ for fs in feature_selection_methods:
     other_outs.update(provide_output_from_fs(fs, config))
 other_outs.update(provide_annotation_output(config))
 
+sample_cluster_keys = config["cluster_samples"]["features"].keys()
+sample_cluster_out = [
+    f"{outdir}/sample_clusters.csv",
+    f"{outdir}/sample_clusters.pdf",
+    f"{outdir}/sample_clusters_consensus.pdf",
+]
+
 if config.get("only_plots", False):
     other_outs = {k: v for k, v in other_outs.items() if k.endswith("PLOT")}
 
@@ -44,6 +51,7 @@ rule all:
         passed_qc,
         permissive_features,
         f"{outdir}/qc",
+        *sample_cluster_out,
         **other_outs,
 
 
@@ -184,10 +192,23 @@ rule cluster_samples:
     params:
         prefix=lambda wc: wc.get("fs"),
     output:
-        f"{outdir}/sample_clusters/{{fs}}.csv",
-        f"{outdir}/sample_clusters/{{fs}}_consensus.pdf",
+        f"{outdir}/.sample_clusters/{{fs}}.csv",
+        f"{outdir}/.sample_clusters/{{fs}}_consensus.pdf",
     script:
         "smk.R"
+
+
+rule gather_sample_clusters:
+    input:
+        expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
+        expand(
+            f"{outdir}/.sample_clusters/{{fs}}_consensus.pdf", fs=sample_cluster_keys
+        ),
+        adata=passed_qc,
+    output:
+        *sample_cluster_out,
+    script:
+        "smk.py"
 
 
 rule do_de:
