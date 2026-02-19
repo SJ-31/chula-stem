@@ -609,14 +609,21 @@ def enrich_clusters(
     gs_df, marker_df = get_gs_and_cell_markers(env, None, True, ("source", "target"))
     if exclude := env["cluster_cells"].get("exclude"):
         adata = adata[~adata.obs["sample"].isin(exclude), :]
-    cluster_names = add_clusterings(adata, clusters_to_add=cfg["to_enrich"], env=env)
+    cluster_names = add_clusterings(
+        adata, clusters_to_add=env["chosen_clusters"], env=env
+    )
     kws = cfg.get("decouple_kws") or {}
     cutoff = cfg.get("cutoff", 0.0001)
     for out, df in zip((gs_out, marker_out), (gs_df, marker_df)):
         ranked_dfs = []
         dc.mt.decouple(adata, df, **kws)
-        dc.mt.consensus(adata)
-        scores: ad.AnnData = dc.pp.get_obsm(adata, key="score_consensus")
+        methods = kws["methods"]
+        if len(methods) > 1:
+            dc.mt.consensus(adata)
+            key = "score_consensus"
+        else:
+            key = f"score_{methods[0]}"
+        scores: ad.AnnData = dc.pp.get_obsm(adata, key=key)
         for clst in cluster_names:
             ranked = dc.tl.rankby_group(scores, groupby=clst)
             ranked = ranked.loc[ranked["pval"] <= cutoff, :].assign(clustering=clst)
