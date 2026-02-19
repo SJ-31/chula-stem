@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+import importlib.resources as res
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -269,14 +270,15 @@ def counts_into_r(
         ro.r(f"rownames({symbol}) <- sample_names")
 
 
-def r_null_if_none(obj, symbol, conversion=lambda x: x) -> None:
+def r_null_if_none(objects: dict, conversion=lambda x: x) -> None:
     """Assign `obj` to R object `symbol` iff obj is not None. Otherwise assign
     NULL to symbol
     """
-    if obj is None:
-        ro.r(f"{symbol} <- NULL")
-    else:
-        ro.globalenv[symbol] = conversion(obj)
+    for symbol, obj in objects.items():
+        if obj is None:
+            ro.r(f"{symbol} <- NULL")
+        else:
+            ro.globalenv[symbol] = conversion(obj)
 
 
 @r_cleanup
@@ -334,11 +336,15 @@ def edgeR_ovr(
 ):
     source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
     adata_to_r(adata, r_symbol="dge", object="dge")
-    kws = ("fc_cutoff", "p_value", "treat", "intercept", "extra_contrasts")
-    namespace = locals()
-    for kw in kws:
-        val = namespace[kw]
-        ro.globalenv[kw] = ro.NULL if val is None else val
+    r_null_if_none(
+        {
+            "fc_cutoff": fc_cutoff,
+            "p_value": p_value,
+            "treat": treat,
+            "intercept": intercept,
+            "extra_contrasts": extra_contrasts,
+        }
+    )
     run = f"""
     result <- edgeR_ovr(dge, '{group}', id_col = '{id_col}',
         fc_cutoff = fc_cutoff,
