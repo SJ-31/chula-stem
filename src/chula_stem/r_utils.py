@@ -333,6 +333,7 @@ def edgeR_ovr(
     treat=True,
     intercept=False,
     extra_contrasts=None,
+    batch_factors: list | None = None,
 ):
     source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
     adata_to_r(adata, r_symbol="dge", object="dge")
@@ -343,6 +344,7 @@ def edgeR_ovr(
             "treat": treat,
             "intercept": intercept,
             "extra_contrasts": extra_contrasts,
+            "batch_factors": batch_factors,
         }
     )
     run = f"""
