@@ -255,8 +255,8 @@ def do_dimensionality_reduction():
 
 
 def train_scvi_permissive(
-    adata_file: str = smk.input[0],
-    feature_idx_file: str = smk.input[1],
+    adata_file: str | None = None,
+    feature_idx_file: str | None = None,
     params=RCONFIG,
     env=smk.config,
 ):
@@ -265,6 +265,9 @@ def train_scvi_permissive(
     Input anndata object is `passed_qc`
     """
     import scvi
+
+    adata_file = adata_file or smk.input[0]
+    feature_idx_file = feature_idx_file or smk.input[1]
 
     adata = ad.read_h5ad(adata_file)
     with open(feature_idx_file, "r") as f:
