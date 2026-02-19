@@ -253,6 +253,49 @@ def do_dimensionality_reduction():
     np.save(smk.output[0], result, allow_pickle=True)
 
 
+def de_internal(
+    adata_file: str,
+    feature_idx_file: str,
+    cluster_file,
+    name: str,
+    output: str,
+    env: dict,
+) -> ad.AnnData | None:
+    with open(feature_idx_file, "r") as f:
+        feature_idx = f.read().splitlines()
+    clst_df: pd.DataFrame = pd.read_csv(cluster_file)
+    adata = ad.read_h5ad(adata_file)
+    adata = adata[:, adata.var.index.isin(feature_idx)]
+    adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
+
+    params = env["de_analysis"][name]
+    method = params.get("method", name)
+    query = params.get("query")
+    kws = params.get("kws") or {}
+    if query:
+        adata = adata[adata.obs.query(query), :]
+    if method == "scVI":
+        import scvi
+
+        model = scvi.model.SCVI.load(smk.input["model"], adata=adata.copy())
+        result = model.differential_expression(**kws)
+    elif method == "edgeR" and (group := kws.pop("groupby")):
+        num_de, result = edgeR_ovr(adata, group=group, **kws)
+    else:
+        raise NotImplementedError()
+    result.reset_index().to_csv(output, index=False)
+
+
+def do_de_samples():
+    de_internal(
+        smk.input["adata"],
+        feature_idx_file=smk.input["features"],
+        cluster_file=smk.input["clusters"],
+        name=smk.params["de_method"],
+        env=smk.config,
+        output=smk.output[0],
+    )
+
 
 def train_scvi_permissive(
     adata_file: str | None = None,
