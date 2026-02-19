@@ -172,3 +172,4 @@ docs
 /lightning_logs/
 /analyses/scrnaseq_hcc/__marimo__/
 /analyses/scrnaseq_hcc/test/
+/analyses/scrnaseq_hcc/test_scanvi/

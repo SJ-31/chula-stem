@@ -177,6 +177,19 @@ rule train_scvi_permissive:
 # * DE analysis
 
 
+rule cluster_samples:
+    input:
+        passed_qc,
+        features=lambda wc: permissive_features if wc.get("fs") == "default" else [],
+    params:
+        prefix=lambda wc: wc.get("fs"),
+    output:
+        f"{outdir}/sample_clusters/{{fs}}.csv",
+        f"{outdir}/sample_clusters/{{fs}}_consensus.pdf",
+    script:
+        "smk.R"
+
+
 rule do_de:
     input:
         adata=passed_qc,
@@ -232,7 +245,7 @@ rule do_de_clusters:
         method=lambda wc: wc.get("method"),
         outdir=anno_out,
     output:
-        f"{outdir}/annotations/cluster-{{method}}_de_genes.csv",
+        f"{outdir}/annotations/clusters-{{method}}_de.csv",
     script:
         "smk.py"
 
