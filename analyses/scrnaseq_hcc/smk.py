@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 
 from collections.abc import Callable
+from functools import reduce
 from pathlib import Path
 
 import anndata as ad
@@ -8,8 +9,11 @@ import chula_stem.sc_rnaseq as sc_utils
 import numpy as np
 import pandas as pd
 import plotnine as gg
+import pymupdf
 import scanpy as sc
+from chula_stem.r_utils import edgeR_ovr
 from loguru import logger
+from pymupdf import Document
 
 import functions as fn
 
@@ -20,6 +24,8 @@ except ImportError:
 
 RNG: int = smk.config["rng"]
 RCONFIG: dict = smk.config.get(smk.rule) or {}
+
+logger.disable("smk")
 
 if len(smk.log) == 1:
     logger.add(smk.log[0])
@@ -325,9 +331,28 @@ def enrich_clusters():
 def do_de_clusters():
     de_counts, top_de = fn.do_de_clusters(
         ad.read_h5ad(smk.input[0]), RCONFIG, smk.config
+
+def gather_sample_clusters():
+    clst_df: pd.DataFrame = reduce(
+        lambda x, y: x.merge(y, on="sample", how="outer"),
+        [pd.read_csv(f) for f in smk.input[0]],
     )
-    de_counts.to_csv(smk.output[0], index=False)
-    top_de.to_csv(smk.output[1], index=False)
+    clst_df.to_csv(smk.output[0])
+    adata = ad.read_h5ad(smk.input["adata"])
+    adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
+    fn.make_cluster_dotplots(
+        adata,
+        filename=smk.output[1],
+        markers={},
+        env=smk.config,
+        additional_groups=[c for c in clst_df.columns if c != "sample"],
+        group_rotation=90,
+        with_samples=False,
+    )
+    doc: Document = pymupdf.open()
+    for d in smk.input[1]:
+        doc.insert_file(d)
+    doc.save(smk.output[2])
 
 
 # * Entry
