@@ -254,7 +254,35 @@ def provide_output_from_fs(fs_name: str, env: dict) -> dict:
     for file in ("similarity", "communities", "ind_clustering"):
         outs[f"{prefix}{file}"] = f"{root}/cfs/{file}.csv"
 
+    # DE analysis
+    # TODO: specify this
+
     return outs
+
+
+def provide_annotation_output(env) -> dict:
+    outdir = env["outdir"]
+    root = f"{outdir}/annotations"
+    result = {
+        "cellassign_predictions": f"{outdir}/cellassign_predictions.csv",
+        "cellassign_run_metrics": f"{outdir}/cellassign_metrics.csv",
+    }
+    if not env.get("chosen_clusters"):
+        return result
+    for csv in (
+        "gene_set_activity",
+        "marker_gene_activity",
+        # TODO: uncomment this after you've set up scVI
+        # "edgeR_de_gene_counts",
+        # "edgeR_de_genes",
+        # "scVI_de_genes",
+    ):
+        if "de_genes" in csv:
+            for level in ("clusters", "samples"):
+                result[csv] = f"{root}/{level}-{csv}.csv"
+        else:
+            result[csv] = f"{root}/{csv}.csv"
+    return result
 
 
 # * Plotting
