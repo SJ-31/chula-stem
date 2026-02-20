@@ -200,8 +200,8 @@ rule cluster_samples:
 
 rule gather_sample_clusters:
     input:
-        expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
-        expand(
+        clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
+        plots=expand(
             f"{outdir}/.sample_clusters/{{fs}}_consensus.pdf", fs=sample_cluster_keys
         ),
         adata=passed_qc,
@@ -226,7 +226,7 @@ rule do_de_samples:
     output:
         f"{anno_out}/.sample_de-{{spec}}.csv",
     script:
-        "smk.R"
+        "smk.py"
 
 
 rule gather_de_samples:
