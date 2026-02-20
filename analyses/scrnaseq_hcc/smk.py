@@ -12,7 +12,6 @@ import plotnine as gg
 import pymupdf
 import scanpy as sc
 from chula_stem.r_utils import edgeR_ovr
-from loguru import logger
 from pymupdf import Document
 
 import functions as fn
@@ -24,11 +23,6 @@ except ImportError:
 
 RNG: int = smk.config["rng"]
 RCONFIG: dict = smk.config.get(smk.rule) or {}
-
-logger.disable("smk")
-
-if len(smk.log) == 1:
-    logger.add(smk.log[0])
 
 
 # * Utility functions
@@ -253,23 +247,17 @@ def do_dimensionality_reduction():
     np.save(smk.output[0], result, allow_pickle=True)
 
 
-def de_internal(
-    adata_file: str,
-    feature_idx_file: str,
-    cluster_file,
-    name: str,
-    output: str,
-    env: dict,
-) -> ad.AnnData | None:
-    with open(feature_idx_file, "r") as f:
+def do_de_samples() -> ad.AnnData | None:
+    with open(smk.input["features"], "r") as f:
         feature_idx = f.read().splitlines()
-    clst_df: pd.DataFrame = pd.read_csv(cluster_file)
-    adata = ad.read_h5ad(adata_file)
+    clst_df: pd.DataFrame = pd.read_csv(smk.input["clusters"])
+    adata = ad.read_h5ad(smk.input["adata"])
     adata = adata[:, adata.var.index.isin(feature_idx)]
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
 
-    params = env["de_analysis"][name]
-    method = params.get("method", name)
+    de_spec = smk.params["spec"]
+    params = smk.config["do_de_samples"][de_spec]
+    method = params.get("method", de_spec)
     query = params.get("query")
     kws = params.get("kws") or {}
     if query:
@@ -283,18 +271,7 @@ def de_internal(
         num_de, result = edgeR_ovr(adata, group=group, **kws)
     else:
         raise NotImplementedError()
-    result.reset_index().to_csv(output, index=False)
-
-
-def do_de_samples():
-    de_internal(
-        smk.input["adata"],
-        feature_idx_file=smk.input["features"],
-        cluster_file=smk.input["clusters"],
-        name=smk.params["de_method"],
-        env=smk.config,
-        output=smk.output[0],
-    )
+    result.reset_index().to_csv(smk.output[0], index=False)
 
 
 def train_scvi_permissive(
@@ -315,7 +292,7 @@ def train_scvi_permissive(
     adata = ad.read_h5ad(adata_file)
     with open(feature_idx_file, "r") as f:
         features = f.read().splitlines()
-    adata = adata[:, adata.var.index.isin(features)]
+    adata = adata[:, adata.var.index.isin(features)].copy()
     batch_key = env["batch_key"]
     tmp = {}
     integrate_data(adata, batch_key, "", tmp, env, params=params, method="scVI")
