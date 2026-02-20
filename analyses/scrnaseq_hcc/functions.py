@@ -20,11 +20,7 @@ import yaml
 from chula_stem.r_utils import edgeR_ovr
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing
-from loguru import logger
 from pymupdf import Document
-
-logger.disable("snakemake")
-logger.disable("rpy2.rinterface")
 
 # * Data prep/retrieval
 
@@ -43,8 +39,8 @@ def prepare_data(file, feature_file, env):
                 droot / patient / "processed" / f"cellranger_{suffix}/{target}"
             )
             if not data_path.exists():
-                logger.warning(
-                    "The files for sample {} ({}) don't exist", patient, suffix
+                print(
+                    "The files for sample {} ({}) don't exist".format(patient, suffix)
                 )
                 continue
             current: ad.AnnData = sc.read_10x_h5(data_path)
@@ -62,7 +58,7 @@ def prepare_data(file, feature_file, env):
         for key, path in extra.items():
             patient, stype, treatment = key.split("|")
             if not Path(path).exists():
-                logger.warning("Path to extra file {} does not exist", path)
+                print(f"WARNING: Path to extra file {path} does not exist")
                 continue
             current = ad.read_h5ad(path)
             current.obs.loc[:, "patient"] = patient
@@ -371,9 +367,7 @@ def make_cluster_dotplots(
     kws = cfg.get("kws") or {}
     totals_kws = cfg.get("totals_kws") or {}
     if isinstance(markers, dict) and (from_cfg := cfg.get("markers")):
-        logger.info(
-            "Adding additional markers from dotplot configuration: {}", from_cfg
-        )
+        print(f"INFO: Adding additional markers from dotplot configuration: {from_cfg}")
         markers.update(from_cfg)
     doc: Document = pymupdf.open()
     transpose = kws.get("swap_axes", False)
