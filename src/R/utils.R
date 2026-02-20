@@ -363,3 +363,32 @@ reduce_by_name <- function(
     )
   })
 }
+
+save_gt_list <- function(tabs, outdir) {
+  got_lib <- FALSE
+  dir.create(outdir)
+  lib <- glue("{outdir}/lib")
+  html_parts <- lapply(tabs, \(t) {
+    dir <- tempdir()
+    temp_file <- tempfile(fileext = ".html", tmpdir = dir)
+    gtsave(t, filename = temp_file)
+    cur_lib <- glue("{dir}/lib")
+    if (!got_lib && dir.exists(cur_lib)) {
+      dir.create(lib)
+      file.copy(cur_lib, outdir, recursive = TRUE)
+      got_lib <<- TRUE
+    }
+    readLines(temp_file)
+  })
+  file <- glue("{outdir}/index.html")
+  tryCatch(
+    {
+      combined_html <- unlist(html_parts)
+      writeLines(combined_html, file)
+    },
+    error = \(e) {
+      unlink(outdir, recursive = TRUE)
+      stop(e)
+    }
+  )
+}
