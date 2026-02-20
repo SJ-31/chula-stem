@@ -714,11 +714,11 @@ def de_clusters_scVI(
     top_de = []
     for clst in cluster_names:
         result = model.differential_expression(groupby=clst, **kws)
-        top_de.append(result.assign(grouping=f"Clustering: {clst}"))
+        top_de.append(result.assign(clustering=clst))
     if extra_contrasts:
         for contrast in extra_contrasts:
             result = model.differential_expression(**contrast, **kws)
-            top_de.append(result.assign(grouping="None"))
+            top_de.append(result.assign(clustering="extra"))
     return {
         "top_de": pd.concat(top_de)
         .reset_index(names="gene")
