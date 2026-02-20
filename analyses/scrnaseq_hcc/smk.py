@@ -357,9 +357,16 @@ def enrich_clusters():
 
 def do_de_clusters():
     method = smk.params["method"]
-    cfg = RCONFIG.get(method)
+    cfg = RCONFIG.get(method) or {}
     adata = ad.read_h5ad(smk.input["adata"])
-    res = fn.do_de_clusters(method, adata, cfg, smk.config)
+    res = fn.do_de_clusters(
+        method,
+        adata,
+        cfg,
+        smk.config,
+        model_file=smk.input["model"],
+        features=smk.input["features"],
+    )
     if method == "edgeR":
         res["de_counts"].to_csv(
             f"{smk.params['outdir']}/edgeR_de_gene_counts.csv", index=False
@@ -370,8 +377,8 @@ def do_de_clusters():
 def gather_sample_clusters():
     clst_df: pd.DataFrame = reduce(
         lambda x, y: x.merge(y, on="sample", how="outer"),
-        [pd.read_csv(f) for f in smk.input[0]],
-    )
+        [pd.read_csv(f) for f in smk.input["clusters"]],
+    ).astype("string")
     clst_df.to_csv(smk.output[0], index=False)
     adata = ad.read_h5ad(smk.input["adata"])
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
@@ -385,7 +392,7 @@ def gather_sample_clusters():
         with_samples=False,
     )
     doc: Document = pymupdf.open()
-    for d in smk.input[1]:
+    for d in smk.input["plots"]:
         doc.insert_file(d)
     doc.save(smk.output[2])
 
