@@ -261,7 +261,8 @@ def do_de_samples() -> ad.AnnData | None:
     query = params.get("query")
     kws = params.get("kws") or {}
     if query:
-        adata = adata[adata.obs.query(query), :]
+        kept_ids = adata.obs.query(query).index
+        adata = adata[adata.obs.index.isin(kept_ids), :]
     if method == "scVI":
         import scvi
 
@@ -275,7 +276,7 @@ def do_de_samples() -> ad.AnnData | None:
         num_de, result = edgeR_ovr(adata, group=group, **kws)
     else:
         raise NotImplementedError()
-    result.reset_index().to_csv(smk.output[0], index=False)
+    result.to_csv(smk.output[0], index=False)
 
 
 def train_scvi_permissive(
