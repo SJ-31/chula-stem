@@ -5,6 +5,7 @@ suppressMessages({
   library(tidyverse)
   library(duckdb)
   library(gt)
+  library(memoise)
   library(glue)
   library(dbplyr)
   use_condaenv("stem-base")
@@ -51,7 +52,7 @@ cc_clusterings <- NULL
 
 ## * Table functions
 
-make_enrichment_table <- function(
+make_enrichment_table_helper <- function(
   ltb,
   clustering,
   cluster,
@@ -66,10 +67,11 @@ make_enrichment_table <- function(
     collect() |>
     gt() |>
     fmt_number(columns = c(stat, meanchange, pval, padj)) |>
-    opt_interactive() |>
+    opt_interactive(page_size_default = 5) |>
     tab_header(title)
 }
 
+make_enrichment_table <- memoise(make_enrichment_table_helper)
 
 ## * Application
 
