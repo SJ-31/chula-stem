@@ -216,6 +216,11 @@ rule do_de_samples:
         adata=passed_qc,
         features=permissive_features,
         clusters=f"{outdir}/sample_clusters.csv",
+        model=lambda wc: (
+            f"{outdir}/scVI_permissive"
+            if config["do_de_samples"][wc.get("spec")].get("method") == "scVI"
+            else []
+        ),
     params:
         spec=lambda wc: wc.get("spec"),
     output:
@@ -228,7 +233,7 @@ rule gather_de_samples:
     input:
         expand(
             f"{anno_out}/.sample_de-{{spec}}.csv",
-            spec=config["de_analysis"].keys(),
+            spec=config["do_de_samples"].keys(),
         ),
     output:
         f"{anno_out}/samples_de.csv",
