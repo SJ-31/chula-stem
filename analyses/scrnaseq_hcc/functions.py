@@ -275,7 +275,7 @@ def provide_annotation_output(env) -> dict:
         "marker_gene_activity",
         "clusters-edgeR_de",
         "clusters-scVI_de",
-        "samples_de.csv",
+        "samples_de",
     ):
         if csv.startswith("clusters") and not env.get("chosen_clusters"):
             continue
@@ -668,19 +668,31 @@ def enrich_clusters(
 # ** DE
 
 
-def do_de_clusters(method: str, adata: ad.AnnData, cfg: dict, env: dict, **kws) -> dict:
+def do_de_clusters(
+    method: str,
+    adata: ad.AnnData,
+    cfg: dict,
+    env: dict,
+    features: str = str,
+    model_file: str = str,
+) -> dict:
     if exclude := env["cluster_cells"].get("exclude"):
         adata = adata[~adata.obs["sample"].isin(exclude), :]
     cluster_names = add_clusterings(
         adata, clusters_to_add=env["chosen_clusters"], env=env
     )
-    extra_contrasts = cfg.get("extra_contrasts")
+    extra_contrasts = cfg.get("extra_contrasts") or {}
     cluster_kws = cfg.get("kws") or {}
     if method == "edgeR":
         return de_clusters_edgeR(adata, cluster_names, extra_contrasts, cluster_kws)
     elif method == "scVI":
         return de_clusters_scVI(
-            adata, cluster_names, extra_contrasts, cluster_kws, **kws
+            adata,
+            cluster_names,
+            extra_contrasts,
+            kws=cluster_kws,
+            model_file=model_file,
+            feature_file=features,
         )
     raise ValueError(f"unsupported method {method}")
 
