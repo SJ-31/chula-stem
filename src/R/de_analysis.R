@@ -7,7 +7,13 @@ library(edgeR)
 #' @return A contrast matrix of where each column is a testing contrast
 #' The ith column of the matrix performs the comparison where the ith level of `objs` is
 #' tested against the mean of all other levels
-ovr_contrasts <- function(objs, design, prefix = "", intercept = FALSE) {
+ovr_contrasts <- function(
+  objs,
+  design,
+  prefix = "",
+  suffix = " vs Rest",
+  intercept = FALSE
+) {
   if (!is.factor(objs)) {
     objs <- as.factor(objs)
   }
@@ -21,7 +27,7 @@ ovr_contrasts <- function(objs, design, prefix = "", intercept = FALSE) {
     contr[1, ] <- 0
   }
   rownames(contr) <- colnames(design)
-  colnames(contr) <- paste0(prefix, levels(objs))
+  colnames(contr) <- paste0(prefix, levels(objs), suffix)
   contr
 }
 

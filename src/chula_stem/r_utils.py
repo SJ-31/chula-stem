@@ -44,6 +44,8 @@ def adata_to_r(
         df_to_r(adata.obs, "samples")
         df_to_r(adata.var, "genes")
         ro.r(f"{id} <- edgeR::DGEList(t(counts), samples = samples, genes = genes)")
+        ro.r(f"rownames({id}) <- rownames(genes)")
+        ro.r(f"colnames({id}) <- rownames(samples)")
         _ = [ro.r(f"rm({f})") for f in ["counts", "samples", "genes"]]
     if not r_symbol:
         return ro.r(id)
@@ -327,7 +329,7 @@ def pooled_normalization(
 def edgeR_ovr(
     adata: ad.AnnData,
     group,
-    id_col="hgnc_symbol",
+    id_col: str | None = None,
     fc_cutoff=1.5,
     p_value=0.05,
     treat=True,
@@ -337,6 +339,9 @@ def edgeR_ovr(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
     adata_to_r(adata, r_symbol="dge", object="dge")
+    if id_col is None:
+        ro.r("dge$genes$gene <- rownames(dge)")
+        id_col = "gene"
     r_null_if_none(
         {
             "fc_cutoff": fc_cutoff,
