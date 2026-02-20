@@ -109,6 +109,7 @@ do_cfs <- function(adata = NULL, kws = NULL, setup_kws = NULL) {
 
 cluster_samples <- function() {
   library(ConsensusClusterPlus)
+  dc <- import("decoupler")
 
   adata <- ad$read_h5ad(snakemake@input[[1]])
   features <- read_lines(snakemake@input[[2]])
