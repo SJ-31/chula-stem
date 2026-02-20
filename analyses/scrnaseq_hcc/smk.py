@@ -266,7 +266,11 @@ def do_de_samples() -> ad.AnnData | None:
         import scvi
 
         model = scvi.model.SCVI.load(smk.input["model"], adata=adata.copy())
-        result = model.differential_expression(**kws)
+        result = (
+            model.differential_expression(**kws)
+            .reset_index(names="gene")
+            .rename(columns={"comparison": "contrast"})
+        )
     elif method == "edgeR" and (group := kws.pop("groupby")):
         num_de, result = edgeR_ovr(adata, group=group, **kws)
     else:

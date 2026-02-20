@@ -714,20 +714,16 @@ def de_clusters_scVI(
     top_de = []
     for clst in cluster_names:
         result = model.differential_expression(groupby=clst, **kws)
-        top_de.append(
-            result.assign(grouping=f"Clustering: {clst}").rename(
-                columns={"comparison": "contrast"}
-            )
-        )
+        top_de.append(result.assign(grouping=f"Clustering: {clst}"))
     if extra_contrasts:
         for contrast in extra_contrasts:
             result = model.differential_expression(**contrast, **kws)
-            top_de.append(
-                result.assign(grouping="None").rename(
-                    columns={"comparison": "contrast"}
-                )
-            )
-    return {"top_de": pd.concat(top_de)}
+            top_de.append(result.assign(grouping="None"))
+    return {
+        "top_de": pd.concat(top_de)
+        .reset_index(names="gene")
+        .rename(columns={"comparison": "contrast"})
+    }
 
 
 def de_clusters_edgeR(adata: ad.AnnData, cluster_names, extra_contrasts, kws) -> dict:
