@@ -1,6 +1,7 @@
 suppressMessages({
   library(reticulate)
   library(tidyverse)
+  library(glue)
   if (exists("snakemake")) {
     use_condaenv(snakemake@config$conda)
   } else {
@@ -118,7 +119,7 @@ cluster_samples <- function() {
 
   kws <- RCONFIG$kws
 
-  bulked <- dc$pp$pseudobulk(tmp, "sample", groups_col = NULL)
+  bulked <- dc$pp$pseudobulk(adata, "sample", groups_col = NULL)
   gene_mask <- sc$pp$filter_genes(bulked, min_counts = 50, inplace = FALSE)
   cell_mask <- sc$pp$filter_cells(bulked, min_counts = 50, inplace = FALSE)
   bulked <- bulked[cell_mask[[1]], gene_mask[[1]]]
@@ -134,21 +135,25 @@ cluster_samples <- function() {
 
   plot <- make_consensus_plot(
     consensus$itemConsensus,
-    RCONFIG$consensus_palette
+    RCONFIG$consensus_palette,
+    prefix = prefix
   )
   tb <- lapply(seq(2, length(result)), \(k) {
     clst <- result[[k]]$consensusClass
-    tibble(sample = names(clst), !!as.symbol(k) := paste0(prefix, "_", clst))
+    tibble(
+      sample = names(clst),
+      !!as.symbol(paste0(prefix, "_", k)) := clst
+    )
   }) |>
     purrr::reduce(\(x, y) inner_join(x, y, by = join_by(sample)))
 
   write_csv(tb, snakemake@output[[1]])
-  ggsave(plot, snakemake@output[[2]])
+  ggsave(snakemake@output[[2]], plot = plot, width = 25)
 }
 
-make_consensus_plot <- function(obj, palette = NULL) {
+make_consensus_plot <- function(obj, prefix, palette = NULL) {
   plot <- ggplot(
-    consensus$itemConsensus,
+    obj,
     aes(x = item, y = itemConsensus, fill = factor(cluster))
   ) +
     geom_bar(position = "fill", stat = "identity") +
