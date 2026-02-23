@@ -141,6 +141,19 @@ def select_features(
 # * Rules
 
 
+def gprofiler_enrich():
+    sample_level = pd.read_csv(smk.input["sample_level"])
+    sl = fn.profile_de_results(sample_level, level="sample", **RCONFIG)
+    sl.to_csv(smk.output["sample_level"])
+    tmp = []
+    for infile in (Path(p) for p in smk.input["cluster_level"]):
+        method = infile.stem.removeprefix("clusters-").removesuffix("_de")
+        df = pd.read_csv(infile)
+        cur = fn.profile_de_results(df, level="sample", **RCONFIG).assign(method=method)
+        tmp.append(cur)
+    pd.concat(cur).to_csv(smk.output["cluster_level"])
+
+
 def integrate(adata: ad.AnnData | None = None, cfg: dict = None):
     """
     1. Identify and subset to HVGs, accounting for batch

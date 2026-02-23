@@ -760,6 +760,31 @@ def de_clusters_edgeR(adata: ad.AnnData, cluster_names, extra_contrasts, kws) ->
     return {"de_counts": pd.concat(de_counts), "top_de": pd.concat(all_top)}
 
 
+def profile_de_results(
+    de_df: pd.DataFrame, level: Literal["cluster", "sample"], **kws
+) -> pd.DataFrame:
+    """Use GProfiler to identify enriched pathways in DE genes identified by the
+    `do_de_clusters` and `do_de_samples` rules
+    """
+    gp = GProfiler(return_dataframe=True)
+    if level == "cluster":
+        tmp = []
+        for cluster in de_df["clustering"].unique():
+            cur = de_df.query("clustering == @cluster")
+            contrast2gene: dict = (
+                cur.groupby("contrast").agg({"gene": list}).to_dict()["gene"]
+            )
+            result = (
+                gp.profile(query=contrast2gene, **kws)
+                .assign(clustering=cluster)
+                .rename(columns={"query": "contrast"})
+            )
+            tmp.append(result)
+        return pd.concat(tmp)
+    contrast2gene = de_df.groupby("contrast").agg({"gene": list}).to_dict()["gene"]
+    return gp.profile(query=contrast2gene, **kws).rename(columns={"query": "contrast"})
+
+
 # * QC
 
 

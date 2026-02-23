@@ -295,6 +295,21 @@ rule do_de_clusters:
         "smk.py"
 
 
+# Enrich DE genes with gprofiler
+rule gprofiler_enrich:
+    input:
+        sample_level=f"{anno_out}/samples_de.csv",
+        cluster_level=expand(
+            f"{anno_out}/clusters-{{method}}_de.csv",
+            method=["scVI", "edgeR"],
+        ),
+    output:
+        cluster_level=f"{anno_out}/clusters_de_gprofiler.csv",
+        sample_level=f"{anno_out}/samples_de_gprofiler.csv",
+    script:
+        "smk.py"
+
+
 # * Plotting
 rule save_other_dotplots:
     input:
