@@ -19,7 +19,7 @@ import snakemake.io
 import yaml
 from chula_stem.r_utils import edgeR_ovr
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
-from chula_stem.utils import read_existing
+from chula_stem.utils import read_existing, set_cover_on_dc_results
 from pymupdf import Document
 
 # * Data prep/retrieval
@@ -661,8 +661,17 @@ def enrich_clusters(
         for clst in cluster_names:
             ranked = dc.tl.rankby_group(scores, groupby=clst)
             ranked = ranked.loc[ranked["pval"] <= cutoff, :].assign(clustering=clst)
-            ranked_dfs.append(ranked)
-        pd.concat(ranked_dfs).to_csv(out, index=False)
+            ranked_dfs.append(reduced)
+        combined = pd.concat(ranked_dfs)
+        reduced = (
+            set_cover_on_dc_results(combined, net=df, coverage=cfg.get("coverage", 100))
+            .loc[:, ["group", "reference", "name"]]
+            .assign(redundant=False)
+        )
+        combined = combined.merge(reduced, on=["group", "reference", "name"]).fillna(
+            {"redundant": True}, axis="columns"
+        )
+        combined.to_csv(out, index=False)
 
 
 # ** DE
