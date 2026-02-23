@@ -276,6 +276,8 @@ def provide_annotation_output(env) -> dict:
         "clusters-edgeR_de",
         "clusters-scVI_de",
         "samples_de",
+        "samples_de_gprofiler",
+        "clusters_de_gprofiler",
     ):
         if csv.startswith("clusters") and not env.get("chosen_clusters"):
             continue
@@ -661,16 +663,16 @@ def enrich_clusters(
         for clst in cluster_names:
             ranked = dc.tl.rankby_group(scores, groupby=clst)
             ranked = ranked.loc[ranked["pval"] <= cutoff, :].assign(clustering=clst)
-            ranked_dfs.append(reduced)
+            ranked_dfs.append(ranked)
         combined = pd.concat(ranked_dfs)
         reduced = (
             set_cover_on_dc_results(combined, net=df, coverage=cfg.get("coverage", 100))
             .loc[:, ["group", "reference", "name"]]
             .assign(redundant=False)
         )
-        combined = combined.merge(reduced, on=["group", "reference", "name"]).fillna(
-            {"redundant": True}, axis="columns"
-        )
+        combined = combined.merge(
+            reduced, on=["group", "reference", "name"], how="left"
+        ).fillna({"redundant": True})
         combined.to_csv(out, index=False)
 
 
