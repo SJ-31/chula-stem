@@ -374,6 +374,14 @@ def make_cluster_dotplots(
     if isinstance(markers, dict) and (from_cfg := cfg.get("markers")):
         print(f"INFO: Adding additional markers from dotplot configuration: {from_cfg}")
         markers.update(from_cfg)
+    for k, genes in markers.items():
+        not_in_adata = [g for g in genes if g not in adata.var_names]
+        if not_in_adata:
+            print(f"""
+            WARNING: the following genes in the marker set {k} are not present in adata.var
+            """)
+            markers[k] = [g for g in genes if g in adata.var_names]
+
     doc: Document = pymupdf.open()
     transpose = kws.get("swap_axes", False)
     with TemporaryDirectory() as tmp:
