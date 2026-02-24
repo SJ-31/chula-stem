@@ -13,13 +13,9 @@ import pymupdf
 import scanpy as sc
 from chula_stem.r_utils import edgeR_ovr
 from pymupdf import Document
+from snakemake.script import snakemake as smk
 
 import functions as fn
-
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {}, "log": [0]})
 
 RNG: int = smk.config["rng"]
 RCONFIG: dict = smk.config.get(smk.rule) or {}
@@ -39,7 +35,7 @@ def dr_dispatch(
         import torchdr as tdr
 
         if integration_method == "unintegrated":
-            x: np.ndarray = adata.obsm["X_pca"][:, : cfg["n_pcs"]]
+            x: np.ndarray = adata.obsm["X_pca"][:, : RCONFIG["n_pcs"]]
             kws["init"] = "normal"
         else:
             x = adata.obsm[get_integration_key(integration_method)]
@@ -149,12 +145,14 @@ def gprofiler_enrich():
     for infile in (Path(p) for p in smk.input["cluster_level"]):
         method = infile.stem.removeprefix("clusters-").removesuffix("_de")
         df = pd.read_csv(infile)
-        cur = fn.profile_de_results(df, level="sample", **RCONFIG).assign(method=method)
+        cur = fn.profile_de_results(df, level="cluster", **RCONFIG).assign(
+            method=method
+        )
         tmp.append(cur)
-    pd.concat(cur).to_csv(smk.output["cluster_level"])
+    pd.concat(tmp).to_csv(smk.output["cluster_level"], index=False)
 
 
-def integrate(adata: ad.AnnData | None = None, cfg: dict = None):
+def integrate(adata: ad.AnnData | None = None, cfg: dict | None = None):
     """
     1. Identify and subset to HVGs, accounting for batch
     2. Integrate data across batches
@@ -188,7 +186,7 @@ def integrate(adata: ad.AnnData | None = None, cfg: dict = None):
     integrated.write_h5ad(smk.output[0])
 
 
-def cluster_cells(cfg: dict = None):
+def cluster_cells(cfg: dict | None = None):
     adata = ad.read_h5ad(smk.input[0])
     integration_layer = ad.read_h5ad(smk.input[1])
     adata.obsm.update(integration_layer.obsm)

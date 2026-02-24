@@ -20,6 +20,7 @@ import yaml
 from chula_stem.r_utils import edgeR_ovr
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing, set_cover_on_dc_results
+from gprofiler import GProfiler
 from pymupdf import Document
 
 # * Data prep/retrieval
@@ -48,6 +49,7 @@ def prepare_data(file, feature_file, env):
             current = ad.read_h5ad(row[file_key])
         current.obs_names_make_unique()
         current.var_names_make_unique()
+        assert isinstance(current.obs, pd.DataFrame)
         current.obs.loc[:, "sample"] = f"{patient}_{suffix}"
         current.obs.loc[:, "patient"] = patient
         current.obs.loc[:, "flowcell"] = row["flowcell"]
@@ -61,6 +63,7 @@ def prepare_data(file, feature_file, env):
                 print(f"WARNING: Path to extra file {path} does not exist")
                 continue
             current = ad.read_h5ad(path)
+            assert isinstance(current.obs, pd.DataFrame)
             current.obs.loc[:, "patient"] = patient
             current.obs.loc[:, "sample"] = f"{patient}_{stype}-{treatment}"
             current.obs.loc[:, "type"] = stype
@@ -400,6 +403,7 @@ def make_cluster_dotplots(
                 #         if isinstance(child, Text):
                 #             if child.get_text():
                 #                 child.set_rotation(0)
+            plot.fig.set_dpi(500)
             plot.fig.savefig(save_to_1, bbox_inches="tight")
             doc.insert_file(save_to_1)
             if col != "sample" and with_samples:
