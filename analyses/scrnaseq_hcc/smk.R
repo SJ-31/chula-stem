@@ -1,6 +1,7 @@
 suppressMessages({
   library(reticulate)
   library(tidyverse)
+  library(paletteer)
   library(glue)
   if (exists("snakemake")) {
     use_condaenv(snakemake@config$conda)
@@ -10,6 +11,7 @@ suppressMessages({
   ad <- import("anndata")
   sc <- import("scanpy")
   sc_utils <- import("chula_stem.sc_rnaseq")
+  source(glue("{snakemake@config$r_src}/utils.R"))
 })
 
 
@@ -167,6 +169,56 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
     plot <- plot + scale_fill_paletteer_d(palette)
   }
   plot
+}
+
+## * Visualizing DE genes & enriched pathways
+
+# TODO: rename after the rule
+prepare_tflink <- function() {
+  id_map <- snakemake@config$gene_reference
+  tflink_mitab <- RCONFIG$tflink_mitab
+  tflink <- simplify_tflink_mitab(tflink_mitab)
+  ncbi2hgnc <- setNames(id_map$hgnc_symbol, id_map$entrezgene_id)
+  tflink$regulator <- ncbi2hgnc[tflink$regulator]
+  tflink$target <- ncbi2hgnc[tflink$target]
+  tflink <- filter(tflink, !(is.na(target) | is.na(regulator)))
+
+  as_tbl_graph(tflink, directed = TRUE) |>
+    activate(edges) |>
+    mutate(ends = "last")
+}
+
+plot_de_regulatory <- function(G) {
+  ggraph(G, "kk") +
+    geom_edge_link(
+      arrow = grid::arrow(
+        ends = E(G)$ends,
+        type = "closed",
+        angle = 25,
+        length = unit(0.1, "inches")
+      ),
+      end_cap = circle(0.75, "cm"),
+      start_cap = circle(0.75, "cm")
+    ) +
+    geom_node_point(
+      aes(fill = is_de, color = lfc, stroke = abs(lfc)),
+      shape = 21,
+      size = 5,
+    ) +
+    geom_node_label(aes(label = name), repel = TRUE) +
+    theme(panel.background = element_rect(fill = "white")) +
+    scale_color_paletteer_c("ggthemes::Green-Gold") +
+    guides(
+      fill = guide_legend("Is DE"),
+      color = guide_legend("LFC")
+    )
+}
+
+visualize_regulation <- function() {
+  library(tidygraph)
+  library(ggraph)
+
+  tflink_g <- prepare_tflink()
 }
 
 ## * Entry
