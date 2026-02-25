@@ -18,6 +18,7 @@ manifest_file_key: null # Set to null to take from the cellranger directory
 conda: stem-base
 args: ?args
 workdir: ?workdir
+r_src: ?f"{proj_root}/src/R"
 outdir: ?outdir
 data_root: ?f"{data_root}/output/HCC/SCRNASEQ"
 logdir: ?f"{workdir}/logs" if not test else f"{workdir}/test/logs"
@@ -115,25 +116,32 @@ normalization:
 
 # * Sample clustering
 cluster_samples:
-  features: # The value can be a file, or list of features to use.
-    # The special key `default` means to use `permissive_features` from the pipeline
+  features:
     default: null
   consensus_palette: null
   kws:
     maxK: 8
     reps: 1000
-    distance: pearson # 1-Pearson correlation
+    distance: pearson
 
 # * DE analyses
 do_de_samples: # Takes the filtered data as input
-  edgeR_subtype:
-    method: edgeR # TODO: need to cluster beforehand so that you can specify
-    # the groupby key correctly
+  # BUG: [2026-02-24 Tue] this doesn't work for some reason
+  # edgeR_subtype:
+  #   method: edgeR # TODO: need to cluster beforehand so that you can specify
+  #   # the groupby key correctly
+  #   query: type == 'tumor' & treatment == 'control'
+  #   kws:
+  #     groupby: "default_4"
+  #     # batch_factors: ?this['batch_key']
+  scVI_subtype:
+    method: scVI
     query: type == 'tumor' & treatment == 'control'
     kws:
-      groupby: "default_3"
-      batch_factors: ?this['batch_key']
-  scVI_subtype:
+      groupby: "default_4"
+      mode: "change"
+      batch_correction: true
+  scVI_patient:
     method: scVI
     query: type == 'tumor' & treatment == 'control'
     # Use query to filter samples beforehand
@@ -190,8 +198,6 @@ gene_set_files: ?[f"{proj_root}/analyses/data/hcc_reference/gene_sets.yaml"]
 marker_files: ?[f"{proj_root}/analyses/data/hcc_reference/cell_markers.yaml"]
 
 # * Cell type annotation
-chosen_cluster_key: null
-# Set this once clusters have been evaluated and a specific clustering is chosen
 
 dotplot:
   markers:
@@ -200,9 +206,14 @@ dotplot:
       - LIN28B
       - GPC3 # glypican 3
       - AFP # Alpha-fetoprotein
+    mage:
       - MAGEA1
       - MAGEA2
       - MAGEA3
+      - MAGEA11 # Found DE in clusters by edgeR
+      - MAGEA4 # Found DE in clusters by edgeR
+      - MAGEA8 # Found DE in clusters by edgeR
+      - MAGEA9B # Found DE in clusters by edgeR
     stemness_tfs:
       - SOX2
       - NANOG
@@ -211,12 +222,28 @@ dotplot:
       - POU5F1 # Oct4
       - KLF4
       - MYC # c-Myc
+    stemness_surface:
+      - CD44
+      - CD133
+      - CD117
     disco_cholangiocyte:
       - KRT7
       - KRT19
       - SPP1
       - ALB
       - SERPINA1
+    emt:
+      - MMP2 # Matrix metalloproteinases
+      -
+      - CDH2 # Mesenchymal marker
+    tcga_idh:
+      - IDH1
+      - IDH2
+      - MIR122
+    tcga_p53:
+      - TP53
+      - MDM4
+      - PTCHD4
   kws:
     gene_symbols: hgnc_symbol
     cmap: "Greens"
@@ -240,22 +267,26 @@ cellassign:
 # Only specified clusterings are used as input to the routine, determine by reviewing
 # the cluster plots
 chosen_clusters: # List of lists: [feature_selection, integration, cluster_name]
-  leiden_res0.5: [seurat, scVI, leiden_res0.5]
+  leiden_res0.1: [seurat, scVI, leiden_res0.1]
   leiden_res0.01: [seurat, scVI, leiden_res0.01]
 
 do_de_clusters:
-  # scVI:
+  scVI:
+    kws:
+      mode: "change"
   edgeR:
     kws:
       p_value: 0.0001
       fc_cutoff: 1.2
       batch_factors: ["flowcell"]
     extra_contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
-      leiden_res0.5:
-        - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
+      null
+      # leiden_res0.5:
+      #   - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
 
 enrich_clusters:
   cutoff: 0.0001
+  coverage: 0.95
   decouple_kws:
     methods: [ulm]
     layer: lshift_normalized
@@ -263,3 +294,13 @@ enrich_clusters:
 # let feature i be the AFP gene. We model the observed statistic e.g. expression of AFP
 # as expr(AFP) = intercept + beta_1x1 + beta_2x2 ...  + beta_px_p + error
 # If x_i is 0 if AFP is not present in the ith feature set and 1 otherwise
+
+# * Visualize DE & enrichment results
+visualize_pathways:
+  to_show:
+    leiden0.01: [4, 5]
+    leiden0.1: [3]
+
+visualize_regulation:
+  tflink_mitab: ?f"{proj_root}/analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
+  to_show:

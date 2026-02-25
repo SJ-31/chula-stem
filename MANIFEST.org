@@ -1,4 +1,23 @@
 # -*- eval: (jinx-mode -1) -*-
+* TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv
+*Relative Path:* =analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv=
+*Date Added:* <2026-02-25 Wed>
+*Source:* [[https://tflink.net/download/][Homo sapiens small-scale interaction table]]
+In MITAB format (see [[https://psicquic.github.io/MITAB28Format.html][here]]). All entries were verified with small-scale experimental evidence
+* human_core_ regulator data
+*Relative Path:* =analyses/data/hcc_reference/human_core_{Regulator_Gene,TF_Target}.txt=
+*Date Added:* <2026-02-25 Wed>
+*Source:* [[http://www.zpliulab.cn/RegNetwork/download][Core data]]
+Regulatory interactions for core human genes
+* signalink_liver_network.csv
+*Relative Path:* =analyses/data/hcc_reference/signalink_liver_network.cys=
+*Date Added:* <2026-02-24 Tue>
+*Source:* [[http://signalink.org/download][Signalink v3.1 Liver]]
++ Obtained by selecting...
+  * species: "human"
+  * all pathways
+  * Pathway regulators, pathway mambers, and transcriptional regulators
+  * liver localization
 * cell_markers.yaml, gene_sets.yaml
 *Relative Path:* =analyses/data/hcc_reference/cell_markers.yaml=
 *Date Added:* <2026-02-11 Wed>
