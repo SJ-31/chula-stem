@@ -370,3 +370,76 @@ plot_sample_variants <- function(
 
   pyplt$savefig(gv, outfile, custom_legend = cmap)
 }
+
+## * Graph visualizations
+
+prepare_tflink <- function(gene_reference, mitab_file) {
+  id_map <- gene_reference
+  tflink <- simplify_tflink_mitab(mitab_file)
+  ncbi2hgnc <- setNames(id_map$hgnc_symbol, id_map$entrezgene_id)
+  tflink$regulator <- ncbi2hgnc[tflink$regulator]
+  tflink$target <- ncbi2hgnc[tflink$target]
+  tflink <- filter(tflink, !(is.na(target) | is.na(regulator)))
+
+  as_tbl_graph(tflink, directed = TRUE) |>
+    activate(edges) |>
+    mutate(ends = "last") |>
+    rename(
+      elabel = replace_values(
+        regulator_type,
+        NA ~ "",
+        "activator" ~ "activates",
+        "repressor" ~ "represses",
+        "activator|repressor" ~ "activates|represses"
+      )
+    )
+}
+
+prepare_reactome_fi <- function(file) {
+  read_tsv(file) |>
+    filter(!str_detect(Annotation, "expression") & Annotation != "predicted") |>
+    as_tbl_graph() |>
+    activate(edges) |>
+    mutate(
+      ends = replace_values(
+        Direction,
+        c("<-", "|-", "<-|") ~ "first",
+        c("->", "-|", "|->") ~ "last",
+        c("<->", "|-|") ~ "both",
+        "-" ~ "last" # This is wrong, but we can remove the arrow by setting angle to 0
+      )
+    ) |>
+    rename(elabel = "Annotation")
+}
+
+plot_de_graph <- function(G) {
+  ends <- E(G)$ends
+  activate(G, nodes) |>
+    mutate(lfc = replace_values(lfc, !is_de ~ NA)) |>
+    ggraph("kk") +
+    geom_edge_link(
+      aes(label = elabel),
+      angle_calc = "along",
+      label_dodge = unit(3, "mm"),
+      arrow = grid::arrow(
+        ends = ends,
+        type = "closed",
+        angle = ifelse(is.na(ends), 0, 25),
+        length = unit(0.1, "inches")
+      ),
+      end_cap = circle(1, "cm"),
+      start_cap = circle(1, "cm")
+    ) +
+    geom_node_label(
+      aes(label = name, fill = lfc, fontface = ifelse(is_de, "bold", "plain")),
+    ) +
+    theme(panel.background = element_rect(fill = "white")) +
+    scale_fill_paletteer_c(
+      "grDevices::Cyan-Magenta",
+      na.value = "white"
+    ) +
+    guides(
+      fill = guide_legend("LFC"),
+      color = guide_legend("LFC")
+    )
+}

@@ -392,3 +392,90 @@ save_gt_list <- function(tabs, outdir) {
     }
   )
 }
+
+
+#' Simplify the information in the MITAB file provided by
+#' TFLINK
+#'
+simplify_tflink_mitab <- function(mitab_file) {
+  header <- c(
+    "uniqueID_A",
+    "uniqueID_B",
+    "alternativeID_A",
+    "alternativeID_B",
+    "alias_A",
+    "alias_B",
+    "detectionMethod",
+    "firstAuthor",
+    "pubmedID",
+    "taxonomyID_A",
+    "taxonomyID_B",
+    "interactionType",
+    "sourceDatabase",
+    "interactionID_source",
+    "confidenceScore",
+    "complexExpansion",
+    "biolRole_A",
+    "biolRole_B",
+    "experimentalRole_A",
+    "experimentalRole_B",
+    "interactorType_A",
+    "interactorType_B",
+    "xref_A",
+    "xref_B",
+    "xref_interaction",
+    "annotation_A",
+    "annotation_B",
+    "annotation_int",
+    "taxonomyID_host",
+    "parameters",
+    "creationDate",
+    "updateDate",
+    "checksum_A",
+    "checksum_B",
+    "checksum_interaction",
+    "negative",
+    "feature_A",
+    "feature_B",
+    "stoichiometry_A",
+    "stoichiometry_B",
+    "participantMethod_A",
+    "participantMethod_B",
+    "biologicalEffect_A",
+    "biologicalEffect_B",
+    "regulatoryMechanism",
+    "causalStatement"
+  )
+  tb <- read_tsv(mitab_file, col_names = header)
+  tb |>
+    mutate(
+      regulator_type = map_chr(annotation_A, \(x) {
+        cleaned <- str_split_1(x, "\\|") |>
+          lapply(\(annot) {
+            str_extract(annot, "function:\"(.*)\"", group = 1)
+          }) |>
+          unlist() |>
+          discard(\(annot) is.na(annot) || annot == "unknown")
+        if (length(cleaned) == 0) {
+          "-"
+        } else {
+          paste0(sort(cleaned), collapse = "|")
+        }
+      }),
+      regulator = str_remove(alternativeID_A, "geneid:"),
+      target = str_remove(alternativeID_B, "geneid:"),
+      regulator_type = replace_values(regulator_type, "-" ~ NA)
+    ) |>
+    select(regulator, target, regulator_type)
+}
+
+keep_interesting_comps <- function(G, filter_col, min = 1) {
+  comps <- G |>
+    decompose() |>
+    lapply(as_tbl_graph) |>
+    keep(\(g) {
+      is_interesting <- activate(g, nodes) |> pull(!!as.symbol(filter_col))
+      sum(is_interesting) >= min
+    })
+  comps[-1]
+}
