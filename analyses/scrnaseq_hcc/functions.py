@@ -744,11 +744,11 @@ def de_clusters_scVI(
     model: scvi.model.SCVI = scvi.model.SCVI.load(model_file, adata)
     top_de = []
     for clst in cluster_names:
-        result = model.differential_expression(groupby=clst, **kws)
+        result = model.differential_expression(mode="change", groupby=clst, **kws)
         top_de.append(result.assign(clustering=clst))
     if contrasts:
         for contrast in contrasts:
-            result = model.differential_expression(**contrast, **kws)
+            result = model.differential_expression(mode="change", **contrast, **kws)
             top_de.append(result.assign(clustering="extra"))
     return {
         "top_de": pd.concat(top_de)

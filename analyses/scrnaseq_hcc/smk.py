@@ -277,9 +277,11 @@ def do_de_samples() -> ad.AnnData | None:
     if method == "scVI":
         import scvi
 
-        model = scvi.model.SCVI.load(smk.input["model"], adata=adata.copy())
+        model: scvi.model.SCVI = scvi.model.SCVI.load(
+            smk.input["model"], adata=adata.copy()
+        )
         result = (
-            model.differential_expression(**kws)
+            model.differential_expression(mode="change", **kws)
             .reset_index(names="gene")
             .rename(columns={"comparison": "contrast"})
         )
