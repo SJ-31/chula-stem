@@ -42,8 +42,12 @@ sample_cluster_out = [
     f"{outdir}/sample_clusters_consensus.pdf",
 ]
 
-if config.get("only_plots", False):
-    other_outs = {k: v for k, v in other_outs.items() if k.endswith("PLOT")}
+if config.get("plots", False):
+    other_outs = {
+        k: v
+        for k, v in other_outs.items()
+        if k.endswith("PLOT") or k.startswith("cellassign")
+    }
 
 
 rule all:
