@@ -2,7 +2,7 @@ suppressMessages({
   library(reticulate)
   library(tidyverse)
   library(paletteer)
-  library(checkthat)
+  library(checkmate)
   library(glue)
   if (exists("snakemake")) {
     use_condaenv(snakemake@config$conda)
@@ -173,53 +173,97 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
 }
 
 ## * Visualizing DE genes & enriched pathways
+# TODO: you should save this somewhere else
 
-# TODO: rename after the rule
-prepare_tflink <- function() {
-  id_map <- snakemake@config$gene_reference
-  tflink_mitab <- RCONFIG$tflink_mitab
-  tflink <- simplify_tflink_mitab(tflink_mitab)
-  ncbi2hgnc <- setNames(id_map$hgnc_symbol, id_map$entrezgene_id)
-  tflink$regulator <- ncbi2hgnc[tflink$regulator]
-  tflink$target <- ncbi2hgnc[tflink$target]
-  tflink <- filter(tflink, !(is.na(target) | is.na(regulator)))
-
-  as_tbl_graph(tflink, directed = TRUE) |>
-    activate(edges) |>
-    mutate(ends = "last")
+annotate_graph_de <- function(G, tb, min_interesting = 1, kept_nodes = NULL) {
+  kept <- activate(G, nodes) |>
+    left_join(tb, by = join_by(x$name == y$gene)) |>
+    mutate(is_de = !is.na(lfc)) |>
+    keep_interesting_comps("is_de", min_interesting, kept_nodes = kept_nodes)
+  if (length(kept) > 0) {
+    purrr::reduce(kept, \(x, y) bind_graphs(x, y))
+  } else {
+    NULL
+  }
 }
 
-plot_de_regulatory <- function(G) {
-  ggraph(G, "kk") +
-    geom_edge_link(
-      arrow = grid::arrow(
-        ends = E(G)$ends,
-        type = "closed",
-        angle = 25,
-        length = unit(0.1, "inches")
-      ),
-      end_cap = circle(0.75, "cm"),
-      start_cap = circle(0.75, "cm")
-    ) +
-    geom_node_point(
-      aes(fill = is_de, color = lfc, stroke = abs(lfc)),
-      shape = 21,
-      size = 5,
-    ) +
-    geom_node_label(aes(label = name), repel = TRUE) +
-    theme(panel.background = element_rect(fill = "white")) +
-    scale_color_paletteer_c("ggthemes::Green-Gold") +
-    guides(
-      fill = guide_legend("Is DE"),
-      color = guide_legend("LFC")
-    )
-}
-
-visualize_regulation <- function() {
+visualize_de_genes <- function() {
+  source(glue("{snakemake@config$r_src}/plotting.R"))
+  dir.create(snakemake@params$outdir)
   library(tidygraph)
+  library(igraph)
   library(ggraph)
 
-  tflink_g <- prepare_tflink()
+  tflink_g <- prepare_tflink(
+    read_csv(snakemake@config$gene_reference),
+    RCONFIG$tflink_mitab
+  )
+  fi_g <- prepare_reactome_fi(RCONFIG$reactome_fi)
+  clusters_de <- local({
+    scvi <- read_csv(snakemake@input$cluster_level_scvi) |>
+      filter(proba_de > RCONFIG$scvi_min_prob) |>
+      rename(lfc = "lfc_median")
+    edger <- read_csv(snakemake@input$cluster_level_edger) |>
+      rename(lfc = "logFC")
+    bind_rows(edger, scvi) |>
+      select(gene, lfc, contrast, clustering) |>
+      distinct(gene, contrast, clustering, .keep_all = TRUE)
+  })
+  samples_de <- read_csv(snakemake@input$sample_level)
+
+  outdir <- snakemake@params$outdir
+  key2tb <- list(clusters = clusters_de, samples = samples_de)
+  for (key in names(key2tb)) {
+    group_key <- ifelse(key == "clusters", "clustering", "analysis_group")
+    tb <- key2tb[[key]]
+
+    groupings <- key2tb[[key]] |>
+      group_by(!!as.symbol(group_key), contrast) |>
+      summarise() |>
+      deframe()
+
+    for (i in seq_along(groupings)) {
+      cur_contrast <- groupings[i]
+      gk <- names(groupings[i])
+
+      prefix <- glue("{gk} {cur_contrast}") |>
+        str_replace_all(" ", "_")
+      cur_cluster <- tb |>
+        filter(
+          !!as.symbol(group_key) == gk & contrast == cur_contrast
+        )
+
+      tflink_to_plot <- annotate_graph_de(
+        tflink_g,
+        cur_cluster,
+        min_interesting = 1,
+        kept_nodes = RCONFIG$always_include
+      )
+      if (!is.null(tflink_to_plot)) {
+        ggsave(
+          glue("{outdir}/{prefix}_tflink_{key}.pdf"),
+          plot = plot_de_graph(tflink_to_plot),
+          height = 15,
+          width = 15
+        )
+      }
+
+      fi_to_plot <- annotate_graph_de(
+        fi_g,
+        cur_cluster,
+        min_interesting = 2,
+        kept_nodes = RCONFIG$always_include
+      )
+      if (!is.null(fi_to_plot)) {
+        ggsave(
+          glue("{outdir}/{prefix}_fi_{key}.pdf"),
+          plot = plot_de_graph(fi_to_plot),
+          height = 15,
+          width = 15
+        )
+      }
+    }
+  }
 }
 
 ## * Entry
