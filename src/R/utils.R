@@ -393,6 +393,7 @@ save_gt_list <- function(tabs, outdir) {
   )
 }
 
+## * working with graphs
 
 #' Simplify the information in the MITAB file provided by
 #' TFLINK
@@ -469,13 +470,38 @@ simplify_tflink_mitab <- function(mitab_file) {
     select(regulator, target, regulator_type)
 }
 
-keep_interesting_comps <- function(G, filter_col, min = 1) {
+keep_interesting_comps <- function(G, filter_col, min = 1, kept_nodes = NULL) {
   comps <- G |>
     decompose() |>
     lapply(as_tbl_graph) |>
     keep(\(g) {
-      is_interesting <- activate(g, nodes) |> pull(!!as.symbol(filter_col))
-      sum(is_interesting) >= min
+      is_interesting <- vertex_attr(g, filter_col)
+      if (!is.null(kept_nodes) && length(intersect(V(g)$name, kept_nodes))) {
+        TRUE
+      } else {
+        sum(is_interesting) >= min
+      }
     })
   comps[-1]
+}
+
+#' Remove leaf nodes that are FALSE for a specific attribute from `G` until all
+#' leaves are TRUE for that attribute
+keep_interesting_leaves <- function(G, filter_col) {
+  activate(G, nodes) |>
+    mutate(leaf = node_is_leaf()) |>
+    iterate_while(
+      {
+        target <- .N() |>
+          filter(leaf) |>
+          pluck(filter_col)
+        !all(target)
+      },
+      \(g) {
+        mask <- V(g)$leaf & !vertex_attr(g, filter_col)
+        activate(g, nodes) |>
+          filter(!mask) |>
+          mutate(leaf = node_is_leaf())
+      }
+    )
 }
