@@ -283,7 +283,11 @@ def do_de_samples() -> ad.AnnData | None:
             .reset_index(names="gene")
             .rename(columns={"comparison": "contrast"})
         )
-    elif method == "edgeR" and (group := kws.pop("groupby")):
+    elif method == "edgeR" and (group := kws.pop("group", None)):
+        agg_obs = adata.obs.groupby("sample").agg("first")
+        adata = sc.get.aggregate(adata, by="sample", func="sum")
+        adata.obs = agg_obs
+        adata.X = adata.layers["sum"]
         num_de, result = edgeR_wrapper(adata, group=group, **kws)
     else:
         raise NotImplementedError()

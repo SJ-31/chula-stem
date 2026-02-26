@@ -173,3 +173,6 @@ docs
 /analyses/scrnaseq_hcc/__marimo__/
 /analyses/scrnaseq_hcc/test/
 /analyses/scrnaseq_hcc/test_scanvi/
+/analyses/scrnaseq_hcc/lightning_logs/
+/config/nas_uploads/records/
+/tests/nas_uploads/
