@@ -247,7 +247,17 @@ rule gather_de_samples:
         tmp = []
         for csv in input:
             spec = Path(csv).stem.replace(".sample_de-", "")
-            tmp.append(pd.read_csv(csv).assign(analysis_group=spec))
+            df = pd.read_csv(csv).assign(analysis_group=spec)
+            if spec.startswith("edgeR") and "logFC" in df.columns:
+                df.loc[:, "lfc"] = df["logFC"]
+            elif spec.startswith("scVI"):
+                if "lfc_median" in df.columns:
+                    df.loc[:, "lfc"] = df["lfc_median"]
+                if "contrast" not in df.columns:
+                    df.loc[:, "contrast"] = df["analysis_group"].str.removeprefix(
+                        "scVI_"
+                    )
+            tmp.append(df)
         pd.concat(tmp).to_csv(output[0], index=False)
 
 
@@ -278,6 +288,8 @@ rule enrich_clusters:
     output:
         f"{outdir}/annotations/gene_set_activity.csv",
         f"{outdir}/annotations/marker_gene_activity.csv",
+    resources:
+        mem="50G",
     script:
         "smk.py"
 
@@ -294,7 +306,7 @@ rule do_de_clusters:
         method=lambda wc: wc.get("method"),
         outdir=anno_out,
     output:
-        f"{outdir}/annotations/clusters-{{method}}_de.csv",
+        f"{anno_out}/clusters-{{method}}_de.csv",
     script:
         "smk.py"
 
