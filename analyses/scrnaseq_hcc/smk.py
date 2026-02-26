@@ -11,7 +11,7 @@ import pandas as pd
 import plotnine as gg
 import pymupdf
 import scanpy as sc
-from chula_stem.r_utils import edgeR_ovr
+from chula_stem.r_utils import edgeR_wrapper
 from pymupdf import Document
 from snakemake.script import snakemake as smk
 
@@ -284,7 +284,7 @@ def do_de_samples() -> ad.AnnData | None:
             .rename(columns={"comparison": "contrast"})
         )
     elif method == "edgeR" and (group := kws.pop("groupby")):
-        num_de, result = edgeR_ovr(adata, group=group, **kws)
+        num_de, result = edgeR_wrapper(adata, group=group, **kws)
     else:
         raise NotImplementedError()
     result.to_csv(smk.output[0], index=False)

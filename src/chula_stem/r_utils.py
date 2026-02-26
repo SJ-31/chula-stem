@@ -326,7 +326,7 @@ def pooled_normalization(
         return adata.X
 
 
-def edgeR_ovr(
+def edgeR_wrapper(
     adata: ad.AnnData,
     group,
     id_col: str | None = None,
@@ -334,7 +334,9 @@ def edgeR_ovr(
     p_value=0.05,
     treat=True,
     intercept=False,
-    extra_contrasts=None,
+    ovr=True,
+    avr: dict[str, dict[str, list]] | None = None,
+    contrasts: dict[str, str] | None = None,
     batch_factors: list | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     source("de_analysis.R", root=res.files("chula_stem").parent / "R", in_r=True)
@@ -348,17 +350,30 @@ def edgeR_ovr(
             "p_value": p_value,
             "treat": treat,
             "intercept": intercept,
-            "extra_contrasts": extra_contrasts,
+            "ovr": ovr,
             "batch_factors": batch_factors,
         }
     )
+    if contrasts is not None:
+        ccs = ro.StrVector(contrasts.values())
+        ccs.names = list(contrasts.keys())
+        ro.globalenv["contrasts"] = ccs
+    else:
+        ro.globalenv["contrasts"] = ro.NULL
+    if avr is not None:
+        to_send = {k: ro.ListVector(v) for k, v in avr.items()}
+        ro.globalenv["avr"] = ro.ListVector(to_send)
+    else:
+        ro.globalenv["avr"] = ro.NULL
     run = f"""
-    result <- edgeR_ovr(dge, '{group}', id_col = '{id_col}',
+    result <- edgeR_glm_wrapper(dge, '{group}', id_col = '{id_col}',
         fc_cutoff = fc_cutoff,
         p_value = p_value,
         treat = treat,
         intercept = intercept,
-        extra_contrasts = extra_contrasts)
+        ovr = ovr,
+        avr = avr,
+        contrasts = contrasts)
     """
     ro.r(run)
     num_de = pd.DataFrame(
