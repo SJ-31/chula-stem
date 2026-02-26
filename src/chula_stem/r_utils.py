@@ -346,6 +346,8 @@ def edgeR_wrapper(
         id_col = "gene"
     r_null_if_none(
         {
+            "id_col": id_col,
+            "group": group,
             "fc_cutoff": fc_cutoff,
             "p_value": p_value,
             "treat": treat,
@@ -366,7 +368,7 @@ def edgeR_wrapper(
     else:
         ro.globalenv["avr"] = ro.NULL
     run = f"""
-    result <- edgeR_glm_wrapper(dge, '{group}', id_col = '{id_col}',
+    result <- edgeR_glm_wrapper(dge, group, id_col = id_col,
         fc_cutoff = fc_cutoff,
         p_value = p_value,
         treat = treat,

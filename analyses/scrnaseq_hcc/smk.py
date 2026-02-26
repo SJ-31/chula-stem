@@ -261,7 +261,7 @@ def do_dimensionality_reduction():
 def do_de_samples() -> ad.AnnData | None:
     with open(smk.input["features"], "r") as f:
         feature_idx = f.read().splitlines()
-    clst_df: pd.DataFrame = pd.read_csv(smk.input["clusters"])
+    clst_df: pd.DataFrame = pd.read_csv(smk.input["clusters"]).astype("string")
     adata = ad.read_h5ad(smk.input["adata"])
     adata = adata[:, adata.var.index.isin(feature_idx)]
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
