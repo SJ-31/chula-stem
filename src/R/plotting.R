@@ -380,11 +380,10 @@ prepare_tflink <- function(gene_reference, mitab_file) {
   tflink$regulator <- ncbi2hgnc[tflink$regulator]
   tflink$target <- ncbi2hgnc[tflink$target]
   tflink <- filter(tflink, !(is.na(target) | is.na(regulator)))
-
   as_tbl_graph(tflink, directed = TRUE) |>
     activate(edges) |>
-    mutate(ends = "last") |>
-    rename(
+    mutate(
+      ends = "last",
       elabel = replace_values(
         regulator_type,
         NA ~ "",
