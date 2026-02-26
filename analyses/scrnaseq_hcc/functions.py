@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import re
 from functools import reduce
 from pathlib import Path
@@ -17,7 +16,7 @@ import pymupdf
 import scanpy as sc
 import snakemake.io
 import yaml
-from chula_stem.r_utils import edgeR_ovr
+from chula_stem.r_utils import edgeR_wrapper
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing, set_cover_on_dc_results
 from gprofiler import GProfiler
@@ -208,6 +207,7 @@ def data_import(env: dict) -> ad.AnnData:
         lambda x: prepare_data(x, env=env),
         lambda x: ad.read_h5ad(x, backed=True),
     )
+    assert isinstance(adata, ad.AnnData)
     print(f"Samples present: {set(adata.obs["sample"])}")
     return adata
 
@@ -696,23 +696,23 @@ def do_de_clusters(
     adata: ad.AnnData,
     cfg: dict,
     env: dict,
-    features: str = str,
-    model_file: str = str,
+    features: str = "",
+    model_file: str = "",
 ) -> dict:
     if exclude := env["cluster_cells"].get("exclude"):
         adata = adata[~adata.obs["sample"].isin(exclude), :]
     cluster_names = add_clusterings(
         adata, clusters_to_add=env["chosen_clusters"], env=env
     )
-    extra_contrasts = cfg.get("extra_contrasts") or {}
+    contrasts = cfg.get("contrasts") or {}
     cluster_kws = cfg.get("kws") or {}
     if method == "edgeR":
-        return de_clusters_edgeR(adata, cluster_names, extra_contrasts, cluster_kws)
+        return de_clusters_edgeR(adata, cluster_names, contrasts, cluster_kws)
     elif method == "scVI":
         return de_clusters_scVI(
             adata,
             cluster_names,
-            extra_contrasts,
+            None if not isinstance(contrasts, list) else contrasts,
             kws=cluster_kws,
             model_file=model_file,
             feature_file=features,
@@ -723,7 +723,7 @@ def do_de_clusters(
 def de_clusters_scVI(
     adata: ad.AnnData,
     cluster_names,
-    extra_contrasts: list | None,
+    contrasts: list | None,
     kws: dict,
     model_file,
     feature_file,
@@ -738,8 +738,8 @@ def de_clusters_scVI(
     for clst in cluster_names:
         result = model.differential_expression(groupby=clst, **kws)
         top_de.append(result.assign(clustering=clst))
-    if extra_contrasts:
-        for contrast in extra_contrasts:
+    if contrasts:
+        for contrast in contrasts:
             result = model.differential_expression(**contrast, **kws)
             top_de.append(result.assign(clustering="extra"))
     return {
@@ -749,7 +749,7 @@ def de_clusters_scVI(
     }
 
 
-def de_clusters_edgeR(adata: ad.AnnData, cluster_names, extra_contrasts, kws) -> dict:
+def de_clusters_edgeR(adata: ad.AnnData, cluster_names, contrasts, kws) -> dict:
     """Perform DE analysis between clusters (OVR) using edgeR"""
     de_counts = []
     all_top = []
@@ -759,9 +759,7 @@ def de_clusters_edgeR(adata: ad.AnnData, cluster_names, extra_contrasts, kws) ->
         )
         sc.pp.filter_cells(bulked, min_counts=15)
         sc.pp.filter_genes(bulked, min_counts=50)
-        n_de, top_de = edgeR_ovr(
-            bulked, clst, extra_contrasts=extra_contrasts.get(clst), **kws
-        )
+        n_de, top_de = edgeR_wrapper(bulked, clst, contrasts=contrasts.get(clst), **kws)
         de_counts.append(
             n_de.reset_index(names="direction")
             .melt("direction")

@@ -2,6 +2,7 @@ suppressMessages({
   library(reticulate)
   library(tidyverse)
   library(paletteer)
+  library(checkthat)
   library(glue)
   if (exists("snakemake")) {
     use_condaenv(snakemake@config$conda)
