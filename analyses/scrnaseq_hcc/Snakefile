@@ -286,8 +286,8 @@ rule enrich_clusters:
         passed_qc,
         f"{outdir}/.clustering_complete",
     output:
-        f"{outdir}/annotations/gene_set_activity.csv",
-        f"{outdir}/annotations/marker_gene_activity.csv",
+        f"{outdir}/annotations/clusters_gene_set_activity.csv",
+        f"{outdir}/annotations/clusters_marker_gene_activity.csv",
     resources:
         mem="50G",
     script:

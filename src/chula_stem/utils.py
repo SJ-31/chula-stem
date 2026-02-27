@@ -518,9 +518,11 @@ def get_ensembl_gene_data(
         "end_position",
         "gene_biotype",
         "hgnc_symbol",
+        "entrezgene_id",
     ),
+    dataset_name="hsapiens_gene_ensembl",
 ) -> pd.DataFrame:
-    attrs, query = construct_biomart_query(attributes)
+    attrs, query = construct_biomart_query(attributes, dataset_name=dataset_name)
     url = "http://www.ensembl.org/biomart/martservice?query="
     req = requests.get(f"{url}{query}")
     req.raise_for_status()
