@@ -472,8 +472,7 @@ simplify_tflink_mitab <- function(mitab_file) {
 
 keep_interesting_comps <- function(G, filter_col, min = 1, kept_nodes = NULL) {
   comps <- G |>
-    decompose() |>
-    lapply(as_tbl_graph) |>
+    to_components() |>
     keep(\(g) {
       is_interesting <- vertex_attr(g, filter_col)
       if (!is.null(kept_nodes) && length(intersect(V(g)$name, kept_nodes))) {
@@ -482,7 +481,6 @@ keep_interesting_comps <- function(G, filter_col, min = 1, kept_nodes = NULL) {
         sum(is_interesting) >= min
       }
     })
-  comps[-1]
 }
 
 #' Remove leaf nodes that are FALSE for a specific attribute from `G` until all
@@ -504,4 +502,68 @@ keep_interesting_leaves <- function(G, filter_col) {
           mutate(leaf = node_is_leaf())
       }
     )
+}
+
+#' Place the results of a GO enrichment analysis in the context of the GO graph
+#'
+#' @param go GO graph as tbl_graph
+#' @param results_tb Tibble of enrichment results
+#' @param min_enriched minimum number of enriched terms required to keep a component
+#' @param simplify_threshold maximum number of nodes in a component before simplifying
+#' @description
+#' 1. Keep only edges between enriched nodes, and edges where the parent is not enriched but the child is.
+#   The latter is to provide some context about where the enriched node sits in the GO
+#' 2. Keep only nodes that are enriched or near_enriched
+#' 3. Decompose
+#' 4. If the number of nodes in the component exceeds `simplify_threshold`, then we keep only the nodes at
+#' the min, max of the distance from the namespace
+to_go_graph_components <- function(
+  results_tb,
+  go,
+  min_enriched = 3,
+  simplify_threshold = 150
+) {
+  assert(check_class(go, "tbl_graph"), check_data_frame(results_tb))
+  expect_col_exists(as_tibble(go, active = "nodes"), "distance_to_ns")
+  expect_col_exists(results_tb, c("name", "pval"))
+  filtered <- go |>
+    activate(nodes) |>
+    left_join(results_tb, by = join_by(name)) |>
+    mutate(
+      enriched = !is.na(pval),
+      near_enriched = node_is_adjacent(which(.N()$enriched)) & !enriched
+    ) |>
+    activate(edges) |>
+    filter({
+      nf <- .N()[from, ]
+      nt <- .N()[to, ]
+      both_enriched <- nf$enriched & nt$enriched
+      parent_not_enriched <- (nf$enriched & !nt$enriched) &
+        (nt$distance_to_ns < nf$distance_to_ns)
+      both_enriched | parent_not_enriched
+    }) |>
+    activate(nodes) |>
+    filter(near_enriched | enriched)
+
+  comps <- keep_interesting_comps(filtered, "enriched", min_enriched) |>
+    lapply(\(g) {
+      if (length(g) <= simplify_threshold) {
+        g
+      } else {
+        g |>
+          activate(nodes) |>
+          filter({
+            max_dist <- max(.N()$distance_to_ns)
+            min_dist <- min(.N()$distance_to_ns)
+            dist_check <- distance_to_ns %in% c(min_dist, max_dist)
+            near_enriched | (enriched & dist_check)
+          }) |>
+          mutate(near_enriched = {
+            kept_enriched <- which(.N()$enriched)
+            node_is_adjacent(kept_enriched) & !enriched
+          }) |>
+          filter(enriched | near_enriched)
+      }
+    })
+  comps
 }
