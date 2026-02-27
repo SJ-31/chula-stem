@@ -504,27 +504,36 @@ keep_interesting_leaves <- function(G, filter_col) {
     )
 }
 
+
 #' Place the results of a GO enrichment analysis in the context of the GO graph
 #'
 #' @param go GO graph as tbl_graph
 #' @param results_tb Tibble of enrichment results
 #' @param min_enriched minimum number of enriched terms required to keep a component
 #' @param simplify_threshold maximum number of nodes in a component before simplifying
+#' @param min_ns_dist minimum distance from namespace for GO term to be kept
 #' @description
 #' 1. Keep only edges between enriched nodes, and edges where the parent is not enriched but the child is.
 #   The latter is to provide some context about where the enriched node sits in the GO
+#'  Edges must also be strictly hierarchical: the child term must be more specific than
+#'      the parent
+#' 3. Remove nodes that are too broad
 #' 2. Keep only nodes that are enriched or near_enriched
 #' 3. Decompose
-#' 4. If the number of nodes in the component exceeds `simplify_threshold`, then we keep only the nodes at
-#' the min, max of the distance from the namespace
+#' 4. If the number of nodes in the component exceeds `simplify_threshold`, then we end
+#'  keep only enriched nodes
+#' 5. If the number of nodes in the component is below `context_threshold`
+#' (which can happen due to 4.), then we provide additional non-enriched nodes as surrounding context
 to_go_graph_components <- function(
   results_tb,
   go,
   min_enriched = 3,
-  simplify_threshold = 150
+  simplify_threshold = 150,
+  context_threshold = 3,
+  min_ns_dist = 2
 ) {
   assert(check_class(go, "tbl_graph"), check_data_frame(results_tb))
-  expect_col_exists(as_tibble(go, active = "nodes"), "distance_to_ns")
+  expect_col_exists(as_tibble(go, active = "nodes"), c(distance_to_ns, term))
   expect_col_exists(results_tb, c("name", "pval"))
   filtered <- go |>
     activate(nodes) |>
@@ -538,31 +547,47 @@ to_go_graph_components <- function(
       nf <- .N()[from, ]
       nt <- .N()[to, ]
       both_enriched <- nf$enriched & nt$enriched
-      parent_not_enriched <- (nf$enriched & !nt$enriched) &
-        (nt$distance_to_ns < nf$distance_to_ns)
-      both_enriched | parent_not_enriched
+      child_more_specific <- (nt$distance_to_ns < nf$distance_to_ns)
+      parent_not_enriched <- (nf$enriched & !nt$enriched)
+      (both_enriched | parent_not_enriched) & child_more_specific
     }) |>
     activate(nodes) |>
-    filter(near_enriched | enriched)
+    filter((near_enriched | enriched) & distance_to_ns >= min_ns_dist)
+  context_nodes <- filtered |>
+    activate(nodes) |>
+    select(name)
 
   comps <- keep_interesting_comps(filtered, "enriched", min_enriched) |>
     lapply(\(g) {
       if (length(g) <= simplify_threshold) {
+        list(g)
+      } else {
+        activate(g, edges) |>
+          filter(.N()[from, ]$enriched & .N()[to, ]$enriched) |>
+          activate(nodes) |>
+          iterate_while(
+            any(local_size() == 1) & nrow(.N()) > 0,
+            \(ig) {
+              activate(ig, nodes) |>
+                filter(local_size() > 1)
+            }
+          ) |>
+          to_components()
+      }
+    }) |>
+    unlist(recursive = FALSE) |>
+    lapply(\(g) {
+      if (length(g) >= context_threshold) {
         g
       } else {
-        g |>
-          activate(nodes) |>
-          filter({
-            max_dist <- max(.N()$distance_to_ns)
-            min_dist <- min(.N()$distance_to_ns)
-            dist_check <- distance_to_ns %in% c(min_dist, max_dist)
-            near_enriched | (enriched & dist_check)
-          }) |>
-          mutate(near_enriched = {
-            kept_enriched <- which(.N()$enriched)
-            node_is_adjacent(kept_enriched) & !enriched
-          }) |>
-          filter(enriched | near_enriched)
+        graph_join(g, context_nodes, by = join_by(name)) |>
+          mutate(
+            near_enriched = {
+              enr <- which(.N()$enriched)
+              node_is_adjacent(enr) & is.na(enriched)
+            }
+          ) |>
+          filter(near_enriched | enriched)
       }
     })
   comps
