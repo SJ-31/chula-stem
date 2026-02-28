@@ -22,8 +22,10 @@ if ("rlang" %in% utils::installed.packages()[, 1]) {
 
 if (exists("snakemake")) {
   RCONFIG <- snakemake@config[[snakemake@rule]]
+  ENV <- snakemake@config
 } else {
   RCONFIG <- list()
+  ENV <- list()
 }
 
 ## * Cluster-fold similarity
@@ -195,10 +197,10 @@ visualize_de_genes <- function() {
   library(ggraph)
 
   tflink_g <- prepare_tflink(
-    read_csv(snakemake@config$gene_reference),
-    RCONFIG$tflink_mitab
+    read_csv(ENV$gene_reference),
+    ENV$tflink_mitab
   )
-  fi_g <- prepare_reactome_fi(RCONFIG$reactome_fi)
+  fi_g <- prepare_reactome_fi(ENV$reactome_fi)
   clusters_de <- local({
     scvi <- read_csv(snakemake@input$cluster_level_scvi) |>
       filter(proba_de > RCONFIG$scvi_min_prob) |>
@@ -240,11 +242,10 @@ visualize_de_genes <- function() {
         kept_nodes = RCONFIG$always_include
       )
       if (!is.null(tflink_to_plot)) {
-        ggsave(
-          glue("{outdir}/{prefix}_tflink_{key}.pdf"),
-          plot = plot_de_graph(tflink_to_plot),
-          height = 15,
-          width = 15
+        ggsave_graph_dynamic(
+          tflink_to_plot,
+          plot_de_graph(tflink_to_plot, palette_c = RCONFIG$palette_c),
+          glue("{outdir}/{prefix}_tflink_{key}.pdf")
         )
       }
 
@@ -255,15 +256,177 @@ visualize_de_genes <- function() {
         kept_nodes = RCONFIG$always_include
       )
       if (!is.null(fi_to_plot)) {
-        ggsave(
-          glue("{outdir}/{prefix}_fi_{key}.pdf"),
-          plot = plot_de_graph(fi_to_plot),
-          height = 15,
-          width = 15
+        ggsave_graph_dynamic(
+          fi_to_plot,
+          plot_de_graph(fi_to_plot, palette_c = RCONFIG$palette_c),
+          glue("{outdir}/{prefix}_fi_{key}.pdf")
         )
       }
     }
   }
+}
+
+
+## ** Enrichment pathways
+
+plot_go_graph <- function(tb, go, output_file) {
+  comps <- to_go_graph_components(
+    tb,
+    go,
+    min_enriched = RCONFIG$min_enriched,
+    simplify_threshold = RCONFIG$simplify_threshold,
+    context_threshold = RCONFIG$context_threshold,
+    min_ns_dist = RCONFIG$min_ns_dist
+  ) |>
+    lapply(\(g) {
+      activate(g, nodes) |>
+        mutate(
+          name = ifelse(is.na(name), name, str_wrap(glue("{name}\n{term}"), 30))
+        )
+    })
+  tmp <- tempdir()
+  files <- lapply(
+    seq_along(comps),
+    \(i) {
+      plot <- plot_enriched_graph(
+        comps[[i]],
+        palette_c = RCONFIG$palette_c %||% "ggthemes::Classic Red-Green Light",
+        palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
+      )
+      name <- glue("{tmp}/{i}.pdf")
+      ggsave_graph_dynamic(comps[[i]], plot, name)
+      list(name) |> `names<-`(length(comps[[i]]))
+    },
+  ) |>
+    list_c()
+  files <- files[order(names(files))]
+  join_pdfs(files, output_file)
+}
+
+plot_reactome_graph <- function(tb, rg, output_file) {
+  comps <- rg |>
+    activate(nodes) |>
+    left_join(tb, by = join_y(name)) |>
+    mutate(enriched = ifelse(enriched, TRUE, FALSE)) |>
+    keep_interesting_comps(rg, "enriched")
+  tmp <- tempdir()
+  files <- lapply(
+    seq_along(comps),
+    \(i) {
+      cur <- keep_interesting_leaves(comps[[i]], "enriched") |>
+        activate(nodes) |>
+        mutate(
+          name = str_wrap(name, width = max_length)
+        )
+      plot <- plot_enriched_graph(
+        cur,
+        palette_c = RCONFIG$palette_d %||% "ggthemes::Classic Red-Green Light",
+        palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
+      )
+      name <- glue("{tmp}/{i}.pdf")
+      ggsave_graph_dynamic(cur, plot, name)
+      list(name) |> `names<-`(length(cur))
+    }
+  ) |>
+    list_c()
+  files <- files[order(names(files))]
+  join_pdfs(files, output_file)
+}
+
+visualize_enrichment_inner <- function(outdir) {
+  GO <- read_graph(ENV$go_graph, "gml") |>
+    as_tbl_graph() |>
+    select(-id) |> # BUG: fix the name weirdness
+    rename(distance_to_ns = "distancetons")
+  go_term2id <- read_csv(ENV$go_term2id) |> distinct(term, .keep_all = TRUE)
+  RG <- prepare_reactome_pwy(
+    pathway_file = ENV$reactome_pathways,
+    relation_file = ENV$reactome_relations
+  )
+  reactome_ids2name <- read_tsv(
+    ENV$reactome_pathways,
+    col_names = c("id", "name", "species")
+  ) |>
+    select(id, name) |>
+    deframe()
+
+  # Combine them, loop over, and get results
+  inputs <- list(
+    gprofiler_clusters = read_csv(snakemake@input$gprofiler_clusters),
+    gprofiler_samples = read_csv(snakemake@input$gprofiler_samples),
+    decoupler_clusters = read_csv(snakemake@input$clusters_gs)
+  )
+  gprofiler_renaming <- c(
+    name = "native",
+    pvalue = "p_value",
+    stat = "precision",
+    enriched = "significant"
+  )
+
+  for (n in names(inputs)) {
+    tb <- inputs[[n]]
+    if (str_starts(n, "gprofiler")) {
+      go_tb <- tb |>
+        filter(str_starts(native, "GO:")) |>
+        dplyr::select(native, precision, p_value) |>
+        rename(gprofiler_renaming)
+
+      reactome_tb <- tb |>
+        filter(str_starts(native, "REAC:")) |>
+        mutate(
+          native = str_remove(native, "REAC:"),
+          native = reactome_ids2name[native]
+        ) |>
+        dplyr::filter(!is.na(native)) |>
+        dplyr::select(native, precision, p_value) |>
+        rename(gprofiler_renaming)
+    } else {
+      go_tb <- tb |>
+        filter(str_starts(name, "GO_..:")) |>
+        mutate(name = str_remove(name, "GO_..:"), enriched = padj <= 0.05) |>
+        inner_join(go_term2id, by = join_by(x$name == y$term))
+      reactome_tb <- tb |>
+        filter(str_starts(name, "Reactome:")) |>
+        mutate(name = str_remove(name, "^Reactome:"), enriched = padj <= 0.05)
+    }
+    group_key <- ifelse(str_ends(n, "clusters"), "clustering", "analysis_group")
+
+    groupings <- tb |>
+      group_by(!!as.symbol(group_key), contrast) |>
+      summarise() |>
+      deframe()
+
+    for (i in seq_along(groupings)) {
+      gk <- names(groupings[i])
+      cur_contrast <- groupings[i]
+
+      go_cur <- go_tb |>
+        filter(contrast == cur_contrast, !!as.symbol(group_key) == gk)
+      reactome_cur <- reactome_tb |>
+        filter(contrast == cur_contrast, !!as.symbol(group_key) == gk)
+
+      prefix <- glue("{gk} {cur_contrast}") |>
+        str_replace_all(" ", "_")
+      suffix <- ifelse(str_ends(n, "clusters"), "clusters", "samples")
+
+      reactome_out <- glue("{outdir}/{prefix}_reactome_{suffix}.pdf")
+      go_out <- glue("{outdir}/{prefix}_go_{suffix}.pdf")
+
+      plot_go_graph(tb = go_tb, go = GO, output_file = go_out)
+      plot_reactome_graph(tb = reactome_tb, rg = RG, output_file = reactome_out)
+    }
+  }
+}
+
+visualize_enrichment <- function() {
+  outdir <- snakemake@params$outdir
+  dir.create(outdir, showWarnings = FALSE)
+  tryCatch(
+    expr = visualize_enrichment_inner(outdir),
+    error = \(.) {
+      unlink(outdir, recursive = TRUE)
+    }
+  )
 }
 
 ## * Entry
