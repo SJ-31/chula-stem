@@ -534,12 +534,12 @@ to_go_graph_components <- function(
 ) {
   assert(check_class(go, "tbl_graph"), check_data_frame(results_tb))
   expect_col_exists(as_tibble(go, active = "nodes"), c(distance_to_ns, term))
-  expect_col_exists(results_tb, c("name", "pval"))
+  expect_col_exists(results_tb, c("name", "enriched"))
   filtered <- go |>
     activate(nodes) |>
     left_join(results_tb, by = join_by(name)) |>
     mutate(
-      enriched = !is.na(pval),
+      enriched = ifelse(enriched, TRUE, FALSE),
       near_enriched = node_is_adjacent(which(.N()$enriched)) & !enriched
     ) |>
     activate(edges) |>
@@ -555,7 +555,7 @@ to_go_graph_components <- function(
     filter((near_enriched | enriched) & distance_to_ns >= min_ns_dist)
   context_nodes <- filtered |>
     activate(nodes) |>
-    select(name)
+    select(name, term)
 
   comps <- keep_interesting_comps(filtered, "enriched", min_enriched) |>
     lapply(\(g) {
@@ -591,4 +591,19 @@ to_go_graph_components <- function(
       }
     })
   comps
+}
+
+join_pdfs <- function(pdf_files, output_file) {
+  # Validate inputs
+  if (!check_character(pdf_files, min.len = 1)) {
+    stop("pdf_files must contain at least one file.")
+  }
+  missing <- pdf_files[!file.exists(pdf_files)]
+  if (length(missing) > 0) {
+    stop(paste("File(s) not found:", paste(missing, collapse = ", ")))
+  }
+
+  pdftools::pdf_combine(pdf_files, output = output_file)
+  message("Merged ", length(pdf_files), " file(s) into: ", output_file)
+  invisible(output_file)
 }
