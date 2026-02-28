@@ -295,6 +295,9 @@ enrich_clusters:
 # as expr(AFP) = intercept + beta_1x1 + beta_2x2 ...  + beta_px_p + error
 # If x_i is 0 if AFP is not present in the ith feature set and 1 otherwise
 
+gprofiler_enrich:
+  scVI_min_proba_de: 0.8
+
 # * Visualize DE & enrichment results
 visualize_pathways:
   to_show:
