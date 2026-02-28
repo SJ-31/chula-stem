@@ -23,7 +23,6 @@ outdir: ?outdir
 data_root: ?f"{data_root}/output/HCC/SCRNASEQ"
 logdir: ?f"{workdir}/logs" if not test else f"{workdir}/test/logs"
 manifest: ?f"{this['workdir']}/manifest.csv"
-gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 
 exclude_from_clustering: # We're excluding normals and treated samples from clustering routines since the goal in those is to find tumor subtypes/tumor-specific cell types
   # Cells from these samples will have their cluster values set to NA
@@ -127,19 +126,26 @@ cluster_samples:
 # * DE analyses
 do_de_samples: # Takes the filtered data as input
   # BUG: [2026-02-24 Tue] this doesn't work for some reason
-  # edgeR_subtype:
-  #   method: edgeR # TODO: need to cluster beforehand so that you can specify
-  #   # the groupby key correctly
-  #   query: type == 'tumor' & treatment == 'control'
-  #   kws:
-  #     groupby: "default_4"
-  #     # batch_factors: ?this['batch_key']
+  # TODO: allow passing arbitrary contrasts
+  edgeR_subtype:
+    method: edgeR
+    query: type == 'tumor' & treatment == 'control'
+    kws:
+      group: "default_4"
+      batch_factors: ?this['batch_key']
+  edgeR_iacs:
+    method: edgeR
+    query: type == 'tumor'
+    kws:
+      group: "treatment"
+      contrasts:
+        iacs_vs_ctrl: "treatmentiacs-treatmentcontrol"
+      batch_factors: ?this['batch_key']
   scVI_subtype:
     method: scVI
     query: type == 'tumor' & treatment == 'control'
     kws:
       groupby: "default_4"
-      mode: "change"
       batch_correction: true
   scVI_patient:
     method: scVI
@@ -147,7 +153,6 @@ do_de_samples: # Takes the filtered data as input
     # Use query to filter samples beforehand
     kws:
       groupby: "patient"
-      mode: "change" # Either "vanilla" or "change". Latter relies on delta
       batch_correction: true
       delta: 0.25 # Default delta
       fdr_target: 0.05 # Default fdr target
@@ -155,9 +160,9 @@ do_de_samples: # Takes the filtered data as input
     query: treatment == 'control'
     method: scVI
     kws:
-      idx1: type == 'tumor'
-      idx2: type == 'normal'
-      mode: "change"
+      groupby: type
+      group1: tumor
+      group2: normal
       batch_correction: true
 
 # * Integration
@@ -273,13 +278,12 @@ chosen_clusters: # List of lists: [feature_selection, integration, cluster_name]
 do_de_clusters:
   scVI:
     kws:
-      mode: "change"
   edgeR:
     kws:
       p_value: 0.0001
       fc_cutoff: 1.2
       batch_factors: ["flowcell"]
-    extra_contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
+    contrasts: # Mapping of keys in `chosen_clusters` to extra comparisons, in addition to one-vs-rest in clusters
       null
       # leiden_res0.5:
       #   - "(leiden_res0.50 + leiden_res0.512)/2 - (leiden_res0.51 + leiden_res0.52 + leiden_res0.53 + leiden_res0.54 + leiden_res0.55 + leiden_res0.56 + leiden_res0.57 + leiden_res0.58 + leiden_res0.59 + leiden_res0.510 + leiden_res0.511 + leiden_res0.513 + leiden_res0.514 + leiden_res0.515)/14" # The groups 0 and 12 are GPC3 positive
@@ -299,11 +303,23 @@ gprofiler_enrich:
   scVI_min_proba_de: 0.8
 
 # * Visualize DE & enrichment results
-visualize_pathways:
-  to_show:
-    leiden0.01: [4, 5]
-    leiden0.1: [3]
+visualize_enrichment:
+  palette_c: "ggthemes::Classic Red-Green Light"
+  palette_d: "LaCroixColoR::CeriseLimon"
 
-visualize_regulation:
-  tflink_mitab: ?f"{proj_root}/analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
-  to_show:
+visualize_de_genes:
+  scvi_min_prob: 0.8
+  palette_c: "grDevices::Cyan-Magenta"
+  always_include:
+    - "GPC3"
+    - "AFP"
+
+# * Resources
+
+gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
+go_term2id: ?f"{proj_root}/analyses/data/go_term2id.csv"
+go_graph: ?f"{proj_root}/analyses/data/go.gml"
+reactome_pathways: ?"f{proj_root}/analyses/data/ReactomePathways.txt"
+reactome_relations: ?"f{proj_root}/analyses/data/ReactomePathwaysRelation.txt"
+tflink_mitab: ?f"{proj_root}/analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
+reactome_fi: ?f"{proj_root}/analyses/data/FIsInGene_04142025_with_annotations.txt"
