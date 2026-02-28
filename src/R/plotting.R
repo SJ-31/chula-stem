@@ -1,9 +1,14 @@
 library(tidyverse)
+library(checkmate)
+library(pointblank)
 library(glue)
 library(grid)
 library(ggplot2)
 R_SRC <- Sys.getenv("R_SRC")
-source(paste0(R_SRC, "/", "utils.R"))
+UTILS_FILE <- paste0(R_SRC, "/", "utils.R")
+if (file.exists(UTILS_FILE)) {
+  source(UTILS_FILE)
+}
 PY_SRC <- Sys.getenv("PY_SRC")
 
 
@@ -394,6 +399,19 @@ prepare_tflink <- function(gene_reference, mitab_file) {
     )
 }
 
+prepare_reactome_pwy <- function(pathway_file, relation_file) {
+  pwys <- read_tsv(
+    pathway_file,
+    col_names = c("id", "name", "species")
+  )
+  relations <- read_tsv(relation_file, col_names = c("from", "to"))
+  as_tbl_graph(relations) |>
+    activate(nodes) |>
+    rename(id = "name") |>
+    inner_join(pwys, by = join_by(id)) |>
+    filter(species == "Homo sapiens")
+}
+
 prepare_reactome_fi <- function(file) {
   read_tsv(file) |>
     filter(!str_detect(Annotation, "expression") & Annotation != "predicted") |>
@@ -411,7 +429,7 @@ prepare_reactome_fi <- function(file) {
     rename(elabel = "Annotation")
 }
 
-plot_de_graph <- function(G) {
+plot_de_graph <- function(G, palette_c = "grDevices::Cyan-Magenta") {
   ends <- E(G)$ends
   activate(G, nodes) |>
     mutate(lfc = replace_values(lfc, !is_de ~ NA)) |>
@@ -434,11 +452,58 @@ plot_de_graph <- function(G) {
     ) +
     theme(panel.background = element_rect(fill = "white")) +
     scale_fill_paletteer_c(
-      "grDevices::Cyan-Magenta",
+      palette_c,
       na.value = "white"
     ) +
     guides(
       fill = guide_legend("LFC"),
       color = guide_legend("LFC")
     )
+}
+
+plot_enriched_graph <- function(
+  G,
+  palette_c = "ggthemes::Classic Red-Green Light",
+  palette_d = "LaCroixColoR::CeriseLimon",
+  layout = "kk"
+) {
+  expect_col_exists(as_tibble(G, active = "nodes"), c(stat, name, enriched))
+  ggraph(G, layout) +
+    geom_edge_diagonal() +
+    geom_node_point(aes(color = enriched), size = 2) +
+    geom_node_label(aes(label = name, fill = stat), repel = TRUE) +
+    theme(panel.background = element_rect(fill = "white")) +
+    scale_color_paletteer_d(palette_d) +
+    scale_fill_paletteer_c(palette_c, na.value = "white") +
+    guides(
+      fill = guide_legend("Enrichment test statistic"),
+      color = "none"
+    )
+}
+
+ggsave_graph_dynamic <- function(G, plot, filename) {
+  assert(
+    check_class(G, "igraph"),
+    check_class(plot, "ggplot"),
+    check_character(filename),
+    combine = "and"
+  )
+  if (length(G) >= 130) {
+    dim <- 30
+  } else if (length(G) >= 100) {
+    dim <- 25
+  } else if (length(G) >= 30) {
+    dim <- 12
+  } else if (length(G) >= 10) {
+    dim <- 10
+  } else {
+    dim <- 8
+  }
+  ggsave(
+    filename = filename,
+    plot = plot,
+    height = dim,
+    width = dim,
+    units = "in"
+  )
 }
