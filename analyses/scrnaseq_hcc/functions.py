@@ -287,14 +287,6 @@ def provide_annotation_output(env) -> dict:
         elif csv.startswith("samples_de") and not env.get("do_de_samples"):
             continue
         result[csv] = f"{root}/{csv}.csv"
-    match env.get("visualize_de_genes"):
-        case dict() as viz_cfg:
-            match viz_cfg:
-                case {"to_plot": to_plot}:
-                    match to_plot:
-                        case {"clusters": clst, "samples": samples}:
-                            if clst and samples:
-                                result["de_PLOT"] = f"{root}/de_plots"
     return result
 
 
