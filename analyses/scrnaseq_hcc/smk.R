@@ -202,7 +202,7 @@ annotate_graph_de <- function(
           lapply(\(comp) {
             if (length(comp) <= context_threshold) {
               graph_join(
-                fi_g,
+                G,
                 comp,
                 by = join_by(name),
                 suffix = c("", "_TMP_JOINED")
