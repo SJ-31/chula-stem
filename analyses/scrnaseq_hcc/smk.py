@@ -397,23 +397,30 @@ def do_de_clusters():
     res["top_de"].to_csv(smk.output[0], index=False)
 
 
-def gather_sample_clusters():
+def save_sample_dotplots():
     clst_df: pd.DataFrame = reduce(
         lambda x, y: x.merge(y, on="sample", how="outer"),
         [pd.read_csv(f) for f in smk.input["clusters"]],
     ).astype("string")
-    clst_df.to_csv(smk.output[0], index=False)
     adata = ad.read_h5ad(smk.input["adata"])
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
     fn.make_cluster_dotplots(
         adata,
-        filename=smk.output[1],
+        filename=smk.output[0],
         markers={},
         env=smk.config,
         additional_groups=[c for c in clst_df.columns if c != "sample"],
         group_rotation=90,
         with_samples=False,
     )
+
+
+def gather_sample_clusters():
+    clst_df: pd.DataFrame = reduce(
+        lambda x, y: x.merge(y, on="sample", how="outer"),
+        [pd.read_csv(f) for f in smk.input["clusters"]],
+    ).astype("string")
+    clst_df.to_csv(smk.output[0], index=False)
     doc: Document = pymupdf.open()
     for d in smk.input["plots"]:
         doc.insert_file(d)

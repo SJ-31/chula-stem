@@ -210,7 +210,8 @@ rule gather_sample_clusters:
         ),
         adata=passed_qc,
     output:
-        *sample_cluster_out,
+        f"{outdir}/sample_clusters.csv",
+        f"{outdir}/sample_clusters_consensus.pdf",
     script:
         "smk.py"
 
@@ -337,6 +338,16 @@ rule save_other_dotplots:
     output:
         f"{outdir}/{{fs_name}}/dotplots.pdf",
         f"{outdir}/{{fs_name}}/cellassign_metrics.pdf",
+    script:
+        "smk.py"
+
+
+rule save_sample_dotplots:
+    input:
+        clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
+        adata=passed_qc,
+    output:
+        f"{outdir}/sample_clusters.pdf",
     script:
         "smk.py"
 
