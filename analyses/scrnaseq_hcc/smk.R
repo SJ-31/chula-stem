@@ -176,6 +176,21 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
 
 ## * Visualizing DE genes & enriched pathways
 # TODO: you should save this somewhere else
+plot_graphs_into_pdf <- function(glist, plot_fn, output_file) {
+  tmp <- tempdir()
+  files <- lapply(
+    seq_along(glist),
+    \(i) {
+      plot <- plot_fn(glist[[i]])
+      name <- glue("{tmp}/{i}.pdf")
+      ggsave_graph_dynamic(glist[[i]], plot, name)
+      list(name) |> `names<-`(length(glist[[i]]))
+    },
+  ) |>
+    list_c()
+  files <- files[order(names(files))]
+  join_pdfs(files, output_file)
+}
 
 annotate_graph_de <- function(
   G,
@@ -218,19 +233,14 @@ annotate_graph_de <- function(
     }) |>
     unlist(recursive = FALSE) |>
     discard(\(x) length(x) <= 2)
-  if (length(kept) > 0) {
-    purrr::reduce(kept, \(x, y) bind_graphs(x, y))
-  } else {
-    NULL
-  }
 }
 
 visualize_de_genes <- function() {
-  source(glue("{snakemake@config$r_src}/plotting.R"))
-  dir.create(snakemake@params$outdir)
   library(tidygraph)
   library(igraph)
   library(ggraph)
+  source(glue("{snakemake@config$r_src}/plotting.R"))
+  dir.create(snakemake@params$outdir)
 
   tflink_g <- prepare_tflink(
     read_csv(ENV$gene_reference),
@@ -280,27 +290,22 @@ visualize_de_genes <- function() {
         min_interesting = 1,
         kept_nodes = RCONFIG$always_include
       )
-      if (!is.null(tflink_to_plot)) {
-        ggsave_graph_dynamic(
-          tflink_to_plot,
-          plot_de_graph(tflink_to_plot, palette_c = RCONFIG$palette_c),
-          glue("{outdir}/{prefix}_tflink_{key}.pdf")
-        )
-      }
-
+      plot_graphs_into_pdf(
+        glist = tflink_to_plot,
+        plot_fn = \(g) plot_de_graph(g, palette_c = RCONFIG$palette_c),
+        output_file = glue("{outdir}/{prefix}_tflink_{key}.pdf")
+      )
       fi_to_plot <- annotate_graph_de(
         fi_g,
         cur_cluster,
         min_interesting = 2,
         kept_nodes = RCONFIG$always_include
       )
-      if (!is.null(fi_to_plot)) {
-        ggsave_graph_dynamic(
-          fi_to_plot,
-          plot_de_graph(fi_to_plot, palette_c = RCONFIG$palette_c),
-          glue("{outdir}/{prefix}_fi_{key}.pdf")
-        )
-      }
+      plot_graphs_into_pdf(
+        fi_to_plot,
+        \(g) plot_de_graph(g, palette_c = RCONFIG$palette_c),
+        glue("{outdir}/{prefix}_fi_{key}.pdf")
+      )
     }
   }
 }
@@ -324,23 +329,19 @@ plot_go_graph <- function(tb, go, output_file) {
         )
     })
   tmp <- tempdir()
-  files <- lapply(
-    seq_along(comps),
-    \(i) {
-      plot <- plot_enriched_graph(
-        comps[[i]],
+  plot_graphs_into_pdf(
+    glist = comps,
+    plot_fn = \(g) {
+      plot_enriched_graph(
+        g,
         palette_c = RCONFIG$palette_c %||% "ggthemes::Classic Red-Green Light",
         palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
       )
-      name <- glue("{tmp}/{i}.pdf")
-      ggsave_graph_dynamic(comps[[i]], plot, name)
-      list(name) |> `names<-`(length(comps[[i]]))
     },
-  ) |>
-    list_c()
-  files <- files[order(names(files))]
-  join_pdfs(files, output_file)
+    output_file = output_file
+  )
 }
+
 
 plot_reactome_graph <- function(tb, rg, output_file) {
   comps <- rg |>
@@ -348,31 +349,23 @@ plot_reactome_graph <- function(tb, rg, output_file) {
     left_join(tb, by = join_y(name)) |>
     mutate(enriched = ifelse(enriched, TRUE, FALSE)) |>
     keep_interesting_comps(rg, "enriched")
-  tmp <- tempdir()
-  files <- lapply(
-    seq_along(comps),
-    \(i) {
-      cur <- keep_interesting_leaves(comps[[i]], "enriched") |>
-        activate(nodes) |>
-        mutate(
-          name = str_wrap(name, width = max_length)
-        )
-      plot <- plot_enriched_graph(
+  plot_graphs_into_pdf(
+    glist = comps,
+    plot_fn = \(g) {
+      plot_enriched_graph(
         cur,
         palette_c = RCONFIG$palette_d %||% "ggthemes::Classic Red-Green Light",
         palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
       )
-      name <- glue("{tmp}/{i}.pdf")
-      ggsave_graph_dynamic(cur, plot, name)
-      list(name) |> `names<-`(length(cur))
-    }
-  ) |>
-    list_c()
-  files <- files[order(names(files))]
-  join_pdfs(files, output_file)
+    },
+    output_file = output_file
+  )
 }
 
 visualize_enrichment <- function(outdir) {
+  library(tidygraph)
+  library(igraph)
+  library(ggraph)
   outdir <- snakemake@params$outdir
   GO <- read_graph(ENV$go_graph, "gml") |>
     as_tbl_graph() |>
