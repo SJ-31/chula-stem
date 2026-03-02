@@ -177,11 +177,47 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
 ## * Visualizing DE genes & enriched pathways
 # TODO: you should save this somewhere else
 
-annotate_graph_de <- function(G, tb, min_interesting = 1, kept_nodes = NULL) {
+annotate_graph_de <- function(
+  G,
+  tb,
+  min_interesting = 1,
+  kept_nodes = NULL,
+  context_threshold = 1,
+  simplify_threshold = 150
+) {
   kept <- activate(G, nodes) |>
     left_join(tb, by = join_by(x$name == y$gene)) |>
-    mutate(is_de = !is.na(lfc)) |>
-    keep_interesting_comps("is_de", min_interesting, kept_nodes = kept_nodes)
+    mutate(is_de = !is.na(lfc), near_de = {
+      enr <- which(.N()$is_de)
+      node_is_adjacent(enr) & is.na(is_de)
+    }) |>
+    keep_interesting_comps("is_de", min_interesting, kept_nodes = kept_nodes) |>
+    lapply(\(g) {
+      if (length(g) <= simplify_threshold) {
+        list(g)
+      } else {
+        activate(g, nodes) |>
+          filter(is_de) |>
+          to_components() |>
+          lapply(\(comp) {
+            if (length(comp) <= context_threshold) {
+              graph_join(
+                fi_g,
+                comp,
+                by = join_by(name),
+                suffix = c("", "_TMP_JOINED")
+              ) |>
+                activate(nodes) |>
+                filter(is_de | near_de)
+            } else {
+              comp
+            }
+          }) |>
+          keep(\(x) any(vertex_attr(x, "is_de")))
+      }
+    }) |>
+    unlist(recursive = FALSE) |>
+    discard(\(x) length(x) <= 2)
   if (length(kept) > 0) {
     purrr::reduce(kept, \(x, y) bind_graphs(x, y))
   } else {
@@ -203,7 +239,10 @@ visualize_de_genes <- function() {
   fi_g <- prepare_reactome_fi(ENV$reactome_fi)
   clusters_de <- local({
     scvi <- read_csv(snakemake@input$cluster_level_scvi) |>
-      filter(proba_de > RCONFIG$scvi_min_prob) |>
+      filter(
+        proba_de > RCONFIG$scVI_min_prob &
+          abs(lfc_median) > RCONFIG$scVI_lfc_threshold
+      ) |>
       rename(lfc = "lfc_median")
     edger <- read_csv(snakemake@input$cluster_level_edger) |>
       rename(lfc = "logFC")
@@ -333,7 +372,8 @@ plot_reactome_graph <- function(tb, rg, output_file) {
   join_pdfs(files, output_file)
 }
 
-visualize_enrichment_inner <- function(outdir) {
+visualize_enrichment <- function(outdir) {
+  outdir <- snakemake@params$outdir
   GO <- read_graph(ENV$go_graph, "gml") |>
     as_tbl_graph() |>
     select(-id) |> # BUG: fix the name weirdness
@@ -359,7 +399,7 @@ visualize_enrichment_inner <- function(outdir) {
   gprofiler_renaming <- c(
     name = "native",
     pvalue = "p_value",
-    stat = "precision",
+    stat = RCONFIG$gprofiler_stat %||% "recall",
     enriched = "significant"
   )
 
@@ -418,16 +458,16 @@ visualize_enrichment_inner <- function(outdir) {
   }
 }
 
-visualize_enrichment <- function() {
-  outdir <- snakemake@params$outdir
-  dir.create(outdir, showWarnings = FALSE)
-  tryCatch(
-    expr = visualize_enrichment_inner(outdir),
-    error = \(.) {
-      unlink(outdir, recursive = TRUE)
-    }
-  )
-}
+## visualize_enrichment <- function() {
+##   outdir <- snakemake@params$outdir
+##   dir.create(outdir, showWarnings = FALSE)
+##   tryCatch(
+##     expr = visualize_enrichment_inner(outdir),
+##     error = \(.) {
+##       unlink(outdir, recursive = TRUE)
+##     }
+##   )
+## }
 
 ## * Entry
 
