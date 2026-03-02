@@ -274,8 +274,8 @@ def provide_annotation_output(env) -> dict:
     if not env.get("chosen_clusters"):
         return result
     for csv in (
-        "gene_set_activity",
-        "marker_gene_activity",
+        "clusters_gene_set_activity",
+        "clusters_marker_gene_activity",
         "clusters-edgeR_de",
         "clusters-scVI_de",
         "samples_de",
@@ -287,6 +287,8 @@ def provide_annotation_output(env) -> dict:
         elif csv.startswith("samples_de") and not env.get("do_de_samples"):
             continue
         result[csv] = f"{root}/{csv}.csv"
+    result["de_genes_PLOT"] = f"{root}/de_plots"
+    result["enrichment_PLOT"] = f"{root}/enrichment_plots"
     return result
 
 
