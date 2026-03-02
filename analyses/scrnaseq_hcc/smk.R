@@ -185,7 +185,7 @@ plot_graphs_into_pdf <- function(glist, plot_fn, output_file) {
       name <- glue("{tmp}/{i}.pdf")
       ggsave_graph_dynamic(glist[[i]], plot, name)
       list(name) |> `names<-`(length(glist[[i]]))
-    },
+    }
   ) |>
     list_c()
   files <- files[order(names(files))]
@@ -366,7 +366,10 @@ visualize_enrichment <- function(outdir) {
   library(tidygraph)
   library(igraph)
   library(ggraph)
+  source(glue("{snakemake@config$r_src}/plotting.R"))
   outdir <- snakemake@params$outdir
+  dir.create(snakemake@params$outdir)
+
   GO <- read_graph(ENV$go_graph, "gml") |>
     as_tbl_graph() |>
     select(-id) |> # BUG: fix the name weirdness
