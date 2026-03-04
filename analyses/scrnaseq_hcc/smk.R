@@ -188,8 +188,10 @@ plot_graphs_into_pdf <- function(glist, plot_fn, output_file) {
     }
   ) |>
     list_c()
-  files <- files[order(names(files))]
-  join_pdfs(files, output_file)
+  if (length(files) > 0) {
+    files <- files[order(names(files))]
+    join_pdfs(unlist(files), output_file)
+  }
 }
 
 annotate_graph_de <- function(
@@ -349,14 +351,14 @@ plot_reactome_graph <- function(tb, rg, output_file) {
   comps <- rg |>
     activate(nodes) |>
     left_join(tb, by = join_by(name)) |>
-    mutate(enriched = ifelse(enriched, TRUE, FALSE)) |>
-    keep_interesting_comps(rg, "enriched")
+    mutate(enriched = replace_values(enriched, NA ~ FALSE)) |>
+    keep_interesting_comps("enriched")
   plot_graphs_into_pdf(
     glist = comps,
     plot_fn = \(g) {
       plot_enriched_graph(
-        cur,
-        palette_c = RCONFIG$palette_d %||% "ggthemes::Classic Red-Green Light",
+        g,
+        palette_c = RCONFIG$palette_c %||% "ggthemes::Classic Red-Green Light",
         palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
       )
     },
