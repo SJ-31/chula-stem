@@ -39,7 +39,7 @@ gene_association_plots = []
 for spec in config["find_gene_associations"].get("spec", []):
     n = spec["name"]
     plot_file = f"{outdir}/gene_associations/{n}.pdf"
-    other_outs["gene_assoc_{n}_PLOT"] = plot_file
+    other_outs[f"gene_assoc_{n}_PLOT"] = plot_file
     gene_association_plots.append(plot_file)
 
 
