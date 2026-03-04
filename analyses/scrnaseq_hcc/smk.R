@@ -403,7 +403,8 @@ visualize_enrichment <- function(outdir) {
   inputs <- list(
     gprofiler_clusters = read_csv(snakemake@input$gprofiler_clusters),
     gprofiler_samples = read_csv(snakemake@input$gprofiler_samples),
-    decoupler_clusters = read_csv(snakemake@input$clusters_gs)
+    decoupler_clusters = read_csv(snakemake@input$clusters_gs) |>
+      mutate(contrast = paste(group, reference))
   )
   gprofiler_renaming <- c(
     name = "native",
@@ -450,9 +451,15 @@ visualize_enrichment <- function(outdir) {
       cur_contrast <- groupings[i]
 
       go_cur <- go_tb |>
-        dplyr::filter(contrast == cur_contrast & !!as.symbol(group_key) == gk)
+        dplyr::filter(
+          contrast == cur_contrast & !!as.symbol(group_key) == gk
+        ) |>
+        distinct(name, .keep_all = TRUE)
       reactome_cur <- reactome_tb |>
-        dplyr::filter(contrast == cur_contrast & !!as.symbol(group_key) == gk)
+        dplyr::filter(
+          contrast == cur_contrast & !!as.symbol(group_key) == gk
+        ) |>
+        distinct(name, .keep_all = TRUE)
 
       prefix <- glue("{gk} {cur_contrast}") |>
         str_replace_all(" ", "_")
