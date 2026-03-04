@@ -598,8 +598,7 @@ join_pdfs <- function(pdf_files, output_file) {
   if (length(missing) > 0) {
     stop(paste("File(s) not found:", paste(missing, collapse = ", ")))
   }
-
-  pdftools::pdf_combine(pdf_files, output = output_file)
+  system2("pdfunite", c(pdf_files, output_file))
   message("Merged ", length(pdf_files), " file(s) into: ", output_file)
   invisible(output_file)
 }
