@@ -236,10 +236,12 @@ annotate_graph_de <- function(
 }
 
 visualize_de_genes <- function() {
-  library(tidygraph)
-  library(igraph)
-  library(ggraph)
-  source(glue("{snakemake@config$r_src}/plotting.R"))
+  suppressMessages({
+    library(tidygraph)
+    library(igraph)
+    library(ggraph)
+    source(glue("{snakemake@config$r_src}/plotting.R"))
+  })
   dir.create(snakemake@params$outdir)
 
   tflink_g <- prepare_tflink(
@@ -363,10 +365,12 @@ plot_reactome_graph <- function(tb, rg, output_file) {
 }
 
 visualize_enrichment <- function(outdir) {
-  library(tidygraph)
-  library(igraph)
-  library(ggraph)
-  source(glue("{snakemake@config$r_src}/plotting.R"))
+  suppressMessages({
+    library(tidygraph)
+    library(igraph)
+    library(ggraph)
+    source(glue("{snakemake@config$r_src}/plotting.R"))
+  })
   outdir <- snakemake@params$outdir
   dir.create(snakemake@params$outdir)
 
@@ -403,26 +407,26 @@ visualize_enrichment <- function(outdir) {
     tb <- inputs[[n]]
     if (str_starts(n, "gprofiler")) {
       go_tb <- tb |>
-        filter(str_starts(native, "GO:")) |>
-        dplyr::select(native, precision, p_value) |>
-        rename(gprofiler_renaming)
+        dplyr::select(-name) |>
+        dplyr::filter(str_starts(native, "GO:")) |>
+        dplyr::rename(all_of(gprofiler_renaming))
 
       reactome_tb <- tb |>
-        filter(str_starts(native, "REAC:")) |>
+        dplyr::filter(str_starts(native, "REAC:")) |>
         mutate(
           native = str_remove(native, "REAC:"),
           native = reactome_ids2name[native]
         ) |>
+        dplyr::select(-name) |>
         dplyr::filter(!is.na(native)) |>
-        dplyr::select(native, precision, p_value) |>
-        rename(gprofiler_renaming)
+        dplyr::rename(all_of(gprofiler_renaming))
     } else {
       go_tb <- tb |>
-        filter(str_starts(name, "GO_..:")) |>
+        dplyr::filter(str_starts(name, "GO_..:")) |>
         mutate(name = str_remove(name, "GO_..:"), enriched = padj <= 0.05) |>
         inner_join(go_term2id, by = join_by(x$name == y$term))
       reactome_tb <- tb |>
-        filter(str_starts(name, "Reactome:")) |>
+        dplyr::filter(str_starts(name, "Reactome:")) |>
         mutate(name = str_remove(name, "^Reactome:"), enriched = padj <= 0.05)
     }
     group_key <- ifelse(str_ends(n, "clusters"), "clustering", "analysis_group")
@@ -437,9 +441,9 @@ visualize_enrichment <- function(outdir) {
       cur_contrast <- groupings[i]
 
       go_cur <- go_tb |>
-        filter(contrast == cur_contrast, !!as.symbol(group_key) == gk)
+        dplyr::filter(contrast == cur_contrast & !!as.symbol(group_key) == gk)
       reactome_cur <- reactome_tb |>
-        filter(contrast == cur_contrast, !!as.symbol(group_key) == gk)
+        dplyr::filter(contrast == cur_contrast & !!as.symbol(group_key) == gk)
 
       prefix <- glue("{gk} {cur_contrast}") |>
         str_replace_all(" ", "_")
@@ -448,22 +452,16 @@ visualize_enrichment <- function(outdir) {
       reactome_out <- glue("{outdir}/{prefix}_reactome_{suffix}.pdf")
       go_out <- glue("{outdir}/{prefix}_go_{suffix}.pdf")
 
-      plot_go_graph(tb = go_tb, go = GO, output_file = go_out)
-      plot_reactome_graph(tb = reactome_tb, rg = RG, output_file = reactome_out)
+      plot_go_graph(tb = go_cur, go = GO, output_file = go_out)
+      plot_reactome_graph(
+        tb = reactome_cur,
+        rg = RG,
+        output_file = reactome_out
+      )
     }
   }
 }
 
-## visualize_enrichment <- function() {
-##   outdir <- snakemake@params$outdir
-##   dir.create(outdir, showWarnings = FALSE)
-##   tryCatch(
-##     expr = visualize_enrichment_inner(outdir),
-##     error = \(.) {
-##       unlink(outdir, recursive = TRUE)
-##     }
-##   )
-## }
 
 ## * Entry
 
