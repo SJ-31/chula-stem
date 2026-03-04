@@ -356,8 +356,15 @@ plot_reactome_graph <- function(tb, rg, output_file) {
   plot_graphs_into_pdf(
     glist = comps,
     plot_fn = \(g) {
+      cur <- g |>
+        activate(nodes) |>
+        mutate(near_enriched = {
+          enr <- which(.N()$enriched)
+          node_is_adjacent(enr) & !enriched
+        }) |>
+        filter(enriched | near_enriched)
       plot_enriched_graph(
-        g,
+        cur,
         palette_c = RCONFIG$palette_c %||% "ggthemes::Classic Red-Green Light",
         palette_d = RCONFIG$palette_d %||% "LaCroixColoR::CeriseLimon"
       )
