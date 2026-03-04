@@ -2,8 +2,11 @@
 import inspect
 from pathlib import Path
 
+import anndata as ad
 import click
 import matplotlib.pyplot as plt
+import pandas as pd
+import scanpy as sc
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
@@ -197,3 +200,45 @@ def savefig(
     if gv.clear_savefig:
         fig.clear()
         plt.close(fig)
+
+
+def plot_associations_tracks(
+    adata: ad.AnnData, groupby: str, assoc_df: pd.DataFrame, n: int = 10
+) -> list[Figure]:
+    """
+    Generate tracksplots for the top n most associated genes
+
+    Parameters
+    ----------
+    assoc_df : pd.DataFrame
+        DataFrame output of `find_proportional_genes`
+    """
+    top_assoc = (
+        assoc_df.reset_index(names="genes")
+        .melt(id_vars="genes")
+        .groupby("variable")
+        .apply(
+            lambda df: df.sort_values("value", ascending=False)
+            .query("genes != variable")
+            .drop("variable", axis=1)
+            .head(n)
+        )
+    ).reset_index(names=["query", "idx"])
+    queries = assoc_df.columns
+    result = []
+    for q in queries:
+        cur_genes = top_assoc.loc[top_assoc["query"] == q, :]
+        axes = sc.pl.tracksplot(
+            adata,
+            var_names=[q] + list(cur_genes["genes"]),
+            show=False,
+            groupby=groupby,
+        )
+        for ax, lab in zip(axes["track_axes"], ["Query"] + list(cur_genes["value"])):
+            ax: Axes
+            old_lab = ax.get_ylabel()
+            if not isinstance(lab, str):
+                lab = round(lab, 2)
+            ax.set_ylabel(f"{old_lab} ({lab})")
+        result.append(axes["groupby_ax"].get_figure())
+    return result
