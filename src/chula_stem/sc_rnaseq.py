@@ -1,14 +1,17 @@
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Literal
 
 import anndata as ad
 import click
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import skbio.stats.composition as comp
 import sklearn.metrics as sm
-from scipy import sparse
+from numba import jit
+from scipy import sparse, stats
 
 from chula_stem import utils as ut
 
@@ -411,3 +414,126 @@ def sweep_clustering(
     purity_df = pd.DataFrame(purity_tracker).set_index(adata.obs_names)
     adata.obsm[f"{prefix}_silhouette"] = sil_df
     adata.obsm[f"{prefix}_neighbor_purity"] = purity_df
+
+
+def alr(
+    data: ad.AnnData | pd.DataFrame,
+    by: int | str,
+    var_col: str | None = None,
+    condition_col: str = "",
+    zero_value: int = 1,
+    gamma: float = 0,
+) -> tuple[np.ndarray, int]:
+    """Normalize counts in adata using ALR, with the counts of a specific
+    gene `by` as the reference.
+
+    Parameters
+    ----------
+
+    by : str | int
+        name of gene to normalize by, or the index of the gene in adata.var
+            if the name is provided, the index is looked up automatically.
+    var_col : str | None
+        column in adata.var containing the gene name. If not provided, adata.var_names
+        is used
+    """
+    index: int | np.ndarray
+    counts = data.X if isinstance(data, ad.AnnData) else data
+    counts: np.ndarray = counts if isinstance(counts, np.ndarray) else counts.toarray()
+    assert isinstance(counts, np.ndarray)
+    counts[counts == 0] = zero_value
+    if isinstance(by, str) and isinstance(data, pd.DataFrame):
+        query = np.where(data.columns == by)
+        index = query[0][0]
+    elif isinstance(by, str) and var_col:
+        query = np.where(data.var[var_col] == by)
+        index = query[0][0]
+        if len(query) > 1:
+            raise ValueError("Key `by` is not unique!")
+    elif isinstance(by, str):
+        index = data.var.index.get_loc(by)
+        if not isinstance(index, int):
+            raise ValueError("Key `by` is not unique!")
+    else:
+        index = by
+    return comp.alr(counts, index), index
+
+
+@jit(nopython=True, cache=True)
+def prop_helper(query_idx, all_idx, transformed):
+    results = []
+    v_cache: dict[int, float] = {}
+    for i, q in enumerate(query_idx):
+        q_vals = transformed[:, q]
+        if q not in v_cache:
+            v_cache[q] = q_vals.var()
+        cur_var: float = v_cache[q]
+        cur_result = []
+        for other in all_idx:
+            o_vals = transformed[:, other]
+            if other not in v_cache:
+                v_cache[other] = o_vals.var()
+            o_var: float = v_cache[other]
+            numer = (q_vals - o_vals).var()
+            prop: float = 1 - (numer / (cur_var + o_var))
+            cur_result.append(prop)
+        results.append(np.array(cur_result))
+    return results
+
+
+def clr(
+    x: ad.AnnData,
+    features=None,
+    feature_col: str = "GENEID",
+    robust: bool = False,
+    zero_value: int = 1,
+) -> np.ndarray:
+    "Centered log-ratio transform"
+    counts: np.ndarray = x.X if isinstance(x.X, np.ndarray) else x.X.toarray()
+    counts = counts + zero_value
+    if features is None and not robust:
+        return comp.clr(counts)
+    if features is not None:
+        subset = x.var[feature_col].isin(features)
+    else:
+        subset = np.ones(counts.shape[1]).astype(bool)
+    if robust:
+        gmean = [
+            stats.gmean(counts[i, counts[i, :] != 0 & subset])
+            for i in range(counts.shape[0])
+        ]
+        gmean = np.array(gmean)
+    else:
+        gmean = stats.gmean(counts[:, subset], axis=1, nan_policy="omit")
+    clr = np.log(counts) - np.log(gmean.reshape(-1, 1))
+    if robust:
+        clr[clr == -np.inf] = 0
+    return clr
+
+
+def find_proportional_genes_rho(
+    adata: ad.AnnData,
+    query_genes: list[str],
+    gene_col: str | None = None,
+    lr_transform: Literal["clr", "alr"] = "clr",
+    **kws,
+) -> pd.DataFrame:
+    if lr_transform == "clr":
+        transformed: np.ndarray = clr(adata, **kws)
+    elif lr_transform == "alr":
+        transformed, removed_idx = alr(adata, **kws)
+    tmp = adata.var_names if gene_col is None else pd.Index(adata.var[gene_col])
+
+    if lr_transform == "alr":
+        tmp = np.delete(tmp, removed_idx)
+
+    all_genes: pd.Index = pd.Index(tmp)
+    idx = list(range(len(all_genes)))
+    results: list[np.ndarray] = prop_helper(
+        [all_genes.get_loc(q) for q in query_genes],
+        idx,
+        transformed,
+    )
+    return pd.DataFrame(
+        {q: results[i] for i, q in enumerate(query_genes)}, index=all_genes
+    )
