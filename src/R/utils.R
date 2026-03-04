@@ -471,9 +471,9 @@ simplify_tflink_mitab <- function(mitab_file) {
 }
 
 keep_interesting_comps <- function(G, filter_col, min = 1, kept_nodes = NULL) {
-  comps <- G |>
-    to_components() |>
-    keep(\(g) {
+  comps <- G |> to_components()
+  if (is.list(comps)) {
+    keep(comps, \(g) {
       is_interesting <- vertex_attr(g, filter_col)
       if (!is.null(kept_nodes) && length(intersect(V(g)$name, kept_nodes))) {
         TRUE
@@ -481,6 +481,9 @@ keep_interesting_comps <- function(G, filter_col, min = 1, kept_nodes = NULL) {
         sum(is_interesting) >= min
       }
     })
+  } else {
+    comps
+  }
 }
 
 #' Remove leaf nodes that are FALSE for a specific attribute from `G` until all
@@ -539,7 +542,7 @@ to_go_graph_components <- function(
     activate(nodes) |>
     left_join(results_tb, by = join_by(name)) |>
     mutate(
-      enriched = ifelse(enriched, TRUE, FALSE),
+      enriched = replace_values(enriched, NA ~ FALSE),
       near_enriched = node_is_adjacent(which(.N()$enriched)) & !enriched
     ) |>
     activate(edges) |>
@@ -552,7 +555,7 @@ to_go_graph_components <- function(
       (both_enriched | parent_not_enriched) & child_more_specific
     }) |>
     activate(nodes) |>
-    filter((near_enriched | enriched) & distance_to_ns >= min_ns_dist)
+    filter((near_enriched | enriched) & (distance_to_ns >= min_ns_dist))
   context_nodes <- filtered |>
     activate(nodes) |>
     select(name, term)
@@ -562,17 +565,10 @@ to_go_graph_components <- function(
       if (length(g) <= simplify_threshold) {
         list(g)
       } else {
-        activate(g, edges) |>
-          filter(.N()[from, ]$enriched & .N()[to, ]$enriched) |>
-          activate(nodes) |>
-          iterate_while(
-            any(local_size() == 1) & nrow(.N()) > 0,
-            \(ig) {
-              activate(ig, nodes) |>
-                filter(local_size() > 1)
-            }
-          ) |>
-          to_components()
+        activate(g, nodes) |>
+          filter(enriched) |>
+          to_components() |>
+          discard(\(ig) length(ig) <= 2)
       }
     }) |>
     unlist(recursive = FALSE) |>

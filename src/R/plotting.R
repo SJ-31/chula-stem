@@ -496,8 +496,10 @@ ggsave_graph_dynamic <- function(G, plot, filename) {
     dim <- 12
   } else if (length(G) >= 10) {
     dim <- 10
-  } else {
+  } else if (length(G) >= 5) {
     dim <- 8
+  } else {
+    dim <- 5
   }
   ggsave(
     filename = filename,
