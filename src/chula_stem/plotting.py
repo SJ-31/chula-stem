@@ -253,8 +253,8 @@ def plot_associations(
             mapping = dict(
                 Query=q,
                 **{
-                    round(v, 2): g
-                    for v, g in zip(cur_genes["genes"], cur_genes["value"])
+                    str(round(v, 2)): g
+                    for g, v in zip(cur_genes["genes"], cur_genes["value"])
                 },
             )
             axes = sc.pl.heatmap(adata, var_names=mapping, show=False, groupby=groupby)
