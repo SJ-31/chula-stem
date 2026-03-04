@@ -475,7 +475,11 @@ def prop_helper(query_idx, all_idx, transformed):
                 v_cache[other] = o_vals.var()
             o_var: float = v_cache[other]
             numer = (q_vals - o_vals).var()
-            prop: float = 1 - (numer / (cur_var + o_var))
+            denom = cur_var + o_var
+            if denom == 0:
+                prop = np.nan
+            else:
+                prop: float = 1 - (numer / denom)
             cur_result.append(prop)
         results.append(np.array(cur_result))
     return results
