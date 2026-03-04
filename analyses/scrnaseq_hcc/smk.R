@@ -319,10 +319,10 @@ plot_go_graph <- function(tb, go, output_file) {
   comps <- to_go_graph_components(
     tb,
     go,
-    min_enriched = RCONFIG$min_enriched,
-    simplify_threshold = RCONFIG$simplify_threshold,
-    context_threshold = RCONFIG$context_threshold,
-    min_ns_dist = RCONFIG$min_ns_dist
+    min_enriched = RCONFIG$min_enriched %||% 3,
+    simplify_threshold = RCONFIG$simplify_threshold %||% 150,
+    context_threshold = RCONFIG$context_threshold %||% 3,
+    min_ns_dist = RCONFIG$min_ns_dist %||% 2
   ) |>
     lapply(\(g) {
       activate(g, nodes) |>
@@ -348,7 +348,7 @@ plot_go_graph <- function(tb, go, output_file) {
 plot_reactome_graph <- function(tb, rg, output_file) {
   comps <- rg |>
     activate(nodes) |>
-    left_join(tb, by = join_y(name)) |>
+    left_join(tb, by = join_by(name)) |>
     mutate(enriched = ifelse(enriched, TRUE, FALSE)) |>
     keep_interesting_comps(rg, "enriched")
   plot_graphs_into_pdf(
