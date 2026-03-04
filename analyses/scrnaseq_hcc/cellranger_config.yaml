@@ -237,18 +237,12 @@ dotplot:
       - SPP1
       - ALB
       - SERPINA1
-    emt:
-      - MMP2 # Matrix metalloproteinases
-      -
-      - CDH2 # Mesenchymal marker
-    tcga_idh:
-      - IDH1
-      - IDH2
-      - MIR122
-    tcga_p53:
-      - TP53
-      - MDM4
-      - PTCHD4
+    edgeR_de:
+      - OR14J1
+      - PRTG
+      - CARD18
+      - CMKLR2
+      - ZEB1
   kws:
     gene_symbols: hgnc_symbol
     cmap: "Greens"
@@ -267,6 +261,31 @@ cellassign:
     train_kws:
       batch_size: 1024
       max_epochs: ?30 if test else 400
+
+# * Associated genes
+
+find_gene_associations:
+  keep: 15
+  # TODO: see if adding a query actually makes a difference
+  spec:
+    - name: "main_set_cluster2"
+      query: "default_4 == '2'"
+      genes: ["LIN28B", "AFP", "GPC3"]
+      group_by: "default_4"
+    - name: "main_set_cluster2_no_subset"
+      genes: ["LIN28B", "AFP", "GPC3"]
+      group_by: "default_4"
+    - name: "others_cluster1"
+      query: "default_4 == '1'"
+      genes: ["OR14J1", "ITIH3", "VCAM1"]
+      group_by: "default_4"
+    - name: "others_cluster3"
+      query: "default_4 == '3'"
+      genes: ["DUOXA2", "MMP1", "SLC28A3"]
+      group_by: "default_4"
+  kws:
+    lr_transform: clr
+    gene_col: null
 
 # * Cluster annotation
 # Only specified clusterings are used as input to the routine, determine by reviewing

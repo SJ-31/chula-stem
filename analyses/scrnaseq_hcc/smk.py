@@ -444,6 +444,47 @@ def gather_sample_clusters():
     doc.save(smk.output[2])
 
 
+def find_gene_associations():
+    adata = ad.read_h5ad(smk.input["adata"])
+    features: list[str] = Path(smk.input["features"]).read_text().splitlines()
+    _, adata = add_all_clusters(
+        smk.input["clusters"], adata, smk.config, to_category=True
+    )
+    assert isinstance(adata, ad.AnnData)
+    outdir: Path = Path(smk.params["outdir"])
+    kws: dict = RCONFIG["kws"]
+    spec: dict | None = None
+    name = smk.params["name"]
+    for spec_tmp in RCONFIG["spec"]:
+        if name == spec_tmp["name"]:
+            spec = spec_tmp
+    if spec is None:
+        raise ValueError("Spec is none for some reason")
+    outfile = smk.output[1]
+    qgenes: list = spec["genes"]
+    if query := spec.get("query"):
+        kept: pd.DataFrame = adata.obs.query(query)
+        filtered: ad.AnnData = adata[adata.obs_names.isin(kept.index), :]
+    else:
+        filtered = adata
+    assert filtered.shape[0] > 0
+    result: pd.DataFrame = sc_utils.find_proportional_genes_rho(filtered, qgenes, **kws)
+    result.assign(group=name).to_csv(smk.output[0], index=False)
+    plots = plot_associations_tracks(
+        adata,
+        groupby=spec.get("group_by", "sample"),
+        assoc_df=result,
+        n=RCONFIG.get("keep", 10),
+    )
+    doc: Document = pymupdf.open()
+    for i, plot in enumerate(plots):
+        tmp = outdir / f"{i}.pdf"
+        plot.savefig(tmp, bbox_inches="tight")
+        doc.insert_file(tmp)
+        tmp.unlink()
+    doc.save(outfile)
+
+
 # * Entry
 if rule_fn := globals().get(smk.rule):
     rule_fn()
