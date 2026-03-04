@@ -279,7 +279,6 @@ rule find_gene_associations:
         outdir=f"{outdir}/gene_associations",
         name=lambda wc: wc.get("name"),
     output:
-        f"{outdir}/gene_associations/{{name}}.csv",
         f"{outdir}/gene_associations/{{name}}.pdf",
     script:
         "smk.py"
@@ -425,9 +424,6 @@ Produces two plots
 """
 
 
-# TODO: [2026-02-24 Tue] custom plots with ggraph, from the results of the GO
-# and pathway enrichment analyses, and well as DE
-# rule visualize_pathways:
 rule visualize_de_genes:
     input:
         cluster_level_scvi=f"{anno_out}/clusters-scVI_de.csv",

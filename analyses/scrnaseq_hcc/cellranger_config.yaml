@@ -266,7 +266,7 @@ cellassign:
 
 find_gene_associations:
   keep: 15
-  # TODO: see if adding a query actually makes a difference
+  style: tracksplot
   spec:
     - name: "main_set_cluster2"
       query: "default_4 == '2'"

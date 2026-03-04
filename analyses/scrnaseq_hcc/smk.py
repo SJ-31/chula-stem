@@ -460,7 +460,6 @@ def find_gene_associations():
             spec = spec_tmp
     if spec is None:
         raise ValueError("Spec is none for some reason")
-    outfile = smk.output[1]
     qgenes: list = spec["genes"]
     if query := spec.get("query"):
         kept: pd.DataFrame = adata.obs.query(query)
@@ -468,13 +467,14 @@ def find_gene_associations():
     else:
         filtered = adata
     assert filtered.shape[0] > 0
-    if Path(smk.output[0]).exists():
-        result = pd.read_csv(smk.output[0])
+    saved = outdir / f"{name}.csv"
+    if saved.exists():
+        result = pd.read_csv(saved).set_index("gene", drop=True)
     else:
         result: pd.DataFrame = sc_utils.find_proportional_genes_rho(
             filtered, qgenes, **kws
         )
-        result.to_csv(smk.output[0], index=False)
+        result.to_csv(saved, index_label="gene")
     plots = plot_associations(
         adata,
         groupby=spec.get("group_by", "sample"),
@@ -484,11 +484,12 @@ def find_gene_associations():
     )
     doc: Document = pymupdf.open()
     for i, plot in enumerate(plots):
-        tmp = outdir / f"{i}.pdf"
+        tmp = outdir / f"tmp_{i}.pdf"
         plot.savefig(tmp, bbox_inches="tight")
-        doc.insert_file(tmp)
-        tmp.unlink()
-    doc.save(outfile)
+        if tmp.exists():
+            doc.insert_file(tmp)
+            tmp.unlink()
+    doc.save(smk.output[0])
 
 
 # * Entry
