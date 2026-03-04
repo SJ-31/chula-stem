@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import inspect
 from pathlib import Path
+from typing import Literal
 
 import anndata as ad
 import click
@@ -202,8 +203,12 @@ def savefig(
         plt.close(fig)
 
 
-def plot_associations_tracks(
-    adata: ad.AnnData, groupby: str, assoc_df: pd.DataFrame, n: int = 10
+def plot_associations(
+    adata: ad.AnnData,
+    groupby: str,
+    assoc_df: pd.DataFrame,
+    n: int,
+    style: Literal["heatmap", "tracksplot"] = "tracksplot",
 ) -> list[Figure]:
     """
     Generate tracksplots for the top n most associated genes
@@ -228,17 +233,30 @@ def plot_associations_tracks(
     result = []
     for q in queries:
         cur_genes = top_assoc.loc[top_assoc["query"] == q, :]
-        axes = sc.pl.tracksplot(
-            adata,
-            var_names=[q] + list(cur_genes["genes"]),
-            show=False,
-            groupby=groupby,
-        )
-        for ax, lab in zip(axes["track_axes"], ["Query"] + list(cur_genes["value"])):
-            ax: Axes
-            old_lab = ax.get_ylabel()
-            if not isinstance(lab, str):
-                lab = round(lab, 2)
-            ax.set_ylabel(f"{old_lab} ({lab})")
+        if style == "tracksplot":
+            vars = [q] + list(cur_genes["genes"])
+            axes = sc.pl.tracksplot(
+                adata,
+                var_names=vars,
+                show=False,
+                groupby=groupby,
+            )
+            for ax, lab in zip(
+                axes["track_axes"], ["Query"] + list(cur_genes["value"])
+            ):
+                ax: Axes
+                old_lab = ax.get_ylabel()
+                if not isinstance(lab, str):
+                    lab = round(lab, 2)
+                ax.set_ylabel(f"{old_lab} ({lab})")
+        else:
+            mapping = dict(
+                Query=q,
+                **{
+                    round(v, 2): g
+                    for v, g in zip(cur_genes["genes"], cur_genes["value"])
+                },
+            )
+            axes = sc.pl.heatmap(adata, var_names=mapping, show=False, groupby=groupby)
         result.append(axes["groupby_ax"].get_figure())
     return result

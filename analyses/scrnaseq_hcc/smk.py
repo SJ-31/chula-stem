@@ -11,7 +11,7 @@ import pandas as pd
 import plotnine as gg
 import pymupdf
 import scanpy as sc
-from chula_stem.plotting import plot_associations_tracks
+from chula_stem.plotting import plot_associations
 from chula_stem.r_utils import edgeR_wrapper
 from pymupdf import Document
 from snakemake.script import snakemake as smk
@@ -468,13 +468,19 @@ def find_gene_associations():
     else:
         filtered = adata
     assert filtered.shape[0] > 0
-    result: pd.DataFrame = sc_utils.find_proportional_genes_rho(filtered, qgenes, **kws)
-    result.assign(group=name).to_csv(smk.output[0], index=False)
-    plots = plot_associations_tracks(
+    if Path(smk.output[0]).exists():
+        result = pd.read_csv(smk.output[0])
+    else:
+        result: pd.DataFrame = sc_utils.find_proportional_genes_rho(
+            filtered, qgenes, **kws
+        )
+        result.to_csv(smk.output[0], index=False)
+    plots = plot_associations(
         adata,
         groupby=spec.get("group_by", "sample"),
         assoc_df=result,
         n=RCONFIG.get("keep", 10),
+        style=RCONFIG.get("style", "heatmap"),
     )
     doc: Document = pymupdf.open()
     for i, plot in enumerate(plots):
