@@ -2,6 +2,7 @@
 from collections.abc import Callable
 from functools import reduce
 from pathlib import Path
+from typing import Literal
 
 import anndata as ad
 import chula_stem.sc_rnaseq as sc_utils
@@ -10,6 +11,7 @@ import pandas as pd
 import plotnine as gg
 import pymupdf
 import scanpy as sc
+from chula_stem.plotting import plot_associations_tracks
 from chula_stem.r_utils import edgeR_wrapper
 from pymupdf import Document
 from snakemake.script import snakemake as smk
@@ -131,6 +133,27 @@ def select_features(
     else:
         raise NotImplementedError()
     return adata
+
+
+def add_all_clusters(
+    sample_clusters: list[str],
+    adata: ad.AnnData | None = None,
+    env: dict | None = None,
+    to_category: bool = False,
+) -> tuple[pd.DataFrame, ad.AnnData | None]:
+    clst_df: pd.DataFrame = reduce(
+        lambda x, y: x.merge(y, on="sample", how="outer"),
+        [pd.read_csv(f) for f in sample_clusters],
+    ).astype("string")
+    if to_category:
+        clst_df = clst_df.astype("category")
+    if adata is not None:
+        if env is not None:
+            cluster_names = fn.add_clusterings(
+                adata, clusters_to_add=env["chosen_clusters"], env=env
+            )
+        adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
+    return clst_df, adata
 
 
 # * Rules
@@ -398,12 +421,9 @@ def do_de_clusters():
 
 
 def save_sample_dotplots():
-    clst_df: pd.DataFrame = reduce(
-        lambda x, y: x.merge(y, on="sample", how="outer"),
-        [pd.read_csv(f) for f in smk.input["clusters"]],
-    ).astype("string")
     adata = ad.read_h5ad(smk.input["adata"])
-    adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
+    clst_df, adata = add_all_clusters(smk.input["clusters"], adata)
+    assert isinstance(adata, ad.AnnData)
     fn.make_cluster_dotplots(
         adata,
         filename=smk.output[0],
@@ -416,10 +436,7 @@ def save_sample_dotplots():
 
 
 def gather_sample_clusters():
-    clst_df: pd.DataFrame = reduce(
-        lambda x, y: x.merge(y, on="sample", how="outer"),
-        [pd.read_csv(f) for f in smk.input["clusters"]],
-    ).astype("string")
+    clst_df, _ = add_all_clusters(smk.input["clusters"])
     clst_df.to_csv(smk.output[0], index=False)
     doc: Document = pymupdf.open()
     for d in smk.input["plots"]:
