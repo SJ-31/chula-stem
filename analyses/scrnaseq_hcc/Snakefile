@@ -35,6 +35,14 @@ for fs in feature_selection_methods:
     other_outs.update(provide_output_from_fs(fs, config))
 other_outs.update(provide_annotation_output(config))
 
+gene_association_plots = []
+for spec in config["find_gene_associations"].get("spec", []):
+    n = spec["name"]
+    plot_file = f"{outdir}/gene_associations/{n}.pdf"
+    other_outs["gene_assoc_{n}_PLOT"] = plot_file
+    gene_association_plots.append(plot_file)
+
+
 sample_cluster_keys = config["cluster_samples"]["features"].keys()
 sample_cluster_out = [
     f"{outdir}/sample_clusters.csv",
@@ -262,6 +270,21 @@ rule gather_de_samples:
         pd.concat(tmp).to_csv(output[0], index=False)
 
 
+rule find_gene_associations:
+    input:
+        clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
+        adata=passed_qc,
+        features=permissive_features,
+    params:
+        outdir=f"{outdir}/gene_associations",
+        name=lambda wc: wc.get("name"),
+    output:
+        f"{outdir}/gene_associations/{{name}}.csv",
+        f"{outdir}/gene_associations/{{name}}.pdf",
+    script:
+        "smk.py"
+
+
 # * Annotation routines
 
 # NOTE: don't need feature selection for cell assign because it will automatically
@@ -418,4 +441,14 @@ rule visualize_de_genes:
         "smk.R"
 
 
-# rule visualize_enriched:
+rule visualize_enrichment:
+    input:
+        gprofiler_clusters=f"{anno_out}/clusters_de_gprofiler.csv",
+        gprofiler_samples=f"{anno_out}/samples_de_gprofiler.csv",
+        clusters_gs=f"{anno_out}/clusters_gene_set_activity.csv",
+    params:
+        outdir=f"{anno_out}/enrichment_plots",
+    output:
+        directory(f"{anno_out}/enrichment_plots"),
+    script:
+        "smk.R"
