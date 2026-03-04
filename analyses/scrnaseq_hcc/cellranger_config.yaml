@@ -319,15 +319,18 @@ enrich_clusters:
 # If x_i is 0 if AFP is not present in the ith feature set and 1 otherwise
 
 gprofiler_enrich:
-  scVI_min_proba_de: 0.8
+  scVI_min_prob: 0.8
+  scVI_lfc_threshold: 1.5
 
 # * Visualize DE & enrichment results
 visualize_enrichment:
   palette_c: "ggthemes::Classic Red-Green Light"
   palette_d: "LaCroixColoR::CeriseLimon"
+  gprofiler_stat: recall
 
 visualize_de_genes:
-  scvi_min_prob: 0.8
+  scVI_min_prob: 0.8
+  scVI_lfc_threshold: 1.5
   palette_c: "grDevices::Cyan-Magenta"
   always_include:
     - "GPC3"
@@ -338,7 +341,7 @@ visualize_de_genes:
 gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
 go_term2id: ?f"{proj_root}/analyses/data/go_term2id.csv"
 go_graph: ?f"{proj_root}/analyses/data/go.gml"
-reactome_pathways: ?"f{proj_root}/analyses/data/ReactomePathways.txt"
-reactome_relations: ?"f{proj_root}/analyses/data/ReactomePathwaysRelation.txt"
+reactome_pathways: ?f"{proj_root}/analyses/data/ReactomePathways.txt"
+reactome_relations: ?f"{proj_root}/analyses/data/ReactomePathwaysRelation.txt"
 tflink_mitab: ?f"{proj_root}/analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
 reactome_fi: ?f"{proj_root}/analyses/data/FIsInGene_04142025_with_annotations.txt"
