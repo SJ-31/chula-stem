@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-
 import importlib.resources as res
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Callable, Iterable, Literal
 
 import anndata as ad
 import anndata2ri
@@ -11,12 +11,13 @@ import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
 import scanpy as sc
+from beartype import beartype
 from rpy2.robjects import RObject, numpy2ri, pandas2ri
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import STAP, InstalledPackage, InstalledSTPackage, importr
 from scipy import sparse, stats
 
-from chula_stem.utils import xarray_if_sparse
+from chula_stem.utils import get_ensembl_gene_data, xarray_if_sparse
 
 
 def register_biocparallel(workers: int, param="MulticoreParam") -> None:
@@ -383,3 +384,61 @@ def edgeR_wrapper(
     )
     top = df_from_r(ro.r("result$top"))
     return num_de, top
+
+
+@beartype
+@r_cleanup
+def tximport(
+    files: Sequence[str | Path],
+    tx2gene: pd.DataFrame | Path | str,
+    sample_names: Sequence[str] | None = None,
+    type: Literal["kallisto", "salmon"] = "kallisto",
+    ignore_tx_version: bool = True,
+) -> ad.AnnData:
+    """
+    Wrapper for tximport to return an
+
+    Returns
+    -------
+    AnnData object where X are the (estimated) gene counts, with two layers
+        summarized abundance, usually in TPM units
+        effective transcript length
+    """
+    if sample_names is None:
+        print("WARNING: sample names not provided, defaulting to generic names")
+        sample_names = [f"sample_{i}" for i in range(len(files))]
+    elif len(sample_names) != len(files):
+        raise ValueError("Length of the sample names does not match length of files")
+    if isinstance(tx2gene, str):
+        tx2gene = Path(tx2gene)
+    if isinstance(tx2gene, Path) and not tx2gene.exists():
+        tmp: Path = tx2gene
+        tx2gene = get_ensembl_gene_data(
+            attributes=("ensembl_transcript_id", "ensembl_gene_id")
+        )
+        tx2gene.to_csv(tmp)
+    elif isinstance(tx2gene, Path):
+        tx2gene = pd.read_csv(tx2gene)
+    df_to_r(tx2gene, r_symbol="tx2gene")
+    r_null_if_none(
+        {
+            "files": ro.StrVector(files),
+            "type": type,
+            "fnames": sample_names,
+            "ignore_tx_version": ignore_tx_version,
+        }
+    )
+    ro.r("names(files) <- fnames")
+    ro.r("""
+    result <- tximport::tximport(files = files, type = type,
+        ignoreTxVersion = ignore_tx_version,
+        tx2gene = tx2gene)
+    """)
+    lengths: pd.DataFrame = df_from_r(ro.r("as.data.frame(t(result$length))"))
+    counts: pd.DataFrame = df_from_r(ro.r("as.data.frame(t(result$counts))"))
+    abundance: pd.DataFrame = df_from_r(ro.r("as.data.frame(t(result$abundance))"))
+    return ad.AnnData(
+        X=counts,
+        layers={"abundance": abundance, "lengths": lengths},
+        uns={"countsFromAbundance": ro.r("result$countsFromAbundance")},
+    )
