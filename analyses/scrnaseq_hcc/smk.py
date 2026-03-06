@@ -162,18 +162,21 @@ def add_all_clusters(
 def gprofiler_enrich():
     sample_level = pd.read_csv(smk.input["sample_level"])
     is_scVI = sample_level["analysis_group"].str.startswith("scVI")
-    scVI_proba_threshold: float = RCONFIG.get("scVI_min_proba_de", 0.8)
-    scVI_passed_threshold = sample_level["proba_de"] >= scVI_proba_threshold
-    sample_level = sample_level[scVI_passed_threshold | ~is_scVI, :]
-    sl = fn.profile_de_results(sample_level, level="sample", **RCONFIG)
-    sl.to_csv(smk.output["sample_level"])
+    scVI_proba_threshold: float = RCONFIG.pop("scVI_min_prob", 0.8)
+    scVI_lfc_threshold: float = RCONFIG.pop("scVI_lfc_threshold", 1.5)
+    scVI_passed_threshold = (sample_level["proba_de"] >= scVI_proba_threshold) & (
+        sample_level["lfc"].abs() >= scVI_lfc_threshold
+    )
+    sample_level = sample_level.loc[scVI_passed_threshold | ~is_scVI, :]
+    sl = fn.profile_de_results(sample_level, grouping_col="analysis_group", **RCONFIG)
+    sl.to_csv(smk.output["sample_level"], index=False)
     tmp = []
     for infile in (Path(p) for p in smk.input["cluster_level"]):
         method = infile.stem.removeprefix("clusters-").removesuffix("_de")
         df = pd.read_csv(infile)
         if "scVI_de" in infile.stem:
-            df = df[df["proba_de"] >= scVI_passed_threshold, :]
-        cur = fn.profile_de_results(df, level="cluster", **RCONFIG).assign(
+            df = df.loc[df["proba_de"] >= scVI_proba_threshold, :]
+        cur = fn.profile_de_results(df, grouping_col="clustering", **RCONFIG).assign(
             method=method
         )
         tmp.append(cur)
