@@ -18,8 +18,9 @@ workflow PURECN_COMPLETE {
 
     if (params.ref.purecn_bait_intervals == null) {
         bait_intervals = PURECN_BAIT_INTERVALS(params.ref.genome,
-                                                   params.ref.baits,
-                                                   module_number).first()
+                                               params.ref.baits,
+                                               params.ref.mappability,
+                                               module_number).out.baits.first()
     } else {
         bait_intervals = file(params.ref.purecn_bait_intervals) 
     }
@@ -35,7 +36,7 @@ workflow PURECN_COMPLETE {
             .merge(normal_cov.out.loess.toList()) { meta, cov ->
                 tuple(meta, tuple(cov)) }
         normaldb = PURECN_NORMALDB(to_normaldb, params.ref.panel_of_normals,
-                                   module_number).first() 
+                                   module_number).out.db.first() 
     } else {
         normaldb = file(params.ref.purecn_normaldb)       
     }
@@ -45,7 +46,7 @@ workflow PURECN_COMPLETE {
                                                 "filename": it[0].id],
                                                it[1]]})
         .join(Utl.getId(mutect2_unfiltered.out.variants))
-        .join(Utl.getId(mutect2_unfiltered.out.stats)).map({ it -> it[1..-1] })
+        .map({ it -> it[1..-1] })
     
-    PURECN_CALL(to_call, normaldb, module_number)
+    PURECN_CALL(to_call, normaldb, module_number + 1)
 }

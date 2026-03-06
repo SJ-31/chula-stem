@@ -5,7 +5,7 @@ process PURECN_CALL {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(coverage), path(mutect2_vcf), path(mutect2_stats)
+    tuple val(meta), path(coverage), path(mutect2_vcf)
     path(normaldb)
     path(bait_intervals)
     path(mapping_bias)
@@ -20,14 +20,13 @@ process PURECN_CALL {
     //
 
     script:
-    // o1 = Utl.getName(module_number, meta, "PureCN_coverage_loess", ".txt.gz")
-    // c1 = file("${meta.out}/${o1}")
+    o1 = Utl.getName(module_number, meta, "Call", "")
+    c1 = file("${meta.out}/${o1}")
     blacklist_flag = snp_blacklist ? " --snp-blacklist ${snp_blacklist}" : ""
     args = task.ext.args.join(" ")
     if (c1.exists()) {
         """
         ln -sr ${c1} .
-        ln -sr ${c2} .
         ln -sr ${meta.log}/purecn_coverage.log .
         """
     } else {
@@ -36,13 +35,15 @@ process PURECN_CALL {
             ${args} \\
             ${blacklist_flag} \\
             --out . \\
+            --sampleid "${module_number}_${meta.id}" \\
             --tumor "${coverage}" \\
             --vcf "${mutect2_vcf}" \\
-            --stats-file "${mutect2_stats}" \\
             --normaldb "${normaldb}" \\
             --intervals "${bait_intervals}" \\
             --genome ${params.genome_build}
 
+        mkdir Call
+        mv "${module_number}_${meta.id}*" Call
 
         get_nextflow_log.bash purecn_call.log
         """

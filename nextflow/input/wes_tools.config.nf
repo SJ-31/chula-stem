@@ -90,12 +90,17 @@ process {
     //     ext.model = "WES"
     // }
 
+    // [2026-03-06 Fri] Recommendations from "PureCN best practices"
+    withName: "PURECN_BAIT_INTERVALS" {
+        ext.args = ["--off-target"] // Recommended except for Amplicon data
+    }
+    
     withName: "PURECN_CALL" {
         ext.args = ["--fun-segmentation PSCBS", "--model betabin",
                     "--min-base-quality 20"]
-        // [2026-03-06 Fri] Recommendations from "PureCN best practices"
         // The base quality flag is specifically because we use mutect2
     }
+    //
 
     withName: "CLASSIFY_CNV" {
         ext.genome = "hg38"

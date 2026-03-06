@@ -11,18 +11,26 @@ process PURECN_NORMALDB {
     //
 
     output:
-    path(output)
+    path(output), emit: db
+    path(png)
+    path(low_cov)
     path("*.log")
     //
 
     script:
     output = "${module_number}-normalDB_${params.genome_build}.rds"
-    check = file("${meta.out}/${output}")
+    png = "interval_weights_${params.genome_build}.png"
+    low_cov = "low_coverage_targets_${params.genome_build}.bed"
+    c1 = file("${meta.out}/${output}")
+    c2 = file("${meta.out}/${png}")
+    c3 = file("${meta.out}/${low_cov}")
     args = task.ext.args.join(" ")
     pon_flag = !pon ? " --normal-panel ${pon}" : ""
-    if (check.exists()) {
+    if (c1.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${c1} .
+        ln -sr ${c2} .
+        ln -sr ${c3} .
         ln -sr ${meta.log}/ .
         """
     } else {

@@ -1,5 +1,5 @@
 process PURECN_BAIT_INTERVALS {
-    ext version: ""
+    ext version: "2.16.1"
 
     publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
@@ -7,25 +7,38 @@ process PURECN_BAIT_INTERVALS {
     input:
     tuple val(meta), val(genome)
     val(baits)
+    val(mappability)
     val(module_number)
     //
 
     output:
+    path(o1), emit: baits
+    path(o2), emit: baits_optimized
     path("*.log")
     //
 
     script:
-    output = Utl.getName()
-    check = file("${meta.out}/${output}")
+    o1 = "baits_intervals.txt"
+    o2 = "baits_optimized.bed"
+    c1 = file("${meta.out}/${o1}")
+    c2 = file("${meta.out}/${o1}")
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (c1.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${c1} .
+        ln -sr ${c2} .
         ln -sr ${meta.log}/ .
         """
     } else {
         """
-        
+        Rscript "${params.purecn_extdata}/IntervalFile.R" \\
+        ${args} \\
+        --in-file "${baits}" \\
+        --fasta "${genome}" \\
+        --genome ${params.genome_build} \\
+        --out-file "${o1}" \\
+        --export "${o2}" \\
+        --mappability "${mappability}"
 
         cp .command.out .log
         """

@@ -18,8 +18,8 @@ process PURECN_COVERAGE {
     //
 
     script:
-    o1 = Utl.getName(module_number, meta, "PureCN_coverage_loess", ".txt.gz")
-    o2 = Utl.getName(module_number, meta, "PureCN_coverage", ".txt.gz")
+    o1 = Utl.getName(module_number, meta, "coverage_loess", ".txt.gz")
+    o2 = Utl.getName(module_number, meta, "coverage", ".txt.gz")
     c1 = file("${meta.out}/${o1}")
     c2 = file("${meta.out}/${o2}")
     sample_flag = normalize_only ? " --coverage " : " --bam "
