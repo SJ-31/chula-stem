@@ -6,15 +6,25 @@ from typing import Literal
 import anndata as ad
 import click
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import plotnine as gg
 import scanpy as sc
+from beartype import beartype
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from pyarrow.util import guid
 from pygenomeviz import GenomeViz
 from pygenomeviz.track import FeatureSubTrack, FeatureTrack, LinkTrack
+from sklearn.metrics import (
+    average_precision_score,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
 
 
 def plot_custom_legend(ax: Axes, legend: dict, **kwargs) -> None:
@@ -260,3 +270,77 @@ def plot_associations(
             axes = sc.pl.heatmap(adata, var_names=mapping, show=False, groupby=groupby)
         result.append(axes["groupby_ax"].get_figure())
     return result
+
+
+@beartype
+def plot_classifier_curve(
+    y_true,
+    y_score,
+    curve: Literal["roc", "precision_recall"] = "roc",
+    pos_label: str | None = None,
+) -> gg.ggplot:
+    """
+    Plot an ROC or Precision-Recall curve using plotnine.
+    TODO: you want this to show the thresholds of the decision function better i.e.
+    at different scores what is the FPR and TPR?
+
+    Parameters
+    ----------
+    y_true : array-like of shape (n_samples,)
+        True binary labels (0 or 1).
+    y_score : array-like of shape (n_samples,)
+        Predicted probabilities or decision function scores for the positive class.
+    curve : {"roc", "precision_recall"}, default="roc"
+        Which curve to plot.
+
+    Returns
+    -------
+    plotnine.ggplot
+        A ggplot object. Call .draw() or print() to render it.
+
+    Examples
+    --------
+    >>> plot_classifier_curve(y_true, y_score, curve="roc")
+    >>> plot_classifier_curve(y_true, y_score, curve="precision_recall")
+    """
+    y_true = np.asarray(y_true)
+    y_score = np.asarray(y_score)
+    guide_line = gg.geom_abline(
+        slope=1, intercept=0, linetype="dashed", color="grey", size=0.8
+    )
+
+    if curve == "roc":
+        # fpr, tpr
+        x, y, threshold = roc_curve(y_true, y_score, pos_label=pos_label)
+        roc_auc = roc_auc_score(y_true, y_score)
+        print(roc_auc)
+        title = gg.labs(
+            title="ROC Curve",
+            subtitle=f"AUC = {round(roc_auc, 2)}",
+            x="False Positive Rate",
+            y="True Positive Rate",
+        )
+    elif curve == "precision_recall":
+        # precision, recall
+        x, y, threshold = precision_recall_curve(y_true, y_score, pos_label=pos_label)
+        threshold = list(threshold) + [1]
+        ap = average_precision_score(y_true, y_score, pos_label=pos_label)
+        title = gg.labs(
+            title="Precision-Recall Curve",
+            subtitle=f"AP =  {ap:.3f}",
+            x="Recall",
+            y="Precision",
+        )
+    df = pd.DataFrame({"x": x, "y": y, "threshold": threshold})
+    p = (
+        gg.ggplot(df, gg.aes(x="x", y="y"))
+        + gg.geom_area(fill="#4C72B0", alpha=0.1)
+        + gg.geom_line(color="#4C72B0", size=1.2)
+        + title
+        + gg.ylim(0, 1)
+        + gg.theme_minimal()
+        + gg.theme(plot_title=gg.element_text(size=14, face="bold"))
+    )
+    if curve == "roc":
+        p = p + guide_line + gg.xlim(0, 1)
+    return p
