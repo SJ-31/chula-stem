@@ -91,8 +91,10 @@ process {
     // }
 
     withName: "PURECN_CALL" {
-        ext.args = ["--fun-segmentation PSCBS", "--model betabin"]
+        ext.args = ["--fun-segmentation PSCBS", "--model betabin",
+                    "--min-base-quality 20"]
         // [2026-03-06 Fri] Recommendations from "PureCN best practices"
+        // The base quality flag is specifically because we use mutect2
     }
 
     withName: "CLASSIFY_CNV" {

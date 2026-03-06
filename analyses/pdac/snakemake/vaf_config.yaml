@@ -1,10 +1,23 @@
-root: "/data/project/stemcell/shannc/output/PDAC" # Root path of wes results
-outdir: "/data/home/shannc/chula-stem/analyses/output/pdac" # Root path for output
-conda: "nf" # conda environment for reticulate
-manifest: "/data/home/shannc/chula-stem/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
+__use_yte__: true
+__definitions__:
+  - from pathlib import Path
+  - import sys
+  - args = sys.argv
+  - home = str(Path.home())
+  - test = "test=True" in args
+  - is_local = home.startswith("/home/shannc")
+  - proj_root = f"{home}/Bio_SDD/chula-stem" if is_local else f"{home}/chula-stem"
+  - data_root = f"{proj_root}/analyses/data_all" if is_local else "/data/project/stemcell/shannc"
+  - conda_env = "stem-base" if is_local else "nf"
+  - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
+
+root: ?f"{data_root}/output/PDAC" # Root path of wes results
+outdir: ?f"{proj_root}/analyses/output/pdac" # Root path for output
+conda: ?conda_env # conda environment for reticulate
+manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
 src: # source directories
-  py: "../../src/chula_stem"
-  r: "../../src/R"
+  py: ?f"{proj_root}/src/chula_stem"
+  r: ?f"{proj_root}/src/R"
 
 source_tag: "SOURCE"
 cohort: "cohort"
@@ -23,9 +36,7 @@ extra:
       "N80_1",
     ]
   multiqc_vep:
-    [
-      "/data/project/stemcell/shannc/output/PHCase/8-PHcase-MultiQC_data/vep.txt",
-    ]
+    - ?f"{data_root}/output/PHCase/8-PHcase-MultiQC_data/vep.txt"
 
 variant_calling:
   paired: False # Set to False if results are from `wes_tumor_only`
