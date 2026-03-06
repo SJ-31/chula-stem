@@ -12,4 +12,4 @@ results = "/data/project/stemcell/shannc/output/HCC/Exome"
 cancer_ngs = "/data/project/stemcell/shannc/output/cancer_ngs"
 
 [sample_mapping]
-P17 = "17"
+P17 = "HCC_R17CH"

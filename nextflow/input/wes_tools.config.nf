@@ -85,9 +85,14 @@ process {
         ext.volume = "/data/project/stemcell/shannc/reference/tool_specific/sigprofiler"
     }
 
-    withName: "DEEPSOMATIC" {
-        container = "/data/home/shannc/tools/deepsomatic.sif"
-        ext.model = "WES"
+    // withName: "DEEPSOMATIC" {
+    //     container = "/data/home/shannc/tools/deepsomatic.sif"
+    //     ext.model = "WES"
+    // }
+
+    withName: "PURECN_CALL" {
+        ext.args = ["--fun-segmentation PSCBS", "--model betabin"]
+        // [2026-03-06 Fri] Recommendations from "PureCN best practices"
     }
 
     withName: "CLASSIFY_CNV" {
