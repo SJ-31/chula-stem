@@ -31,11 +31,11 @@ workflow rnaseq {
     }
 
 
-    to_combine = PREPROCESS_FASTQ.out.counts.map({ ["sample": it[0].id,
+    to_combine = PREPROCESS_FASTQ.out.counts.map({ it -> ["sample": it[0].id,
                                                     "type": it[0].type,
                                                     "file": it[1]] })
-        .collect().map({ [["out": params.outdir, "log": params.logdir,
-                          "filename": cohort_name], it] })
+        .collect().map({ it -> [["out": params.outdir, "log": params.logdir,
+                                 "filename": cohort_name], it] })
     COMBINE_COUNTS(to_combine, 4)
     
     
@@ -43,8 +43,8 @@ workflow rnaseq {
     // Metrics
     //
     metric_bams = Utl.modifyMeta(PREPROCESS_FASTQ.out.bam,
-                                 ["out": { "${params.outdir}/${it.id}/metrics" },
-                                  "log": { "${params.logdir}/${it.id}/metrics" }])
+                                 ["out": { it -> "${params.outdir}/${it.id}/metrics" },
+                                  "log": { it -> "${params.logdir}/${it.id}/metrics" }])
 
     DUPRADAR(metric_bams, params.ref.genome_gff, params.strandedness, true, 4)
 
@@ -54,7 +54,7 @@ workflow rnaseq {
 
     
     to_multiqc = PREPROCESS_FASTQ.out.fastp_json.mix(PICARD.out.metrics)
-        .flatten().collect().map({ [["out": params.outdir,
+        .flatten().collect().map({ it -> [["out": params.outdir,
                                      "log": params.logdir,
                                      "filename": cohort_name], it] })
     MULTIQC(to_multiqc, 5)

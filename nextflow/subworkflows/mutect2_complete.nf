@@ -14,10 +14,10 @@ workflow MUTECT2_COMPLETE {
 
     main:
     MUTECT2(meta_and_bam, params.ref.genome, params.ref.targets,
-            params.ref.germline, module_number)
+            params.ref.germline, params.interval_padding, module_number)
     LEARN_READ_ORIENTATION(MUTECT2.out.raw, module_number)
 
-    to_pileup = meta_and_bam.map({ [it[0], it[2], it[3] ] })
+    to_pileup = meta_and_bam.map({ it -> [it[0], it[2], it[3] ] })
 
     GET_PILEUP_SUMMARIES(to_pileup, params.ref.pileup, module_number)
 

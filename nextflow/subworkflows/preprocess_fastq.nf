@@ -18,7 +18,7 @@ workflow PREPROCESS_FASTQ {
     main:
     input = channel.fromPath(manifest)
         .splitCsv(header: true)
-        .map { [["id": it.patient,
+        .map { it -> [["id": it.patient,
                 "out": "${outdir}/${it.patient}/${it.source}",
                 "type": it.source,
                 "log": "${logdir}/${it.patient}/${it.source}",

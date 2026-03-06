@@ -25,7 +25,7 @@ workflow panel_of_normals {
     empty_indices_2 = EMPTY_FILES_3(PREPROCESS_FASTQ.out.bam_index, "E2", 1)
 
     collected_normals = PREPROCESS_FASTQ.out.bam_index.mix(PREPROCESS_FASTQ.out.bam)
-        .map({ it[1] }).toList()
+        .map({ it -> it[1] }).toList()
     CNVKIT_PREP(channel.of(["filename": cohort_name,
                             "out": "${params.outdir}/cnvkit_reference",
                             "log": "${params.outdir}/cnvkit_reference"])
@@ -36,7 +36,7 @@ workflow panel_of_normals {
     to_mutect2 = Utl.joinFirst(empty_bams, [PREPROCESS_FASTQ.out.bam,
                                             PREPROCESS_FASTQ.out.bam_index,
                                             empty_indices_1])
-        .map({it[0..-3] + [it[-2..-1]]})
+        .map({ it -> it[0..-3] + [it[-2..-1]]})
     to_clairs = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
                               [PREPROCESS_FASTQ.out.bam_index,
                                empty_indices_1])
@@ -48,16 +48,16 @@ workflow panel_of_normals {
 
     to_concat = Utl.joinFirst(MUTECT2.out.variants,
                               [CLAIRS_TO.out.variants, OCTOPUS.out.variants])
-        .map({ [it[0], it[1..-1]] })
+        .map({ it -> [it[0], it[1..-1]] })
 
     CONCAT_VCF(to_concat, 5)
 
     // BUG: <2025-01-22 Wed> db_import isn't working, will try see if it's due to
     // handling the vcfs of the other callers
-    vcf_channels = CONCAT_VCF.out.vcf.map({ it[1] }).mix(previous_vcfs).collect()
+    vcf_channels = CONCAT_VCF.out.vcf.map({ it -> it[1] }).mix(previous_vcfs).collect()
 
     // vcf_channels = MUTECT2.out.variants.map({ it[1] }).collect()
-    to_pon = vcf_channels.map({ [["filename": params.cohort,
+    to_pon = vcf_channels.map({ it -> [["filename": params.cohort,
                                           "out": params.outdir,
                                           "log": params.logdir ], it] })
 

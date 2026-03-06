@@ -39,7 +39,7 @@ workflow whole_exome_tumor_only {
 
     main:
     def cohort_name = params.cohort ? params.cohort : "cohort"
-    def cohortTopLevel = { [["out": params.outdir, "log": params.logdir,
+    def cohortTopLevel = { it -> [["out": params.outdir, "log": params.logdir,
                              "filename": cohort_name], it] }
 
     /*
@@ -48,7 +48,7 @@ workflow whole_exome_tumor_only {
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
 
     empty_normals = EMPTY_FILES_1(PREPROCESS_FASTQ.out.bam, "", 1)
-    tumors = PREPROCESS_FASTQ.out.bam.map { [
+    tumors = PREPROCESS_FASTQ.out.bam.map { it -> [
                         ["type": "paired",
                         "id": it[0].id,
                         "out": "${params.outdir}/${it[0].id}/variant_calling",
@@ -65,7 +65,7 @@ workflow whole_exome_tumor_only {
 
     paired = Utl.joinFirst(empty_normals, [tumors],
                            ["id"], true) // -> [n_meta, n, t_meta, t]
-        .map({ [it[2].id] + [it[2]] + [it[1]] + [it[3]] }) // -> [id, t_meta, n, t]
+        .map({ it -> [it[2].id] + [it[2]] + [it[1]] + [it[3]] }) // -> [id, t_meta, n, t]
         .join(all_indices) // -> [id, t_meta, n, t, [n_index, t_index]]
 
     paired_no_id = Utl.delId(paired)
@@ -83,7 +83,7 @@ workflow whole_exome_tumor_only {
 
     // Small variants
 
-    to_mutect = paired_no_id.map { [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
+    to_mutect = paired_no_id.map { it -> [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1] }
     MUTECT2_COMPLETE(to_mutect, 5)
 
     to_clairs = Utl.joinFirst(tumors, [PREPROCESS_FASTQ.out.bam_index,
@@ -100,7 +100,7 @@ workflow whole_exome_tumor_only {
     // Combine variants by type
     small_variants_to_oct = Utl.joinFirst(
         MUTECT2_COMPLETE.out, [CLAIRS_TO.out.variants]
-    ).map({ toConcat("Small_all", "annotations", it) })
+    ).map({ it -> toConcat("Small_all", "annotations", it) })
 
     CONCAT_SMALL_1(small_variants_to_oct, 6)
 
@@ -109,12 +109,12 @@ workflow whole_exome_tumor_only {
     OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
 
     CONCAT_SMALL_2(Utl.joinFirst(CONCAT_SMALL_1.out.vcf, [OCTOPUS.out.variants])
-                    .map({ toConcat("Small_all", "annotations", it) }), 6)
+                    .map({ it -> toConcat("Small_all", "annotations", it) }), 6)
 
     small_variants = CONCAT_SMALL_2.out.vcf
 
     structural_variants = Utl.joinFirst(MANTA.out.somatic, [GRIDSS.out.variants])
-        .map({ toConcat("SV_all", "annotations", it) })
+        .map({ it -> toConcat("SV_all", "annotations", it) })
 
     CONCAT_SV(structural_variants, 6)
 
@@ -137,7 +137,7 @@ workflow whole_exome_tumor_only {
     /*
     * Copy number abberation
     */
-    purity_ploidy = tumors.map({ [it[0].id, null, null] })
+    purity_ploidy = tumors.map({ it -> [it[0].id, null, null] })
 
     if (!params.ref.cnvkit_reference) {
         CNVKIT_PREP(channel.of(["filename": "flat_reference",
@@ -151,7 +151,7 @@ workflow whole_exome_tumor_only {
         cnvkit_reference = params.ref.cnvkit_reference
     }
 
-    to_cnvkit = Utl.delId(paired.map({ it[0..1] + [it[3]] })
+    to_cnvkit = Utl.delId(paired.map({ it -> it[0..1] + [it[3]] })
                           .join(Utl.getId(QC_SMALL.out.vcf))
                           .join(purity_ploidy))
 
@@ -160,9 +160,9 @@ workflow whole_exome_tumor_only {
     CLASSIFY_CNV_FORMAT(CNVKIT.out.cns, 5)
 
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
-        .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },
+        .collectFile( { it -> [ "5-${it[0].id}-ClassifyCNV_all.bed", it[1] ] },
                      keepHeader: true, skip: 1)
-        .map({ def id = (it.baseName =~ /[0-9]+-(.*)-ClassifyCNV.*/)[0][1]
+        .map({ it -> def id = (it.baseName =~ /[0-9]+-(.*)-ClassifyCNV.*/)[0][1]
               [["id": id, "filename": id,
           "out": "${params.outdir}/${id}/annotations",
           "log": "${params.logdir}/${id}/annotations"], it]
@@ -189,7 +189,7 @@ workflow whole_exome_tumor_only {
 
     SIGPROFILERASSIGNMENT(Utl.delSuffix(QC_SMALL.out.vcf), true,
                           "${params.configdir}/excluded_signatures.txt", 7)
-    SIGPROFILERASSIGNMENT_COLLECT(SIGPROFILERASSIGNMENT.out.activities.map({ it[1] })
+    SIGPROFILERASSIGNMENT_COLLECT(SIGPROFILERASSIGNMENT.out.activities.map({ it -> it[1] })
                                     .collect().map(cohortTopLevel), 8)
     CLASSIFY_CNV(cnv_bed, 7)
 
@@ -199,15 +199,15 @@ workflow whole_exome_tumor_only {
                         params.ref.cnv_reference, 8)
     to_cr_msi = Utl.modifyMeta(MSISENSORPRO.out.tsv,
                                [suffix: "CR_MSI",
-                                out: { "${params.outdir}/${it.id}/annotations" },
-                                log: { "${params.logdir}/${it.id}/annotations" } ])
+                                out: { it -> "${params.outdir}/${it.id}/annotations" },
+                                log: { it -> "${params.logdir}/${it.id}/annotations" } ])
     CROSS_REFERENCE_MSI(to_cr_msi, "MSI", params.ref.clingen_gene,
                         params.ref.msi_reference, 8)
 
     /*
      * Metric collection
      */
-    def replaceOut = { [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
+    def replaceOut = { it -> [it[0] + ["out": "${params.outdir}/${it[0].id}/metrics",
                                  "log": "${params.logdir}/${it[0].id}/metrics"],
                         it[1], it[2]] }
 
@@ -235,15 +235,15 @@ workflow whole_exome_tumor_only {
 
     // Combine channels for report
     vep_grouped = Utl.getId(CALLSET_QC_TSV.out.tsv)
-        .groupTuple(sort: { (it.baseName =~ /VEP_small/) ? 1 : -1 })
+        .groupTuple(sort: { it -> (it.baseName =~ /VEP_small/) ? 1 : -1 })
     vep_to_report = vep_grouped
-        .map({ [it[0]] + [vep_small: it[1][1], vep_sv: it[1][0]] })
+        .map({ it -> [it[0]] + [vep_small: it[1][1], vep_sv: it[1][0]] })
 
     others = Utl.joinFirst(SIGPROFILERASSIGNMENT.out.activities,
                            [CNVKIT.out.cns, CNVKIT.out.cnr,
                             CROSS_REFERENCE_CNV.out.tsv,
                             CROSS_REFERENCE_MSI.out.tsv ]).map(
-        { [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
+        { it -> [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
                    cnvkit_cnr: it[3], classify_cnv: it[4],
                    msisensor_pro: it[5],
                    civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
@@ -251,13 +251,13 @@ workflow whole_exome_tumor_only {
                    cosmic_reference: params.ref.cosmic_reference], ]})
 
     to_report = Utl.modifyMeta(Utl.delId(Utl.getId(others, true).join(vep_to_report))
-                               .map({ [it[0], it[1] + it[2]] }),
-                               [out: { "${params.outdir}/${it.id}" },
-                                log: { "${params.logdir}/${it.id}" }])
+                               .map({ it -> [it[0], it[1] + it[2]] }),
+                               [out: { it -> "${params.outdir}/${it.id}" },
+                                log: { it -> "${params.logdir}/${it.id}" }])
 
     // if (!params.ref.civic_cache && !params.ref.pandrugs2_cache) {
-    //     all_vep = vep_grouped.map({ it[1] }).flatten().collect().map({
-    //         [[out: "${params.outdir}/cache", log: params.logdir], it]
+    //     all_vep = vep_grouped.map({ it -> it[1] }).flatten().collect().map({
+    //         it -> [[out: "${params.outdir}/cache", log: params.logdir], it]
     //     })
     //     GET_THERAPY_CACHE(all_vep)
     //     caches = GET_THERAPY_CACHE.out.civic
