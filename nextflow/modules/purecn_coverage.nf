@@ -12,17 +12,22 @@ process PURECN_COVERAGE {
     //
 
     output:
+    tuple val(meta), path(o1), emit: loess
+    tuple val(meta), path(o2), emit: cov
     path("*.log")
     //
 
     script:
-    output = Utl.getName(module_number, meta, "PureCN_loess", ".txt.gz")
-    check = file("${meta.out}/${output}")
+    o1 = Utl.getName(module_number, meta, "PureCN_coverage_loess", ".txt.gz")
+    o2 = Utl.getName(module_number, meta, "PureCN_coverage", ".txt.gz")
+    c1 = file("${meta.out}/${o1}")
+    c2 = file("${meta.out}/${o2}")
     sample_flag = normalize_only ? " --coverage " : " --bam "
     args = task.ext.args.join(" ")
-    if (check.exists()) {
+    if (c1.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${c1} .
+        ln -sr ${c2} .
         ln -sr ${meta.log}/purecn_coverage.log .
         """
     } else {
@@ -34,6 +39,9 @@ process PURECN_COVERAGE {
             --intervals ${bait_intervals} \\
             --cores ${task.cpus}
 
+        mv *_loess.txt.gz ${o1}
+        mv *_coverage.txt.gz ${o2}
+        
         get_nextflow_log.bash purecn_coverage.log
         """
     }
