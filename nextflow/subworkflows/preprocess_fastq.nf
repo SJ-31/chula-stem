@@ -16,7 +16,7 @@ workflow PREPROCESS_FASTQ {
     offset // Offset for module number
 
     main:
-    input = Channel.fromPath(manifest)
+    input = channel.fromPath(manifest)
         .splitCsv(header: true)
         .map { [["id": it.patient,
                 "out": "${outdir}/${it.patient}/${it.source}",
@@ -49,8 +49,8 @@ workflow PREPROCESS_FASTQ {
         BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants,
              false, offset + 4)
         bams = BQSR.out.bam
-        chimeric_junction = Channel.empty()
-        counts = Channel.empty()
+        chimeric_junction = channel.empty()
+        counts = channel.empty()
     }
     SAMTOOLS_INDEX(bams) // indices are required by certain callers
 

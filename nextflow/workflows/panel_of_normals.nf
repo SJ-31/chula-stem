@@ -13,10 +13,10 @@ workflow panel_of_normals {
 
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, params.omics_type, 0)
     if (params.previous_vcfs) {
-        previous_vcfs = Channel.fromList(params.previous_vcfs.readLines()
+        previous_vcfs = channel.fromList(params.previous_vcfs.readLines()
                                         .collect({ file(it) }))
     } else {
-        previous_vcfs = Channel.empty()
+        previous_vcfs = channel.empty()
     }
     def cohort_name = params.cohort ? params.cohort : "cohort"
 
@@ -26,7 +26,7 @@ workflow panel_of_normals {
 
     collected_normals = PREPROCESS_FASTQ.out.bam_index.mix(PREPROCESS_FASTQ.out.bam)
         .map({ it[1] }).toList()
-    CNVKIT_PREP(Channel.of(["filename": cohort_name,
+    CNVKIT_PREP(channel.of(["filename": cohort_name,
                             "out": "${params.outdir}/cnvkit_reference",
                             "log": "${params.outdir}/cnvkit_reference"])
                 .merge(collected_normals) { meta, bams -> tuple(meta, tuple(bams)) },

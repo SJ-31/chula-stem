@@ -3,7 +3,7 @@ include { VCFEVAL } from "../modules/vcfeval.nf"
 workflow compare_variants {
 
     main:
-    input = Channel.fromPath(params.manifest)
+    input = channel.fromPath(params.manifest)
         .splitCsv(header: true)
         .map { [["id": it.sample,
                 "out": "${params.outdir}/${it.sample}",

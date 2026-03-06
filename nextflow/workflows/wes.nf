@@ -147,7 +147,7 @@ workflow whole_exome {
     if (!params.ref.cnvkit_reference) {
         collected_normals = normals.map({ it[2] })
             .mix(PREPROCESS_FASTQ.out.bam_index.map({ it[1] })).toList()
-        CNVKIT_PREP(Channel.of(["filename": cohort_name,
+        CNVKIT_PREP(channel.of(["filename": cohort_name,
                                 "out": "${params.outdir}/cnvkit_reference",
                                 "log": "${params.outdir}/cnvkit_reference"])
                     .merge(collected_normals) { meta, bams -> tuple(meta, tuple(bams)) },

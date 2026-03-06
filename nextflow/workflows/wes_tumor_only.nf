@@ -140,10 +140,10 @@ workflow whole_exome_tumor_only {
     purity_ploidy = tumors.map({ [it[0].id, null, null] })
 
     if (!params.ref.cnvkit_reference) {
-        CNVKIT_PREP(Channel.of(["filename": "flat_reference",
+        CNVKIT_PREP(channel.of(["filename": "flat_reference",
                                 "out": "${params.outdir}/cnvkit_cnn",
                                 "log": "${params.outdir}/cnvkit_cnn"])
-                        .merge(Channel.fromPath("${params.configdir}/EMPTY.txt")),
+                        .merge(channel.fromPath("${params.configdir}/EMPTY.txt")),
                     params.ref.genome, params.ref.baits_unzipped,
                     params.ref.genome_blacklist, false, "hybrid", 4)
         cnvkit_reference = CNVKIT_PREP.out.reference.first()
@@ -263,8 +263,8 @@ workflow whole_exome_tumor_only {
     //     caches = GET_THERAPY_CACHE.out.civic
     //         .mix(GET_THERAPY_CACHE.out.pandrugs2).collect()
     // } else {
-    //     caches = Channel.fromPath(params.ref.civic_cache)
-    //         .mix(Channel.fromPath(params.ref.pandrugs2_cache)).collect()
+    //     caches = channel.fromPath(params.ref.civic_cache)
+    //         .mix(channel.fromPath(params.ref.pandrugs2_cache)).collect()
     // }
     caches = [] // <2025-01-08 Wed> for temporary debugging
     REPORT(to_report, caches, "variant_calling", 8)
