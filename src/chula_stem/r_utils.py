@@ -387,6 +387,21 @@ def edgeR_wrapper(
 
 
 @beartype
+def read_geo(file: str | Path) -> ad.AnnData:
+    if isinstance(file, Path):
+        file = str(file)
+    # TODO: would need to handle if the object is an expression set
+    # TODO: make this multiple dispatch
+    ro.globalenv["file"] = file
+    ro.r(f"obj <- GEOquery::getGEO(filename = file)")
+    expr = df_from_r(ro.r("as.data.frame(t(Biobase::exprs(obj)))"))
+    var_meta = df_from_r(ro.r("Biobase::varMetadata(obj)"))
+    obs = df_from_r(ro.r("Biobase::pData(obj)"))
+    var = df_from_r(ro.r("Biobase::fData(obj)"))
+    return ad.AnnData(X=expr, obs=obs, var=var, uns={"var_metadata": var_meta})
+
+
+@beartype
 @r_cleanup
 def tximport(
     files: Sequence[str | Path],
@@ -396,7 +411,7 @@ def tximport(
     ignore_tx_version: bool = True,
 ) -> ad.AnnData:
     """
-    Wrapper for tximport to return an
+    Wrapper for tximport
 
     Returns
     -------
