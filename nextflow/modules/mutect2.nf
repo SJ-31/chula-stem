@@ -9,6 +9,7 @@ process MUTECT2 {
     val(reference)
     val(target_intervals) // For exome data, path to target intervals file
     val(germline_resource) // A germline resource in the form of a population vcf with AF
+    val(interval_padding)
     val(module_number)
     //
 
@@ -45,6 +46,7 @@ process MUTECT2 {
             ${germline_flag} \\
             ${target_flag} \\
             --f1r2-tar-gz $raw \\
+            --interval-padding ${interval_padding} \\
             --output tmp.vcf.gz
 
         mv tmp.vcf.gz.stats $stats
