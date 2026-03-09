@@ -8,42 +8,52 @@ process PURECN_CALL {
     tuple val(meta), path(coverage), path(mutect2_vcf)
     path(normaldb)
     path(bait_intervals)
-    path(mapping_bias)
     val(snp_blacklist)
+    val(default_purity)
+    val(default_ploidy)
     val(module_number)
     //
 
     output:
-    // TODO: still unsure about the output
-    tuple val(meta), path(o1), emit: loess
+    tuple val(meta), path(output), emit: call
+    tuple val(meta), eval("head purity.txt"), eval("head ploidy.txt"), emit: purity_ploidy
     path("*.log")
     //
 
     script:
-    o1 = Utl.getName(module_number, meta, "Call", "")
-    c1 = file("${meta.out}/${o1}")
+    output = Utl.getName(module_number, meta, "Call", "")
+    check = file("${meta.out}/${output}")
     blacklist_flag = snp_blacklist ? " --snp-blacklist ${snp_blacklist}" : ""
+    sample_id = "${module_number}_${meta.id}"
     args = task.ext.args.join(" ")
-    if (c1.exists()) {
+    if (check.exists()) {
         """
-        ln -sr ${c1} .
+        ln -sr ${check} .
         ln -sr ${meta.log}/purecn_coverage.log .
         """
     } else {
         """
-        Rscript "${params.purecn_extdata}/PureCN.R" \\
+        Rscript \$PURECN/PureCN.R \\
             ${args} \\
             ${blacklist_flag} \\
             --out . \\
-            --sampleid "${module_number}_${meta.id}" \\
+            --sampleid ${sample_id} \\
             --tumor "${coverage}" \\
             --vcf "${mutect2_vcf}" \\
             --normaldb "${normaldb}" \\
             --intervals "${bait_intervals}" \\
             --genome ${params.genome_build}
 
-        mkdir Call
-        mv "${module_number}_${meta.id}*" Call
+        mkdir ${output}
+        mv "${sample_id}*" ${output}
+
+        if [[ -e ${output}/${sample_id}.csv ]]; then
+            cut -d, -f 2 ${output}/${sample_id}.csv | tail -n 1 > purity.txt
+            cut -d, -f 3 ${output}/${sample_id}.csv | tail -n 1 > ploidy.txt
+        else
+            echo ${default_purity} > purity.txt
+            echo ${default_ploidy} > ploidy.txt
+        fi
 
         get_nextflow_log.bash purecn_call.log
         """
