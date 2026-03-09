@@ -37,7 +37,7 @@ process PURECN_NORMALDB {
         """
         ls *coverage.txt.gz > files.list
 
-        Rscript "${params.purecn_extdata}/NormalDB.R"
+        Rscript \$PURECN/NormalDB.R
             ${args} \\
             --out-dir . \\
             --coverage-files files.list \\

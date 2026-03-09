@@ -32,7 +32,7 @@ process PURECN_COVERAGE {
         """
     } else {
         """
-        Rscript ${params.purecn_extdata}/Coverage.R \\
+        Rscript \$PURECN/Coverage.R \\
             ${args} \\
             --out-dir . \\
             ${sample_flag} ${bam_or_cov} \\

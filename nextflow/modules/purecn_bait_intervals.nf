@@ -31,7 +31,7 @@ process PURECN_BAIT_INTERVALS {
         """
     } else {
         """
-        Rscript "${params.purecn_extdata}/IntervalFile.R" \\
+        Rscript \$PURECN/IntervalFile.R \\
         ${args} \\
         --in-file "${baits}" \\
         --fasta "${genome}" \\
