@@ -1,5 +1,6 @@
 include { MUTECT2_COMPLETE } from "../subworkflows/mutect2_complete.nf"
 include { PREPROCESS_FASTQ } from "../subworkflows/preprocess_fastq.nf"
+include { PURECN_COMPLETE } from "../subworkflows/purecn_complete.nf"
 include { MANTA } from "../modules/manta.nf"
 include { STRELKA2 } from "../modules/strelka2.nf"
 include { MSISENSORPRO } from "../modules/msisensorpro.nf"
@@ -20,15 +21,12 @@ include { CONCAT_VCF as CONCAT_SMALL_1 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SMALL_2 } from "../modules/concat_vcf.nf"
 include { CONCAT_VCF as CONCAT_SV } from "../modules/concat_vcf.nf"
 include { CALLSET_QC as QC_SMALL } from "../modules/callset_qc.nf"
-// include { CALLSET_QC as QC_SV } from "../modules/callset_qc.nf"
 include { CALLSET_QC_TSV } from "../modules/callset_qc_tsv.nf"
 include { CROSS_REFERENCE as CROSS_REFERENCE_MSI } from "../modules/cross_reference.nf"
 include { CROSS_REFERENCE as CROSS_REFERENCE_CNV } from "../modules/cross_reference.nf"
 include { STANDARDIZE_VCF } from "../modules/standardize_vcf.nf"
 include { MUSE2 } from "../modules/muse2.nf"
 include { GRIDSS } from "../modules/gridss.nf"
-include { FACETS_PILEUP } from "../modules/facets_pileup.nf"
-include { FACETS } from "../modules/facets.nf"
 include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { SIGPROFILERASSIGNMENT_COLLECT } from "../modules/sigprofilerassignment.nf"
 include { VEP } from "../modules/vep.nf"
@@ -161,20 +159,19 @@ workflow whole_exome {
         cnvkit_autobin = params.ref.cnvkit_autobin
     }
 
-    FACETS_PILEUP(paired_no_id, params.ref.pileup, 5)
-    // <2025-02-27 Thu> BUG: facets is failing
-    // FACETS(FACETS_PILEUP.out.pileup, cnvkit_autobin, 5)
-    // purity_ploidy = FACETS.out.purity_ploidy
-    //     .map({ [it[0].id, nullIfNotNum(it[1]), nullIfNotNum(it[2])] })
-    purity_ploidy = FACETS_PILEUP.out.pileup.map({ it -> [it[0].id, null, null] })
-
+    branched_with_index = PREPROCESS_FASTQ.out.bam_with_index.branch(branchSources)
+    PURECN_COMPLETE(MUTECT2_COMPLETE.out.unfiltered,
+                    branched_with_index.tumor,
+                    branched_with_index.normal,
+                    4)
+    
     to_cnvkit = Utl.delId(paired.map({ it -> it[0..1] + [it[3]] })
             .join(Utl.getId(QC_SMALL.out.vcf))
-            .join(purity_ploidy))
+            .join(Utl.getId(PURECN_COMPLETE.out.purity_ploidy)))
 
     CNVKIT(to_cnvkit, cnvkit_reference, "hybrid", 5)
 
-    // CLASSIFY_CNV_FORMAT(CNVKIT.out.cns.mix(FACETS.out.rds), 5) <2025-02-27 Thu> uncomment when facets works again
+
     CLASSIFY_CNV_FORMAT(CNVKIT.out.cns, 5)
     cnv_bed = CLASSIFY_CNV_FORMAT.out.bed
         .collectFile( { meta, file -> [ "5-${meta.id}-ClassifyCNV_all.bed", file ] },

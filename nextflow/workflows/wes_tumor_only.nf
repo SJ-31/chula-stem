@@ -33,6 +33,7 @@ include { VEP } from "../modules/vep.nf"
 include { CLAIRS } from "../modules/clairs.nf"
 include { MUTECT2 } from "../modules/mutect2.nf"
 include { REPORT } from "../modules/report.nf"
+include { PURECN_COMPLETE } from "../subworkflows/purecn_complete.nf" 
 include { GET_THERAPY_CACHE } from "../modules/get_therapy_cache.nf"
 
 workflow whole_exome_tumor_only {
@@ -87,7 +88,7 @@ workflow whole_exome_tumor_only {
     MUTECT2_COMPLETE(to_mutect, 5)
 
     to_clairs = Utl.joinFirst(tumors, [PREPROCESS_FASTQ.out.bam_index,
-                                       MUTECT2_COMPLETE.out])
+                                       MUTECT2_COMPLETE.out.filtered])
 
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
 
@@ -99,7 +100,7 @@ workflow whole_exome_tumor_only {
 
     // Combine variants by type
     small_variants_to_oct = Utl.joinFirst(
-        MUTECT2_COMPLETE.out, [CLAIRS_TO.out.variants]
+        MUTECT2_COMPLETE.out.filtered, [CLAIRS_TO.out.variants]
     ).map({ it -> toConcat("Small_all", "annotations", it) })
 
     CONCAT_SMALL_1(small_variants_to_oct, 6)
@@ -136,9 +137,17 @@ workflow whole_exome_tumor_only {
 
     /*
     * Copy number abberation
-    */
-    purity_ploidy = tumors.map({ it -> [it[0].id, null, null] })
-
+     */
+    if (params.ref.purecn_normaldb) {
+        PURECN_COMPLETE(MUTECT2_COMPLETE.out.unfiltered,
+                        PREPROCESS_FASTQ.out.bam_with_index,
+                        channel.empty(),
+                        4)
+        purity_ploidy = Utl.getId(PURECN_COMPLETE.out.purity_ploidy)
+    } else {
+        purity_ploidy = tumors.map({ it -> [it[0].id, null, null] })
+    }
+    
     if (!params.ref.cnvkit_reference) {
         CNVKIT_PREP(channel.of(["filename": "flat_reference",
                                 "out": "${params.outdir}/cnvkit_cnn",
