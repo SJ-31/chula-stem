@@ -253,25 +253,50 @@ def annotate_marker(
 
 def annotate_adata_vars(
     adata: ad.AnnData,
-    gene_id_col: str = "gene_id",
+    merge_on: str = "ensembl_gene_id",
+    new_index_col: str | None = None,
+    new_index_name: str = "gene",
     savepath: Path | None = None,
     **kws,
-) -> None:
-    if not adata.var[gene_id_col].is_unique:
-        raise ValueError(f"Can't pass a gene_id column '{gene_id_col}' with duplicates")
+) -> ad.AnnData:
+    assert isinstance(adata.var, pd.DataFrame)
     if savepath and savepath.exists():
         metadata: pd.DataFrame = pd.read_csv(savepath)
     else:
         metadata = ut.get_ensembl_gene_data()
         metadata.to_csv(savepath)
-    merged = (
-        adata.var.reset_index(names="index")
-        .merge(metadata, left_on=gene_id_col, right_on="ensembl_gene_id", how="left")
-        .drop_duplicates("index")
-        .set_index("index", drop=True)
+    merged: pd.DataFrame = adata.var.merge(
+        metadata.drop_duplicates(merge_on),
+        left_index=True,
+        right_on=merge_on,
+        how="left",
     )
+    if new_index_col is not None:
+        tmp: pd.Series = merged[new_index_col].fillna(merged[merge_on])
+        to_remove: np.ndarray = tmp.duplicated().values
+        tmp = tmp[~to_remove]
+        adata = adata[:, ~to_remove]
+        merged = merged.loc[~to_remove, :]
+        merged.index = tmp
+        merged.index.set_names(new_index_name)
+        merged.drop(new_index_col, inplace=True, axis="columns")
     adata.var = merged
-    adata.var.loc[:, "mito"] = (adata.var["chromosome_name"] == "MT").fillna(False)
+    if "chromosome_name" in adata.var.columns:
+        adata.var.loc[:, "mito"] = (adata.var["chromosome_name"] == "MT").fillna(False)
+    return adata
+
+
+# def add_var_metadata(adata: ad.AnnData, gene_meta: pd.DataFrame) -> None:
+#     assert isinstance(adata, pd.DataFrame)
+#     adata.var = adata.var.merge(
+#         gene_meta.drop_duplicates("ensembl_gene_id"),
+#         left_index=True,
+#         right_on="ensembl_gene_id",
+#         how="left",
+#         sort=True,
+#     )
+#     adata.var_names = adata.var["hgnc_symbol"].fillna(adata.var["ensembl_gene_id"])
+#     adata.var_names.set_names("gene", inplace=True)
 
 
 def distance_by_mads(
