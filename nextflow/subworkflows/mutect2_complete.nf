@@ -14,7 +14,9 @@ workflow MUTECT2_COMPLETE {
 
     main:
     MUTECT2(meta_and_bam, params.ref.genome, params.ref.targets,
-            params.ref.germline, params.interval_padding, module_number)
+            params.ref.germline,
+            params.interval_padding ? params.interval_padding : 0,
+            module_number)
     LEARN_READ_ORIENTATION(MUTECT2.out.raw, module_number)
 
     to_pileup = meta_and_bam.map({ it -> [it[0], it[2], it[3] ] })
@@ -32,6 +34,7 @@ workflow MUTECT2_COMPLETE {
     FILTER_MUTECT_CALLS(to_filter, params.ref.genome, module_number)
 
     emit:
-    FILTER_MUTECT_CALLS.out.filtered
+    unfiltered = MUTECT2.out.variants
+    filtered = FILTER_MUTECT_CALLS.out.filtered
 
 }
