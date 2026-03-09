@@ -13,7 +13,7 @@ process SIGPROFILERASSIGNMENT {
 
     output:
     tuple val(meta), path(output), emit: data
-    tuple val(meta), path("${output}/Activities/Assignment_Solution_Activities.txt"), emit: activities
+    tuple val(meta), path(activities_file), emit: activities
     path("*.log")
     //
 
@@ -23,6 +23,7 @@ process SIGPROFILERASSIGNMENT {
     exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args.join(" ")
     check = file("$meta.out/$output")
+    activities_file = "${output}/Activities/Assignment_Solution_Activities.txt"
     if (check.exists()) {
         """
         cp -r $check .
@@ -46,6 +47,10 @@ process SIGPROFILERASSIGNMENT {
 
         mv ${output}/Assignment_Solution/* ${output}
         rmdir ${output}/Assignment_Solution
+
+        if [[ ! -e '${activities_file}' ]]; then
+            echo EMPTY > ${activities_file}
+        fi
 
         get_nextflow_log.bash sigprofilerassignment.log
         """
@@ -79,9 +84,11 @@ process SIGPROFILERASSIGNMENT_COLLECT {
         files <- list.files(pattern = "Assignment_Solution_Activities.txt",
             recursive = TRUE)
         combined <- lapply(files, read_tsv) |> bind_rows()
-        combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
-        str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
-        })
+        if (nrow(combined) > 0) {
+            combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
+            str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
+            })
+        }
         write_tsv(combined, "${output}")
         """
     }

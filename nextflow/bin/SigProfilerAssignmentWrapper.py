@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import os
+from pathlib import Path
+
 from SigProfilerAssignment import Analyzer as Analyze
 
 
@@ -47,11 +50,15 @@ if __name__ == "__main__":
     if args["exclude_file"]:
         with open(args["exclude_file"], "r") as r:
             to_exclude = [s.strip() for s in r.read().splitlines()]
-    Analyze.cosmic_fit(
-        args["input_folder"],
-        args["output_folder"],
-        input_type=args["input_type"],
-        exome=args["exome"],
-        genome_build=args["genome_build"],
-        exclude_signature_subgroups=to_exclude,
-    )
+    try:
+        Analyze.cosmic_fit(
+            args["input_folder"],
+            args["output_folder"],
+            input_type=args["input_type"],
+            exome=args["exome"],
+            genome_build=args["genome_build"],
+            exclude_signature_subgroups=to_exclude,
+        )
+    except ValueError:
+        outpath = Path(args["output_folder"]) / "Assignment_Solution"
+        outpath.mkdir(parents=True)
