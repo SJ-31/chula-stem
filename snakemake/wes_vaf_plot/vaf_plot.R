@@ -1,6 +1,6 @@
 suppressMessages({
-  library(ggpubr)
-  library(cowplot)
+  library(patchwork)
+  library(checkmate)
   library(glue)
   library(ggplot2)
   library(tidyverse)
@@ -15,6 +15,7 @@ suppressMessages({
   target_genes <- snakemake@params$wanted_genes
   combined_vep <- read_tsv(snakemake@input$combined_vep)
   config <- snakemake@config
+  label_spec <- config$sample_labels
 })
 
 
@@ -65,16 +66,19 @@ prettify <- function(tb) {
 
 ## * Plot
 
+TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
+
+
 vaf_heatmap <- function(plot) {
   plot +
-    geom_tile(width = 0.95, height = 0.95) +
+    TILE_CALL +
     xlab("Sample") +
     ylab("Gene") +
     theme_grey() +
     theme(
       plot.background = element_blank(),
       panel.border = element_blank(),
-      panel.grid.major.x = element_blank(),
+      panel.grid = element_blank(),
       axis.ticks = element_line(linewidth = 0.5),
       axis.text.x = element_text(angle = 90),
     )
@@ -249,15 +253,18 @@ tmb_plot <- tmb_merged |>
 
 ## *** Counts plot
 counts_plot <- replicate_figure |>
-  distinct(sample, SYMBOL, .keep_all = TRUE) |>
+  ## distinct(sample, SYMBOL, .keep_all = TRUE) |> # [2026-03-09 Mon] Pretty sure you don't need this
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
-  scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
+  scale_y_discrete(limits = rev(sample_freq$SYMBOL), labels = \(old) {
+    deframe(select(sample_freq, SYMBOL, freq))[old]
+  }) +
   theme_void() +
   theme(
     axis.text.x = element_text(),
     axis.title.x = element_text(face = "italic", size = axis_title_size),
+    axis.text.y = element_text(),
     axis.line.x = element_line(),
     axis.ticks.x = element_line(),
     axis.ticks.length.x = unit(5, "points")
@@ -333,13 +340,6 @@ if (add_groupings) {
     scale_x_discrete(labels = labs, limits = sample_names)
 }
 
-r2 <- r1 +
-  scale_y_discrete(limits = rev, labels = rev(sample_freq$freq)) +
-  guides(fill = "none") +
-  theme(axis.ticks.y = element_blank())
-
-freq_plot <- ggdraw(get_y_axis(r2))
-
 ## **** for each variant type
 
 heatmap_helper <- function(tb) {
@@ -370,6 +370,23 @@ if (add_groupings) {
     scale_x_discrete(labels = labs, limits = sample_names)
 }
 
+## ** Extra sample labels
+
+if (!is.null(label_spec)) {
+  assert_list(label_spec, names = "unique")
+  extra_labels <- lapply(label_spec, \(spec) {
+    assert_list(spec)
+    assert_names(names(spec), must.include = c("palette", "file"))
+    read_tsv(spec$file)
+  })
+  label_palettes <- lapply(label_spec, \(s) s$palette)
+  label_plot <- combine_sample_label_plots(
+    extra_labels,
+    palettes = label_palettes
+  )
+} else {
+  label_plot <- NULL
+}
 
 ## ** Arranging
 
@@ -380,36 +397,36 @@ tmb_plot <- tmb_plot + guides(fill = "none")
 
 r1 <- r1 + guides(alpha = "none")
 
-replicate_plot <- ggarrange(
-  tmb_plot,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  r1,
-  NULL,
-  freq_plot,
-  counts_plot,
-  sbs_plot,
-  NULL,
-  NULL,
-  NULL,
-  ncol = 4,
-  nrow = 4,
-  align = "hv",
-  widths = c(0.7, 0.01, -0.06, 0.3),
-  heights = c(0.2, -0.08, 0.6, 0.2)
+# TODO: [2026-03-09 Mon] gotta check this works
+to_arrange <- list(
+  tmb_plot, # 1
+  r1, # 2
+  counts_plot, # 3
+  sbs_plot, # 4
+  type_legend # 5
 )
+if (!is.null(label_plot)) {
+  to_arrange <- c(to_arrange, label_plot)
+  design <- "
+1#
+23
+6#
+4#
+55
+"
+  heights <- c(3, 10, 1, 3, 5)
+} else {
+  design <- "
+1#
+23
+4#
+55
+"
+  heights <- c(3, 10, 3, 5)
+}
 
-final_rep <- ggarrange(
-  replicate_plot,
-  type_legend,
-  ncol = 1,
-  heights = c(0.9, 0.1)
-)
+final_rep <- wrap_plots(to_arrange, design = design, heights = heights)
+
 
 ## * Plot metrics
 smm <- replicate_figure |>
