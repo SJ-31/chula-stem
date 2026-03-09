@@ -7,6 +7,10 @@
   * Specify tool-specific [[https://www.nextflow.io/docs/latest/process.html#directives][directives]] (e.g. container, memory usage) with =params.tools=, e.g. in a file =<pipeline_name>_tools_config.nf=. see the =config= directory for examples
     * Most tools can be passed custom command-line arguments with =task.ext.args=. The format is a Groovy list, each element either a flag or flag-value pair, which will be separated by spaces when passed with the rest of the tool's flags.
   * Cohort information to be displayed in the report (e.g. address, notes, sample collection dates) is stored in the groovy map =params.report_data=
+* Required parameters
+TODO: describe these
++ =interval_padding= Recommended to be > 0 for PureCN
++ =defaults=
 * Whole-exome sequencing (=wes.nf= )
 A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re/sarek/3.4.4/][nf-core's sarek]] and GATK best practices. The final output
 ** Input
@@ -43,6 +47,9 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
 + =civic_cache=: path to json file containing cached calls to Civic API (is automatically generated and updated if it doesn't exist)
 + =pandrugs2_cache=: path to json file containing cached calls to Pandrugs2 API (is automatically generated and updated if it doesn't exist)
 + =pon= : path to a panel of normals. Any variants found in this file will be excluded from the final callset
++ For PureCN
+  * =snp_blacklist= TODO
+  * =mappability= TODO
 ** Steps
 *** Preprocessing
 + Quality control ([[https://github.com/OpenGene/fastp][fastp]])

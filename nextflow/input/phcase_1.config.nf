@@ -30,11 +30,15 @@ resourcedir = "/data/home/shannc/chula-stem/resources"
 
 params.ref = ["genome": genome,
               "homopolymers_microsatellites": homopolymers_microsatellites,
+              "mappability": "${refdir}/tool_specific/GCA_000001405.15_GRCh38_no_alt_analysis_set_100.bw",
               "targets": mgi_targets,
               "baits": mgi_targets, // Bait information not available
               "baits_il": mgi_targets_il,
               "targets_il": mgi_targets_il,
               "baits_unzipped": mgi_targets_unzipped,
+              "panel_of_normals": null,
+              "snp_blacklist": null,
+              "purecn_bait_intervals": null,
               "genome_blacklist": genome_blacklist,
               "delly_exclude": "",
               "known_variants": [dbsnp, gnomad_subset],
