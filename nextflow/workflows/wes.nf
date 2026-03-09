@@ -37,9 +37,9 @@ workflow whole_exome {
 
     main:
     def cohort_name = params.cohort ? params.cohort : "cohort"
-    def branchSources = branchCriteria { meta, files ->
-        tumor: meta.type == "cancer" || meta.type == "tumor"
-        normal: meta.type == "normal"
+    def branchSources = branchCriteria { it ->
+        tumor: it[0].type == "cancer" || it[0].type == "tumor"
+        normal: it[0].type == "normal"
     }
     def toConcat = { suffix, outdir_name, it ->
         [it[0] + ["suffix": suffix,
