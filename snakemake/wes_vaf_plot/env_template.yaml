@@ -16,6 +16,19 @@ extra:
   multiqc_vep: [] # Additional vep.txt files to include from other cohorts i.e. the ones
   # in `cases`
 
+sample_labels:
+  null # Mapping describing additional labels to be displayed for each sample
+  # Keys are the names of the labeling scheme e.g. `Moffitt` for tumor subtypes
+  # Values are also lists, which must have two keys:
+  # file - TSV file mapping sample names to the label
+  # palette - name of a paletteer palette to use for fill
+  # Moffitt:
+  #   file:
+  #   palette:
+  # Waddell:
+  #   file:
+  #   palette:
+
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
