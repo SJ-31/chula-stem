@@ -102,7 +102,7 @@ workflow whole_exome {
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
 
     // Combine variants by type
-    small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out,
+    small_variants_to_geno = Utl.joinFirst(MUTECT2_COMPLETE.out.filtered,
                                            [STRELKA2.out.variants
                                             .map({ it -> [it[0]] + it[1] }),
                                             MUSE2.out.variants])
@@ -220,9 +220,8 @@ workflow whole_exome {
      * Metric collection
      */
 
-    to_metrics = Utl.joinFirst(PREPROCESS_FASTQ.out.bam,
-                               [PREPROCESS_FASTQ.out.bam_index],
-                               ["id", "type"]).map({ it -> newOutPath(it, "metrics") })
+    to_metrics = PREPROCESS_FASTQ.out.bam_with_index
+        .map({ it -> newOutPath(it, "metrics") })
 
     PICARD(to_metrics, "hs", params.ref.genome,
            params.ref.targets_il, params.ref.baits_il,

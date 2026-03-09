@@ -54,8 +54,12 @@ workflow PREPROCESS_FASTQ {
     }
     SAMTOOLS_INDEX(bams) // indices are required by certain callers
 
+    with_index = Utl.joinFirst(bams, [SAMTOOLS_INDEX.out.index],
+                               ["id", "type"])
+
     emit:
     bam = bams
+    bam_with_index = with_index
     bam_index = SAMTOOLS_INDEX.out.index
     fastp_json = FASTP.out.json
     trimmed = FASTP.out.passed
