@@ -137,7 +137,9 @@ workflow whole_exome {
     small_all = Utl.delSuffix(STANDARDIZE_VCF.out.vcf)
     sv_all = Utl.delSuffix(CONCAT_SV.out.vcf)
 
-    QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"), params.small_qc, 7)
+    QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"),
+             params.small_qc,
+             params.ref.panel_of_normals ? params.ref.panel_of_normals : "", 7)
 
     /*
     * Copy number abberation
@@ -192,7 +194,9 @@ workflow whole_exome {
                                ["suffix": "VEP_SV", "variant_class": "sv",
                                 "qc": params.sv_qc])
 
-    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
+    VEP(to_vep_small.mix(to_vep_sv),
+        params.ref.genome,
+        params.ref.panel_of_normals ? params.ref.panel_of_normals : "", 7)
 
     to_qc_tsv = Utl.joinFirst(VEP.out.tsv,
                               [MSISENSORPRO.out.tsv.mix(MSISENSORPRO.out.tsv)])

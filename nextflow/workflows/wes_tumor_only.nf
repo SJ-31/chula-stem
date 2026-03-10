@@ -130,8 +130,10 @@ workflow whole_exome_tumor_only {
 
     STANDARDIZE_VCF(to_standardize, params.ref.genome, 6)
 
-    QC_SMALL(Utl.addSuffix(STANDARDIZE_VCF.out.vcf,
-                           "Small_high_conf"), params.small_qc, 7)
+    QC_SMALL(Utl.addSuffix(STANDARDIZE_VCF.out.vcf, "Small_high_conf"),
+             params.small_qc,
+             params.ref.panel_of_normals ? params.ref.panel_of_normals : "",
+             7)
 
     QC_SV(Utl.addSuffix(CONCAT_SV.out.vcf, "SV_high_conf"), params.sv_qc, 7)
 
@@ -189,7 +191,8 @@ workflow whole_exome_tumor_only {
                            ["suffix": "VEP_SV", "variant_class": "sv",
                             "qc": params.sv_qc])
 
-    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, 7)
+    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome,
+        params.ref.panel_of_normals ? params.ref.panel_of_normals : "", 7)
 
     to_qc_tsv = Utl.joinFirst(VEP.out.tsv,
                               [MSISENSORPRO.out.tsv.mix(MSISENSORPRO.out.tsv)])

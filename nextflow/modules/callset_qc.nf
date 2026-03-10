@@ -14,6 +14,7 @@ process CALLSET_QC {
     // - max_normal_depth: the maximum number of ALT reads found in the normal (FORMAT/DP)
     // - min_VAF: minimum variant allele frequency in the tumor (FORMAT/VAF)
     // - accepted_filters: A list of FILTER flags that calls must have to be accepted
+    val(panel_of_normals)
     val(module_number)
     //
 
@@ -41,10 +42,10 @@ process CALLSET_QC {
         .collect({ "bcftools filter -i '${it}'" }).join(" | ")
     all = all != "" && all != null ? "${all} -O z > ${output}" : "bcftools view -O z > ${output}"
 
-    input = params.ref.pon ? "pon_filtered.vcf.gz" : vcf
-    if (params.ref.pon) {
+    input = panel_of_normals ? "pon_filtered.vcf.gz" : vcf
+    if (panel_of_normals) {
         pon_filter_command = """
-        rtg vcffilter -i ${vcf} --exclude-vcf=${params.ref.pon} -o - | \\
+        rtg vcffilter -i ${vcf} --exclude-vcf=${panel_of_normals} -o - | \\
             bcftools view -O z -W -o pon_filtered.vcf.gz
         """
     } else {

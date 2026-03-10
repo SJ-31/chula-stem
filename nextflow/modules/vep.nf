@@ -7,6 +7,7 @@ process VEP {
     input:
     tuple val(meta), path(vcf)
     val(reference)
+    val(panel_of_normals)
     val(module_number)
     //
 
@@ -27,10 +28,10 @@ process VEP {
     variant_class = meta.variant_class ? meta.variant_class : "small"
     // One of "sv" or "small"
     normal_flag = !params.tumor_only ? "-n ${meta.RGSM_normal}" : ""
-    input = params.ref.pon ? "pon_filtered.vcf" : vcf
-    if (params.ref.pon) {
+    input = panel_of_normals ? "pon_filtered.vcf" : vcf
+    if (panel_of_normals) {
         pon_filter_command = """
-        rtg vcffilter -i ${vcf} --exclude-vcf=${params.ref.pon} -o pon_filtered.vcf
+        rtg vcffilter -i ${vcf} --exclude-vcf=${panel_of_normals} -o pon_filtered.vcf
         """
     } else {
         pon_filter_command = ""

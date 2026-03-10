@@ -16,6 +16,7 @@ workflow MUTECT2_COMPLETE {
     MUTECT2(meta_and_bam, params.ref.genome, params.ref.targets,
             params.ref.germline,
             params.interval_padding ? params.interval_padding : 0,
+            params.ref.panel_of_normals ? params.ref.panel_of_normals : "",
             module_number)
     LEARN_READ_ORIENTATION(MUTECT2.out.raw, module_number)
 

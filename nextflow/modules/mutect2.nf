@@ -9,6 +9,7 @@ process MUTECT2 {
     val(reference)
     val(target_intervals) // For exome data, path to target intervals file
     val(germline_resource) // A germline resource in the form of a population vcf with AF
+    val(panel_of_normals)
     val(interval_padding)
     val(module_number)
     //
