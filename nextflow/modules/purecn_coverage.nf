@@ -5,7 +5,7 @@ process PURECN_COVERAGE {
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
-    tuple val(meta), path(bam_or_cov)
+    tuple val(meta), path(bam_or_cov), path(index)
     val(bait_intervals)
     val(normalize_only) // PureCN supports using third-party tools for coverage calculation. If `normalize_only` is true, then the precomputed coverage files are GC-normalized
     val(module_number)
@@ -18,8 +18,8 @@ process PURECN_COVERAGE {
     //
 
     script:
-    o1 = Utl.getName(module_number, meta, "coverage_loess", ".txt.gz")
-    o2 = Utl.getName(module_number, meta, "coverage", ".txt.gz")
+    o1 = Utl.getName(module_number, meta, "coverage_loess", "txt.gz")
+    o2 = Utl.getName(module_number, meta, "coverage", "txt.gz")
     c1 = file("${meta.out}/${o1}")
     c2 = file("${meta.out}/${o2}")
     sample_flag = normalize_only ? " --coverage " : " --bam "
@@ -37,12 +37,13 @@ process PURECN_COVERAGE {
             --out-dir . \\
             ${sample_flag} ${bam_or_cov} \\
             --intervals ${bait_intervals} \\
-            --cores ${task.cpus}
+            --cores ${task.cpus} > tmp
 
         mv *_loess.txt.gz ${o1}
         mv *_coverage.txt.gz ${o2}
         
         get_nextflow_log.bash purecn_coverage.log
+        cat tmp >> purecn_coverage.log
         """
     }
     //
