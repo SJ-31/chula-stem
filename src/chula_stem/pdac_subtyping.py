@@ -1,16 +1,14 @@
 #!/usr/bin/env ipython
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal
 
 import anndata as ad
 import click
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
-from awkward import count
 from beartype import beartype
-from jax.numpy import single
 from scipy import sparse
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
@@ -33,11 +31,20 @@ SCHEMA: pa.DataFrameSchema = pa.DataFrameSchema(
         ),
         "sample": pa.Column(str, nullable=False, unique=False),
         "type": pa.Column(
-            str, pa.Check(lambda x: x.isin({"SV", "salmon", "kallisto"}))
+            str,
+            pa.Check(
+                lambda x: x.isin(
+                    {"SV", "salmon", "kallisto", "purecn_variant", "purecn_gene"}
+                )
+            ),
         ),
     },
     unique=["sample", "type"],
 )
+
+
+# TODO: also wanna collect the PureCN summary files and plot the comments (as a heatmap),
+# and purity + ploidy of the samples
 
 
 @beartype
@@ -80,6 +87,12 @@ def read_manifest(manifest: pd.DataFrame, tx2gene: pd.DataFrame) -> ad.AnnData:
             obs=pd.DataFrame({"rnaseq_available": False}, index=no_expr),
         )
         adata = ad.concat([adata, dummy], merge="first", join="outer", uns_merge="same")
+    purecn_df = df.query("type == 'purecn_variant' | type == 'purecn_gene'")
+    if not purecn_df.empty:
+        kras_scores = call_kras_imbalance(df)
+        adata.obs = adata.obs.merge(kras_scores["subtype"], on="sample", how="left")
+        adata.uns["purecn_kras_variants"] = kras_scores["variants"]
+        adata.uns["purecn_kras_genes"] = kras_scores["genes"]
     adata.X = sparse.csc_array(adata.X)
     return adata
 
@@ -91,6 +104,9 @@ def group_by_index(files: Sequence[str], index_col: str, **kws) -> list[list]:
         tmp["index"].append(tuple(cur[index_col]))
         tmp["file"].append(f)
     return [g["file"].tolist() for _, g in pd.DataFrame(tmp).groupby("index")]
+
+
+# * Moffitt
 
 
 class MoffittBasal:
@@ -195,6 +211,9 @@ class MoffittBasal:
         self.adata.obs.loc[:, "moffitt_is_basal"] = np.where(
             proba > self.threshold, [1], [0]
         )
+        self.adata.obs.loc[:, "moffitt_is_basal"] = self.adata.obs[
+            "moffitt_is_basal"
+        ].astype("string")
 
     def tune(
         self,
@@ -313,3 +332,109 @@ class MoffittBasal:
     if not inplace:
         return proba
     adata.obs.loc[:, "moffitt_pr_basal"] = proba
+
+
+# * KRAS instability
+
+
+def instability_score_one(
+    v_df: pd.DataFrame,
+    g_df: pd.DataFrame,
+) -> Literal["wt", "balanced", "minor", "major", "NA"]:
+    v_df.iloc[:, "major_C"] = v_df["ML.C"] - v_df["ML.M.SEGMENT"]
+    g_df.iloc[:, "major_C"] = g_df["C"] - g_df["M"]
+    if v_df.empty and g_df.empty:
+        return "wt"
+    elif v_df.empty:
+        if g_df.shape[0] != 1:
+            print(g_df)
+            raise ValueError("Shape of gene_df after filtering should be 1")
+        total_cn = g_df["C"].item()
+        minor_cn = g_df["M"].item()
+        major_cn = total_cn - minor_cn
+        # If loh, the gene bearing variants was lost
+        if total_cn == 0:  # Unsure how to categorize deletions
+            return "NA"
+        if major_cn == minor_cn:
+            return "balanced"
+        if major_cn > minor_cn:  # TODO: is assuming that loh is wt correct?
+            return "wt"
+        return "NA"
+
+    n_vars = v_df.shape[0]
+    m_cn: pd.Series = v_df["ML.M.SEGMENT"]
+    balance_count = m_cn == v_df["major_C"]
+    if (balance_count.sum() / n_vars) > 0.5:
+        return "balanced"
+
+    no_wt: pd.Series = v_df["major_C"] == 0
+    wt_one: pd.Series = v_df["major_C"] == 1
+
+    minor_ins_count = (no_wt & m_cn == 1) | (wt_one & m_cn == 2)
+    if (minor_ins_count.sum() / n_vars) > 0.5:
+        return "minor"
+    major_ins_count = (no_wt & m_cn > 1) | (wt_one & m_cn > 2)
+    if (major_ins_count.sum() / n_vars) > 0.5:
+        return "major"
+    wt_greater = v_df["major_C"] > m_cn
+    if (wt_greater.sum() / n_vars) > 0.5:
+        return "wt"  # TODO: what about situation when WT copies > mutant copies?
+    return "NA"
+
+
+@beartype
+def call_kras_imbalance(
+    manifest: pd.DataFrame,
+) -> dict[str, pd.DataFrame]:
+    results: dict = {}
+    tmp_subtype = {"sample": [], "KRAS_imbalance_subtype": []}
+    gene_schema = pa.DataFrameSchema(
+        {
+            "gene.symbol": pa.Column(str),
+            "loh": pa.Column(bool),
+            "M": pa.Column(int),
+            "M.flagged": pa.Column(bool),
+            "C.flagged": pa.Column(bool),
+        }
+    )
+    variant_schema = pa.DataFrameSchema(
+        {
+            "gene.symbol": pa.Column(str),
+            "POSTERIOR.SOMATIC": pa.Column(
+                float
+            ),  # To check whether variant is somatic
+            "M.SEGMENT.FLAGGED": pa.Column(bool),  # To ignore unreliable segments
+            "ML.M.SEGMENT": pa.Column(int),  # Minor copy number
+            "ML.C": pa.Column(float),  # Total copy number
+        }
+    )
+
+    df = manifest.pivot(columns="type", index="sample", values="file")
+    variant_dfs = []
+    gene_dfs = []
+    for index, series in df.iterrows():
+        v = series["purecn_variant"]  # output of predictSomatic
+        g = series["purecn_gene"]  # output of callAlterations
+        if not v or not g:
+            raise ValueError(f"A PureCN file is missing for sample {index}")
+        tmp_subtype["sample"].append(index)
+        v_df: pd.DataFrame = pd.read_csv(v)
+        g_df: pd.DataFrame = pd.read_csv(g)
+        gene_schema.validate(g_df)
+        variant_schema.validate(v_df)
+        sym_query = "gene.symbol == 'KRAS'"
+        v_df = v_df.query(
+            f"{sym_query} & (POSTERIOR.SOMATIC >= 0.8) & ~M.SEGMENT.FLAGGED"
+        )
+        # Cutoff for somatic calls provided by PureCN manual
+        g_df = g_df.query(f"{sym_query} & ~M.flagged & ~C.flagged")
+        variant_dfs.append(v_df.assign(sample=index))
+        gene_dfs.append(g_df.assign(sample=index))
+
+        tmp_subtype["KRAS_imbalance_subtype"].append(
+            instability_score_one(v_df=v_df, g_df=g_df)
+        )
+    results["subtype"] = pd.DataFrame(tmp_subtype)
+    results["variants"] = pd.concat(variant_dfs)
+    results["genes"] = pd.concat(gene_dfs)
+    return results
