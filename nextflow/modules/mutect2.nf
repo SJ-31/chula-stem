@@ -27,6 +27,8 @@ process MUTECT2 {
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !params.tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
+    genotype_germline_flag = !params.tumor_only ? " --genotype-germline-sites true" : ""     // Required for PureCN
+
     args = task.ext.args.join(" ")
     germline_flag = germline_resource != "" ? " --germline-resource ${germline_resource} " : ""
     if (check.exists()) {
@@ -44,6 +46,7 @@ process MUTECT2 {
             -I $tumor \\
             ${normal_flag} \\
             ${germline_flag} \\
+            ${genotype_germline_flag} \\
             ${target_flag} \\
             --f1r2-tar-gz $raw \\
             --interval-padding ${interval_padding} \\
