@@ -86,7 +86,7 @@ workflow whole_exome {
      */
     if (params.create_pon) {
         to_pon_bam = branched.normal
-            .map({ it -> [it[0] + ["out": "${params.outdir}/panel_of_normals"]] +
+            .map({ it -> [it[0] + ["out": "${params.outdir}/for_panel_of_normals"]] +
                   it[1..-1] }) 
         to_pon_bam_indices = PREPROCESS_FASTQ.out.bam_index
             .filter({ v -> v[0].type == "normal" })

@@ -57,13 +57,13 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
     // handling the vcfs of the other callers
     vcf_channels = CONCAT_VCF.out.vcf.map({ it -> it[1] }).mix(previous_vcfs).collect()
 
-    // vcf_channels = MUTECT2.out.variants.map({ it[1] }).collect()
     to_pon = vcf_channels.map({ it -> [["filename": params.cohort,
                                           "out": params.outdir,
                                           "log": params.logdir ], it] })
 
     min_samples = params.minimum_samples ? params.minimum_samples : 2
-    CREATE_PANEL_OF_NORMALS(to_pon, min_samples, params.ref.add_to_pon, 7)
+    add_to_pon = params.ref.add_to_pon ? params.ref.add_to_pon : []
+    CREATE_PANEL_OF_NORMALS(to_pon, min_samples, add_to_pon, 7)
 
     emit:
     pon = CREATE_PANEL_OF_NORMALS.out.pon
