@@ -28,10 +28,15 @@ process MUTECT2 {
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !params.tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
-    genotype_germline_flag = !params.tumor_only ? " --genotype-germline-sites true" : ""     // Required for PureCN
 
     args = task.ext.args.join(" ")
     germline_flag = germline_resource != "" ? " --germline-resource ${germline_resource} " : ""
+    pon_flag = panel_of_normals ? " --panel-of-normals ${panel_of_normals}" : ""
+
+    // Required for PureCN
+    genotype_germline_flag = !params.tumor_only ? " --genotype-germline-sites true" : ""
+    genotype_pon_flag = panel_of_normals ? "--genotype-pon-sites true" : ""
+
     if (check.exists()) {
         """
         ln -sr $check .
@@ -47,7 +52,9 @@ process MUTECT2 {
             -I $tumor \\
             ${normal_flag} \\
             ${germline_flag} \\
+            ${pon_flag} \\
             ${genotype_germline_flag} \\
+            ${genotype_pon_flag} \\
             ${target_flag} \\
             --f1r2-tar-gz $raw \\
             --interval-padding ${interval_padding} \\
@@ -77,5 +84,3 @@ process MUTECT2 {
         """
     }
 }
-// Look into using --panel-of-normals flag \\
-// https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2 describes how to create a pon from your own data

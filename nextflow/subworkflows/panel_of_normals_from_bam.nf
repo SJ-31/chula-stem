@@ -37,8 +37,11 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
     to_clairs = Utl.joinFirst(bams, [bam_indices, empty_indices_1])
     to_oct = Utl.joinFirst(to_mutect2, [empty_indices_2])
 
-    MUTECT2(to_mutect2, params.ref.genome, params.ref.targets, params.ref.germline,
-            "", 5)
+    MUTECT2(to_mutect2,
+            params.ref.genome,
+            params.ref.targets,
+            params.ref.germline, "",
+            params.interval_padding ? params.interval_padding : 0, 5)
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
     OCTOPUS(to_oct, params.ref.genome, params.ref.targets, 5)
 
