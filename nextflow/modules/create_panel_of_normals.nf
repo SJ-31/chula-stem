@@ -21,6 +21,7 @@ process CREATE_PANEL_OF_NORMALS {
     output = Utl.getName(module_number, meta, "PON", "vcf.gz")
     output_ws = Utl.getName(module_number, meta, "PON_ws", "vcf.gz")
     to_sample_spec = vcfs.toList().join("\n")
+    other_flag = other_vcfs ? " -v other.txt " : "" 
     to_other_spec = other_vcfs.join("\n")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
@@ -35,7 +36,7 @@ process CREATE_PANEL_OF_NORMALS {
 
         create_panel_of_normals.bash -l samples.txt \\
             -m ${minimum} \\
-            -v other.txt \\
+            ${other_flag} \\
             -t ${task.cpus} \\
             -o ${output} \\
             -a ${output_ws}

@@ -38,9 +38,9 @@ process PURECN_BAIT_INTERVALS {
         --genome ${params.genome_build} \\
         --out-file "${o1}" \\
         --export "${o2}" \\
-        --mappability "${mappability}"
+        --mappability "${mappability}" > purecn_bait_intervals.log
 
-        cp .command.out .log
+        cat .command.out >> purecn_bait_intervals.log
         """
     }
     //

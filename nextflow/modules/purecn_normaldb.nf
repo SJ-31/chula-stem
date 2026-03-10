@@ -42,7 +42,7 @@ process PURECN_NORMALDB {
             --out-dir . \\
             --coverage-files files.list \\
             ${pon_flag} \\
-            --genome ${params.genome_build}
+            --genome ${params.genome_build} > purecn_normaldb.log 
 
         mv *rds ${output}
 

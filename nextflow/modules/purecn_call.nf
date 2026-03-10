@@ -42,7 +42,7 @@ process PURECN_CALL {
             --vcf "${mutect2_vcf}" \\
             --normaldb "${normaldb}" \\
             --intervals "${bait_intervals}" \\
-            --genome ${params.genome_build}
+            --genome ${params.genome_build} > tmp
 
         mkdir ${output}
         mv "${sample_id}*" ${output}
@@ -56,6 +56,7 @@ process PURECN_CALL {
         fi
 
         get_nextflow_log.bash purecn_call.log
+        cat tmp >> purecn_call.log
         """
     }
     //
