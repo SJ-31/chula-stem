@@ -11,6 +11,7 @@ process OCTOPUS {
     //      octopus' list of candidate variants (does not guarantee that they will be called)
     val(reference) // Must have ".fasta" extension
     val(target_intervals) // (bgzipped) BED file of target intervals
+    val(tumor_only)
     val(module_number)
     //
 
@@ -25,7 +26,7 @@ process OCTOPUS {
     somatic = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
     check1 = file("${meta.out}/${output}")
     prev_flag = previous_variants.size() != 0 ? "--source-candidates ${previous_variants}" : ""
-    if (!params.tumor_only) {
+    if (!tumor_only) {
         bam_flag = "-I ${normal} ${tumor} --normal-sample ${meta.RGSM_normal}"
     } else {
         bam_flag = "-I ${tumor} -C cancer"
@@ -53,7 +54,7 @@ process OCTOPUS {
             --threads ${task.cpus} \\
             --output tmp.vcf
 
-        if [[ "${params.tumor_only}" == "false" ]]; then
+        if [[ "${tumor_only}" == "false" ]]; then
             bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" tmp.vcf | \\
                 vcf_info_add_tag.bash -n ${params.source_name} \\
                     -d "$params.source_description" \\

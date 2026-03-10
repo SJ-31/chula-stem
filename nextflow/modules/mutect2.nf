@@ -11,6 +11,7 @@ process MUTECT2 {
     val(germline_resource) // A germline resource in the form of a population vcf with AF
     val(panel_of_normals)
     val(interval_padding)
+    val(tumor_only)
     val(module_number)
     //
 
@@ -27,14 +28,14 @@ process MUTECT2 {
     raw = Utl.getName(module_number, meta, "Mutect2_raw", "tar.gz")
     target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
-    normal_flag = !params.tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
+    normal_flag = !tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
 
     args = task.ext.args.join(" ")
     germline_flag = germline_resource != "" ? " --germline-resource ${germline_resource} " : ""
     pon_flag = panel_of_normals ? " --panel-of-normals ${panel_of_normals}" : ""
 
     // Required for PureCN
-    genotype_germline_flag = !params.tumor_only ? " --genotype-germline-sites true" : ""
+    genotype_germline_flag = !tumor_only ? " --genotype-germline-sites true" : ""
     genotype_pon_flag = panel_of_normals ? "--genotype-pon-sites true" : ""
 
     if (check.exists()) {
@@ -62,7 +63,7 @@ process MUTECT2 {
 
         mv tmp.vcf.gz.stats $stats
 
-        if [[ "${params.tumor_only}" == "false" ]]; then
+        if [[ "${tumor_only}" == "false" ]]; then
             bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" tmp.vcf.gz | \\
                 vcf_info_add_tag.bash -n ${params.source_name} \\
                     -d "$params.source_description" \\

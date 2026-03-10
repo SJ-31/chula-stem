@@ -41,9 +41,11 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
             params.ref.genome,
             params.ref.targets,
             params.ref.germline, "",
-            params.interval_padding ? params.interval_padding : 0, 5)
+            params.interval_padding ? params.interval_padding : 0,
+            true,
+            5)
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
-    OCTOPUS(to_oct, params.ref.genome, params.ref.targets, 5)
+    OCTOPUS(to_oct, params.ref.genome, params.ref.targets, true, 5)
 
     to_concat = Utl.joinFirst(MUTECT2.out.variants,
                               [CLAIRS_TO.out.variants, OCTOPUS.out.variants])

@@ -136,7 +136,7 @@ workflow whole_exome {
 
     // Octopus and Clairs uses previous variants to aid calling
     to_geno = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
-    OCTOPUS(to_geno, params.ref.genome, params.ref.targets, 5)
+    OCTOPUS(to_geno, params.ref.genome, params.ref.targets, false, 5)
     CLAIRS(to_geno, params.ref.genome, params.ref.targets, 5)
 
     to_concat_small_2 = Utl.joinFirst(CONCAT_SMALL_1.out.vcf,

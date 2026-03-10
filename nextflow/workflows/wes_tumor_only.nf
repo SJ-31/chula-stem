@@ -107,7 +107,7 @@ workflow whole_exome_tumor_only {
 
     to_octopus = Utl.joinFirst(paired_no_id, [CONCAT_SMALL_1.out.vcf])
 
-    OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, 5)
+    OCTOPUS(to_octopus, params.ref.genome, params.ref.targets, true, 5)
 
     CONCAT_SMALL_2(Utl.joinFirst(CONCAT_SMALL_1.out.vcf, [OCTOPUS.out.variants])
                     .map({ it -> toConcat("Small_all", "annotations", it) }), 6)
