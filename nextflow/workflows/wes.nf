@@ -31,6 +31,7 @@ include { SIGPROFILERASSIGNMENT } from "../modules/sigprofilerassignment.nf"
 include { SIGPROFILERASSIGNMENT_COLLECT } from "../modules/sigprofilerassignment.nf"
 include { VEP } from "../modules/vep.nf"
 include { DELLY_CNV } from '../modules/delly_cnv.nf'
+include { PANEL_OF_NORMALS_FROM_BAM } from "../subworkflows/panel_of_normals_from_bam.nf"
 
 
 workflow whole_exome {
@@ -58,8 +59,10 @@ workflow whole_exome {
      */
 
     PREPROCESS_FASTQ(params.input, params.outdir, params.logdir, "wes", 0)
-    // After preprocessing, branch data into tumor and normal then pair up by id and join with
-    //  index
+    // After preprocessing, branch data into tumor and normal then pair up by id and join with  index
+
+
+    
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
     normals = Utl.getId(branched.normal
                         .map({ it -> [["type": "paired",
@@ -79,6 +82,28 @@ workflow whole_exome {
     // the order of indices doesn't matter, they just need to be present
 
     /*
+     * (Optional) Panel of normals
+     */
+    if (params.create_pon) {
+        to_pon_bam = branched.normal
+            .map({ it -> [it[0] + ["out": "${params.outdir}/panel_of_normals"]] +
+                  it[1..-1] }) 
+        to_pon_bam_indices = PREPROCESS_FASTQ.out.bam_index
+            .filter({ v -> v[0].type == "normal" })
+        
+        to_pon_bam.dump(tag: "pon_bam")
+        to_pon_bam_indices.dump(tag: "pon_bam_indices")
+        PANEL_OF_NORMALS_FROM_BAM(to_pon_bam,
+                                  to_pon_bam_indices,
+                                  cohort_name,
+                                  channel.empty(),
+                                  false)
+        panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon
+    } else {
+        panel_of_normals = params.ref.panel_of_normals ? params.ref.panel_of_normals : ""
+    }
+    
+    /*
      * Variant calling
      */
 
@@ -96,7 +121,7 @@ workflow whole_exome {
     to_mutect = paired_no_id.map({
         it -> [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1]
     })
-    MUTECT2_COMPLETE(to_mutect, 5)
+    MUTECT2_COMPLETE(to_mutect, panel_of_normals, 5)
     to_strelka = Utl.delId(paired.join(MANTA.out.indels))
     STRELKA2(to_strelka, params.ref.genome, params.ref.targets, 5)
     MUSE2(paired_no_id, params.ref.genome, params.ref.dbsnp, "exome", 5)
@@ -137,9 +162,8 @@ workflow whole_exome {
     small_all = Utl.delSuffix(STANDARDIZE_VCF.out.vcf)
     sv_all = Utl.delSuffix(CONCAT_SV.out.vcf)
 
-    QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"),
-             params.small_qc,
-             params.ref.panel_of_normals ? params.ref.panel_of_normals : "", 7)
+    QC_SMALL(Utl.addSuffix(small_all, "Small_high_conf"), params.small_qc,
+             panel_of_normals, 7)
 
     /*
     * Copy number abberation
@@ -165,6 +189,8 @@ workflow whole_exome {
     PURECN_COMPLETE(MUTECT2_COMPLETE.out.unfiltered,
                     branched_with_index.tumor,
                     branched_with_index.normal,
+                    panel_of_normals,
+                    cohort_name,
                     4)
     
     to_cnvkit = Utl.delId(paired.map({ it -> it[0..1] + [it[3]] })
@@ -194,9 +220,7 @@ workflow whole_exome {
                                ["suffix": "VEP_SV", "variant_class": "sv",
                                 "qc": params.sv_qc])
 
-    VEP(to_vep_small.mix(to_vep_sv),
-        params.ref.genome,
-        params.ref.panel_of_normals ? params.ref.panel_of_normals : "", 7)
+    VEP(to_vep_small.mix(to_vep_sv), params.ref.genome, panel_of_normals, 7)
 
     to_qc_tsv = Utl.joinFirst(VEP.out.tsv,
                               [MSISENSORPRO.out.tsv.mix(MSISENSORPRO.out.tsv)])
