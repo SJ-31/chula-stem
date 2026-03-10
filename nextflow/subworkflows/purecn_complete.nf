@@ -12,10 +12,14 @@ workflow PURECN_COMPLETE {
     mutect2_unfiltered
     tumor_bam
     normal_bam
+    panel_of_normals
+    cohort_name
     module_number
 
     main:
-    def cohort_name = params.cohort ? params.cohort : "cohort"
+    
+    tumor_bam.dump(tag: "purecn_tumor")
+    normal_bam.dump(tag: "purecn_normal")
 
     if (!params.ref.purecn_bait_intervals) {
         PURECN_BAIT_INTERVALS([["out": "${params.outdir}/PureCN_ref",
@@ -33,13 +37,13 @@ workflow PURECN_COMPLETE {
 
     if (!params.ref.purecn_normaldb) {
         COVERAGE_NORMAL(normal_bam, bait_intervals, false, module_number)
+        normal_files = COVERAGE_NORMAL.out.loess.map({ it -> it[1] }).toList() 
         def to_normaldb = channel.of(["filename": cohort_name,
                                       "out": "${params.outdir}/PureCN_ref",
                                       "log": "${params.outdir}/PureCN_ref"])
-            .merge(COVERAGE_NORMAL.out.loess.toList()) { meta, cov ->
-                tuple(meta, tuple(cov)) }
-        pon = params.ref.panel_of_normals ? params.ref.panel_of_normals : ""
-        PURECN_NORMALDB(to_normaldb, pon, module_number)
+            .merge(normal_files) { meta, cov -> tuple(meta, tuple(cov)) }
+        to_normaldb.dump(tag: "purecn_normaldb")
+        PURECN_NORMALDB(to_normaldb, panel_of_normals, module_number)
         normaldb = PURECN_NORMALDB.out.db.first()
     } else {
         normaldb = file(params.ref.purecn_normaldb)       
