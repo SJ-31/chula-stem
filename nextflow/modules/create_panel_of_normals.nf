@@ -7,6 +7,7 @@ process CREATE_PANEL_OF_NORMALS {
     input:
     tuple val(meta), val(vcfs)
     val(minimum)
+    val(reference)
     val(other_vcfs)
     val(module_number)
     //
@@ -14,6 +15,7 @@ process CREATE_PANEL_OF_NORMALS {
     output:
     tuple val(meta), path(output), emit: pon // Empty pon with no sample information
     tuple val(meta), path(output_ws), emit: pon_ws
+    path("*.tbi")
     path("*.log")
     //
 
@@ -24,10 +26,14 @@ process CREATE_PANEL_OF_NORMALS {
     to_sample_spec = "${to_sample_spec}\n"
     other_flag = other_vcfs ? " -v other.txt " : "" 
     to_other_spec = other_vcfs.join("\n")
-    check = file("${meta.out}/${output}")
-    if (check.exists()) {
+    c1 = file("${meta.out}/${output}")
+    c2 = file("${meta.out}/${output_ws}")
+    if (c1.exists() & c2.exists()) {
         """
-        ln -sr ${check} .
+        ln -sr ${c1} .
+        ln -sr ${c2} .
+        ln -sr ${c1}.tbi .
+        ln -sr ${c2}.tbi .
         ln -sr ${meta.log}/create_panel_of_normals.log .
         """
     } else {
@@ -39,9 +45,21 @@ process CREATE_PANEL_OF_NORMALS {
             -m ${minimum} \\
             ${other_flag} \\
             -t ${task.cpus} \\
-            -o ${output} \\
-            -a ${output_ws}
+            -o tmp.vcf.gz \\
+            -a tmp_ws.vcf.gz
 
+        standardize_vcf_clean.bash -i tmp.vcf.gz \\
+            -r ${reference} \\
+            -o ${output} 
+
+        gatk IndexFeatureFile -I ${output}
+
+        standardize_vcf_clean.bash -i tmp_ws.vcf.gz \\
+            -r ${reference} \\
+            -o ${output_ws}
+        
+        gatk IndexFeatureFile -I ${output_ws}
+        
         get_nextflow_log.bash create_panel_of_normals.log
         """
     }
