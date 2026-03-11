@@ -37,7 +37,7 @@ include { PANEL_OF_NORMALS_FROM_BAM } from "../subworkflows/panel_of_normals_fro
 workflow whole_exome {
 
     main:
-    def cohort_name = params.cohort ? params.cohort : "cohort"
+    def cohort_name = params.cohort ?: "cohort"
     def branchSources = branchCriteria { it ->
         tumor: it[0].type == "cancer" || it[0].type == "tumor"
         normal: it[0].type == "normal"
@@ -100,7 +100,7 @@ workflow whole_exome {
                                   false)
         panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon_ws.map({ it -> it[1] })
     } else {
-        panel_of_normals = params.ref.panel_of_normals ? params.ref.panel_of_normals : ""
+        panel_of_normals = params.ref.panel_of_normals ?: ""
     }
     
     /*
@@ -281,8 +281,8 @@ workflow whole_exome {
         { it -> [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
                    cnvkit_cnr: it[3], classify_cnv: it[4],
                    msisensor_pro: it[5],
-                   civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
-                   pandrugs2_cache: params.ref.pandrugs2_cache ? params.ref.pandrugs2_cache : "pandrugs2_cache.json",
+                   civic_cache: params.ref.civic_cache ?: "civic_cache.json",
+                   pandrugs2_cache: params.ref.pandrugs2_cache ?: "pandrugs2_cache.json",
                    cosmic_reference: params.ref.cosmic_reference]]})
 
     to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report))

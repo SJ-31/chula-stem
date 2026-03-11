@@ -39,11 +39,11 @@ include { GET_THERAPY_CACHE } from "../modules/get_therapy_cache.nf"
 workflow whole_exome_tumor_only {
 
     main:
-    def cohort_name = params.cohort ? params.cohort : "cohort"
+    def cohort_name = params.cohort ?: "cohort"
     def cohortTopLevel = { it -> [["out": params.outdir, "log": params.logdir,
                              "filename": cohort_name], it] }
 
-    def panel_of_normals = params.ref.panel_of_normals ? params.ref.panel_of_normals : ""
+    def panel_of_normals = params.ref.panel_of_normals ?: ""
     /*
      * Preprocessing
      */
@@ -259,8 +259,8 @@ workflow whole_exome_tumor_only {
         { it -> [it[0], [sigprofiler: it[1], cnvkit_cns: it[2],
                    cnvkit_cnr: it[3], classify_cnv: it[4],
                    msisensor_pro: it[5],
-                   civic_cache: params.ref.civic_cache ? params.ref.civic_cache : "civic_cache.json",
-                   pandrugs2_cache: params.ref.pandrugs2_cache ? params.ref.pandrugs2_cache : "pandrugs2_cache.json",
+                   civic_cache: params.ref.civic_cache ?: "civic_cache.json",
+                   pandrugs2_cache: params.ref.pandrugs2_cache ?: "pandrugs2_cache.json",
                    cosmic_reference: params.ref.cosmic_reference], ]})
 
     to_report = Utl.modifyMeta(Utl.delId(Utl.getId(others, true).join(vep_to_report))

@@ -1,7 +1,7 @@
 include { MUTECT2 } from "../modules/mutect2.nf"
 include { PURECN_BAIT_INTERVALS } from "../modules/purecn_bait_intervals.nf"
-include { PURECN_COVERAGE as COVERAGE_NORMAL } from "../modules/purecn_coverage.nf" 
-include { PURECN_COVERAGE as COVERAGE_TUMOR } from "../modules/purecn_coverage.nf" 
+include { PURECN_COVERAGE as COVERAGE_NORMAL } from "../modules/purecn_coverage.nf"
+include { PURECN_COVERAGE as COVERAGE_TUMOR } from "../modules/purecn_coverage.nf"
 include { PURECN_NORMALDB } from "../modules/purecn_normaldb.nf"
 include { PURECN_CALL } from "../modules/purecn_call.nf"
 
@@ -46,7 +46,8 @@ workflow PURECN_COMPLETE {
         PURECN_NORMALDB(to_normaldb, panel_of_normals, module_number)
         normaldb = PURECN_NORMALDB.out.db.first()
     } else {
-        normaldb = file(params.ref.purecn_normaldb)       
+        normaldb = params.ref.purecn_normaldb
+        mapping_bias = params.ref.purecn_mapping_bias ?: ""
     }
     to_call = COVERAGE_TUMOR.out.loess.map({ it -> [it[0].id,
                                                ["type": "paired",
@@ -59,7 +60,7 @@ workflow PURECN_COMPLETE {
                 [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations"]] +
                     it[1..-1] })
 
-    snp_blacklist = params.ref.snp_blacklist ? params.ref.snp_blacklist : "" 
+    snp_blacklist = params.ref.snp_blacklist ?: ""
     PURECN_CALL(to_call,
                 normaldb,
                 bait_intervals,
