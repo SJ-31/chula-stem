@@ -25,7 +25,7 @@ process PURECN_NORMALDB {
     c2 = file("${meta.out}/${png}")
     c3 = file("${meta.out}/${low_cov}")
     args = task.ext.args.join(" ")
-    pon_flag = !pon ? " --normal-panel ${pon}" : ""
+    pon_flag = pon ? " --normal-panel ${pon}" : ""
     if (c1.exists()) {
         """
         ln -sr ${c1} .
@@ -35,9 +35,9 @@ process PURECN_NORMALDB {
         """
     } else {
         """
-        ls *coverage.txt.gz > files.list
+        ls *coverage*.txt.gz > files.list
 
-        Rscript \$PURECN/NormalDB.R
+        Rscript \$PURECN/NormalDB.R \\
             ${args} \\
             --out-dir . \\
             --coverage-files files.list \\
