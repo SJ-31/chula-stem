@@ -37,13 +37,12 @@ process PURECN_COVERAGE {
             --out-dir . \\
             ${sample_flag} ${bam_or_cov} \\
             --intervals ${bait_intervals} \\
-            --cores ${task.cpus} > tmp
+            --cores ${task.cpus}
 
         mv *_loess.txt.gz ${o1}
         mv *_coverage.txt.gz ${o2}
-        
+
         get_nextflow_log.bash purecn_coverage.log
-        cat tmp >> purecn_coverage.log
         """
     }
     //

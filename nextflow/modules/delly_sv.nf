@@ -20,7 +20,7 @@ process DELLY_SV {
     out = Utl.getName(module_number, meta, "DellySV", "vcf.gz")
     check = file("${meta.out}/${out}")
     args = task.ext.args.join(" ")
-    exclude_flag = exclude == "" ? "" : "-x ${exclude}"
+    exclude_flag = exclude ? "-x ${exclude}" : "" 
     if (check.exists()) {
         """
         ln -sr ${check} .

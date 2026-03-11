@@ -26,12 +26,12 @@ process MUTECT2 {
     out = Utl.getName(module_number, meta, "Mutect2", "vcf.gz")
     stats = "${out}.stats"
     raw = Utl.getName(module_number, meta, "Mutect2_raw", "tar.gz")
-    target_flag = target_intervals != "" ? " --intervals ${target_intervals} " : ""
+    target_flag = target_intervals ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""
 
     args = task.ext.args.join(" ")
-    germline_flag = germline_resource != "" ? " --germline-resource ${germline_resource} " : ""
+    germline_flag = germline_resource ? " --germline-resource ${germline_resource} " : ""
     pon_flag = panel_of_normals ? " --panel-of-normals ${panel_of_normals}" : ""
 
     // Required for PureCN
