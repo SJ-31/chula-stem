@@ -21,6 +21,7 @@ process CREATE_PANEL_OF_NORMALS {
     output = Utl.getName(module_number, meta, "PON", "vcf.gz")
     output_ws = Utl.getName(module_number, meta, "PON_ws", "vcf.gz")
     to_sample_spec = vcfs.toList().join("\n")
+    to_sample_spec = "${to_sample_spec}\n"
     other_flag = other_vcfs ? " -v other.txt " : "" 
     to_other_spec = other_vcfs.join("\n")
     check = file("${meta.out}/${output}")
