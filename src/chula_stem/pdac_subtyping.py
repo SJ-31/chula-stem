@@ -11,7 +11,7 @@ import pandera.pandas as pa
 from beartype import beartype
 from scipy import sparse
 from scipy.special import expit
-from sklearn.linear_model import LogisticRegression
+from scipy.stats import expon, goodness_of_fit
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import train_test_split
 
@@ -22,7 +22,6 @@ from chula_stem.r_utils import tximport
 # TODO: [2026-03-04 Wed] for now also just plot GATA6 expression distribution
 # among samples just do heatmap
 
-from chula_stem.utils import get_ensembl_gene_data
 
 SCHEMA: pa.DataFrameSchema = pa.DataFrameSchema(
     {
@@ -32,11 +31,7 @@ SCHEMA: pa.DataFrameSchema = pa.DataFrameSchema(
         "sample": pa.Column(str, nullable=False, unique=False),
         "type": pa.Column(
             str,
-            pa.Check(
-                lambda x: x.isin(
-                    {"SV", "salmon", "kallisto", "purecn_variant", "purecn_gene"}
-                )
-            ),
+            pa.Check(lambda x: x.isin({"SV", "salmon", "kallisto", "purecn"})),
         ),
     },
     unique=["sample", "type"],
@@ -48,7 +43,9 @@ SCHEMA: pa.DataFrameSchema = pa.DataFrameSchema(
 
 
 @beartype
-def read_manifest(manifest: pd.DataFrame, tx2gene: pd.DataFrame) -> ad.AnnData:
+def read_manifest(
+    manifest: pd.DataFrame, tx2gene: pd.DataFrame, purecn_prefix: str = ""
+) -> ad.AnnData:
     SCHEMA.validate(manifest)
 
     sv_check: set = {"SV"}
@@ -58,28 +55,7 @@ def read_manifest(manifest: pd.DataFrame, tx2gene: pd.DataFrame) -> ad.AnnData:
         .query("type == @sv_check")
         .index.to_list()
     )
-    count_adatas: list[ad.AnnData] = []
-    for group, df in manifest.groupby("type"):
-        names = df["sample"]
-        files = df["file"]
-        if group in {"salmon", "kallisto"}:
-            index_col = "Name" if group == "salmon" else "target_id"
-            index_groups = group_by_index(files, index_col, sep="\t")
-            # necessary to avoid errors with files not having the same index
-            for g in index_groups:
-                cur = df.query("file.isin(@g)")
-                adata = tximport(
-                    files=list(cur["file"]),
-                    tx2gene=tx2gene,
-                    sample_names=list(cur["sample"]),
-                    type=group,
-                )
-                adata.obs.loc[:, "rnaseq_available"] = ~adata.obs.index.isin(no_expr)
-                count_adatas.append(adata)
-        elif group == "SV":
-            # TODO: want to read in the SV data as a dataframe and add it to adata.obs
-            pass
-    adata = ad.concat(count_adatas, merge="first", join="outer", uns_merge="same")
+    adata: ad.AnnData = get_counts(manifest, tx2gene, no_expr)
     if no_expr:
         dummy = ad.AnnData(
             X=np.zeros((len(no_expr), adata.shape[1])),
@@ -87,9 +63,9 @@ def read_manifest(manifest: pd.DataFrame, tx2gene: pd.DataFrame) -> ad.AnnData:
             obs=pd.DataFrame({"rnaseq_available": False}, index=no_expr),
         )
         adata = ad.concat([adata, dummy], merge="first", join="outer", uns_merge="same")
-    purecn_df = df.query("type == 'purecn_variant' | type == 'purecn_gene'")
+    purecn_df = manifest.query("type == 'purecn_variant' | type == 'purecn_gene'")
     if not purecn_df.empty:
-        kras_scores = call_kras_imbalance(df)
+        kras_scores = call_kras_imbalance(manifest, purecn_prefix=purecn_prefix)
         adata.obs = adata.obs.merge(kras_scores["subtype"], on="sample", how="left")
         adata.uns["purecn_kras_variants"] = kras_scores["variants"]
         adata.uns["purecn_kras_genes"] = kras_scores["genes"]
@@ -104,6 +80,30 @@ def group_by_index(files: Sequence[str], index_col: str, **kws) -> list[list]:
         tmp["index"].append(tuple(cur[index_col]))
         tmp["file"].append(f)
     return [g["file"].tolist() for _, g in pd.DataFrame(tmp).groupby("index")]
+
+
+def get_counts(
+    manifest: pd.DataFrame, tx2gene: pd.DataFrame, no_expr: list[str]
+) -> ad.AnnData:
+    count_adatas: list[ad.AnnData] = []
+    for group, df in manifest.groupby("type"):
+        files = df["file"]
+        if group in {"salmon", "kallisto"}:
+            index_col = "Name" if group == "salmon" else "target_id"
+            index_groups = group_by_index(files, index_col, sep="\t")
+            # necessary to avoid errors with files not having the same index
+            for _ in index_groups:
+                cur = df.query("file.isin(@g)")
+                adata = tximport(
+                    files=list(cur["file"]),
+                    tx2gene=tx2gene,
+                    sample_names=list(cur["sample"]),
+                    type=group,
+                )
+                adata.obs.loc[:, "rnaseq_available"] = ~adata.obs.index.isin(no_expr)
+                count_adatas.append(adata)
+    adata = ad.concat(count_adatas, merge="first", join="outer", uns_merge="same")
+    return adata
 
 
 # * Moffitt
