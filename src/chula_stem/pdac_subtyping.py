@@ -341,6 +341,19 @@ def instability_score_one(
     v_df: pd.DataFrame,
     g_df: pd.DataFrame,
 ) -> Literal["wt", "balanced", "minor", "major", "NA"]:
+    """
+    Provide a KRAS imbalance score for the given sample, following
+    https://www.nature.com/articles/s41588-019-0566-9/figures/13
+
+    The `major` allele is in the notes and variable names refers to the wild-type
+    reference allele (as the calls were filtered to be somatic only)
+
+    Notes
+    -----
+    The samples fail classification (assigned 'NA') in any of the following situations
+        The KRAS gene was deleted completely (total CN == 0)
+        TODO: find other situations of this
+    """
     v_df.iloc[:, "major_C"] = v_df["ML.C"] - v_df["ML.M.SEGMENT"]
     g_df.iloc[:, "major_C"] = g_df["C"] - g_df["M"]
     if v_df.empty and g_df.empty:
@@ -385,6 +398,7 @@ def instability_score_one(
 @beartype
 def call_kras_imbalance(
     manifest: pd.DataFrame,
+    purecn_prefix: str = "",
 ) -> dict[str, pd.DataFrame]:
     results: dict = {}
     tmp_subtype = {"sample": [], "KRAS_imbalance_subtype": []}
@@ -410,16 +424,25 @@ def call_kras_imbalance(
     )
 
     df = manifest.pivot(columns="type", index="sample", values="file")
-    variant_dfs = []
-    gene_dfs = []
+    variant_dfs, gene_dfs, summary_dfs = [], [], []
     for index, series in df.iterrows():
-        v = series["purecn_variant"]  # output of predictSomatic
-        g = series["purecn_gene"]  # output of callAlterations
-        if not v or not g:
-            raise ValueError(f"A PureCN file is missing for sample {index}")
+        assert isinstance(index, str)
+        dir = Path(series["purecn"])  # output of predictSomatic
+        assert dir.exists() and dir.is_dir()
+        v_result = dir / f"{purecn_prefix}{index}_variants.csv"
+        g_result = (
+            dir / f"{purecn_prefix}{index}_genes.csv"
+        )  # output of callAlterations
+        summary = dir / f"{purecn_prefix}{index}.csv"
+        for file in (v_result, g_result, summary):
+            if not file.exists():
+                raise ValueError(f"PureCN file {file} is missing")
+        summary_dfs.append(pd.read_csv(summary))
+
         tmp_subtype["sample"].append(index)
-        v_df: pd.DataFrame = pd.read_csv(v)
-        g_df: pd.DataFrame = pd.read_csv(g)
+        v_df: pd.DataFrame = pd.read_csv(v_result)
+        g_df: pd.DataFrame = pd.read_csv(g_result)
+
         gene_schema.validate(g_df)
         variant_schema.validate(v_df)
         sym_query = "gene.symbol == 'KRAS'"
@@ -434,7 +457,9 @@ def call_kras_imbalance(
         tmp_subtype["KRAS_imbalance_subtype"].append(
             instability_score_one(v_df=v_df, g_df=g_df)
         )
+
     results["subtype"] = pd.DataFrame(tmp_subtype)
     results["variants"] = pd.concat(variant_dfs)
     results["genes"] = pd.concat(gene_dfs)
+    results["summary"] = pd.concat(summary_dfs)
     return results
