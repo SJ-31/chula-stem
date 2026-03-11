@@ -98,7 +98,7 @@ workflow whole_exome {
                                   cohort_name,
                                   channel.empty(),
                                   false)
-        panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon
+        panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon_ws.map({ it -> it[1] })
     } else {
         panel_of_normals = params.ref.panel_of_normals ? params.ref.panel_of_normals : ""
     }
