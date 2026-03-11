@@ -17,7 +17,7 @@ workflow PURECN_COMPLETE {
     module_number
 
     main:
-    
+
     tumor_bam.dump(tag: "purecn_tumor")
     normal_bam.dump(tag: "purecn_normal")
 
@@ -30,14 +30,14 @@ workflow PURECN_COMPLETE {
                               module_number)
         bait_intervals = PURECN_BAIT_INTERVALS.out.baits
     } else {
-        bait_intervals = file(params.ref.purecn_bait_intervals) 
+        bait_intervals = params.ref.purecn_bait_intervals
     }
-    
+
     COVERAGE_TUMOR(tumor_bam, bait_intervals, false, module_number)
 
     if (!params.ref.purecn_normaldb) {
         COVERAGE_NORMAL(normal_bam, bait_intervals, false, module_number)
-        normal_files = COVERAGE_NORMAL.out.loess.map({ it -> it[1] }).toList() 
+        normal_files = COVERAGE_NORMAL.out.loess.map({ it -> it[1] }).toList()
         def to_normaldb = channel.of(["filename": cohort_name,
                                       "out": "${params.outdir}/PureCN_ref",
                                       "log": "${params.outdir}/PureCN_ref"])
@@ -45,6 +45,7 @@ workflow PURECN_COMPLETE {
         to_normaldb.dump(tag: "purecn_normaldb")
         PURECN_NORMALDB(to_normaldb, panel_of_normals, module_number)
         normaldb = PURECN_NORMALDB.out.db.first()
+        mapping_bias = PURECN_NORMALDB.out.mapping_bias.first()
     } else {
         normaldb = params.ref.purecn_normaldb
         mapping_bias = params.ref.purecn_mapping_bias ?: ""
@@ -64,6 +65,7 @@ workflow PURECN_COMPLETE {
     PURECN_CALL(to_call,
                 normaldb,
                 bait_intervals,
+                mapping_bias,
                 snp_blacklist,
                 params.defaults.purity,
                 params.defaults.ploidy,

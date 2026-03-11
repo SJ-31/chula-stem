@@ -6,8 +6,9 @@ process PURECN_CALL {
 
     input:
     tuple val(meta), path(coverage), path(mutect2_vcf)
-    path(normaldb)
-    path(bait_intervals)
+    val(normaldb)
+    val(bait_intervals)
+    val(mapping_bias)
     val(snp_blacklist)
     val(default_purity)
     val(default_ploidy)
@@ -24,17 +25,19 @@ process PURECN_CALL {
     output = Utl.getName(module_number, meta, "Call", "")
     check = file("${meta.out}/${output}")
     blacklist_flag = snp_blacklist ? " --snp-blacklist ${snp_blacklist}" : ""
+    mb_flag = mapping_bias ? " --mapping-bias-file ${mapping_bias}" : ""
     sample_id = "${module_number}_${meta.id}"
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
         ln -sr ${check} .
-        ln -sr ${meta.log}/purecn_coverage.log .
+        ln -sr ${meta.log}/purecn_call.log .
         """
     } else {
         """
         Rscript \$PURECN/PureCN.R \\
             ${args} \\
+            ${mb_flag} \\
             ${blacklist_flag} \\
             --out . \\
             --sampleid ${sample_id} \\
@@ -42,7 +45,7 @@ process PURECN_CALL {
             --vcf "${mutect2_vcf}" \\
             --normaldb "${normaldb}" \\
             --intervals "${bait_intervals}" \\
-            --genome ${params.genome_build} > tmp
+            --genome ${params.genome_build}
 
         mkdir ${output}
         mv "${sample_id}*" ${output}
@@ -56,7 +59,6 @@ process PURECN_CALL {
         fi
 
         get_nextflow_log.bash purecn_call.log
-        cat tmp >> purecn_call.log
         """
     }
     //
