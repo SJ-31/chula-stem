@@ -91,10 +91,12 @@ class ChainData:
         self.data[f"{self.chain}_{key}"] = val
 
 
+@beartype
 def get_best_alignment(
     query: DNA, references: list[DNA], free_ends, return_alignment: bool = False
 ) -> tuple[float, DNA] | tuple[PairAlignResult, DNA]:
-    best_align = pair_align(query, references[0], free_ends=free_ends)
+    best_seq = references[0]
+    best_align = pair_align(query, best_seq, free_ends=free_ends)
     cur_best = (
         best_align.score,
         references[0],
@@ -104,9 +106,10 @@ def get_best_alignment(
         if alignment.score > cur_best[0]:
             cur_best = (alignment.score, s)
             best_align = alignment
+            best_seq = s
     if not return_alignment:
         return cur_best
-    return best_align, s
+    return best_align, best_seq
 
 
 def plot_construct(
