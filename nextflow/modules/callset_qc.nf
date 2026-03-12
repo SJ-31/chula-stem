@@ -45,8 +45,7 @@ process CALLSET_QC {
     input = panel_of_normals ? "pon_filtered.vcf.gz" : vcf
     if (panel_of_normals) {
         pon_filter_command = """
-        rtg vcffilter -i ${vcf} --exclude-vcf=${panel_of_normals} -o - | \\
-            bcftools view -O z -W -o pon_filtered.vcf.gz
+        bcftools view -T ^${panel_of_normals} ${vcf} -O z -W -o pon_filtered.vcf.gz 
         """
     } else {
         pon_filter_command = ""
