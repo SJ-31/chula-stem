@@ -58,7 +58,8 @@ workflow PURECN_COMPLETE {
         .join(Utl.getId(mutect2_unfiltered))
         .map({ it -> it[1..-1] })
         .map({ it ->
-                [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations"]] +
+                [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations",
+                          "log": "${params.logdir}/${it[0].id}/annotations"]] +
                     it[1..-1] })
 
     snp_blacklist = params.ref.snp_blacklist ?: ""
