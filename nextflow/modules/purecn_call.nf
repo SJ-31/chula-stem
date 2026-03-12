@@ -18,7 +18,7 @@ process PURECN_CALL {
     output:
     tuple val(meta), path(output), emit: call
     tuple val(meta), eval("head purity.txt"), eval("head ploidy.txt"), emit: purity_ploidy
-    path("*.log")
+    path("*.log"), optional: true
     //
 
     script:
@@ -26,12 +26,22 @@ process PURECN_CALL {
     check = file("${meta.out}/${output}")
     blacklist_flag = snp_blacklist ? " --snp-blacklist ${snp_blacklist}" : ""
     mb_flag = mapping_bias ? " --mapping-bias-file ${mapping_bias}" : ""
-    sample_id = "${module_number}_${meta.id}"
+    get_purity_ploidy = """
+    if [[ -e ${output}/${meta.id}.csv ]]; then
+         cut -d, -f 2 ${output}/${meta.id}.csv | tail -n 1 > purity.txt
+         cut -d, -f 3 ${output}/${meta.id}.csv | tail -n 1 > ploidy.txt
+    else
+        echo ${default_purity} > purity.txt
+        echo ${default_ploidy} > ploidy.txt
+    fi
+    """
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """
-        ln -sr ${check} .
+        cp -r ${check} .
         ln -sr ${meta.log}/purecn_call.log .
+
+        ${get_purity_ploidy}
         """
     } else {
         """
@@ -40,23 +50,18 @@ process PURECN_CALL {
             ${mb_flag} \\
             ${blacklist_flag} \\
             --out . \\
-            --sampleid ${sample_id} \\
+            --sampleid ${meta.id} \\
             --tumor "${coverage}" \\
             --vcf "${mutect2_vcf}" \\
             --normaldb "${normaldb}" \\
             --intervals "${bait_intervals}" \\
             --genome ${params.genome_build}
 
-        mkdir ${output}
-        mv "${sample_id}*" ${output}
+        mkdir _tmp
+        mv ${meta.id}* _tmp
+        mv _tmp ${output}
 
-        if [[ -e ${output}/${sample_id}.csv ]]; then
-            cut -d, -f 2 ${output}/${sample_id}.csv | tail -n 1 > purity.txt
-            cut -d, -f 3 ${output}/${sample_id}.csv | tail -n 1 > ploidy.txt
-        else
-            echo ${default_purity} > purity.txt
-            echo ${default_ploidy} > ploidy.txt
-        fi
+        ${get_purity_ploidy}
 
         get_nextflow_log.bash purecn_call.log
         """
