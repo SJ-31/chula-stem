@@ -146,19 +146,29 @@ def get_seq_from_cfg(
     name: str = "",
     prefix: str = "",
     default: str = "",
-) -> DNA:
+    metadata: dict | None = None,
+) -> list[DNA]:
     if isinstance(key, str):
         val = cfg.get(key)
     else:
         val = cfg.get(key[0], {}).get(key[1])
     val = val or default
-    if (path := Path(val)).exists() and val != "":
+
+    def read_one(f: Path) -> DNA:
         seq: DNA = DNA.read(path, "fasta")
         seq.metadata["id"] = (
             f"{prefix}{seq.metadata['id']} {seq.metadata['description']}"
         )
+        if metadata:
+            seq.metadata.update(metadata)
         return seq
-    return DNA(val, metadata={"id": name})
+
+    if (path := Path(val)).exists() and val != "":
+        if path.is_file():
+            return [read_one(p) for p in path.iterdir()]
+    if val:
+        return [DNA(val, metadata={"id": name})]
+    return []
 
 
 def get_chain_name_from_call(call: str) -> CHAIN_NAME:
@@ -199,11 +209,11 @@ def get_imgt_seqs(
     return seqs
 
 
-def infer_air_endpoint(
+def air_endpoint_candidates(
     cdata: ChainData,
     endpoint: Literal["c", "leader"] = "c",
     c_try_match_allele: bool = True,
-) -> DNA:
+) -> list[DNA]:
     """
     Infer sequence of an end segment (leader or C gene) of a TCR from available data
 
@@ -222,7 +232,7 @@ def infer_air_endpoint(
             f"No sequences for {endpoint} could be found in {seq_file}. Try checking its contents"
         )
     if (endpoint == "c" and not c_try_match_allele) or len(candidates) == 1:
-        return candidates[0]
+        return candidates
     try:
         full = cdata["sequence"]
     except KeyError:
@@ -233,8 +243,10 @@ def infer_air_endpoint(
     else:
         seq = full[: cdata["v_sequence_start"]]
         free_ends = [False, True]
-    score, best_seq = get_best_alignment(DNA(seq), candidates, free_ends=free_ends)
-    return best_seq
+    query = DNA(seq)
+    scored = [(pair_align(query, cand).score, cand) for cand in candidates]
+    scored = [s[1] for s in sorted(scored, key=lambda x: x[0], reverse=True)]
+    return scored
 
 
 def get_stitchr_file(chain_name: CHAIN_NAME) -> Path:
@@ -286,39 +298,43 @@ class TCRConstruct:
         self.viz_offset: int = 0
         self.ref_sequences: dict | None = ref_sequences
 
-    def get_leader(self, cdata, chain_name) -> DNA:
-        leader = get_seq_from_cfg(
+    def get_leaders(self, cdata, chain_name) -> list[DNA]:
+        leaders = get_seq_from_cfg(
             self.cfg["sequences"], ("leader", chain_name), "V leader", "V leader"
         )
-        if not leader:
-            leader = infer_air_endpoint(cdata, "leader")
-            leader_allele = leader.metadata["description"].split("|")[1]
-            leader.metadata["id"] = f"V leader: {leader_allele}"
-            logger.info(f"Inferred leader sequence as {leader_allele}")
-        if leader:
-            leader.metadata["region_type"] = "v_leader"
-        return leader
+        if not leaders:
+            leaders = air_endpoint_candidates(cdata, "leader")
+            for l in leaders:
+                leader_allele = l.metadata["description"].split("|")[1]
+                l.metadata["id"] = f"V leader: {leader_allele}"
+        if leaders:
+            for l in leaders:
+                l.metadata["region_type"] = "v_leader"
+        return leaders
 
-    def get_c_gene(self, cdata, chain_name, allow_stop: bool = False) -> DNA:
-        c_gene: DNA = get_seq_from_cfg(
+    def get_c_genes(self, cdata, chain_name, allow_stop: bool = False) -> list[DNA]:
+        tmp: list[DNA] = get_seq_from_cfg(
             self.cfg.get("sequences", {}),
             ("c_gene", chain_name),
             "C gene",
             prefix="C gene: ",
             default="",
         )
-        if not c_gene:
-            c_gene = infer_air_endpoint(cdata, "c")
-            c_allele = c_gene.metadata["description"].split("|")[1]
-            c_gene.metadata["id"] = f"C gene: {c_allele}"
-            logger.info(f"Inferred C gene as {c_allele}")
-        if c_gene:
-            c_gene.metadata["id"] = "C gene"
-            c_gene.metadata["region_type"] = "c_gene"
-            last_codon = str(c_gene)[-3:]
-            if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
-                c_gene = c_gene[:-3]
-        return c_gene
+        if not tmp:
+            tmp = air_endpoint_candidates(cdata, "c")
+            for c in tmp:
+                c_allele = c.metadata["description"].split("|")[1]
+                c.metadata["id"] = f"C gene: {c_allele}"
+        c_genes = []
+        if tmp:
+            for c in tmp:
+                c.metadata["id"] = "C gene"
+                c.metadata["region_type"] = "c_gene"
+                last_codon = str(c)[-3:]
+                if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
+                    c = c[:-3]
+                c_genes.append(c)
+        return c_genes
 
     def add_genes_to_viz(
         self,
@@ -358,9 +374,10 @@ class TCRConstruct:
         gene_offset -= cdata.get("v_sequence_start", 0)
         chain_name: CHAIN_NAME = get_chain_name_from_call(cdata["j_call"])
         if self.with_leader:
-            leader = self.get_leader(cdata, chain_name)
-            leader.metadata["interval"] = (acc, acc + len(leader))
-            self.add_seq_check_inframe_stop(leader, chain_index=chain_index)
+            leaders = self.get_leaders(cdata, chain_name)
+            for l in leaders:
+                l.metadata["interval"] = (acc, acc + len(l))
+            leader = self.add_seq_check_inframe_stop(leaders, chain_index=chain_index)
             self.viz_data.append(leader)
             acc += len(leader)
             gene_offset += len(leader)
@@ -370,7 +387,7 @@ class TCRConstruct:
             )
             region_seq.metadata["interval"] = (acc, acc + len(region_seq))
             acc += len(region_seq)
-            self.add_seq_check_inframe_stop(region_seq, chain_index)
+            self.add_seq_check_inframe_stop([region_seq], chain_index)
             self.viz_data.append(region_seq)
         full = cdata.get("sequence")
         genes: list = ["v", "j"]
@@ -381,12 +398,13 @@ class TCRConstruct:
                 full, genes, cdata, gene_offset, chain_name=chain_name
             )
         if self.cfg.get("include_c", True):
-            c_gene = self.get_c_gene(cdata, chain_name, allow_stop=allow_stop)
-            c_gene.metadata["interval"] = (acc, acc + len(c_gene))
-            acc += len(c_gene)
-            self.add_seq_check_inframe_stop(
-                c_gene, chain_index, allow_terminal=allow_stop
+            c_genes = self.get_c_genes(cdata, chain_name, allow_stop=allow_stop)
+            for c in c_genes:
+                c.metadata["interval"] = (acc, acc + len(c))
+            c_gene = self.add_seq_check_inframe_stop(
+                c_genes, chain_index, allow_terminal=allow_stop
             )
+            acc += len(c_gene)
             self.viz_data.append(c_gene)
         return acc
 
@@ -396,16 +414,17 @@ class TCRConstruct:
         acc: int,
     ) -> int:
         name = "5' flank" if flank == "five_prime" else "3' flank"
-        flank_seq = get_seq_from_cfg(
+        seqs = get_seq_from_cfg(
             self.cfg.get("sequences", {}), ("flanking", flank), name, default=""
         )
-        if flank_seq:
-            flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
-            flank_seq.metadata["region_type"] = flank
-            flank_seq.metadata["id"] = name
-            self.to_assemble.append(flank_seq)
-            self.viz_data.append(flank_seq)
-            acc += len(flank_seq)
+        if seqs:
+            for flank_seq in seqs:
+                flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
+                flank_seq.metadata["region_type"] = flank
+                flank_seq.metadata["id"] = name
+            added = self.add_seq_check_inframe_stop(seqs, 0)
+            self.viz_data.append(added)
+            acc += len(added)
         return acc
 
     @beartype
@@ -440,27 +459,42 @@ class TCRConstruct:
         self.vreport.gene_validation[gene] = result
 
     def add_seq_check_inframe_stop(
-        self,
-        seq: DNA,
-        chain_index: int,
-        allow_terminal: bool = False,
-    ):
+        self, seqs: list[DNA], chain_index: int, allow_terminal: bool = False
+    ) -> DNA:
         """
         Append construct sequence `seq` to the internal list, and check if adding it would
         introduce stop codons
         """
-        self.to_assemble.append(seq)
+        tracker: dict[int, bool] = {}
+        stop_indices: dict[int, np.ndarray] = {}
+
+        def has_ifs(seq: DNA, idx: int) -> bool:
+            block = DNA.concat(self.to_assemble + [seq])
+            stops: np.ndarray = block.translate().stops()
+            n_stops = stops.sum().item()
+            has_terminal = stops[-1] and allow_terminal
+            res = n_stops > 1 if (allow_terminal and has_terminal) else n_stops > 0
+            tracker[idx] = res
+            stop_indices[idx] = stops
+            return res
+
         block: DNA = DNA.concat(self.to_assemble)
-        stops: np.ndarray = block.translate().stops()
-        n_stops = stops.sum().item()
-        has_terminal = stops[-1] and allow_terminal
-        has_inframe_stops = (
-            n_stops > 1 if (allow_terminal and has_terminal) else n_stops > 0
-        )
+        chosen_idx = 0
+        for i, seq in enumerate(seqs):
+            if not has_ifs(seq, i) or i == len(seqs) - 1:
+                chosen_idx = i
+                break
+            logger.warning(
+                f"Adding sequence {seq.metadata['id']} introduces stop. Trying another..."
+            )
+        has_inframe_stops = tracker[chosen_idx]
+        self.to_assemble.append(seqs[chosen_idx])
         self.vreport.check_no_inframe_stop = not has_inframe_stops
         if has_inframe_stops:
+            seq.metadata["chain_index"] = chain_index
             self.vreport.inframe_stop_origins.append(seq.metadata)
-            self.vreport.inframe_stop_origins.extend(np.where(stops)[0].tolist())
+            self.vreport.inframe_stop_origins.extend(stop_indices[chosen_idx].tolist())
+        return seqs[chosen_idx]
 
     def _check_start_stop(self):
         """Check whether the start of the TCR block contains start and stop codons"""
@@ -479,14 +513,15 @@ class TCRConstruct:
             acc = self.add_chain_regions(
                 cdata, acc, gene_offset, allow_stop=is_final_chain, chain_index=i
             )
-            linker = get_seq_from_cfg(
+            linkers = get_seq_from_cfg(
                 seq_cfg, "linker", "linker", prefix="linker: ", default=""
             )
-            if linker and not is_final_chain:
-                linker.metadata["interval"] = (acc, acc + len(linker))
-                linker.metadata["region_type"] = "linker"
-                linker.metadata["id"] = "linker"
-                self.add_seq_check_inframe_stop(linker, chain_index=i)
+            if linkers and not is_final_chain:
+                for l in linkers:
+                    l.metadata["interval"] = (acc, acc + len(l))
+                    l.metadata["region_type"] = "linker"
+                    l.metadata["id"] = "linker"
+                linker = self.add_seq_check_inframe_stop(linkers, chain_index=i)
                 self.viz_data.append(linker)
                 acc += len(linker)
             gene_offset = acc
