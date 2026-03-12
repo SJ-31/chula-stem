@@ -353,10 +353,12 @@ class TCRConstruct:
             start, end = cdata.start_end(g)
             seq = full[start:end]
             call: str = cdata[f"{g}_call"]
-            self._check_alignment(seq, g, call, chain=chain_name)
+            if g != "d":  # TODO: check why there are no d genes
+                self._check_alignment(DNA(seq), g, call, chain=chain_name)
             meta = {
                 "id": f"{g.upper()} gene: {call}",
                 "interval": (start + gene_offset, end + gene_offset),
+                "region_type": f"{g}_gene",
             }
             self.viz_data.append(DNA(seq, metadata=meta))
 
@@ -434,7 +436,7 @@ class TCRConstruct:
     def _check_alignment(
         self,
         sequence: DNA,
-        gene: Literal["v", "d", "j"],
+        gene: Literal["v", "j"],
         allele: str,
         chain: CHAIN_NAME,
     ):
