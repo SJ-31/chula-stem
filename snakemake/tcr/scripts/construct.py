@@ -2,7 +2,7 @@
 import re
 import subprocess as sp
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -640,10 +640,14 @@ def assemble_constructs():
         with open(outdir / f"{prefix}.fasta", "w") as f:
             f.write("\n".join(to_fasta))
         with open(outdir / f"{prefix}.yaml", "w") as f:
-            yaml.safe_dump(result["validation"], f)
+            yaml.safe_dump(asdict(result["validation"]), f)
         ax, _ = result["plot"].plot(figure_width=rconfig.get("figure_width", 4))
         ax.figure.savefig(
             outdir / f"{prefix}.png",
             dpi=rconfig.get("dpi", 500),
             bbox_inches="tight",
         )
+
+
+if __name__ == "__main__":
+    assemble_constructs()
