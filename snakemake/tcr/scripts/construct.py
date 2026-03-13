@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import subprocess as sp
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -20,6 +21,7 @@ from Bio.SeqRecord import SeqRecord
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from loguru import logger
 from pymsaviz import MsaViz
+from skbio import Protein
 from skbio.alignment import pair_align
 from skbio.alignment._pair import PairAlignResult
 from skbio.metadata import IntervalMetadata
@@ -331,8 +333,11 @@ class TCRConstruct:
                 elif dir_or_file.exists():
                     self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
         self.outdir: str | None = self.cfg.get("outdir")
+        self.ref_matches: dict[str, dict[str, Protein]] = defaultdict(dict)
+        # Mapping of chain->{gene->best_ref_match}
         self.prefix = out_prefix
         self.cur_chain: CHAIN_TYPES
+        self.fivep_flank_len: int = 0
 
     def _get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -460,6 +465,8 @@ class TCRConstruct:
                 flank_seq.metadata["region_type"] = flank
                 flank_seq.metadata["id"] = name
             added = self._add_seq_check_inframe_stop(seqs, 0)
+            if flank == "five_prime":
+                self.fivep_flank_len = len(added)
             self.viz_data.append(added)
             acc += len(added)
         return acc
@@ -527,10 +534,59 @@ class TCRConstruct:
             "query_length": len(seq_aa),
             "alignment": aa_aligned.paths[0].to_aligned((seq_aa, match_aa)),
         }
+        self.ref_matches[self.cur_chain][gene] = match_aa
         if self.cur_chain not in self.vreport.gene_validation:
             self.vreport.gene_validation[self.cur_chain] = {}
             # BUG: pyyaml doesn't work with defaultdict
         self.vreport.gene_validation[self.cur_chain][gene] = result
+
+    def _align_tcr_block_aa(self):
+        """
+        Align reference genes with the TCR block as AA for validation
+        """
+        # BUG: you need to split the translated block into subsequences for each gene,
+        # and align separately
+        block = self.tcr_block.translate()
+        build_msa = [SeqRecord(str(block), id="TCR Block")]
+        chain_intervals: dict[str, tuple[int, int]] = {}
+        start_acc, stop_acc = 0, 0
+        prev_chain = None
+        block_seqs = [
+            s
+            for s in self.to_assemble
+            if s.metadata["region_type"] not in {"five_prime", "three_prime"}
+        ]
+        for i, seq in enumerate(block_seqs):
+            chain = seq.metadata["chain"]
+            if prev_chain is None:
+                prev_chain = chain
+            translated = seq.translate()
+            stop_acc += len(translated)
+            if chain != prev_chain:
+                chain_intervals[prev_chain] = (start_acc, stop_acc)
+                start_acc += stop_acc
+                prev_chain = chain
+            elif i == len(block_seqs) - 1:
+                chain_intervals[chain] = (start_acc, stop_acc)
+        for chain, chain_dict in self.ref_matches.items():
+            interval = chain_intervals[chain]
+            acc_interval: int = 0
+            for gene, seq_aa in chain_dict.items():
+                left_offset = acc_interval + interval[0]
+                res = pair_align(
+                    seq_aa,
+                    block[left_offset : interval[1]],
+                    free_ends=(True, False),
+                    gap_cost=np.inf,
+                )
+                alignment = res.paths[0].to_aligned((seq_aa, block))
+                query_name = f"{chain} {gene.upper()} gene ({seq_aa.metadata['id']}) "
+                rpad = "-" * (len(block) - interval[1])
+                lpad = "-" * left_offset
+                to_add = f"{lpad}{alignment[0]}{rpad}"
+                build_msa.append(SeqRecord(to_add, id=query_name))
+                acc_interval += len(seq_aa)
+        return MultipleSeqAlignment(build_msa)
 
     def _plot_alignment_validation(self):
         out: pymupdf.Document = pymupdf.open()
@@ -553,6 +609,12 @@ class TCRConstruct:
                         fig.axes[0].set_title(title, loc="left")
                         fig.savefig(fname=f"{d}/{key}.pdf")
                         out.insert_file(f"{d}/{key}.pdf")
+            block_msa = self._align_tcr_block_aa()
+            mv = MsaViz(block_msa, wrap_length=100, color_scheme="Blossom")
+            fig = mv.plotfig()
+            fig.axes[0].set_title("Reference alignment with translated TCR block")
+            fig.savefig(fname=f"{d}/reference.pdf")
+            out.insert_file(f"{d}/reference.pdf")
         out.save(f"{self.outdir}/{self.prefix}gene_validation.pdf")
 
     def _add_seq_check_inframe_stop(
@@ -604,6 +666,8 @@ class TCRConstruct:
         chosen: DNA = seqs[chosen_idx]
         has_inframe_stops = tracker[chosen_idx]
         self.to_assemble.append(chosen)
+        if hasattr(self, "cur_chain"):
+            chosen.metadata["chain"] = self.cur_chain
         if self.vreport.check_no_inframe_stop and has_inframe_stops:
             self.vreport.check_no_inframe_stop = False
         if has_inframe_stops:
