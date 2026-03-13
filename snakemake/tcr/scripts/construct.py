@@ -158,7 +158,7 @@ def get_seq_from_cfg(
     val = val or default
 
     def read_one(f: Path) -> DNA:
-        seq: DNA = DNA.read(path, "fasta")
+        seq: DNA = DNA.read(f, "fasta")
         seq.metadata["id"] = (
             f"{prefix}{seq.metadata['id']} {seq.metadata['description']}"
         )
@@ -166,12 +166,19 @@ def get_seq_from_cfg(
             seq.metadata.update(metadata)
         return seq
 
-    if (path := Path(val)).exists() and val != "":
-        if path.is_file():
-            return [read_one(p) for p in path.iterdir()]
-    if val:
-        return [DNA(val, metadata={"id": name})]
-    return []
+    sequences = []
+    if isinstance(val, str):
+        val = [val]
+    for v in val:
+        if (path := Path(v)).exists() and v:
+            if path.is_file():
+                sequences.append(read_one(path))
+                continue
+            elif path.is_dir():
+                sequences.extend([read_one(p) for p in path.iterdir()])
+        elif v:
+            sequences.append(DNA(val, metadata={"id": name}))
+    return sequences
 
 
 def get_chain_name_from_call(call: str) -> CHAIN_NAME:
@@ -206,7 +213,7 @@ def get_imgt_seqs(
             seqs.append(
                 DNA(
                     seq,  # "id" is the allele name
-                    metadata={"id": desc[0], "description": "|".join(desc)},
+                    metadata={"id": desc[1], "description": "|".join(desc)},
                 )
             )
     return seqs
@@ -226,6 +233,11 @@ def air_endpoint_candidates(
         When inferring the C gene, if the c call is generic and does not match an allele,
         then return the first allele unless this is false.
         Otherwise, the sequence of the allele with the highest alignment score is returned
+
+    Notes
+    -----
+    - For the C gene, this uses alignment between remaining sequence downstream of the J
+    - For the V leader, uses alignment upstream of the V sequence
     """
     chain_name: CHAIN_NAME = cdata.chain_name
     seq_file = get_stitchr_file(chain_name)
