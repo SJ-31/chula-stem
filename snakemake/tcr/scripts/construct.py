@@ -116,7 +116,7 @@ def plot_construct(
     sequence: str,
     features: list[DNA],
     cfg: dict,
-    ignored: Sequence = ("cdr1", "cdr2", "fwr1", "fwr2", "fwr3", "fwr4"),
+    ignored: Sequence = ("CDR1", "CDR2", "FWR1", "FWR2", "FWR3", "FWR4"),
 ):
     graphic_features = []
     colormap: dict[REGION_TYPES, str] = {
@@ -300,6 +300,8 @@ class TCRConstruct:
         self.vreport: ConstructValidation = ConstructValidation()
         self.viz_offset: int = 0
         self.ref_sequences: dict | None = ref_sequences
+        self.allowed_stop_indices: set[int] = set()  # Keep track of positions where
+        # stop codons are allowed
 
     def get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -454,36 +456,45 @@ class TCRConstruct:
             aligned = pair_align(sequence, match)
         else:
             aligned, match = get_best_alignment(
-                sequence, cur.values(), free_ends=True, return_alignment=True
+                sequence, list(cur.values()), free_ends=True, return_alignment=True
             )
         assert isinstance(aligned, PairAlignResult)
         result["score"] = aligned.score
         result["query_length"] = len(sequence)
         result["matching_seq"] = match.metadata
-        result["alignment"] = aligned.paths[0].to_aligned(sequence, match)
+        result["alignment"] = aligned.paths[0].to_aligned((sequence, match))
         self.vreport.gene_validation[gene] = result
 
     def add_seq_check_inframe_stop(
-        self, seqs: list[DNA], chain_index: int, allow_terminal: bool = False
+        self,
+        seqs: list[DNA],
+        chain_index: int,
+        allow_terminal: bool = False,
     ) -> DNA:
         """
         Append construct sequence `seq` to the internal list, and check if adding it would
         introduce stop codons
         """
         tracker: dict[int, bool] = {}
-        stop_indices: dict[int, np.ndarray] = {}
+        stop_indices: dict[int, list] = {}
 
         def has_ifs(seq: DNA, idx: int) -> bool:
-            block = DNA.concat(self.to_assemble + [seq])
+            block = DNA.concat([self.tcr_block] + [seq])
             stops: np.ndarray = block.translate().stops()
-            n_stops = stops.sum().item()
-            has_terminal = stops[-1] and allow_terminal
-            res = n_stops > 1 if (allow_terminal and has_terminal) else n_stops > 0
+            has_terminal = stops[-1]
+            indices = [
+                i for i in np.where(stops)[0] if i not in self.allowed_stop_indices
+            ]
+            stop_indices[idx] = indices
+            if allow_terminal and has_terminal:
+                res = len(indices) > 1
+                self.allowed_stop_indices.add(indices[-1])
+                logger.debug(indices)
+            else:
+                res = len(indices) > 0
             tracker[idx] = res
-            stop_indices[idx] = stops
             return res
 
-        block: DNA = DNA.concat(self.to_assemble)
         chosen_idx = 0
         for i, seq in enumerate(seqs):
             if not has_ifs(seq, i) or i == len(seqs) - 1:
@@ -492,18 +503,29 @@ class TCRConstruct:
             logger.warning(
                 f"Adding sequence {seq.metadata['id']} introduces stop. Trying another..."
             )
+        chosen: DNA = seqs[chosen_idx]
         has_inframe_stops = tracker[chosen_idx]
-        self.to_assemble.append(seqs[chosen_idx])
+        self.to_assemble.append(chosen)
         self.vreport.check_no_inframe_stop = not has_inframe_stops
         if has_inframe_stops:
-            seq.metadata["chain_index"] = chain_index
-            self.vreport.inframe_stop_origins.append(seq.metadata)
-            self.vreport.inframe_stop_origins.extend(stop_indices[chosen_idx].tolist())
-        return seqs[chosen_idx]
+            chosen.metadata["chain_index"] = chain_index
+            self.vreport.inframe_stop_origins.append(chosen.metadata)
+            self.vreport.inframe_stop_origins.append(stop_indices[chosen_idx])
+        return chosen
+
+    @property
+    def tcr_block(self) -> DNA:
+        return DNA.concat(
+            [
+                s
+                for s in self.to_assemble
+                if s.metadata["region_type"] not in {"five_prime", "three_prime"}
+            ]
+        )
 
     def _check_start_stop(self):
         """Check whether the start of the TCR block contains start and stop codons"""
-        tcr_block: DNA = DNA.concat(self.to_assemble)
+        tcr_block: DNA = self.tcr_block
         stops: np.ndarray = tcr_block.translate().stops()
         self.vreport.check_has_terminal_stop = stops[-1].item()
         self.vreport.check_has_start = str(tcr_block[:3]) == "ATG"
@@ -531,9 +553,9 @@ class TCRConstruct:
                 acc += len(linker)
             gene_offset = acc
         _ = self.add_flanking("three_prime", acc)
-        self._check_start_stop()
         full_construct = "".join([str(seq) for seq in self.to_assemble])
         with_names = {}
+        self._check_start_stop()
         for i, seq in enumerate(self.to_assemble):
             name = seq.metadata.get("id")
             seq.interval_metadata = IntervalMetadata(len(seq))
@@ -635,7 +657,6 @@ def assemble_constructs():
         rconfig,
         extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"],
     )
-    # TODO: support providing multiple C gene candidates in the config
     for row in df.iter_rows(named=True):
         prefix = f"cid{row["clone_id"]}_{row["Sample_Name"]}"
         cons = TCRConstruct(airr_data=row, chains=["VJ_1", "VDJ_1"], cfg=rconfig)
