@@ -254,12 +254,15 @@ def air_endpoint_candidates(
         raise ValueError("Cannot infer endpoint without the full TCR sequence")
     if endpoint == "c":
         seq = full[cdata["j_sequence_end"] :]
-        free_ends = [True, False]
+        free_ends = (True, False)
     else:
         seq = full[: cdata["v_sequence_start"]]
-        free_ends = [False, True]
+        free_ends = (False, True)
     query = DNA(seq)
-    scored = [(pair_align(query, cand).score, cand) for cand in candidates]
+    scored = [
+        (pair_align(query, cand, free_ends=free_ends).score, cand)
+        for cand in candidates
+    ]
     scored = [s[1] for s in sorted(scored, key=lambda x: x[0], reverse=True)]
     return scored
 
@@ -323,7 +326,7 @@ class TCRConstruct:
                 elif dir_or_file.exists():
                     self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
 
-    def get_leaders(self, cdata, chain_name) -> list[DNA]:
+    def _get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
             self.cfg["sequences"], ("leader", chain_name), "V leader", "V leader"
         )
@@ -337,7 +340,7 @@ class TCRConstruct:
                 l.metadata["region_type"] = "v_leader"
         return leaders
 
-    def get_c_genes(self, cdata, chain_name, allow_stop: bool = False) -> list[DNA]:
+    def _get_c_genes(self, cdata, chain_name, allow_stop: bool = False) -> list[DNA]:
         tmp: list[DNA] = get_seq_from_cfg(
             self.cfg.get("sequences", {}),
             ("c_gene", chain_name),
@@ -360,7 +363,7 @@ class TCRConstruct:
                 c_genes.append(c)
         return c_genes
 
-    def add_genes_to_viz(
+    def _add_genes_to_viz(
         self,
         full,
         genes: list[Literal["v", "j", "d"]],
@@ -383,7 +386,7 @@ class TCRConstruct:
             }
             self.viz_data.append(DNA(seq, metadata=meta))
 
-    def add_chain_regions(
+    def _add_chain_regions(
         self, cdata: ChainData, acc, gene_offset, allow_stop: bool, chain_index: int
     ) -> int:
         """Combine sequences from ChainData object `cdata` into a construct
@@ -400,10 +403,10 @@ class TCRConstruct:
         gene_offset -= cdata.get("v_sequence_start", 0)
         chain_name: CHAIN_NAME = get_chain_name_from_call(cdata["j_call"])
         if self.with_leader:
-            leaders = self.get_leaders(cdata, chain_name)
+            leaders = self._get_leaders(cdata, chain_name)
             for l in leaders:
                 l.metadata["interval"] = (acc, acc + len(l))
-            leader = self.add_seq_check_inframe_stop(leaders, chain_index=chain_index)
+            leader = self._add_seq_check_inframe_stop(leaders, chain_index=chain_index)
             self.viz_data.append(leader)
             acc += len(leader)
             gene_offset += len(leader)
@@ -413,28 +416,28 @@ class TCRConstruct:
             )
             region_seq.metadata["interval"] = (acc, acc + len(region_seq))
             acc += len(region_seq)
-            self.add_seq_check_inframe_stop([region_seq], chain_index)
+            self._add_seq_check_inframe_stop([region_seq], chain_index)
             self.viz_data.append(region_seq)
         full = cdata.get("sequence")
         genes: list = ["v", "j"]
         if cdata.chain.startswith("VDJ"):
             genes.insert(1, "d")
         if full:
-            self.add_genes_to_viz(
+            self._add_genes_to_viz(
                 full, genes, cdata, gene_offset, chain_name=chain_name
             )
         if self.cfg.get("include_c", True):
-            c_genes = self.get_c_genes(cdata, chain_name, allow_stop=allow_stop)
+            c_genes = self._get_c_genes(cdata, chain_name, allow_stop=allow_stop)
             for c in c_genes:
                 c.metadata["interval"] = (acc, acc + len(c))
-            c_gene = self.add_seq_check_inframe_stop(
+            c_gene = self._add_seq_check_inframe_stop(
                 c_genes, chain_index, allow_terminal=allow_stop
             )
             acc += len(c_gene)
             self.viz_data.append(c_gene)
         return acc
 
-    def add_flanking(
+    def _add_flanking(
         self,
         flank: Literal["five_prime", "three_prime"],
         acc: int,
@@ -448,7 +451,7 @@ class TCRConstruct:
                 flank_seq.metadata["interval"] = (acc, acc + len(flank_seq))
                 flank_seq.metadata["region_type"] = flank
                 flank_seq.metadata["id"] = name
-            added = self.add_seq_check_inframe_stop(seqs, 0)
+            added = self._add_seq_check_inframe_stop(seqs, 0)
             self.viz_data.append(added)
             acc += len(added)
         return acc
@@ -471,7 +474,7 @@ class TCRConstruct:
             match can be found from those sources, the best match will be returned
             from the IMGT sequences in stitchr for the given chain and gene
 
-        TODO: do the translated alignment and create plots
+        TODO: create plots
         """
         if not self.check_with_reference:
             return
@@ -520,7 +523,9 @@ class TCRConstruct:
         }
         self.vreport.gene_validation[gene] = result
 
-    def add_seq_check_inframe_stop(
+    # def _plot_alignment_validation(self, vresult: dict):
+
+    def _add_seq_check_inframe_stop(
         self,
         seqs: list[DNA],
         chain_index: int,
@@ -604,13 +609,14 @@ class TCRConstruct:
         self.vreport.check_has_start = str(tcr_block[:3]) == "ATG"
 
     def assemble(self) -> dict:
+        "Assemble construct from init data. The only function you need to call"
         acc = 0
         seq_cfg: dict = self.cfg.get("sequences", {})
-        gene_offset = acc = self.add_flanking("five_prime", acc)
+        gene_offset = acc = self._add_flanking("five_prime", acc)
         for i, chain in enumerate(self.chains):
             is_final_chain = i == len(self.chains) - 1
             cdata = ChainData(chain, self.airr_data)
-            acc = self.add_chain_regions(
+            acc = self._add_chain_regions(
                 cdata, acc, gene_offset, allow_stop=is_final_chain, chain_index=i
             )
             linkers = get_seq_from_cfg(
@@ -621,11 +627,11 @@ class TCRConstruct:
                     l.metadata["interval"] = (acc, acc + len(l))
                     l.metadata["region_type"] = "linker"
                     l.metadata["id"] = "linker"
-                linker = self.add_seq_check_inframe_stop(linkers, chain_index=i)
+                linker = self._add_seq_check_inframe_stop(linkers, chain_index=i)
                 self.viz_data.append(linker)
                 acc += len(linker)
             gene_offset = acc
-        _ = self.add_flanking("three_prime", acc)
+        _ = self._add_flanking("three_prime", acc)
         full_construct = "".join([str(seq) for seq in self.to_assemble])
         with_names = {}
         self._check_start_stop()
@@ -650,6 +656,11 @@ def get_cdr3_indices(
     chain: str = "VJ_1",
     verify: bool = True,
 ) -> pl.DataFrame:
+    """
+    Obtain CDR3 indices from airr data. Requires that the start of the V sequence is
+    present (which is the equivalent to the start of fwr1).
+    From that
+    """
     pre_cdr3 = [
         "fwr1",
         "cdr1",
@@ -686,6 +697,9 @@ def get_cdr3_indices(
 
 
 def filter_wanted_clones(airr: ad.AnnData, cfg: dict, extras=()):
+    """Subset airr object to the wanted clones specified in the config
+    and generate necessary columns
+    """
     fields = airr.obsm["airr"].fields
     df = (
         pl.from_pandas(
