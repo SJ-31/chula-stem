@@ -298,10 +298,18 @@ class TCRConstruct:
         self.to_assemble: list[DNA] = []
         self.vreport: ConstructValidation = ConstructValidation()
         self.viz_offset: int = 0
-        self.ref_sequences: dict | None = ref_sequences
-        # self.allowed_stop_indices: set[int] = set()
+        self.ref_sequences: dict[tuple[str, str], dict[str, DNA]] | None = ref_sequences
+        # Dictionary of (chain, gene) -> {allele->DNA}
         self.seen_stop_indices: set[int] = set()
         # Keep track of positions where stop codons were seen already
+        self.ref_sequences_fastas: dict[str, Path] = {}
+        if ref_seq_dirs := self.cfg.get("ref_seq_dirs"):
+            for dir_or_file in (Path(d) for d in ref_seq_dirs):
+                if dir_or_file.exists() and dir_or_file.is_dir():
+                    for f in dir_or_file.iterdir():
+                        self.ref_sequences_fastas[f.stem] = f
+                elif dir_or_file.exists():
+                    self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
 
     def get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -441,27 +449,63 @@ class TCRConstruct:
         allele: str,
         chain: CHAIN_NAME,
     ):
+        """
+        Check the called V or J allele/gene with a reference sequence by alignment
+
+        Notes
+        -----
+        IMGT reference sequences are obtained from stitchr's data directory, or the
+            user-provided reference sequences in the config "ref_seq_dirs". If no
+            match can be found from those sources, the best match will be returned
+            from the IMGT sequences in stitchr for the given chain and gene
+
+        TODO: do the translated alignment and create plots
+        """
         if not self.check_with_reference:
             return
         if not self.ref_sequences:
             self.ref_sequences = {}
-        if gene not in self.ref_sequences:
+        if (chain, gene) not in self.ref_sequences:
             seq_file = get_stitchr_file(chain)
             seqs = get_imgt_seqs(seq_file, region=gene)
-            self.ref_sequences[gene] = {s.metadata["id"]: s for s in seqs}
-        cur: dict[str, DNA] = self.ref_sequences[gene]
+            self.ref_sequences[(chain, gene)] = {s.metadata["id"]: s for s in seqs}
+        cur: dict[str, DNA] = self.ref_sequences[(chain, gene)]
         result = {}
         if match := cur.get(allele):
             aligned = pair_align(sequence, match)
+        elif match_with_ext := self.ref_sequences_fastas.get(allele):
+            tmp = next(SeqIO.parse(match_with_ext, "fasta"))
+            match = DNA(
+                str(tmp.seq),
+                lowercase=True,
+                metadata={"description": tmp.description, "id": tmp.id},
+            )
+            self.ref_sequences[(chain, gene)][allele] = match
+            aligned = pair_align(sequence, match)
         else:
+            logger.warning(
+                f"The sequence {allele} couldn't be found in stitchr's IMGT database. Will return best match"
+            )
             aligned, match = get_best_alignment(
                 sequence, list(cur.values()), free_ends=True, return_alignment=True
             )
         assert isinstance(aligned, PairAlignResult)
-        result["score"] = aligned.score
-        result["query_length"] = len(sequence)
+        seq_aa = sequence.translate()
+        match_aa = match.translate()
+        aa_aligned = pair_align(seq_aa, match_aa)
+        result["call"] = allele
+        result["sequence_in_db"] = allele in cur
         result["matching_seq"] = match.metadata
-        result["alignment"] = aligned.paths[0].to_aligned((sequence, match))
+        result["dna"] = {
+            "score": aligned.score,
+            "query_length": len(sequence),
+            "alignment": aligned.paths[0].to_aligned((sequence, match)),
+        }
+        result["aa"] = {
+            "score": aa_aligned.score,
+            "query_length": len(seq_aa),
+            "alignment": aa_aligned.paths[0].to_aligned((seq_aa, match_aa)),
+        }
         self.vreport.gene_validation[gene] = result
 
     def add_seq_check_inframe_stop(
@@ -488,7 +532,6 @@ class TCRConstruct:
 
         def has_ifs(seq: DNA, idx: int) -> bool:
             block = DNA.concat([self.tcr_block] + [seq])
-            # NOTE: don't do this block = DNA.concat(self.to_assemble + [seq])
             stops: np.ndarray = block.translate().stops()
             has_terminal = stops[-1]
             indices = [
@@ -675,16 +718,19 @@ def assemble_constructs():
         rconfig,
         extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"],
     )
+    reference_db = {}
     for row in df.iter_rows(named=True):
         prefix = f"cid{row["clone_id"]}_{row["Sample_Name"]}"
         cons = TCRConstruct(airr_data=row, chains=["VJ_1", "VDJ_1"], cfg=rconfig)
         result: dict = cons.assemble()
+        if cons.ref_sequences:
+            reference_db.update(cons.ref_sequences)
         to_fasta = [f">{prefix}_full_construct\n{result['sequence']}"]
         to_fasta.extend([f">{k}\n{str(v)}" for k, v in result["named"].items()])
         with open(outdir / f"{prefix}.fasta", "w") as f:
             f.write("\n".join(to_fasta))
         with open(outdir / f"{prefix}.yaml", "w") as f:
-            yaml.safe_dump(asdict(result["validation"]), f)
+            yaml.safe_dump(asdict(result["validation"]), f, sort_keys=False)
         ax, _ = result["plot"].plot(figure_width=rconfig.get("figure_width", 4))
         ax.figure.savefig(
             outdir / f"{prefix}.png",
