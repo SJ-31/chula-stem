@@ -265,10 +265,9 @@ def get_stitchr_file(chain_name: CHAIN_NAME) -> Path:
 @dataclass
 class ConstructValidation:
     check_has_terminal_stop: bool | None = None
-    check_has_start: bool | None = (
-        None  # Either the leader sequence, or the start of the TCR block
-    )
-    check_no_inframe_stop: bool | None = None
+    check_has_start: bool | None = None
+    # Either the leader sequence, or the start of the TCR block
+    check_no_inframe_stop: bool = True
     inframe_stops: list = field(default_factory=list)
     inframe_stop_origins: list = field(default_factory=list)
     gene_validation: dict = field(default_factory=dict)
@@ -300,8 +299,9 @@ class TCRConstruct:
         self.vreport: ConstructValidation = ConstructValidation()
         self.viz_offset: int = 0
         self.ref_sequences: dict | None = ref_sequences
-        self.allowed_stop_indices: set[int] = set()  # Keep track of positions where
-        # stop codons are allowed
+        # self.allowed_stop_indices: set[int] = set()
+        self.seen_stop_indices: set[int] = set()
+        # Keep track of positions where stop codons were seen already
 
     def get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -333,7 +333,6 @@ class TCRConstruct:
         c_genes = []
         if tmp:
             for c in tmp:
-                c.metadata["id"] = "C gene"
                 c.metadata["region_type"] = "c_gene"
                 last_codon = str(c)[-3:]
                 if last_codon in {"TAA", "TAG", "TGA"} and not allow_stop:
@@ -474,22 +473,31 @@ class TCRConstruct:
         """
         Append construct sequence `seq` to the internal list, and check if adding it would
         introduce stop codons
+
+        Notes
+        -----
+        For the purposes of checking whether inframe stops are present, the 5' and 3'
+        sequences are ignored. Only the TCR block is checked, following instruction of [1]
+
+        References
+        ----------
+        [1] Afeyan AB, Wu CJ, Oliveira G. Rapid parallel reconstruction and specificity screening of hundreds of T cell receptors. Nat Protoc. 2025 Mar;20(3):539-586. doi: 10.1038/s41596-024-01061-4. Epub 2024 Nov 8. PMID: 39516267; PMCID: PMC11896752.
         """
         tracker: dict[int, bool] = {}
         stop_indices: dict[int, list] = {}
 
         def has_ifs(seq: DNA, idx: int) -> bool:
             block = DNA.concat([self.tcr_block] + [seq])
+            # NOTE: don't do this block = DNA.concat(self.to_assemble + [seq])
             stops: np.ndarray = block.translate().stops()
             has_terminal = stops[-1]
             indices = [
-                i for i in np.where(stops)[0] if i not in self.allowed_stop_indices
+                i.item() for i in np.where(stops)[0] if i not in self.seen_stop_indices
             ]
+            self.seen_stop_indices |= set(indices)
             stop_indices[idx] = indices
             if allow_terminal and has_terminal:
                 res = len(indices) > 1
-                self.allowed_stop_indices.add(indices[-1])
-                logger.debug(indices)
             else:
                 res = len(indices) > 0
             tracker[idx] = res
@@ -506,11 +514,21 @@ class TCRConstruct:
         chosen: DNA = seqs[chosen_idx]
         has_inframe_stops = tracker[chosen_idx]
         self.to_assemble.append(chosen)
-        self.vreport.check_no_inframe_stop = not has_inframe_stops
+        if self.vreport.check_no_inframe_stop and has_inframe_stops:
+            self.vreport.check_no_inframe_stop = False
         if has_inframe_stops:
-            chosen.metadata["chain_index"] = chain_index
-            self.vreport.inframe_stop_origins.append(chosen.metadata)
-            self.vreport.inframe_stop_origins.append(stop_indices[chosen_idx])
+            offset = np.sum(
+                [
+                    len(s)
+                    for s in self.to_assemble
+                    if s.metadata["region_type"] == "five_prime"
+                ]
+            )
+            indices = stop_indices[chosen_idx]
+            meta = chosen.metadata.copy()
+            meta["chain_number"] = chain_index
+            meta["stop_codon_starts"] = [int(i * 3 + offset) for i in indices]
+            self.vreport.inframe_stop_origins.append(meta)
         return chosen
 
     @property
