@@ -370,4 +370,4 @@ rule assemble_constructs:
         ),
         # BUG: these aren't showing up in the report
     script:
-        "scripts/primers.py"
+        "scripts/construct.py"
