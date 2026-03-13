@@ -289,7 +289,7 @@ class ConstructValidation:
     check_no_inframe_stop: bool = True
     inframe_stops: list = field(default_factory=list)
     inframe_stop_origins: list = field(default_factory=list)
-    gene_validation: dict[str, dict] = field(default_factory=dict)
+    gene_validation: dict[str, dict[str, dict]] = field(default_factory=dict)
     # Sequences that, when added, produce an inframe stop codon
 
 
@@ -332,6 +332,7 @@ class TCRConstruct:
                     self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
         self.outdir: str | None = self.cfg.get("outdir")
         self.prefix = out_prefix
+        self.cur_chain: CHAIN_TYPES
 
     def _get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -480,8 +481,6 @@ class TCRConstruct:
             user-provided reference sequences in the config "ref_seq_dirs". If no
             match can be found from those sources, the best match will be returned
             from the IMGT sequences in stitchr for the given chain and gene
-
-        TODO: create plots
         """
         if not self.check_with_reference:
             return
@@ -528,29 +527,32 @@ class TCRConstruct:
             "query_length": len(seq_aa),
             "alignment": aa_aligned.paths[0].to_aligned((seq_aa, match_aa)),
         }
-        self.vreport.gene_validation[gene] = result
+        if self.cur_chain not in self.vreport.gene_validation:
+            self.vreport.gene_validation[self.cur_chain] = {}
+            # BUG: pyyaml doesn't work with defaultdict
+        self.vreport.gene_validation[self.cur_chain][gene] = result
 
-    def _plot_alignment_validation(self, genes: Sequence[str]):
+    def _plot_alignment_validation(self):
         out: pymupdf.Document = pymupdf.open()
         with TemporaryDirectory() as d:
-            for g in genes:
-                vresult: dict = self.vreport.gene_validation[g]
-                for key in ("dna", "aa"):
-                    a = SeqRecord(
-                        vresult[key]["alignment"][0], id=f"Call: {vresult["call"]}"
-                    )
-                    b = SeqRecord(
-                        vresult[key]["alignment"][1],
-                        id=f"Match: {vresult["matching_seq"]["id"]}",
-                    )
-                    msa = MultipleSeqAlignment([a, b])
-                    colorscheme = "Nucleotide" if key == "dna" else "Sunset"
-                    mv = MsaViz(msa, wrap_length=100, color_scheme=colorscheme)
-                    fig = mv.plotfig()
-                    title = f"{g.upper()} gene {key.upper()}"
-                    fig.axes[0].set_title(title, loc="left")
-                    fig.savefig(fname=f"{d}/{key}.pdf")
-                    out.insert_file(f"{d}/{key}.pdf")
+            for chain, chain_dict in self.vreport.gene_validation.items():
+                for g, vresult in chain_dict.items():
+                    for key in ("dna", "aa"):
+                        a = SeqRecord(
+                            vresult[key]["alignment"][0], id=f"Call: {vresult["call"]}"
+                        )
+                        b = SeqRecord(
+                            vresult[key]["alignment"][1],
+                            id=f"Match: {vresult["matching_seq"]["id"]}",
+                        )
+                        msa = MultipleSeqAlignment([a, b])
+                        colorscheme = "Nucleotide" if key == "dna" else "Sunset"
+                        mv = MsaViz(msa, wrap_length=100, color_scheme=colorscheme)
+                        fig = mv.plotfig()
+                        title = f"{chain} {g.upper()} gene {key.upper()}"
+                        fig.axes[0].set_title(title, loc="left")
+                        fig.savefig(fname=f"{d}/{key}.pdf")
+                        out.insert_file(f"{d}/{key}.pdf")
         out.save(f"{self.outdir}/{self.prefix}gene_validation.pdf")
 
     def _add_seq_check_inframe_stop(
@@ -642,6 +644,7 @@ class TCRConstruct:
         seq_cfg: dict = self.cfg.get("sequences", {})
         gene_offset = acc = self._add_flanking("five_prime", acc)
         for i, chain in enumerate(self.chains):
+            self.cur_chain = chain
             is_final_chain = i == len(self.chains) - 1
             cdata = ChainData(chain, self.airr_data)
             acc = self._add_chain_regions(
@@ -668,7 +671,7 @@ class TCRConstruct:
             seq.interval_metadata = IntervalMetadata(len(seq))
             seq.interval_metadata.add(bounds=[(0, len(seq))], metadata={"name": name})
             with_names[f"{i}_{name}"] = seq
-        self._plot_alignment_validation(self.vreport.gene_validation.keys())
+        self._plot_alignment_validation()
         return {
             "sequence": full_construct,
             "plot": plot_construct(full_construct, self.viz_data, self.cfg),
