@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
-import re
 import subprocess as sp
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Literal, TypeAlias
 
 import anndata as ad
 import numpy as np
 import polars as pl
 import polars.selectors as cs
+import pymupdf
 import scirpy as ir
 import yaml
 from beartype import beartype
 from Bio import SeqIO
+from Bio.Align import MultipleSeqAlignment
+from Bio.SeqRecord import SeqRecord
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from loguru import logger
+from pymsaviz import MsaViz
 from skbio.alignment import pair_align
 from skbio.alignment._pair import PairAlignResult
 from skbio.metadata import IntervalMetadata
@@ -285,7 +289,7 @@ class ConstructValidation:
     check_no_inframe_stop: bool = True
     inframe_stops: list = field(default_factory=list)
     inframe_stop_origins: list = field(default_factory=list)
-    gene_validation: dict = field(default_factory=dict)
+    gene_validation: dict[str, dict] = field(default_factory=dict)
     # Sequences that, when added, produce an inframe stop codon
 
 
@@ -303,6 +307,7 @@ class TCRConstruct:
         chains: list[CHAIN_TYPES],
         cfg: dict,
         ref_sequences: dict | None = None,
+        out_prefix: str = "",
     ) -> None:
         self.cfg: dict = cfg
         self.chains: list[CHAIN_TYPES] = chains
@@ -325,6 +330,8 @@ class TCRConstruct:
                         self.ref_sequences_fastas[f.stem] = f
                 elif dir_or_file.exists():
                     self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
+        self.outdir: str | None = self.cfg.get("outdir")
+        self.prefix = out_prefix
 
     def _get_leaders(self, cdata, chain_name) -> list[DNA]:
         leaders = get_seq_from_cfg(
@@ -523,7 +530,28 @@ class TCRConstruct:
         }
         self.vreport.gene_validation[gene] = result
 
-    # def _plot_alignment_validation(self, vresult: dict):
+    def _plot_alignment_validation(self, genes: Sequence[str]):
+        out: pymupdf.Document = pymupdf.open()
+        with TemporaryDirectory() as d:
+            for g in genes:
+                vresult: dict = self.vreport.gene_validation[g]
+                for key in ("dna", "aa"):
+                    a = SeqRecord(
+                        vresult[key]["alignment"][0], id=f"Call: {vresult["call"]}"
+                    )
+                    b = SeqRecord(
+                        vresult[key]["alignment"][1],
+                        id=f"Match: {vresult["matching_seq"]["id"]}",
+                    )
+                    msa = MultipleSeqAlignment([a, b])
+                    colorscheme = "Nucleotide" if key == "dna" else "Sunset"
+                    mv = MsaViz(msa, wrap_length=100, color_scheme=colorscheme)
+                    fig = mv.plotfig()
+                    title = f"{g.upper()} gene {key.upper()}"
+                    fig.axes[0].set_title(title, loc="left")
+                    fig.savefig(fname=f"{d}/{key}.pdf")
+                    out.insert_file(f"{d}/{key}.pdf")
+        out.save(f"{self.outdir}/{self.prefix}gene_validation.pdf")
 
     def _add_seq_check_inframe_stop(
         self,
@@ -640,6 +668,7 @@ class TCRConstruct:
             seq.interval_metadata = IntervalMetadata(len(seq))
             seq.interval_metadata.add(bounds=[(0, len(seq))], metadata={"name": name})
             with_names[f"{i}_{name}"] = seq
+        self._plot_alignment_validation(self.vreport.gene_validation.keys())
         return {
             "sequence": full_construct,
             "plot": plot_construct(full_construct, self.viz_data, self.cfg),
@@ -745,9 +774,15 @@ def assemble_constructs():
         extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"],
     )
     reference_db = {}
+    rconfig["outdir"] = outdir
     for row in df.iter_rows(named=True):
         prefix = f"cid{row["clone_id"]}_{row["Sample_Name"]}"
-        cons = TCRConstruct(airr_data=row, chains=["VJ_1", "VDJ_1"], cfg=rconfig)
+        cons = TCRConstruct(
+            airr_data=row,
+            chains=["VJ_1", "VDJ_1"],
+            cfg=rconfig,
+            out_prefix=f"{prefix}_",
+        )
         result: dict = cons.assemble()
         if cons.ref_sequences:
             reference_db.update(cons.ref_sequences)
