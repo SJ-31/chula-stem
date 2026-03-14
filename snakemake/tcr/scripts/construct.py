@@ -310,6 +310,7 @@ class TCRConstruct:
         cfg: dict,
         ref_sequences: dict | None = None,
         out_prefix: str = "",
+        outdir: str | None = None,
     ) -> None:
         self.cfg: dict = cfg
         self.chains: list[CHAIN_TYPES] = chains

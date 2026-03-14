@@ -1,6 +1,9 @@
 library(tidygraph)
+library(igraph)
 library(tidyverse)
+library(checkmate)
 library(ggraph)
+library(pointblank)
 library(here)
 
 tb <- read_tsv(
@@ -42,46 +45,137 @@ breakpoints <- tb |>
   filter(SVTYPE == "BND") |>
   select(chr, pos, Ref, Alt)
 
-n_bins <- 15
 
-nodes <- enframe(CHR_LENGTHS, name = "chr", value = "length") |>
-  mutate(
-    segments = lapply(length, \(l) seq(0, l, length.out = n_bins)),
-    seq_id = lapply(length, \(.) seq(n_bins))
+#' Generate a chromosome graph to plot breakpoints
+#'
+#' @description
+#' @param n_bins Number of nodes displayed for each chromosome. Incompatible with
+#' `interval_length` parameter
+make_chr_graph <- function(
+  tb,
+  chr_col = "chr",
+  alt_col = "Alt",
+  n_bins = 15
+) {
+  assert_data_frame(tb, min.rows = 1)
+  expect_col_vals_regex(tb, alt_col, regex = "[\\[\\]]")
+  expect_col_vals_regex(tb, alt_col, regex = ":")
+
+  tb <- rename(tb, chr = chr_col, alt = alt_col) |>
+    distinct(chr, pos, .keep_all = TRUE)
+
+  chrs_present <- c(
+    unique(tb$chr),
+    str_extract(tb$alt, "([1-9]+):", group = 1)
+  )
+  kept_chr <- CHR_LENGTHS[names(CHR_LENGTHS) %in% chrs_present]
+
+  bp_nodes <- bind_rows(
+    select(tb, chr, pos),
+    select(
+      mutate(
+        select(tb, alt),
+        chr = str_extract(alt, "([1-9]+):", group = 1),
+        pos = as.numeric(str_extract(alt, ":([0-9]+)", group = 1))
+      ),
+      -alt
+    )
   ) |>
-  unnest(c(segments, seq_id)) |>
-  mutate(name = paste0(chr, ".", seq_id)) |>
-  select(-seq_id)
+    mutate(type = "breakpoint", name = paste0(chr, ":", pos))
 
-# TODO: this works well, now just add in the breakpoints before making the edges
+  nodes <- enframe(kept_chr, name = "chr", value = "length") |>
+    mutate(
+      pos = lapply(length, \(l) seq(0, l, length.out = n_bins)),
+      seq_id = lapply(length, \(.) seq(n_bins))
+    ) |>
+    unnest(c(pos, seq_id)) |>
+    mutate(name = paste0(chr, ".", seq_id), type = "scaffold") |>
+    select(-seq_id) |>
+    bind_rows(bp_nodes) |>
+    group_by(chr) |>
+    group_split() |>
+    lapply(\(x) {
+      cur_chr <- head(x$chr, n = 1)
+      add_row(arrange(x, pos), chr = cur_chr, pos = -1000, type = "chr_label")
+    }) |>
+    bind_rows() |>
+    mutate(id = row_number()) |>
+    mutate(
+      label = case_when(
+        pos == 0 ~ "",
+        type == "scaffold" ~ as.character(round(pos / 10^6, 0)),
+        type == "chr_label" ~ paste0("chr", chr),
+        .default = ""
+      ),
+      size = case_when(
+        type == "breakpoint" ~ 1,
+        type == "chr_label" ~ 2,
+        .default = 0,
+      )
+    )
 
-edges <- nodes |>
-  mutate(id = row_number()) |>
+  name2key <- select(nodes, name, id) |> deframe()
+  bp_edges <- tb |>
+    mutate(
+      from = paste0(chr, ":", pos),
+      to = str_extract(alt, "([1-9]+:[0-9]+)", group = 1),
+      ## direction = case_when(str_match(alt, "[") ~ "left" ),
+    ) |>
+    mutate(
+      from = name2key[from],
+      to = name2key[to],
+      type = "breakpoint",
+      label = alt
+    )
+
+  edges <- nodes |>
+    group_by(chr) |>
+    summarize(from = list(id), to = list(id)) |>
+    mutate(
+      from = lapply(from, \(x) head(x, -1)),
+      to = lapply(to, \(x) tail(x, -1))
+    ) |>
+    unnest(c(from, to)) |>
+    mutate(type = "scaffold") |>
+    bind_rows(bp_edges) |>
+    mutate(
+      label = replace_values(label, NA ~ ""),
+      color = case_when(type == "scaffold" ~ chr, .default = NA)
+    )
+
+  G <- tbl_graph(nodes = nodes, edges = edges)
+}
+
+
+# [2026-03-13 Fri] TODO: Getting there, but you should experiment with other layouts too
+# Also get rid of the nodes that aren't breakpoints
+
+G <- make_chr_graph(breakpoints)
+
+chr2x <- local({
+  chr <- unique(vertex_attr(G)$chr)
+  setNames(seq(1, 5, length.out = length(chr)), chr)
+})
+
+x_y <- activate(G, nodes) |>
+  as_tibble() |>
+  mutate(x = chr2x[chr]) |>
   group_by(chr) |>
-  summarize(from = list(id), to = list(id)) |>
-  mutate(
-    from = lapply(from, \(x) head(x, -1)),
-    to = lapply(to, \(x) tail(x, -1))
-  ) |>
-  unnest(c(from, to))
+  group_split() |>
+  lapply(\(x) mutate(x, y = pos)) |>
+  bind_rows() |>
+  select(x, y)
 
-G <- tbl_graph(nodes = nodes, edges = edges)
-
-
-ggraph(G) + geom_node_point() + geom_edge_fan(aes(color = chr)) + theme_void()
-
-## test_g <- tbl_graph(
-##   nodes = tibble(
-##     name = c(
-##       "11:72109776",
-##       "3:105649604",
-##       "6:156547959",
-##       "11:START",
-##       "11:END",
-##       "3:START",
-##       "3:END"
-##       "6:START"
-##     )
-##   ),
-##   edges = tibble(from = )
-## )
+plot <- ggraph(G, "manual", x = x_y$x, y = x_y$y) +
+  geom_edge_link(
+    aes(color = color, label = label),
+    angle_calc = "along",
+    edge_width = 1.5
+  ) +
+  geom_node_text(aes(label = label), repel = TRUE) +
+  geom_node_point(size = vertex_attr(G)$size, aes(color = chr)) +
+  guides(color = "none") +
+  theme_void() +
+  scale_y_reverse()
+plot
+ggsave(here(".scratch", "foobar.pdf"), plot)
