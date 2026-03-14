@@ -55,7 +55,8 @@ make_chr_graph <- function(
   tb,
   chr_col = "chr",
   alt_col = "Alt",
-  n_bins = 15
+  bin_width = 10^6,
+  n_bins = NULL
 ) {
   assert_data_frame(tb, min.rows = 1)
   expect_col_vals_regex(tb, alt_col, regex = "[\\[\\]]")
@@ -83,11 +84,21 @@ make_chr_graph <- function(
   ) |>
     mutate(type = "breakpoint", name = paste0(chr, ":", pos))
 
-  nodes <- enframe(kept_chr, name = "chr", value = "length") |>
-    mutate(
+  if (!is.null(n_bins)) {
+    nested <- mutate(
+      enframe(kept_chr, name = "chr", value = "length"),
       pos = lapply(length, \(l) seq(0, l, length.out = n_bins)),
       seq_id = lapply(length, \(.) seq(n_bins))
-    ) |>
+    )
+  } else {
+    nested <- mutate(
+      enframe(kept_chr, name = "chr", value = "length"),
+      pos = lapply(length, \(l) seq(0, l, by = bin_width)),
+      seq_id = lapply(pos, \(p) seq_along(p))
+    )
+  }
+
+  nodes <- nested |>
     unnest(c(pos, seq_id)) |>
     mutate(name = paste0(chr, ".", seq_id), type = "scaffold") |>
     select(-seq_id) |>
@@ -150,11 +161,11 @@ make_chr_graph <- function(
 # [2026-03-13 Fri] TODO: Getting there, but you should experiment with other layouts too
 # Also get rid of the nodes that aren't breakpoints
 
-G <- make_chr_graph(breakpoints)
+G <- make_chr_graph(breakpoints, bin_width = 10^6.8)
 
 chr2x <- local({
   chr <- unique(vertex_attr(G)$chr)
-  setNames(seq(1, 5, length.out = length(chr)), chr)
+  setNames(seq(1, 24, length.out = length(chr)), chr)
 })
 
 x_y <- activate(G, nodes) |>
@@ -170,12 +181,20 @@ plot <- ggraph(G, "manual", x = x_y$x, y = x_y$y) +
   geom_edge_link(
     aes(color = color, label = label),
     angle_calc = "along",
-    edge_width = 1.5
+    edge_width = 1.5,
+    label_dodge = unit(4, "mm"),
+    check_overlap = TRUE,
+    # TODO: add the correct arrows indicating directionality
   ) +
-  geom_node_text(aes(label = label), repel = TRUE) +
-  geom_node_point(size = vertex_attr(G)$size, aes(color = chr)) +
-  guides(color = "none") +
+  geom_node_text(
+    aes(label = label),
+    nudge_x = -0.1,
+    hjust = "right",
+    fontface = ifelse(vertex_attr(G, "type") == "chr_label", "bold", "plain")
+  ) +
+  geom_node_point(size = vertex_attr(G)$size) +
+  guides(color = "none") + # TODO: this isn't working for some reason
   theme_void() +
   scale_y_reverse()
 plot
-ggsave(here(".scratch", "foobar.pdf"), plot)
+ggsave(here(".scratch", "foobar.pdf"), plot, width = 10)
