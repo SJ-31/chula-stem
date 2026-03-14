@@ -28,10 +28,10 @@ process VEP {
     variant_class = meta.variant_class ? meta.variant_class : "small"
     // One of "sv" or "small"
     normal_flag = !params.tumor_only ? "-n ${meta.RGSM_normal}" : ""
-    input = panel_of_normals ? "pon_filtered.vcf" : vcf
+    input = panel_of_normals ? "pon_filtered.vcf.gz" : vcf
     if (panel_of_normals) {
         pon_filter_command = """
-        rtg vcffilter -i ${vcf} --exclude-vcf=${panel_of_normals} -o pon_filtered.vcf
+        bcftools view -T ^${panel_of_normals} ${vcf} -O z -W -o pon_filtered.vcf.gz
         """
     } else {
         pon_filter_command = ""
@@ -46,10 +46,11 @@ process VEP {
         """
     } else {
         """
+        ${pon_filter_command}
+        
         bcftools view ${input} -H | head > check.txt
 
         if [[ -s check.txt ]]; then
-                ${pon_filter_command}
 
                 vep --cache \\
                     $args \\
