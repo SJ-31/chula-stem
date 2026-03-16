@@ -1,4 +1,5 @@
 library(tidyverse)
+library(checkmate)
 library(here)
 library(glue)
 source(here("src", "R", "utils.R"))
@@ -35,11 +36,23 @@ gene_tb <- unlist(snakemake@params$genes, use.names = FALSE) |>
   bind_rows()
 write_tsv(gene_tb, TARGET_FILE, col_names = FALSE)
 
-get_wanted_genes <- function(name, file, is_paired = TRUE, vep = TRUE) {
+get_wanted_genes <- function(name, file, is_paired = "detect", vep = TRUE) {
+  assert_character(is_paired)
+  assert_choice(is_paired, c("yes", "no", "detect"))
   args <- c(
     "view",
     glue("--targets-file {TARGET_FILE}")
   )
+  if (is_paired == "detect") {
+    is_paired <- length(system2(
+      "bcftools",
+      args = c("query", "-l", file),
+      stdout = TRUE
+    )) >
+      1
+  } else {
+    is_paired <- is_paired == "yes"
+  }
   if (is_paired) {
     samples <- system2("bcftools", args = c("query", "-l", file), stdout = TRUE)
     tumor_sample <- keep(samples, \(x) str_detect(x, "tumor"))[1]
