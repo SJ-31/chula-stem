@@ -3,6 +3,9 @@ process CNVKIT {
     errorStrategy "ignore" // [2025-06-24 Tue] Temporary incompatibility with cnvkit
     // and the pdac reference file
 
+    // BUG: cnvkit doesn't like the GT format header and having multiple samples
+    // if the data are paired, should get only the tumor sample and clean it up
+    
     publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 

@@ -27,7 +27,6 @@ process CALLSET_QC {
     output = Utl.getName(module_number, meta, "QC", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
-
     ndepth = qc.max_normal_depth ? "FORMAT/AD[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""
     tdepth = qc.min_tumor_depth ? "FORMAT/AD[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
     vaf = qc.min_VAF ? "FORMAT/AF[@tumor.txt] > ${qc.min_VAF}" : ""
@@ -45,7 +44,7 @@ process CALLSET_QC {
     input = panel_of_normals ? "pon_filtered.vcf.gz" : vcf
     if (panel_of_normals) {
         pon_filter_command = """
-        bcftools view -T ^${panel_of_normals} ${vcf} -O z -W -o pon_filtered.vcf.gz 
+        bcftools view -T ^${panel_of_normals} ${vcf} -O z -W -o pon_filtered.vcf.gz
         """
     } else {
         pon_filter_command = ""

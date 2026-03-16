@@ -45,8 +45,15 @@ process SIGPROFILERASSIGNMENT {
             ${exome_flag} \\
             ${exclude_flag}
 
-        mv ${output}/Assignment_Solution/* ${output}
+        if [[ ! -z \$(ls -A ${output}/Assignment_Solution) ]]; then
+            mv ${output}/Assignment_Solution/* ${output}
+        fi
+        
         rmdir ${output}/Assignment_Solution
+
+        if [[ ! -e ${output}/Activities ]]; then
+            mkdir ${output}/Activities
+        fi
 
         if [[ ! -e '${activities_file}' ]]; then
             echo EMPTY > ${activities_file}
