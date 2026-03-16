@@ -395,7 +395,7 @@ def instability_score_one(
     minor_ins_count = (no_wt & m_cn == 1) | (wt_one & m_cn == 2)
     if (minor_ins_count.sum() / n_vars) > 0.5:
         return "minor"
-    major_ins_count = (no_wt & m_cn > 1) | (wt_one & m_cn > 2)
+    major_ins_count = (no_wt & (m_cn > 1)) | (wt_one & (m_cn > 2))
     if (major_ins_count.sum() / n_vars) > 0.5:
         return "major"
     wt_greater = v_df["major_C"] > m_cn
@@ -429,22 +429,25 @@ def call_kras_imbalance(
     gene_schema = pa.DataFrameSchema(
         {
             "gene.symbol": pa.Column(str),
-            "loh": pa.Column(bool),
-            "M": pa.Column(int),
-            "M.flagged": pa.Column(bool),
-            "C.flagged": pa.Column(bool),
+            "loh": pa.Column("boolean", nullable=True),
+            "M": pa.Column("Int16", nullable=True),
+            "M.flagged": pa.Column("boolean", nullable=True),
+            "C.flagged": pa.Column("boolean", nullable=True),
         }
     )
     variant_schema = pa.DataFrameSchema(
         {
-            "gene.symbol": pa.Column(str),
+            "gene.symbol": pa.Column("string"),
             "POSTERIOR.SOMATIC": pa.Column(
-                float
+                "Float64", nullable=True
             ),  # To check whether variant is somatic
-            "M.SEGMENT.FLAGGED": pa.Column(bool),  # To ignore unreliable segments
-            "ML.M.SEGMENT": pa.Column(int),  # Minor copy number
-            "ML.C": pa.Column(float),  # Total copy number
-        }
+            "M.SEGMENT.FLAGGED": pa.Column(
+                "boolean", nullable=True
+            ),  # To ignore unreliable segments
+            "ML.M.SEGMENT": pa.Column("Int64", nullable=True),  # Minor copy number
+            "ML.C": pa.Column("Float64", nullable=True),  # Total copy number
+        },
+        drop_invalid_rows=True,
     )
 
     df = manifest.pivot(columns="type", index="sample", values="file")
@@ -474,7 +477,7 @@ def call_kras_imbalance(
             f"{sym_query} & (`POSTERIOR.SOMATIC` >= 0.8) & ~`M.SEGMENT.FLAGGED`"
         )
         # Cutoff for somatic calls provided by PureCN manual
-        g_df = g_df.query(f"{sym_query} & ~M.flagged & ~C.flagged")
+        g_df = g_df.query(f"{sym_query} & ~`M.flagged` & ~`C.flagged`")
         variant_dfs.append(v_df.assign(sample=index))
         gene_dfs.append(g_df.assign(sample=index))
 
