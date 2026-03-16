@@ -395,6 +395,21 @@ def instability_score_one(
     return "NA"
 
 
+GENE_DF_DTYPES: dict = {
+    "loh": "boolean",
+    "M.flagged": "boolean",
+    "C.flagged": "boolean",
+    "M": "Int16",
+}
+VARIANT_DF_DTYPES: dict = {
+    "gene.symbol": "string",
+    "POSTERIOR.SOMATIC": "Float64",
+    "M.SEGMENT.FLAGGED": "boolean",
+    "ML.M.SEGMENT": "Int64",
+    "ML.C": "Float64",
+}
+
+
 @beartype
 def call_kras_imbalance(
     manifest: pd.DataFrame,
@@ -440,14 +455,14 @@ def call_kras_imbalance(
         summary_dfs.append(pd.read_csv(summary))
 
         tmp_subtype["sample"].append(index)
-        v_df: pd.DataFrame = pd.read_csv(v_result)
-        g_df: pd.DataFrame = pd.read_csv(g_result)
+        v_df: pd.DataFrame = pd.read_csv(v_result, dtype=VARIANT_DF_DTYPES)
+        g_df: pd.DataFrame = pd.read_csv(g_result, dtype=GENE_DF_DTYPES)
 
         gene_schema.validate(g_df)
-        variant_schema.validate(v_df)
-        sym_query = "gene.symbol == 'KRAS'"
+        variant_schema.validate(v_df, lazy=True)
+        sym_query = "`gene.symbol` == 'KRAS'"
         v_df = v_df.query(
-            f"{sym_query} & (POSTERIOR.SOMATIC >= 0.8) & ~M.SEGMENT.FLAGGED"
+            f"{sym_query} & (`POSTERIOR.SOMATIC` >= 0.8) & ~`M.SEGMENT.FLAGGED`"
         )
         # Cutoff for somatic calls provided by PureCN manual
         g_df = g_df.query(f"{sym_query} & ~M.flagged & ~C.flagged")
