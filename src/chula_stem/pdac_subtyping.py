@@ -8,10 +8,11 @@ import click
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
+import polars as pl
 from beartype import beartype
 from scipy import sparse
 from scipy.special import expit
-from scipy.stats import expon, goodness_of_fit
+from scipy.stats import expon, goodness_of_fit, iqr
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import train_test_split
 
@@ -76,11 +77,16 @@ def add_kras_imbalance(
 ) -> None:
     purecn_df = manifest.query("type == 'purecn'")
     if not purecn_df.empty:
+        if "KRAS_imbalance_subtype" in adata.obs:
+            adata.obs = adata.obs.drop("KRAS_imbalance_subtype", axis="columns")
         kras_scores = call_kras_imbalance(purecn_df, purecn_prefix=purecn_prefix)
         adata.obs = adata.obs.merge(kras_scores["subtype"], on="sample", how="left")
-        adata.uns["purecn_kras_variants"] = kras_scores["variants"]
-        adata.uns["purecn_kras_genes"] = kras_scores["genes"]
-        adata.uns["purecn_summary"] = kras_scores["summary"]
+        for key in ("kras_variants", "kras_genes", "summary"):
+            df = kras_scores[key]
+            if not df.empty:
+                adata.uns[f"purecn_{key}"] = df
+            else:
+                adata.uns[f"purecn_{key}"] = pd.DataFrame()
     else:
         print("Warning: No samples with PureCN directories present in manifest")
 
@@ -366,8 +372,8 @@ def instability_score_one(
         The KRAS gene was deleted completely (total CN == 0)
         TODO: find other situations of this
     """
-    v_df.iloc[:, "major_C"] = v_df["ML.C"] - v_df["ML.M.SEGMENT"]
-    g_df.iloc[:, "major_C"] = g_df["C"] - g_df["M"]
+    v_df = v_df.assign(major_c=v_df["ML.C"] - v_df["ML.M.SEGMENT"])
+    g_df = g_df.assign(majo_C=g_df["C"] - g_df["M"])
     if v_df.empty and g_df.empty:
         return "wt"
     elif v_df.empty:
@@ -408,6 +414,8 @@ def instability_score_one(
 
 
 GENE_DF_DTYPES: dict = {
+    "chr": "string",
+    "type": "string",
     "loh": "boolean",
     "M.flagged": "boolean",
     "C.flagged": "boolean",
@@ -467,7 +475,7 @@ def call_kras_imbalance(
         for file in (v_result, g_result, summary):
             if not file.exists():
                 raise ValueError(f"PureCN file {file} is missing")
-        summary_dfs.append(pd.read_csv(summary))
+        summary_dfs.append(pd.read_csv(summary, dtype={"Comment": "string"}))
 
         tmp_subtype["sample"].append(index)
         v_df: pd.DataFrame = pd.read_csv(v_result, dtype=VARIANT_DF_DTYPES)
@@ -487,9 +495,9 @@ def call_kras_imbalance(
         tmp_subtype["KRAS_imbalance_subtype"].append(
             instability_score_one(v_df=v_df, g_df=g_df)
         )
-
-    results["subtype"] = pd.DataFrame(tmp_subtype)
-    results["variants"] = pd.concat(variant_dfs)
-    results["genes"] = pd.concat(gene_dfs)
+    results["kras_genes"] = pd.concat(gene_dfs)
     results["summary"] = pd.concat(summary_dfs)
+    results["subtype"] = pd.DataFrame(tmp_subtype)
+    results["kras_variants"] = pd.concat(variant_dfs)
     return results
+
