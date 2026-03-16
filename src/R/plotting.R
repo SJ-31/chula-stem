@@ -1,5 +1,6 @@
 library(tidyverse)
 library(checkmate)
+library(patchwork)
 library(pointblank)
 library(glue)
 library(grid)
@@ -508,4 +509,53 @@ ggsave_graph_dynamic <- function(G, plot, filename) {
     width = dim,
     units = "in"
   )
+}
+
+combine_sample_label_plots <- function(
+  label_tbs,
+  palettes = list()
+) {
+  assert_list(label_tbs, names = "named")
+  if (length(palettes) > 1) {
+    assert_list(palettes, names = "named")
+    assert_names(names(palettes), subset.of = names(label_tbs))
+  }
+
+  plot_one <- function(tb, title, lpos, last = FALSE, palette = NULL) {
+    assert_data_frame(tb)
+    plot <- ggplot(tb, aes(x = sample, y = 1, fill = label)) +
+      TILE_CALL +
+      theme_minimal() +
+      theme(
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        axis.text.y = element_blank()
+      )
+    if (!is.null(palette)) {
+      plot <- plot + scale_fill_paletteer_d(palette)
+    }
+    if (!last) {
+      plot <- plot +
+        theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+    }
+    plot + guides(fill = guide_legend(title = title, position = lpos))
+  }
+
+  plots <- lapply(
+    seq_along(label_tbs),
+    \(i) {
+      name <- names(label_tbs)[i]
+      position <- ifelse(i %% 2 == 0, "left", "right")
+      plot_one(
+        label_tbs[[name]],
+        name,
+        palettes[[name]],
+        lpos = position,
+        last = i == length(label_tbs)
+      ) +
+        theme(plot.margin = margin(0, 0, 0, 0, "cm"))
+    }
+  )
+  wrap_plots(plots, ncol = 1)
 }
