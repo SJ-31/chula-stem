@@ -8,6 +8,7 @@ import click
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
+import pandera.polars as pal
 import polars as pl
 from beartype import beartype
 from scipy import sparse
@@ -88,7 +89,7 @@ def add_kras_imbalance(
             else:
                 adata.uns[f"purecn_{key}"] = pd.DataFrame()
     else:
-        print("Warning: No samples with PureCN directories present in manifest")
+        print("Warning: No samples with PureCN directories in manifest")
 
 
 def group_by_index(files: Sequence[str], index_col: str, **kws) -> list[list]:
@@ -501,3 +502,154 @@ def call_kras_imbalance(
     results["kras_variants"] = pd.concat(variant_dfs)
     return results
 
+
+# * Waddell
+
+# TODO: want to visualize these data as well
+
+CHR_LENGTHS: dict = {
+    "1": 248956422,
+    "2": 242193529,
+    "3": 198295559,
+    "4": 190214555,
+    "5": 181538259,
+    "6": 170805979,
+    "7": 159345973,
+    "8": 145138636,
+    "9": 138394717,
+    "10": 133797422,
+    "11": 135086622,
+    "12": 133275309,
+    "13": 114364328,
+    "14": 107043718,
+    "15": 101991189,
+    "16": 90338345,
+    "17": 83257441,
+    "18": 80373285,
+    "19": 58617616,
+    "20": 64444167,
+    "21": 46709983,
+    "22": 50818468,
+    "X": 156040895,
+    "Y": 57227415,
+}
+
+
+def add_waddell_classification(manifest: pd.DataFrame, adata: ad.AnnData) -> None:
+    sv_schema = pal.DataFrameSchema(
+        {
+            "Loc": pal.Column("string"),
+            "Alt": pal.Column("string"),
+            "Ref": pal.Column("string"),
+            "SVTYPE": pal.Column("string"),
+        }
+    )
+    has_sv = manifest.query("type == 'SV'")
+    if not has_sv.empty:
+        if "waddell_subtype" in adata.obs:
+            adata.obs = adata.obs.drop("waddell_subtype", axis="columns")
+        tmp = {"sample": [], "waddell_subtype": []}
+        for _, row in has_sv.iterrows():
+            tmp["sample"].append(row["sample"])
+            tmp["waddell_subtype"].append(classify_waddell_one(row["file"], sv_schema))
+        df = pd.DataFrame(tmp)
+        adata.obs = adata.obs.merge(df, on="sample", how="left")
+    else:
+        print("Warning: No samples with SV data in manifest")
+
+
+def classify_waddell_one(
+    file: str, schema: pal.DataFrameSchema
+) -> Literal["stable", "scattered", "unstable", "locally_rearranged", "NA"]:
+    df = pl.read_csv(file, separator="\t" if file.endswith(".tsv") else ",")
+    if df.is_empty():
+        return "stable"
+    schema.validate(df)
+    formatted = (
+        df.unique(["Loc", "Alt", "Ref"])
+        .filter(pl.col("SVTYPE") != "INS")
+        .with_columns(
+            pl.col("Loc").str.split_exact(":", 1).struct.rename_fields(["chr", "pos"])
+        )
+        .unnest("Loc")
+        .with_columns(pl.col("pos").cast(pl.Int64))
+    )
+    if formatted["chr"].str.starts_with("chr").all():
+        formatted = formatted.with_columns(pl.col("chr").str.strip_prefix("chr"))
+    sv_total: int = formatted.height
+    c_df: pl.DataFrame = check_sv_clustering_significance(formatted)
+    l_df: pl.DataFrame = check_locally_rearranged(formatted)
+    if sv_total < 50 and not c_df["clustering_significant"].any():
+        return "stable"
+    if 50 <= sv_total < 200 and not c_df["clustering_significant"].any():
+        return "scattered"
+    if sv_total >= 200 and not c_df["clustering_significant"].any():
+        return "unstable"
+    if sv_total > 50 and l_df["locally_rearranged"].any():
+        return "locally_rearranged"
+    return "NA"
+
+
+def check_locally_rearranged(sv_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Identify locally rearranged chromosomes, according to [1]
+
+    1. Calculate SV rate per MB for each chromosome
+    2. Mark chromosomes are rearranged if their SV rate > 5 *IQR(SV rate) + quantile(SV rate)
+
+    References
+    ----------
+    [1] Waddell, N., Pajic, M., Patch, AM. et al. Whole genomes redefine the mutational landscape of pancreatic cancer. Nature 518, 495–501 (2015). https://doi.org/10.1038/nature14169
+    """
+    grouped = (
+        sv_df.group_by("chr")
+        .agg(pl.col("pos").len().alias("n"))
+        .with_columns(pl.col("chr").replace_strict(CHR_LENGTHS).alias("length"))
+        .with_columns((pl.col("n") / pl.col("length") * 10**6).alias("rate_mb"))
+    )
+    print(grouped["rate_mb"])
+    iqr_val = iqr(grouped["rate_mb"])
+    upper_quartile = np.quantile(grouped["rate_mb"], 0.75)
+    grouped = grouped.with_columns(
+        (pl.col("rate_mb") > 5 * iqr_val + upper_quartile).alias("locally_rearranged")
+    )
+    return grouped
+
+
+def check_sv_clustering_significance(
+    sv_df: pl.DataFrame, threshold: float = 0.0001
+) -> pl.DataFrame:
+    """
+    Method adapted from Box 2, "Clustering of breakpoints" of [1]
+
+    For each chromosome,
+
+    1. Order SVs from lowest to highest coordinates on the reference
+    2. Compute distances between adjacent SVs to get SV distance distribution
+    3. Goodness-of-fit test with exponential distribution
+
+    Returns
+    -------
+    DataFrame with two columns:
+        chromosome name and the p-value from the test
+
+    References
+    ----------
+    [1] Criteria for Inference of Chromothripsis in Cancer Genomes Korbel, Jan O. et al. Cell, Volume 152, Issue 6, 1226 - 1236
+    """
+    chr_groups = sv_df.group_by("chr")
+    result: dict = {"chr": [], "clustering_significant": []}
+    for chr, df in chr_groups:
+        result["chr"].append(chr)
+        if df.height > 2:
+            df = df.sort("pos")
+            distances: np.ndarray = (df["pos"][1:] - df["pos"][:-1]).to_numpy()
+            mean = distances.mean()
+            gof = goodness_of_fit(
+                expon, known_params={"loc": 0, "scale": mean}, data=distances
+            )
+            if gof.fit_result.success and gof.pvalue < threshold:
+                result["clustering_significant"].append(True)
+                continue
+        result["clustering_significant"].append(False)
+    return pl.DataFrame(result)
