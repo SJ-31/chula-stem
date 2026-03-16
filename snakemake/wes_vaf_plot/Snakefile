@@ -25,11 +25,11 @@ def samples_setup() -> tuple[pd.DataFrame, dict]:
         if "root" not in spec:
             raise ValueError("Root must be specified")
         root = spec["root"]
-        df = pd.read_csv(spec["manifest"]).assign(root=root)
+        df = pd.read_csv(spec["manifest"]).assign(root=root).query("source != 'normal'")
         if rename := spec.get("rename"):
             df.loc[:, "patient"] = df["patient"].replace(rename)
         if extra := spec.get("extra"):
-            df = pd.concat(df, pd.DataFrame({"patient": extra, "root": root}))
+            df = pd.concat([df, pd.DataFrame({"patient": extra, "root": root})])
         cases = df["patient"]
         to_ignore = set()
         for c in cases:
@@ -37,7 +37,7 @@ def samples_setup() -> tuple[pd.DataFrame, dict]:
                 to_ignore.add(c)
         if to_ignore:
             print(f"No VEP data available for the following: {to_ignore}")
-            df = df[~df["patient"].isin(to_ignore), :]
+            df = df.loc[~df["patient"].isin(to_ignore), :]
         tmp.append(df)
     combined = pd.concat(tmp)
     if (combined["patient"].value_counts() > 1).any():
@@ -121,6 +121,7 @@ rule vaf_plot:  # Assemble plot
         tmb=rules.get_tmb.output,
     params:
         wanted_genes=config["wanted_genes"].keys(),
+        samples=samples,
     output:
         gene_metrics=VAF_OUT["gene_metrics"],
         vaf_separate=VAF_OUT["vaf_separate"],
