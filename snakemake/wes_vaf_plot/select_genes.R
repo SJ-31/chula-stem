@@ -4,7 +4,7 @@ library(glue)
 source(here("src", "R", "utils.R"))
 rlang::global_entrace(enable = TRUE)
 
-data_path <- snakemake@params$data_path
+data_mapping <- snakemake@params$data_mapping
 cases <- snakemake@params$cases
 
 SOURCE_TAG <- snakemake@config$source_tag
@@ -18,7 +18,7 @@ TARGET_FILE <- glue("{snakemake@scriptdir}/target_genes.tsv")
 vcfs <- sapply(
   cases,
   \(x) {
-    glue("{data_path}/{x}/annotations/7-{x}-VEP_small.vcf.gz")
+    glue("{data_mapping[[x]]}/{x}/annotations/7-{x}-VEP_small.vcf.gz")
   },
   simplify = FALSE,
   USE.NAMES = TRUE

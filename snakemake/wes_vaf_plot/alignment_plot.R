@@ -230,16 +230,23 @@ ref_genome <- readDNAStringSet(cfg$reference_genome)
 window <- as.numeric(cfg$window)
 log_debug("window {window}")
 outdir <- snakemake@params$outdir
-data_path <- snakemake@params$data_path
+data_mapping <- snakemake@params$data_mapping
 
 samples <- snakemake@input$vcfs
 sample_tb <- tibble(vcf = samples) |>
-  mutate(sample = str_remove(basename(vcf), ".tsv")) |>
   mutate(
-    bam = glue("{data_path}/{sample}/tumor/4-{sample}_tumor-recal.bam"),
-    normal_bam = glue(
-      "{data_path}/{sample}/normal/4-{sample}_normal-recal.bam"
-    ),
+    sample = str_remove(basename(vcf), ".tsv"),
+    root = map_chr(sample, \(s) data_mapping[[s]])
+  ) |>
+  mutate(
+    bam = paste0(root, "/", glue("{sample}/tumor/4-{sample}_tumor-recal.bam")),
+    normal_bam = paste0(
+      root,
+      "/",
+      glue(
+        "{sample}/normal/4-{sample}_normal-recal.bam"
+      )
+    )
   )
 
 t0 <- apply(sample_tb, 1, \(tb_row) {

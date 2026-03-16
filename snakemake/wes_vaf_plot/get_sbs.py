@@ -1,7 +1,6 @@
 #!/usr/bin/env ipython
 
 import os
-import re
 from io import StringIO
 from pathlib import Path
 from subprocess import run
@@ -59,7 +58,7 @@ def get_substitution_types(
     return df
 
 
-data: Path = Path(smk.params["data_path"])
+data_mapping: dict[str, str] = smk.params["data_mapping"]
 target = str(smk.output)
 cases = smk.params["cases"]
 
@@ -69,6 +68,7 @@ cwd = os.getcwd()
 found_cases = []
 files = []
 for case in cases:
+    data = Path(data_mapping[case])
     case_dir = data.joinpath(case).resolve().absolute()
     look_for = next(case_dir.rglob("7-*-Small_high_conf.vcf.gz"), None)
     if look_for:

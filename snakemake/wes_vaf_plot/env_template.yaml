@@ -1,20 +1,18 @@
-root: "" # Root path of wes results
 outdir: "" # Root path for output
 conda: "" # conda environment for reticulate
-manifest: "" # Nextflow manifest file used for WES pipeline
+
+sample_spec: # A list of mappings, each with the following keys
+  - root: "" # Root path of wes results
+    manifest: "" # Nextflow manifest file used for WES pipeline
+    cohort: "8-CEN2"
+    cases: [] # Specify additional cases that may not be on the manifest to include in plot
+  # Must symlink/copy these cases' directories into `root` for this to work
+
 src: # source directories
   py: "../../src/chula_stem"
   r: "../../src/R"
 
 get_alignments: False # Set to true to get alignment plots instead
-
-cohort: "8-CEN2"
-
-extra:
-  cases: [] # Specify additional cases that may not be on the manifest to include in plot
-  # Must symlink/copy these cases' directories into `root` for this to work
-  multiqc_vep: [] # Additional vep.txt files to include from other cohorts i.e. the ones
-  # in `cases`
 
 sample_labels:
   null # Mapping describing additional labels to be displayed for each sample

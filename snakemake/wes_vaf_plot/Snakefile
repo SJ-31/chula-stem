@@ -15,20 +15,41 @@ See env_template.yaml for what to specify
 
 
 outdir = f"{config['outdir']}/{DATE}"
-data_path = config["root"]
-sample_sheet = pd.read_csv(config["manifest"])
-cohort = config.get("cohort", "cohort")
-extra = config.get("extra", {})
 
-cases = set(list(sample_sheet["patient"]) + extra.get("cases", []))
 
-to_ignore = set()
-for c in cases:
-    if not Path(f"{data_path}/{c}/annotations/7-{c}-VEP_small.vcf.gz").exists():
-        to_ignore.add(c)
+def samples_setup() -> tuple[pd.DataFrame, dict]:
+    tmp = []
+    for spec in config["sample_spec"]:
+        if "manifest" not in spec:
+            raise ValueError("Manifest must be specified")
+        if "root" not in spec:
+            raise ValueError("Root must be specified")
+        root = spec["root"]
+        df = pd.read_csv(spec["manifest"]).assign(root=root)
+        if rename := spec.get("rename"):
+            df.loc[:, "patient"] = df["patient"].replace(rename)
+        if extra := spec.get("extra"):
+            df = pd.concat(df, pd.DataFrame({"patient": extra, "root": root}))
+        cases = df["patient"]
+        to_ignore = set()
+        for c in cases:
+            if not Path(f"{root}/{c}/annotations/7-{c}-VEP_small.vcf.gz").exists():
+                to_ignore.add(c)
+        if to_ignore:
+            print(f"No VEP data available for the following: {to_ignore}")
+            df = df[~df["patient"].isin(to_ignore), :]
+        tmp.append(df)
+    combined = pd.concat(tmp)
+    if (combined["patient"].value_counts() > 1).any():
+        print(combined)
+        raise ValueError(
+            "Duplicate sample names detected, try setting the `rename` key"
+        )
+    return combined, dict(zip(combined["patient"], combined["root"]))
 
-print("Ignoring cases", to_ignore)
-cases = list(cases - to_ignore)
+
+manifest, sample2root = samples_setup()
+samples = manifest["patient"]
 vcf_dir = f"{outdir}/vcfs"
 align_dir = f"{outdir}/alignments"
 
@@ -41,7 +62,7 @@ VAF_OUT = {
     "variant_table": f"{outdir}/variant_table.html",
     # BUG: this really should be pdf, but would need chrome installed on server
 }
-ALIGN_OUT = {"alignments": expand("{o}/{c}", o=align_dir, c=cases)}
+ALIGN_OUT = {"alignments": expand("{o}/{c}", o=align_dir, c=samples)}
 
 if config.get("get_alignments"):
     print("Creating alignment plot only...")
@@ -57,13 +78,13 @@ rule all:
 
 rule get_vep:  # Retrieve vep results for select genes
     output:
-        tsvs=expand("{v}/{sample}.tsv", v=vcf_dir, sample=cases),
-        vcfs=[temp(f) for f in expand("{v}/{sample}.vcf", v=vcf_dir, sample=cases)],
+        tsvs=expand("{v}/{sample}.tsv", v=vcf_dir, sample=samples),
+        vcfs=[temp(f) for f in expand("{v}/{sample}.vcf", v=vcf_dir, sample=samples)],
         combined=f"{vcf_dir}/combined.tsv",
     params:
         outdir=vcf_dir,
-        cases=cases,
-        data_path=data_path,
+        cases=samples,
+        data_mapping=sample2root,
         genes=config["wanted_genes"],
     script:
         "select_genes.R"
@@ -71,17 +92,17 @@ rule get_vep:  # Retrieve vep results for select genes
 
 rule get_sbs:  # Get single-base-substitution statistics
     params:
-        data_path=data_path,
-        cases=cases,
+        data_mapping=sample2root,
+        cases=samples,
     output:
         f"{outdir}/sbs.tsv",
     script:
         "get_sbs.py"
 
 
-multiqc_veps = [f"{data_path}/8-{cohort}-MultiQC_data/vep.txt"] + extra.get(
-    "multiqc_vep", []
-)
+multiqc_veps = [
+    f"{s['root']}/8-{s['cohort']}-MultiQC_data/vep.txt" for s in config["sample_spec"]
+]
 
 
 rule get_tmb:  # Retrieve tumor mutational burden counts
@@ -122,10 +143,10 @@ rule alignment_plot:
     input:
         vcfs=rules.get_vep.output.tsvs,
     output:
-        plots=directory(expand("{o}/{c}", o=align_dir, c=cases)),
+        plots=directory(expand("{o}/{c}", o=align_dir, c=samples)),
     params:
         outdir=align_dir,
-        data_path=data_path,
+        data_mapping=sample2root,
     log:
         f"{align_dir}/alignment_plot.log",
     script:
