@@ -3,6 +3,7 @@ library(gt)
 library(glue)
 library(here)
 
+SOURCE_COL <- paste0("INFO_", snakemake@config$source_tag %||% "SOURCE")
 
 format_for_gt <- function(tb, wanted_genes = NULL) {
   if (is.null(wanted_genes)) {
@@ -16,7 +17,7 @@ format_for_gt <- function(tb, wanted_genes = NULL) {
       AF = mean(AF, na.rm = TRUE),
       DP = mean(INFO_DP, na.rm = TRUE),
       GT = first(GT),
-      n_called_by = length(unique(INFO_TOOL_SOURCE)),
+      n_called_by = length(unique(!!as.symbol(SOURCE_COL))),
       Consequence = first(Consequence),
       Impact = first(IMPACT),
       HGVSp = str_remove(first(HGVSp), "ENS.*\\..*:p\\."),
