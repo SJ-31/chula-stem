@@ -10,13 +10,60 @@ suppressMessages({
   library(here)
   utils <- new.env()
   source(here("src", "R", "utils.R"), local = utils)
+  source(here("src", "R", "plotting.R"))
   tmb_merged <- read_tsv(snakemake@input$tmb)
   sbs <- read_tsv(snakemake@input$sbs)
   target_genes <- snakemake@params$wanted_genes
   combined_vep <- read_tsv(snakemake@input$combined_vep)
   config <- snakemake@config
   label_spec <- config$sample_labels
+  samples <- snakemake@params$samples |> sort()
+  nd_label <- config$no_data_label %||% "ND"
 })
+
+print(glue("Available samples: {paste0(samples, collapse = ',')}"))
+
+with_no_data <- c()
+TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
+
+# [2026-03-16 Mon] BUG: the samples prefixed with N aren't showing up
+# Might be because they have TOOL_SOURCE as the source tag and not "SOURCE". So
+# gotta rename them
+# More importantly, they use a different system for chr names... Need to relabel chrs
+# Add a how_to for both of these
+
+## * Get extra sample labels
+
+if (!is.null(label_spec)) {
+  assert_list(label_spec, names = "unique")
+  extra_labels <- lapply(label_spec, \(spec) {
+    assert_list(spec)
+    assert_names(names(spec), must.include = c("palette", "file"))
+    tb <- read_tsv(spec$file) |> mutate(label = as.character(label))
+    others <- samples |> discard(\(s) s %in% tb$sample)
+    new_samples <- tb |>
+      pluck("sample") |>
+      discard(\(s) s %in% samples)
+    if (config$add_label_samples %||% TRUE) {
+      samples <<- unique(c(samples, new_samples))
+      with_no_data <<- unique(c(with_no_data, new_samples))
+    }
+    tb |> bind_rows(tb, tibble(sample = others, label = NA))
+  })
+  label_palettes <- lapply(label_spec, \(s) s$palette)
+  extra_labels[["Exome data available"]] <- tibble(sample = samples) |>
+    mutate(label = case_when(sample %in% with_no_data ~ "N", .default = "Y"))
+  label_palettes[["Exome data available"]] <- "ggsci::alternating_igv"
+  samples <<- sort(samples)
+  label_plot <- combine_sample_label_plots(
+    extra_labels,
+    palettes = label_palettes
+  ) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5)) +
+    scale_x_discrete(limits = samples)
+} else {
+  label_plot <- NULL
+}
 
 
 accepted_consequence <- config$accepted_consequence
@@ -59,15 +106,11 @@ prettify <- function(tb) {
         \(x) mode_and_capitalize(x)
       ),
       clinvar = map_chr(CLIN_SIG, \(x) mode_and_capitalize(x, "benign")),
-      clinvar = case_match(clinvar, "na" ~ "not provided", .default = clinvar)
+      clinvar = replace_values(clinvar, "na" ~ "not provided")
     )
 }
 
-
 ## * Plot
-
-TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
-
 
 vaf_heatmap <- function(plot) {
   plot +
@@ -80,16 +123,14 @@ vaf_heatmap <- function(plot) {
       panel.border = element_blank(),
       panel.grid = element_blank(),
       axis.ticks = element_line(linewidth = 0.5),
-      axis.text.x = element_text(angle = 90),
+      axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
     )
 }
 
-n_samples <- sbs$sample |>
+n_samples <- samples |>
   unique() |>
   length()
 
-
-sample_names <- as.factor(unique(sbs$sample)) |> sort()
 add_groupings <- FALSE
 
 extra <- c()
@@ -98,7 +139,7 @@ if ("cases" %in% names(config$extra) && length(config$extra$cases) != 0) {
   extra <- config$extra$cases
 }
 
-if (config$variant_calling$protein_only) {
+if (config$variant_calling$protein_only %||% FALSE) {
   log_info("Filtering by coding variants...")
   log_info("Count before: {nrow(combined_vep)}")
   combined_vep <- filter(combined_vep, !is.na(HGVSp))
@@ -139,10 +180,10 @@ replicate_figure <- combined_vep |>
         }
       }
     )))),
-    Existing_variation = map_chr(
+    Existing_variation = list(unique(unlist(lapply(
       Existing_variation,
       \(x) str_replace_all(x, "&", ";")
-    ),
+    )))),
     VAF = mean(AF),
     Alt_depth = mean(
       map_dbl(AD, \(x) {
@@ -159,6 +200,7 @@ replicate_figure <- combined_vep |>
   ) |>
   dplyr::rename(sample = subject) |>
   distinct()
+
 
 if (!is.null(min_alt_depth)) {
   replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
@@ -207,10 +249,27 @@ sbs_plot <- sbs |>
   guides(fill = guide_legend(title = element_blank())) +
   theme_void() +
   scale_fill_paletteer_d("ggthemes::excel_Depth") +
-  scale_x_discrete(limits = sample_names)
+  scale_x_discrete(limits = samples)
 
 rep_theme <- "tidyquant::tq_light"
 axis_title_size <- 12
+
+# Add any extra samples from the labels
+if (length(with_no_data) > 0) {
+  no_data_tb <- tibble(
+    sample = with_no_data,
+    Consequence = list(nd_label),
+    CLIN_SIG = list(nd_label)
+  ) |>
+    mutate(
+      SYMBOL = lapply(sample, \(.) {
+        unique(replicate_figure$SYMBOL)
+      })
+    ) |>
+    unnest(SYMBOL)
+  replicate_figure <- bind_rows(replicate_figure, no_data_tb)
+}
+
 
 ## *** TMB plot
 
@@ -248,7 +307,7 @@ tmb_plot <- tmb_merged |>
     expand = c(0, 0),
     breaks = c(0, tmb_max)
   ) +
-  scale_x_discrete(limits = sample_names)
+  scale_x_discrete(limits = samples)
 
 
 ## *** Counts plot
@@ -307,7 +366,7 @@ r1 <- replicate_figure |>
     axis.text.x = element_text(size = axis_title_size),
     axis.title.y = element_text(size = axis_title_size, face = "italic")
   ) +
-  scale_x_discrete(limits = sample_names)
+  scale_x_discrete(limits = samples)
 
 if (add_groupings) {
   replicate_figure <- local({
@@ -337,7 +396,7 @@ if (add_groupings) {
   sample_names <- tmp$sample
   r1 <- r1 +
     theme(axis.text.x = element_markdown()) +
-    scale_x_discrete(labels = labs, limits = sample_names)
+    scale_x_discrete(labels = labs, limits = samples)
 }
 
 ## **** for each variant type
@@ -363,29 +422,11 @@ heatmap_helper <- function(tb) {
 }
 
 with_separate_cons <- heatmap_helper(replicate_figure) +
-  scale_x_discrete(limits = sample_names)
+  scale_x_discrete(limits = samples)
 if (add_groupings) {
   with_separate_cons <- with_separate_cons +
     theme(axis.text.x = element_markdown()) +
-    scale_x_discrete(labels = labs, limits = sample_names)
-}
-
-## ** Extra sample labels
-
-if (!is.null(label_spec)) {
-  assert_list(label_spec, names = "unique")
-  extra_labels <- lapply(label_spec, \(spec) {
-    assert_list(spec)
-    assert_names(names(spec), must.include = c("palette", "file"))
-    read_tsv(spec$file)
-  })
-  label_palettes <- lapply(label_spec, \(s) s$palette)
-  label_plot <- combine_sample_label_plots(
-    extra_labels,
-    palettes = label_palettes
-  )
-} else {
-  label_plot <- NULL
+    scale_x_discrete(labels = labs, limits = samples)
 }
 
 ## ** Arranging
@@ -398,6 +439,7 @@ tmb_plot <- tmb_plot + guides(fill = "none")
 r1 <- r1 + guides(alpha = "none")
 
 # TODO: [2026-03-09 Mon] gotta check this works
+# TODO: revert to grabbing the y axis from counts plot if the margins don't work well
 to_arrange <- list(
   tmb_plot, # 1
   r1, # 2
@@ -406,6 +448,8 @@ to_arrange <- list(
   type_legend # 5
 )
 if (!is.null(label_plot)) {
+  to_arrange[[2]] <- r1 +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
   to_arrange <- c(to_arrange, label_plot)
   design <- "
 1#
