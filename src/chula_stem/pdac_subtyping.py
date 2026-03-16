@@ -48,13 +48,16 @@ def read_manifest(
 ) -> ad.AnnData:
     SCHEMA.validate(manifest)
 
-    sv_check: set = {"SV"}
     no_expr: list[str] = (
-        manifest.groupby("sample")
-        .agg({"type": set})
-        .query("type == @sv_check")
-        .index.to_list()
+        pl.from_pandas(manifest)
+        .group_by("sample")
+        .agg(pl.col("type"))
+        .filter(
+            pl.col("type").list.set_intersection(["kallisto", "salmon"]).list.len() == 0
+        )["sample"]
+        .to_list()
     )
+
     adata: ad.AnnData = get_counts(manifest, tx2gene, no_expr)
     if no_expr:
         dummy = ad.AnnData(
@@ -101,8 +104,8 @@ def get_counts(
             index_col = "Name" if group == "salmon" else "target_id"
             index_groups = group_by_index(files, index_col, sep="\t")
             # necessary to avoid errors with files not having the same index
-            for _ in index_groups:
-                cur = df.query("file.isin(@g)")
+            for index_group in index_groups:
+                cur = df.loc[df["file"].isin(index_group), :]
                 adata = tximport(
                     files=list(cur["file"]),
                     tx2gene=tx2gene,
