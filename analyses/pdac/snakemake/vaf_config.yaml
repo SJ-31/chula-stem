@@ -11,35 +11,27 @@ __definitions__:
   - conda_env = "stem-base" if is_local else "nf"
   - outdir = f"{data_root}/output/HCC/SCRNASEQ/cohort" if not test else f"{workdir}/test"
 
-root: ?f"{data_root}/output/PDAC" # Root path of wes results
 outdir: ?f"{proj_root}/analyses/output/pdac" # Root path for output
 conda: ?conda_env # conda environment for reticulate
-manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
+
+sample_spec:
+  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
+    root: ?f"{data_root}/output/PDAC" # Root path of wes results
+    extra: ["N45_2", "N51_2", "N56_2", "N59_2", "N68_2", "N76_1", "N80_1"]
+    cohort: "cohort"
+  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_phcase1.csv"
+    cohort: "PHcase"
+    root: ?f"{data_root}/output/PHCase"
+
+manifest:
 src: # source directories
   py: ?f"{proj_root}/src/chula_stem"
   r: ?f"{proj_root}/src/R"
 
 source_tag: "SOURCE"
-cohort: "cohort"
-
-extra:
-  cases:
-    [
-      "PHcase_1",
-      "PHcase_6",
-      "N45_2",
-      "N51_2",
-      "N56_2",
-      "N59_2",
-      "N68_2",
-      "N76_1",
-      "N80_1",
-    ]
-  multiqc_vep:
-    - ?f"{data_root}/output/PHCase/8-PHcase-MultiQC_data/vep.txt"
 
 variant_calling:
-  paired: False # Set to False if results are from `wes_tumor_only`
+  paired: "detect" # One of "yes", "no", "detect", Set to "no" if results are from `wes_tumor_only`. Will autodetect otherwise
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
 plot:
   dpi: 500
@@ -47,6 +39,17 @@ plot:
   height: 10
 
 only_curated: False # Only allow named variants, regardless of type
+
+sample_labels:
+  "Waddell Class":
+    palette: "Manu::Korora"
+    file: ?f"{proj_root}/analyses/pdac_subtyping/waddell_subtype.tsv"
+  "KRAS subtype":
+    palette: "Manu::Hoiho"
+    file: ?f"{proj_root}/analyses/pdac_subtyping/KRAS_imbalance_subtype.tsv"
+  "Moffitt basal-like":
+    palette: "Manu::Hihi"
+    file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal.tsv"
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
