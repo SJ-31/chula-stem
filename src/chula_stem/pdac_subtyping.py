@@ -63,14 +63,23 @@ def read_manifest(
             obs=pd.DataFrame({"rnaseq_available": False}, index=no_expr),
         )
         adata = ad.concat([adata, dummy], merge="first", join="outer", uns_merge="same")
-    purecn_df = manifest.query("type == 'purecn_variant' | type == 'purecn_gene'")
+
+    adata.X = sparse.csc_array(adata.X)
+    return adata
+
+
+def add_kras_imbalance(
+    manifest: pd.DataFrame, adata: ad.AnnData, purecn_prefix: str = ""
+) -> None:
+    purecn_df = manifest.query("type == 'purecn'")
     if not purecn_df.empty:
-        kras_scores = call_kras_imbalance(manifest, purecn_prefix=purecn_prefix)
+        kras_scores = call_kras_imbalance(purecn_df, purecn_prefix=purecn_prefix)
         adata.obs = adata.obs.merge(kras_scores["subtype"], on="sample", how="left")
         adata.uns["purecn_kras_variants"] = kras_scores["variants"]
         adata.uns["purecn_kras_genes"] = kras_scores["genes"]
-    adata.X = sparse.csc_array(adata.X)
-    return adata
+        adata.uns["purecn_summary"] = kras_scores["summary"]
+    else:
+        print("Warning: No samples with PureCN directories present in manifest")
 
 
 def group_by_index(files: Sequence[str], index_col: str, **kws) -> list[list]:
