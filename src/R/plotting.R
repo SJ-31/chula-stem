@@ -7,9 +7,7 @@ library(grid)
 library(ggplot2)
 
 box::use(paletteer[scale_fill_paletteer_d, scale_fill_paletteer_c])
-box::use(ggplot2[...])
-box::use(dplyr[...])
-box::use(patchwork[...])
+box::use(dplyr[...], tidyr[...], ggplot2[...], patchwork[...], stringr[...])
 
 R_SRC <- Sys.getenv("R_SRC")
 UTILS_FILE <- paste0(R_SRC, "/", "utils.R")

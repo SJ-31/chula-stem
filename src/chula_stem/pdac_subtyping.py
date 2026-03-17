@@ -1,4 +1,5 @@
 #!/usr/bin/env ipython
+import importlib.resources as res
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Callable, Literal
@@ -10,6 +11,7 @@ import pandas as pd
 import pandera.pandas as pa
 import pandera.polars as pal
 import polars as pl
+import rpy2.robjects as ro
 from beartype import beartype
 from scipy import sparse
 from scipy.special import expit
@@ -17,7 +19,14 @@ from scipy.stats import expon, goodness_of_fit, iqr
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import train_test_split
 
-from chula_stem.r_utils import tximport
+from chula_stem.r_utils import (
+    box_use,
+    df_to_r,
+    r_cleanup,
+    r_null_if_none,
+    source,
+    tximport,
+)
 
 "[2026-03-04 Wed] Interested in GATA6 and RAS want to score a transcriptome based on activity of these genes"
 
@@ -73,8 +82,19 @@ def read_manifest(
     return adata
 
 
+@r_cleanup
+def save_purecn_summary(
+    df: pd.DataFrame, file: str, palette_c=None, palette_d=None
+) -> None:
+    box_use("R/plotting[plot_purecn_summary]")
+    df_to_r(df, r_symbol="df")
+    r_null_if_none({"palette_c": palette_c, "palette_d": palette_d})
+    ro.r("plot <- plot_purecn_summary(df, palette_d, palette_c)")
+    ro.r(f"ggsave('{file}', plot = plot)")
+
+
 def add_kras_imbalance(
-    manifest: pd.DataFrame, adata: ad.AnnData, purecn_prefix: str = ""
+    manifest: pd.DataFrame, adata: ad.AnnData, purecn_prefix: str = "", **kws
 ) -> None:
     purecn_df = manifest.query("type == 'purecn'")
     if not purecn_df.empty:
