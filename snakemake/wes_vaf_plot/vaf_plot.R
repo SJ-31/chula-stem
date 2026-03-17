@@ -19,6 +19,7 @@ suppressMessages({
   label_spec <- config$sample_labels
   samples <- snakemake@params$samples |> sort()
   nd_label <- config$no_data_label %||% "ND"
+  samples_with_wes <- samples
 })
 
 print(glue("Available samples: {paste0(samples, collapse = ',')}"))
@@ -233,10 +234,11 @@ order <- replicate_figure$SYMBOL |>
 replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
 
 sample_freq <- replicate_figure |>
+  filter(sample %in% samples_with_wes) |>
   distinct(SYMBOL, sample) |>
   group_by(SYMBOL) |>
   summarise(
-    freq_raw = (round(n() / n_samples, 2) * 100),
+    freq_raw = (round(n() / length(samples_with_wes), 2) * 100),
     freq = freq_raw |>
       as.character() %>%
       paste0(., " %")
@@ -313,6 +315,7 @@ tmb_plot <- tmb_merged |>
 ## *** Counts plot
 counts_plot <- replicate_figure |>
   ## distinct(sample, SYMBOL, .keep_all = TRUE) |> # [2026-03-09 Mon] Pretty sure you don't need this
+  filter(sample %in% samples_with_wes) |>
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
@@ -330,11 +333,11 @@ counts_plot <- replicate_figure |>
   ) +
   scale_x_continuous(
     position = "top",
-    limits = c(0, n_samples),
-    breaks = c(0, n_samples),
+    limits = c(0, length(samples_with_wes)),
+    breaks = c(0, length(samples_with_wes)),
     expand = c(0, 0)
   ) +
-  xlab("Number of samples") +
+  xlab("Number of samples (with WES)") +
   guides(fill = "none") +
   scale_fill_paletteer_d(rep_theme, drop = FALSE)
 

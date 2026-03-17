@@ -31,7 +31,7 @@ variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: null # Minimum depth that variants are counted in the plot
   # [2025-12-19 Fri] Removed because some callers don't report alt depth
-  protein_only: True # Only allow variants that affect proteins
+  protein_only: False # Only allow variants that affect proteins
 plot:
   dpi: 500
   width: 15

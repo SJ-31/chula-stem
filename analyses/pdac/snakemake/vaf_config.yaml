@@ -17,8 +17,10 @@ conda: ?conda_env # conda environment for reticulate
 sample_spec:
   - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
     root: ?f"{data_root}/output/PDAC" # Root path of wes results
-    extra: ["N45_2", "N51_2", "N56_2", "N59_2", "N68_2", "N76_1", "N80_1"]
     cohort: "cohort"
+  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_prev.csv"
+    root: ?f"{data_root}/output/PDAC" # Root path of wes results
+    cohort: "prev_cohort"
   - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_phcase1.csv"
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
@@ -32,10 +34,11 @@ source_tag: "SOURCE"
 
 variant_calling:
   paired: "detect" # One of "yes", "no", "detect", Set to "no" if results are from `wes_tumor_only`. Will autodetect otherwise
-  min_alt_depth: 10 # Minimum depth that variants are counted in the plot
+  min_alt_depth: 5 # Minimum depth that variants are counted in the plot
+  protein_only: false
 plot:
   dpi: 500
-  width: 15
+  width: 20
   height: 10
 
 only_curated: False # Only allow named variants, regardless of type
@@ -50,6 +53,10 @@ sample_labels:
   "Moffitt basal-like":
     palette: "Manu::Hihi"
     file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal.tsv"
+
+no_data_label: "no data"
+add_label_samples: true # Add any samples that are found in the label files, but not
+# in the exome pipeline (will be marked with `no_data_label`)
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
