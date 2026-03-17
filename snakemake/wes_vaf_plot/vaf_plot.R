@@ -437,20 +437,22 @@ if (add_groupings) {
 ## ** Arranging
 
 # Get and remove legends
-type_legend <- ggpubr::get_legend(tmb_plot)
-## vaf_legend <- ggpubr::get_legend(r1)
-tmb_plot <- tmb_plot + guides(fill = "none")
+type_legend <- ggpubr::get_legend(tmb_plot) |> ggpubr::as_ggplot()
+tmb_plot <- tmb_plot +
+  guides(fill = "none")
+sbs_legend <- ggpubr::get_legend(sbs_plot) |> ggpubr::as_ggplot()
+sbs_plot <- sbs_plot + guides(fill = "none")
+r1 <- r1 +
+  guides(alpha = "none") +
+  xlab("Sample")
 
-r1 <- r1 + guides(alpha = "none")
-
-# TODO: [2026-03-09 Mon] gotta check this works
-# TODO: revert to grabbing the y axis from counts plot if the margins don't work well
 to_arrange <- list(
   tmb_plot, # 1
   r1, # 2
   counts_plot, # 3
   sbs_plot, # 4
-  type_legend # 5
+  type_legend, # 5
+  sbs_legend # 6
 )
 if (!is.null(label_plot)) {
   to_arrange[[2]] <- r1 +
@@ -459,22 +461,22 @@ if (!is.null(label_plot)) {
   label_plot <- label_plot + xlab("Sample")
   to_arrange <- c(to_arrange, label_plot, guide_area)
   design <- "
-#1#
-723
-76#
-74#
-75#
+#1##
+8233
+87##
+846#
+85##
 "
   heights <- c(3, 12, 3, 3, 5)
-  widths <- c(1, 10, 3)
+  widths <- c(2, 10, 0.3, 4)
 } else {
   design <- "
-1#
-23
-35
-4#
+1##
+233
+46#
+5##
 "
-  widths <- c(10, 4)
+  widths <- c(10, 0.3, 4)
   heights <- c(3, 10, 3, 5)
 }
 
