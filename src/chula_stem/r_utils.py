@@ -115,8 +115,22 @@ def dgelist2anndata(rds: str | RObject) -> ad.AnnData:
     return adata
 
 
-def source(r_script: str, root: Path, in_r=False) -> STAP | None:
+def box_use(use_string, path: str | None | Sequence[str] = None) -> None:
+    """Call box use in R, after setting `box.path` to path"""
+    if path is None:
+        path = str(res.files("chula_stem").parent)
+    if isinstance(path, str):
+        path = [path]
+    ro.globalenv["box_path"] = ro.StrVector(path)
+    ro.r("options(box.path = box_path)")
+    ro.r(f"box::use({use_string})")
+    ro.r("rm(box_path)")
+
+
+def source(r_script: str, root: Path | None = None, in_r=False) -> STAP | None:
     """Import `r script` in src/R as a STAP"""
+    if root is None:
+        root = res.files("chula_stem").parent / "R"
     r_src = root.parent.joinpath("R")
     script = r_src.joinpath(r_script)
     if not script.exists():
