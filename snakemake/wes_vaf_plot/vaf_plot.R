@@ -300,7 +300,8 @@ tmb_plot <- tmb_merged |>
     axis.ticks.length.y.left = unit(5, "points"),
     axis.line.y = element_line(),
     axis.ticks.y = element_line(),
-    axis.text.y = element_text()
+    axis.text.y = element_text(),
+    plot.margin = unit(c(30, 0, 0, 0), "points")
   ) +
   guides(fill = guide_legend(title = element_blank(), position = "bottom")) +
   scale_fill_paletteer_d(rep_theme, drop = FALSE) +
@@ -320,7 +321,7 @@ counts_plot <- replicate_figure |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
   scale_y_discrete(limits = rev(sample_freq$SYMBOL), labels = \(old) {
-    deframe(select(sample_freq, SYMBOL, freq))[old]
+    paste0(deframe(select(sample_freq, SYMBOL, freq))[old], " ")
   }) +
   theme_void() +
   theme(
@@ -329,10 +330,11 @@ counts_plot <- replicate_figure |>
     axis.text.y = element_text(),
     axis.line.x = element_line(),
     axis.ticks.x = element_line(),
-    axis.ticks.length.x = unit(5, "points")
+    axis.ticks.length.x = unit(5, "points"),
+    plot.margin = unit(c(0, 30, 0, 0), "points")
   ) +
   scale_x_continuous(
-    position = "top",
+    ## position = "top",
     limits = c(0, length(samples_with_wes)),
     breaks = c(0, length(samples_with_wes)),
     expand = c(0, 0)
@@ -453,26 +455,36 @@ to_arrange <- list(
 if (!is.null(label_plot)) {
   to_arrange[[2]] <- r1 +
     theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-  to_arrange <- c(to_arrange, label_plot)
+  guide_area <- guide_area()
+  label_plot <- label_plot + xlab("Sample")
+  to_arrange <- c(to_arrange, label_plot, guide_area)
   design <- "
-1#
-23
-6#
-4#
-55
+#1#
+723
+76#
+74#
+75#
 "
-  heights <- c(3, 10, 1, 3, 5)
+  heights <- c(3, 12, 3, 3, 5)
+  widths <- c(1, 10, 3)
 } else {
   design <- "
 1#
 23
+35
 4#
-55
 "
+  widths <- c(10, 4)
   heights <- c(3, 10, 3, 5)
 }
 
-final_rep <- wrap_plots(to_arrange, design = design, heights = heights)
+final_rep <- wrap_plots(
+  to_arrange,
+  design = design,
+  heights = heights,
+  widths = widths
+) +
+  plot_layout(guides = "collect")
 
 
 ## * Plot metrics
