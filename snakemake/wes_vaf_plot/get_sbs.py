@@ -67,6 +67,7 @@ cwd = os.getcwd()
 
 found_cases = []
 files = []
+
 for case in cases:
     data = Path(data_mapping[case])
     case_dir = data.joinpath(case).resolve().absolute()
@@ -74,6 +75,8 @@ for case in cases:
     if look_for:
         files.append(look_for)
         found_cases.append(case)
+    else:
+        raise ValueError(f"Couldn't find file for {case}")
 
 with TemporaryDirectory() as tmpdir:
     os.chdir(tmpdir)

@@ -49,10 +49,9 @@ def samples_setup() -> tuple[pd.DataFrame, dict]:
 
 
 manifest, sample2root = samples_setup()
-samples = manifest["patient"]
+samples = manifest["patient"].tolist()
 vcf_dir = f"{outdir}/vcfs"
 align_dir = f"{outdir}/alignments"
-
 
 VAF_OUT = {
     "gene_metrics": f"{outdir}/gene_metrics.png",
