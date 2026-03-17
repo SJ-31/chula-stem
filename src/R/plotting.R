@@ -5,6 +5,12 @@ library(pointblank)
 library(glue)
 library(grid)
 library(ggplot2)
+
+box::use(paletteer[scale_fill_paletteer_d, scale_fill_paletteer_c])
+box::use(ggplot2[...])
+box::use(dplyr[...])
+box::use(patchwork[...])
+
 R_SRC <- Sys.getenv("R_SRC")
 UTILS_FILE <- paste0(R_SRC, "/", "utils.R")
 if (file.exists(UTILS_FILE)) {
@@ -533,7 +539,7 @@ combine_sample_label_plots <- function(
         axis.text.y = element_blank()
       )
     if (!is.null(palette)) {
-      plot <- plot + scale_fill_paletteer_d(palette)
+      plot <- plot + scale_fill_paletteer_d(palette, breaks = ~ .x[!is.na(.x)])
     }
     if (!last) {
       plot <- plot +
@@ -558,4 +564,33 @@ combine_sample_label_plots <- function(
     }
   )
   wrap_plots(plots, ncol = 1)
+}
+
+#' @export
+plot_purecn_summary <- function(
+  tb,
+  palette_d = NULL,
+  palette_c = NULL
+) {
+  flag_tb <- tb |>
+    select(Sampleid, Comment, Flagged) |>
+    separate_longer_delim(Comment, ";") |>
+    mutate(Comment = str_replace(Comment, "POOR GOF .*", "POOR GOF")) |>
+    mutate(Comment = replace_values(Comment, NA ~ ""))
+  purity_plot <- ggplot(tb, aes(x = Sampleid, y = Ploidy, fill = Purity)) +
+    geom_bar(stat = "identity")
+  comment_plot <- ggplot(
+    flag_tb,
+    aes(x = Sampleid, y = Comment, fill = Flagged)
+  ) +
+    theme_minimal() +
+    geom_tile(width = 0.90, height = 0.90) +
+    theme(axis.text.x = element_blank(), axis.title.x = element_blank())
+  if (!is.null(palette_d)) {
+    comment_plot <- comment_plot + scale_fill_paletteer_d(palette_d)
+  }
+  if (!is.null(palette_c)) {
+    purity_plot <- purity_plot + scale_fill_paletteer_c(palette_c)
+  }
+  comment_plot / purity_plot + plot_layout(heights = c(1, 5))
 }
