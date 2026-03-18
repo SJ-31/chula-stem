@@ -17,7 +17,8 @@ output <- snakemake@output[[1]]
 tb <- read_tsv(
   snakemake@input[[1]]
 ) |>
-  filter(SYMBOL == wanted)
+  filter(SYMBOL == wanted) |>
+  mutate(HGVSg = str_remove(HGVSg, "^chr"))
 
 grouped <- tb |>
   group_by(subject, HGVSg) |>

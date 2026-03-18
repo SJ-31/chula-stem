@@ -59,6 +59,7 @@ VAF_OUT = {
     "vaf": f"{outdir}/vaf.png",
     "plot_data": f"{outdir}/vaf_plot_data.tsv",
     "variant_table": f"{outdir}/variant_table.html",
+    "variant_summary_table": f"{outdir}/variant_summary.html",
     # BUG: this really should be pdf, but would need chrome installed on server
 }
 ALIGN_OUT = {"alignments": expand("{o}/{c}", o=align_dir, c=samples)}
@@ -150,6 +151,15 @@ rule variant_table:
         rules.get_vep.output.combined,
     output:
         VAF_OUT["variant_table"],
+    script:
+        "variant_table.R"
+
+
+rule variant_summary:
+    input:
+        rules.get_vep.output.combined,
+    output:
+        VAF_OUT["variant_summary_table"],
     script:
         "variant_table.R"
 
