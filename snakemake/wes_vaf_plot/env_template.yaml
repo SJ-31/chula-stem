@@ -27,6 +27,12 @@ sample_labels:
   #   file:
   #   palette:
 
+individual_gene_plots: # Plots showing the distribution of variants for specific genes in cohort
+  wanted: ["TP53", "KRAS"]
+  palette_c:
+  palette_d:
+  dpi: 500
+
 variant_calling:
   paired: True # Set to False if results are from `wes_tumor_only`
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot

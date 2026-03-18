@@ -70,6 +70,10 @@ else:
     TARGETS = VAF_OUT
 
 
+for gene in config["individual_gene_plots"].get("wanted"):
+    TARGETS[f"{gene}_individual"] = f"{outdir}/{gene}_variants.png"
+
+
 rule all:
     input:
         **TARGETS,
@@ -128,6 +132,17 @@ rule vaf_plot:  # Assemble plot
         plot_data=VAF_OUT["plot_data"],
     script:
         "vaf_plot.R"
+
+
+rule individual_gene_plots:
+    input:
+        rules.get_vep.output.combined,
+    params:
+        wanted=lambda wc: wc.get("gene"),
+    output:
+        f"{outdir}/{{gene}}_variants.png",
+    script:
+        "gene_variants_plot.R"
 
 
 rule variant_table:
