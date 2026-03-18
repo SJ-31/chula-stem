@@ -10,8 +10,6 @@ Rplots.pdf
 package.json
 .snakemake
 package-lock.json
-analyses/data
-analyses/data_all
 analyses/*.pdf
 *.vcf.gz
 *.html
