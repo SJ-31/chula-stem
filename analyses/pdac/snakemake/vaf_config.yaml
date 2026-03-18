@@ -50,12 +50,12 @@ sample_labels:
   "KRAS subtype":
     palette: "Manu::Hoiho"
     file: ?f"{proj_root}/analyses/pdac_subtyping/KRAS_imbalance_subtype.tsv"
-  "Moffitt basal-like":
+  "Moffitt is basal-like":
     palette: "Manu::Hihi"
     file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal.tsv"
 
 no_data_label: "no data"
-add_label_samples: true # Add any samples that are found in the label files, but not
+add_label_samples: false # Add any samples that are found in the label files, but not
 # in the exome pipeline (will be marked with `no_data_label`)
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
@@ -72,6 +72,13 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   - "inframe_deletion"
   - "splice_donor_5th_base_variant"
   - "NMD_transcript_variant"
+
+individual_gene_plots:
+  wanted: ["TP53", "KRAS"]
+  palette_c:
+  width: 20
+  palette_d:
+  dpi: 500
 
 wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   TP53: "17:7661779-7687546"

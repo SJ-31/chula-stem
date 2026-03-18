@@ -27,13 +27,8 @@ print(glue("Available samples: {paste0(samples, collapse = ',')}"))
 with_no_data <- c()
 TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
 
-# [2026-03-16 Mon] BUG: the samples prefixed with N aren't showing up
-# Might be because they have TOOL_SOURCE as the source tag and not "SOURCE". So
-# gotta rename them
-# More importantly, they use a different system for chr names... Need to relabel chrs
-# Add a how_to for both of these
-
 ## * Get extra sample labels
+add_missing <- config$add_label_samples %||% TRUE
 
 if (!is.null(label_spec)) {
   assert_list(label_spec, names = "unique")
@@ -45,16 +40,20 @@ if (!is.null(label_spec)) {
     new_samples <- tb |>
       pluck("sample") |>
       discard(\(s) s %in% samples)
-    if (config$add_label_samples %||% TRUE) {
+    if (add_missing) {
       samples <<- unique(c(samples, new_samples))
       with_no_data <<- unique(c(with_no_data, new_samples))
+      tb |> bind_rows(tb, tibble(sample = others, label = NA))
+    } else {
+      tb
     }
-    tb |> bind_rows(tb, tibble(sample = others, label = NA))
   })
   label_palettes <- lapply(label_spec, \(s) s$palette)
-  extra_labels[["Exome data available"]] <- tibble(sample = samples) |>
-    mutate(label = case_when(sample %in% with_no_data ~ "N", .default = "Y"))
-  label_palettes[["Exome data available"]] <- "ggsci::alternating_igv"
+  if (add_missing) {
+    extra_labels[["Exome data available"]] <- tibble(sample = samples) |>
+      mutate(label = case_when(sample %in% with_no_data ~ "N", .default = "Y"))
+    label_palettes[["Exome data available"]] <- "ggsci::alternating_igv"
+  }
   samples <<- sort(samples)
   label_plot <- combine_sample_label_plots(
     extra_labels,
@@ -313,6 +312,12 @@ tmb_plot <- tmb_merged |>
   scale_x_discrete(limits = samples)
 
 
+counts_x_lab <- ifelse(
+  add_missing,
+  "N samples (with WES)",
+  "N samples"
+)
+
 ## *** Counts plot
 counts_plot <- replicate_figure |>
   ## distinct(sample, SYMBOL, .keep_all = TRUE) |> # [2026-03-09 Mon] Pretty sure you don't need this
@@ -339,7 +344,7 @@ counts_plot <- replicate_figure |>
     breaks = c(0, length(samples_with_wes)),
     expand = c(0, 0)
   ) +
-  xlab("Number of samples (with WES)") +
+  xlab(counts_x_lab) +
   guides(fill = "none") +
   scale_fill_paletteer_d(rep_theme, drop = FALSE)
 
