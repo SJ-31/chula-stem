@@ -320,7 +320,6 @@ counts_x_lab <- ifelse(
 
 ## *** Counts plot
 counts_plot <- replicate_figure |>
-  ## distinct(sample, SYMBOL, .keep_all = TRUE) |> # [2026-03-09 Mon] Pretty sure you don't need this
   filter(sample %in% samples_with_wes) |>
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +

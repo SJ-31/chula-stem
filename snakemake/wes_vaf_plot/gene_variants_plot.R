@@ -2,6 +2,7 @@ library(tidyverse)
 library(glue)
 library(ggplot2)
 library(patchwork)
+library(ggtext)
 library(paletteer)
 
 rconfig <- snakemake@config[[snakemake@rule]]
@@ -40,6 +41,15 @@ grouped <- tb |>
     )
   )
 
+format_consequence <- function(vec) {
+  str_replace_all(vec, "_", " ") |>
+    str_replace_all("&", ", ") |>
+    str_to_title() |>
+    str_replace_all("Utr", "UTR") |>
+    str_replace_all("3 Prime", "3'") |>
+    str_replace_all("5 Prime", "5'")
+}
+
 ordered_variants <- grouped |>
   ungroup() |>
   select(var_display, POS) |>
@@ -53,20 +63,42 @@ var_names2consequence <- grouped |>
   select(var_display, Consequence) |>
   distinct() |>
   deframe() |>
-  str_replace_all("_", " ") |>
-  str_replace_all("&", ", ") |>
-  str_to_title() |>
-  str_replace_all("Utr", "UTR") |>
-  str_replace_all("3 Prime", "3'") |>
-  str_replace_all("5 Prime", "5'")
+  format_consequence()
+
+prop_map <- grouped |>
+  ungroup() |>
+  count(var_display) |>
+  mutate(n = {
+    mul <- (n / length(unique(grouped$subject))) * 100
+    mul |>
+      round(2) |>
+      as.character() |>
+      paste0("%")
+  }) |>
+  deframe()
+
+color_map <- setNames(
+  paletteer_d("Polychrome::dark")[seq_along(unique(var_names2consequence))],
+  unique(var_names2consequence)
+)
+
+style_color <- function(vec, color) {
+  paste0("<b style='color:", color, "'>", vec, "</b>")
+}
 
 consequence_axis <- ggplot(
   grouped,
   aes(y = factor(var_display, levels = ordered_variants))
 ) +
-  scale_y_discrete(labels = \(x) var_names2consequence[x]) +
+  scale_y_discrete(
+    labels = \(x) {
+      mapped <- var_names2consequence[x]
+      with_color <- style_color(mapped, color_map[mapped])
+      paste0(with_color, " (", prop_map[x], ")")
+    }
+  ) +
   theme_void() +
-  theme(axis.text.y = element_text(hjust = 0))
+  theme(axis.text.y = element_markdown(hjust = 0))
 
 
 plot <- ggplot(
@@ -81,6 +113,7 @@ plot <- ggplot(
   ) +
   theme(
     axis.text.x = element_text(angle = 90),
+    axis.ticks.y.right = element_line(),
     panel.grid = element_blank(),
     plot.background = element_blank(),
     legend.title = element_text(face = "bold")
@@ -97,6 +130,6 @@ plot <- ggplot(
 
 combined <- plot +
   consequence_axis +
-  plot_layout(widths = c(10, 0.1), guides = "collect")
+  plot_layout(widths = c(10, 0.5), guides = "collect")
 
 ggsave(output, combined, width = width, height = height, dpi = dpi)
