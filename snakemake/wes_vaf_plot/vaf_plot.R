@@ -40,12 +40,12 @@ if (!is.null(label_spec)) {
     new_samples <- tb |>
       pluck("sample") |>
       discard(\(s) s %in% samples)
+    tb <- bind_rows(tb, tibble(sample = others, label = NA))
     if (add_missing) {
       samples <<- unique(c(samples, new_samples))
       with_no_data <<- unique(c(with_no_data, new_samples))
-      tb |> bind_rows(tb, tibble(sample = others, label = NA))
     } else {
-      tb
+      tb |> filter(sample %in% samples_with_wes)
     }
   })
   label_palettes <- lapply(label_spec, \(s) s$palette)
