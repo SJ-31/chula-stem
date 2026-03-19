@@ -1,4 +1,15 @@
 # -*- eval: (jinx-mode -1) -*-
+* tcr_imgt_c
+*Relative Path:* =analyses/data/tcr_imgt_c=
+*Date Added:* <2026-03-18 Wed>
+*Source:* [[https://www.imgt.org/genedb/][IMGT]]
++ IMGT reference sequences for human TCR C chains to use for TCR constructs
+  * For TRAC, the C-REGION (which contains all of the cDNA) was extracted from the X02592 accession and concatenated with a stop codon 
+  * No cDNA pages were available for TRBC[1,2] so instead for each allele, sequences EX1-4 (exons) were obtained and concatenated together with a stop codon
++ Links
+  * [[https://www.imgt.org/ligmdb/result.action?accessionNumber=X02592][TRAC]]
+  * [[https://www.imgt.org/genedb/fasta?outputFormat=fastaNAllP&selectGenes=TRBC1&selectSpecies=Homo%20sapiens][TRBC1]]
+  * [[https://www.imgt.org/genedb/fasta?outputFormat=fastaNAllP&selectGenes=TRBC2&selectSpecies=Homo%20sapiens][TRBC2]]
 * TCR_VDJ_families
 *Relative Path:* =analyses/data/TCR_VDJ_families=
 *Date Added:* <2026-03-12 Thu>
@@ -64,7 +75,7 @@ IEDB data formatted for TCRMatch
 *Relative Path:* =analyses/data/CEDAR_data.tsv=
 *Date Added:* <2025-10-06 Mon>
 *Source:* https://github.com/IEDB/TCRMatch
-Epitope data from the CEDAR database as provided in the 1.3 release of TCRMatch 
+Epitope data from the CEDAR database as provided in the 1.3 release of TCRMatch
 * vdjdb.h5ad
 *Relative Path:* =analyses/data/vdjdb.h5ad=
 *Date Added:* <2025-09-26 Fri>
