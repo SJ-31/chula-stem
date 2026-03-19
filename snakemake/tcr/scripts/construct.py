@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import Literal, TypeAlias
 
 import anndata as ad
+import dnachisel as dc
 import numpy as np
 import polars as pl
 import polars.selectors as cs
@@ -98,6 +99,62 @@ class ChainData:
 
 
 @beartype
+def optimize_reduce_complexity(
+    sequence: DNA,
+    method: Literal[
+        "use_best_codon", "match_codon_usage", "harmonize_rca"
+    ] = "use_best_codon",
+    gc_range: tuple[float, float] = (0.4, 0.6),
+    k: int = 8,
+    stem_size: int = 20,
+    hairpin_window: int = 200,
+    gc_window: int = 100,
+    hairpin_boost=1.0,
+    kmer_boost=1.0,
+) -> dict:
+    """
+    Codon-optimize `sequence` while also reducing its complexity for cloning purposes
+    This function attempts to...
+    - Remove repetitive regions
+    - Remove hairpins
+    - Maintain GC content below the specified threshold
+
+    Notes
+    -----
+    Default parameters are based on the gBlocks complexity calculator [1]
+
+    The resulting sequence should have an identical translation to the original
+
+    References
+    ----------
+    [1] https://sg.idtdna.com/site/order/gblockentry
+    """
+    translated_before = sequence.translate()
+    problem = dc.DnaOptimizationProblem(
+        sequence=str(sequence),
+        constraints=[
+            dc.UniquifyAllKmers(k=k, boost=kmer_boost),
+            dc.AvoidHairpins(
+                stem_size=stem_size, hairpin_window=hairpin_window, boost=hairpin_boost
+            ),
+            dc.EnforceTranslation(),
+            dc.EnforceGCContent(mini=gc_range[0], maxi=gc_range[1], window=gc_window),
+        ],
+        objectives=[dc.CodonOptimize(species="h_sapiens", method=method)],
+    )
+    problem.resolve_constraints()
+    problem.optimize()
+    soln = DNA(problem.sequence)
+    translated_after = soln.translate()
+    return {
+        "translation_same": translated_before == translated_after,
+        "objective_summary": problem.objectives_text_summary(),
+        "constraint_summary": problem.constraints_text_summary(),
+        "seq": soln,
+    }
+
+
+@beartype
 def get_best_alignment(
     query: DNA, references: list[DNA], free_ends, return_alignment: bool = False
 ) -> tuple[float, DNA] | tuple[PairAlignResult, DNA]:
@@ -157,6 +214,18 @@ def get_seq_from_cfg(
     default: str = "",
     metadata: dict | None = None,
 ) -> list[DNA]:
+    """
+    Retrieve sequences from the TCR configuration dictionary
+
+    Notes
+    -----
+    Values in the config can be...
+    - raw sequence strings
+    - a fasta file path
+    - a directory containing fasta files
+
+    A list may also be specified
+    """
     if isinstance(key, str):
         val = cfg.get(key)
     else:
@@ -164,7 +233,10 @@ def get_seq_from_cfg(
     val = val or default
 
     def read_one(f: Path) -> DNA:
-        seq: DNA = DNA.read(f, "fasta")
+        try:
+            seq: DNA = DNA.read(f, "fasta")
+        except ValueError:
+            seq = DNA.read(f, "fasta", lowercase=True)
         seq.metadata["id"] = (
             f"{prefix}{seq.metadata['id']} {seq.metadata['description']}"
         )
@@ -293,6 +365,7 @@ class ConstructValidation:
     inframe_stop_origins: list = field(default_factory=list)
     gene_validation: dict[str, dict[str, dict]] = field(default_factory=dict)
     # Sequences that, when added, produce an inframe stop codon
+    optimization: dict | None = None
 
 
 class TCRConstruct:
@@ -333,7 +406,7 @@ class TCRConstruct:
                         self.ref_sequences_fastas[f.stem] = f
                 elif dir_or_file.exists():
                     self.ref_sequences_fastas[dir_or_file.stem] = dir_or_file
-        self.outdir: str | None = self.cfg.get("outdir")
+        self.outdir: str | None = outdir or self.cfg.get("outdir")
         self.ref_matches: dict[str, dict[str, Protein]] = defaultdict(
             lambda: defaultdict(dict)
         )
@@ -391,6 +464,9 @@ class TCRConstruct:
         gene_offset,
         chain_name: CHAIN_NAME,
     ):
+        """
+        Add gene indices to the visualization list, and also check their alignments
+        """
         for g in genes:
             if not cdata.get(f"{g}_call"):
                 continue
@@ -399,6 +475,7 @@ class TCRConstruct:
             call: str = cdata[f"{g}_call"]
             if g != "d":  # TODO: check why there are no d genes
                 self._check_alignment(DNA(seq), g, call, chain=chain_name)
+                # Store the observed indices for later plotting
                 g_start = start + gene_offset - self.fivep_flank_len
                 g_end = end + gene_offset - self.fivep_flank_len
                 self.tcr_block_gene_indices["dna"][self.cur_chain][g] = (
@@ -588,6 +665,7 @@ class TCRConstruct:
                 elif i == len(block_seqs) - 1:
                     chain_intervals[chain] = (start_acc, stop_acc)
             annotations = []
+            # Align reference sequence with interval of the TCR block and save result
             for chain, chain_dict in self.ref_matches[seq_type].items():
                 interval = chain_intervals[chain]
                 acc_interval: int = 0
@@ -609,6 +687,7 @@ class TCRConstruct:
                     query_name = (
                         f"{chain} {gene.upper()} gene ({seq_aa.metadata['id']}) "
                     )
+                    # Padding to keep lengths consistent with the full TCR block
                     rpad = "-" * (len(block) - interval[1])
                     lpad = "-" * left_offset
                     to_add = f"{lpad}{alignment[0]}{rpad}"
@@ -618,6 +697,10 @@ class TCRConstruct:
         return result
 
     def _plot_alignment_validation(self):
+        """
+        Produce MSA plots of the observed sequences with IMGT reference sequences, saving
+        the result to the output directory given during init or in the config
+        """
         out: pymupdf.Document = pymupdf.open()
         with TemporaryDirectory() as d:
             for chain, chain_dict in self.vreport.gene_validation.items():
@@ -763,6 +846,8 @@ class TCRConstruct:
             gene_offset = acc
         _ = self._add_flanking("three_prime", acc)
         full_construct = "".join([str(seq) for seq in self.to_assemble])
+        full_optimized, soln = self._get_optimized()
+        self.vreport.optimization = soln
         with_names = {}
         self._check_start_stop()
         for i, seq in enumerate(self.to_assemble):
@@ -770,13 +855,28 @@ class TCRConstruct:
             seq.interval_metadata = IntervalMetadata(len(seq))
             seq.interval_metadata.add(bounds=[(0, len(seq))], metadata={"name": name})
             with_names[f"{i}_{name}"] = seq
-        self._plot_alignment_validation()
+        if self.outdir is not None:
+            self._plot_alignment_validation()
         return {
             "sequence": full_construct,
+            "sequence_optimized": full_optimized,
             "plot": plot_construct(full_construct, self.viz_data, self.cfg),
             "named": with_names,
             "validation": self.vreport,
         }
+
+    def _get_optimized(self) -> tuple[str, dict]:
+        tmp_optmized = []
+        soln: dict = optimize_reduce_complexity(
+            self.tcr_block, **self.cfg.get("optimization", {})
+        )
+        if self.to_assemble[0].metadata["region_type"] == "five_prime":
+            tmp_optmized.append(self.to_assemble[0])
+        tmp_optmized.append(soln["seq"])
+        del soln["seq"]
+        if self.to_assemble[-1].metadata["region_type"] == "three_prime":
+            tmp_optmized.append(self.to_assemble[-1])
+        return "".join([str(s) for s in tmp_optmized]), soln
 
 
 # * Rule
@@ -888,7 +988,11 @@ def assemble_constructs():
         result: dict = cons.assemble()
         if cons.ref_sequences:
             reference_db.update(cons.ref_sequences)
-        to_fasta = [f">{prefix}_full_construct\n{result['sequence']}"]
+        to_fasta = [
+            f">{prefix}_full_construct\n{result['sequence']}",
+            f">{prefix}_full_construct_optimized\n{result['sequence_optimized']}",
+            f">{prefix}_TCR_block\n{str(cons.tcr_block)}",
+        ]
         to_fasta.extend([f">{k}\n{str(v)}" for k, v in result["named"].items()])
         with open(outdir / f"{prefix}.fasta", "w") as f:
             f.write("\n".join(to_fasta))
