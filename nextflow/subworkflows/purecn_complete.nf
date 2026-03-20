@@ -24,7 +24,7 @@ workflow PURECN_COMPLETE {
     if (!params.ref.purecn_bait_intervals) {
         PURECN_BAIT_INTERVALS([["out": "${params.outdir}/PureCN_ref",
                                 "log": "${params.outdir}/PureCN_ref"],
-                               params.ref.genome],
+                              params.ref.genome],
                               params.ref.baits,
                               params.ref.mappability,
                               module_number)
@@ -62,12 +62,11 @@ workflow PURECN_COMPLETE {
                           "log": "${params.logdir}/${it[0].id}/annotations"]] +
                     it[1..-1] })
 
-    snp_blacklist = params.ref.snp_blacklist ?: ""
     PURECN_CALL(to_call,
                 normaldb,
                 bait_intervals,
                 mapping_bias,
-                snp_blacklist,
+                params.ref.snp_blacklist ?: "",
                 params.defaults.purity,
                 params.defaults.ploidy,
                 module_number + 1)

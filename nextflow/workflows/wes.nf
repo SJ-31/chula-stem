@@ -166,7 +166,7 @@ workflow whole_exome {
              panel_of_normals, 7)
 
     /*
-    * Copy number abberation
+    * Copy number aberration
     */
 
     if (!params.ref.cnvkit_reference) {

@@ -7,20 +7,32 @@
   * Specify tool-specific [[https://www.nextflow.io/docs/latest/process.html#directives][directives]] (e.g. container, memory usage) with =params.tools=, e.g. in a file =<pipeline_name>_tools_config.nf=. see the =config= directory for examples
     * Most tools can be passed custom command-line arguments with =task.ext.args=. The format is a Groovy list, each element either a flag or flag-value pair, which will be separated by spaces when passed with the rest of the tool's flags.
   * Cohort information to be displayed in the report (e.g. address, notes, sample collection dates) is stored in the groovy map =params.report_data=
-* Required parameters
-TODO: describe these
-+ =interval_padding= Recommended to be > 0 for PureCN
-+ =defaults=
+  * Setup for =env=
+    * =R_SRC=: path to directory containing this repo's R scripts
+    * =PURECN=: path to PureCN scripts (should be the exdata directory of your PureCN R installation)
+* General parameters
++ =defaults=: a map with default parameters for specific tools
+  * =purity=, =ploidy=: in the case where purity or ploidy estimation fails or is disabled, fall back to these values
++ =create_pon=: for the paired mode of the whole-exome pipeline, whether to create a panel of normals from the normal samples. If this is enabled, the PON is automatically used in downstream filtering
++ =cohort=: name of the cohort used in summaries e.g. MultiQC
++ =genome_build=: either "hg38" or "hg17". Should be consistent with the genome fasta file
++ Output
+  * =outdir=: root of all pipeline output
+  * =logdir=: root to process logs
 * Whole-exome sequencing (=wes.nf= )
 A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re/sarek/3.4.4/][nf-core's sarek]] and GATK best practices. The final output
 ** Input
-+ A csv file with four fields
++ A csv file with 8 fields
   * =patient= Patient id (will be present twice on paired data)
-  * =fastq_1= path to raw reads
-  * =fastq_2=
+  * =fastq_1, fastq_2= paths to raw reads
   * =source=  either tumor or normal to specify the origin of the reads on the row
-*** =params.ref= fields
-+ *WARNING:* every single resource below MUST have the same contig names
+  * Additional metadata fields required for compatibility with GATK tools
+    * =read_group_platform_unit=
+    * =read_group_platform=
+    * =read_group_library=
+    * =read_group_sample_name=
+*** =params.ref=
++ *WARNING:* every single resource below MUST use the same contig names for chromosomes
 + =genome=: reference genome
 + =vep_species=: species of annotation sources
   * Can be cached and downloaded with the =INSTALL.pl= script
@@ -47,9 +59,12 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
 + =civic_cache=: path to json file containing cached calls to Civic API (is automatically generated and updated if it doesn't exist)
 + =pandrugs2_cache=: path to json file containing cached calls to Pandrugs2 API (is automatically generated and updated if it doesn't exist)
 + =pon= : path to a panel of normals. Any variants found in this file will be excluded from the final callset
-+ For PureCN
-  * =snp_blacklist= TODO
-  * =mappability= TODO
++ *PureCN-specific parameters*
+  * In =params.ref=
+    * =snp_blacklist=: vcf file containing snps that PureCN should ignore
+    * =mappability=: path to an "rtracklayer parsable file with a mappability score in the first meta data column". See header 2 of [2] for more information
+    * =purecn_normaldb=: path to a pre-generated normaldb e.g. for in tumor-only mode
+  * =interval_padding=: a Mutect2 parameter, pads exome intervals to increase the number of heterozygous SNPs called. Set this to 50-75, unless for very high coverages, where you can set it to 200 [2]
 ** Steps
 *** Preprocessing
 + Quality control ([[https://github.com/OpenGene/fastp][fastp]])
@@ -65,7 +80,9 @@ Find variants with multiple, intended to be used as an additional form of callse
 + Small variants ( [[https://gatk.broadinstitute.org/hc/en-us/articles/360037593851-Mutect2][Mutect2]], [[https://github.com/Illumina/strelka][Strelka2]], [[https://github.com/wwylab/MuSE][MuSE2]], [[https://luntergroup.github.io/octopus/][Octopus]], [[https://github.com/HKU-BAL/ClairS][ClairS]])
 + Microsatellite instability ([[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]])
 + Structural variants ([[https://github.com/Illumina/manta][Manta]], [[https://github.com/dellytools/delly][delly]], [[https://github.com/PapenfussLab/gridss][gridss]])
-+ Copy number variants ([[https://github.com/etal/cnvkit][CNVkit]] [[https://github.com/mskcc/facets-suite][facets-suite]])
++ Copy number variants ([[https://github.com/lima1/PureCN][PureCN]], [[https://github.com/etal/cnvkit][CNVkit]], [[https://github.com/mskcc/facets-suite][facets-suite]])
+  * The subworkflow used for PureCN follows the best practices outlined in [2], which uses (unfiltered) Mutect2 calls as the source of SNPs and performs internal segmentation.
+  * For optimal results, you should either provide a panel of normals or create one in the paired workflow so that PureCN can generate a mapping bias file.
 *** Callset quality control
 + Filters for small and structural variants include requiring specified filter fields (PASS by default) and identification by a minimum number of variants
 + You can also filter small variants* with minimum read depth in tumor, maximum read depth in normal and minimum VAF
@@ -84,7 +101,7 @@ params.qc = ["accepted_filters": ["PASS"],
 - Genes overlapping unstable regions detected by msisensor-pro are also reported
 *** Misc. output
 + The pipeline collects various metrics, including..
-  * Estimation of tumor purity and ploidy (facets)
+  * Estimation of tumor purity and ploidy (PureCN)
   * Sequencing metrics ([[https://github.com/brentp/mosdepth][mosdepth]], [[https://gatk.broadinstitute.org/hc/en-us/articles/360036856051-CollectHsMetrics-Picard][Picard CollectHsMetrics]], [[https://gatk.broadinstitute.org/hc/en-us/articles/360042476752-CollectAlignmentSummaryMetrics-Picard][CollectAlignmentSummaryMetrics]])
   * QC metrics (=fastp=,  [[https://gatk.broadinstitute.org/hc/en-us/articles/360037066912-AnalyzeCovariates][GATK AnalyzeCovariates]])
   * [[https://github.com/MultiQC/MultiQC][MultiQC]] summarizes the latter two metrics + COSMIC mutational signature fitting ([[https://github.com/AlexandrovLab/SigProfilerAssignment?tab=readme-ov-file][SigProfilerAssignment]])
@@ -92,9 +109,9 @@ params.qc = ["accepted_filters": ["PASS"],
 + The pipeline has support for tumor-only WES datasets with the following variant callers
   * Small variants: Mutect2, Octopus, [[https://github.com/HKU-BAL/ClairS-TO][ClairS-TO]]
   * Structural variants: gridss, Manta
-  * Copy number variants: cnvkit
-    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [6]
-+ With the exception of purity and ploidy estimation, all other metrics are still provided
+  * Copy number variants: cnvkit, PureCN
+    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [1]
+    * PureCN requires a normaldb generated from process-matched normal samples, which can be generated automatically from a run of the paired mode
 * RNA-seq
 TODO
 ** Input
@@ -110,11 +127,6 @@ TODO
 
 * VAR
 :REFERENCES:
-+ [1] https://support.illumina.com/content/dam/illumina-support/help/Illumina_DRAGEN_Bio_IT_Platform_v3_7_1000000141465/Content/SW/Informatics/Dragen/GPipelineAltMap_fDG.htm
-+ [2] [[https://www.nature.com/articles/s41598-020-69772-8#Tab2][SomaticCombiner]]
-+ [3] [[https://gatk.broadinstitute.org/hc/en-us/articles/360035531132--How-to-Call-somatic-mutations-using-GATK4-Mutect2][GATK Mutect2 Ho2]]
-+ [4] [cite:@theicgc/tcgapan-canceranalysisofwholegenomesconsortiumPancancerAnalysisWhole2020]
-+ [5] [[https://www.nature.com/articles/s41467-024-54387-8#Sec12][Whole-exome sequencing reveals genomic landscape of intrahepatic cholangiocarcinoma and ide
-  ntifies SAV1 as a potential driver]]
-+ [6] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
++ [1] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
++ [2] [[https://bioconductor.org/packages/release/bioc/vignettes/PureCN/inst/doc/Quick.html#2_Prepare_environment_and_assay-specific_reference_files][PureCN best practices]]
 :END:

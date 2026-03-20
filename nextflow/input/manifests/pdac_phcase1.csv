@@ -23,3 +23,11 @@ PHcase_15,/data/project/stemcell/shannc/PDAC/raw/PHcase-15_B_1.fq.gz,/data/proje
 PHcase_15,/data/project/stemcell/shannc/PDAC/raw/PHcase-15_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-15_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_15-tumor,PHcase_15-tumor
 PHcase_18,/data/project/stemcell/shannc/PDAC/raw/PHcase-18_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-18_B_2.fq.gz,normal,1,ILLUMINA,PHcase_18-normal,PHcase_18-normal
 PHcase_18,/data/project/stemcell/shannc/PDAC/raw/PHcase-18_TC_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-18_TC_2.fq.gz,tumor,1,ILLUMINA,PHcase_18-tumor,PHcase_18-tumor
+PHcase_12,/data/project/stemcell/shannc/PDAC/raw/PHcase-12_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-12_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_12-tumor,PHcase_12-tumor
+PHcase_12,/data/project/stemcell/shannc/PDAC/raw/PHcase-12_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-12_B_2.fq.gz,normal,1,ILLUMINA,PHcase_12-normal,PHcase_12-normal
+PHcase_16,/data/project/stemcell/shannc/PDAC/raw/PHcase-16_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-16_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_16-tumor,PHcase_16-tumor
+PHcase_16,/data/project/stemcell/shannc/PDAC/raw/PHcase-16_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-16_B_2.fq.gz,normal,1,ILLUMINA,PHcase_16-normal,PHcase_16-normal
+PHcase_17,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_17-tumor,PHcase_17-tumor
+PHcase_17,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_B_2.fq.gz,normal,1,ILLUMINA,PHcase_17-normal,PHcase_17-normal
+PHcase_21,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_21-tumor,PHcase_21-tumor
+PHcase_21,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_B_2.fq.gz,normal,1,ILLUMINA,PHcase_21-normal,PHcase_21-normal
