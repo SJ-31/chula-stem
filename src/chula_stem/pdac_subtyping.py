@@ -94,7 +94,7 @@ def save_purecn_summary(
 
 
 def add_kras_imbalance(
-    manifest: pd.DataFrame, adata: ad.AnnData, purecn_prefix: str = "", **kws
+    manifest: pd.DataFrame, adata: ad.AnnData, purecn_prefix: str = ""
 ) -> None:
     purecn_df = manifest.query("type == 'purecn'")
     if not purecn_df.empty:
@@ -102,7 +102,7 @@ def add_kras_imbalance(
             adata.obs = adata.obs.drop("KRAS_imbalance_subtype", axis="columns")
         kras_scores = call_kras_imbalance(purecn_df, purecn_prefix=purecn_prefix)
         adata.obs = adata.obs.merge(kras_scores["subtype"], on="sample", how="left")
-        for key in ("kras_variants", "kras_genes", "summary"):
+        for key in ("kras_variants", "kras_genes", "summary", "warnings"):
             df = kras_scores[key]
             if not df.empty:
                 adata.uns[f"purecn_{key}"] = df
@@ -379,7 +379,7 @@ class MoffittBasal:
 def instability_score_one(
     v_df: pd.DataFrame,
     g_df: pd.DataFrame,
-) -> Literal["wt", "balanced", "minor", "major", "NA"]:
+) -> Literal["wt", "balanced", "minor", "major", "ambiguous"]:
     """
     Provide a KRAS imbalance score for the given sample, following
     https://www.nature.com/articles/s41588-019-0566-9/figures/13
@@ -389,7 +389,7 @@ def instability_score_one(
 
     Notes
     -----
-    The samples fail classification (assigned 'NA') in any of the following situations
+    The samples fail classification (assigned 'ambiguous') in any of the following situations
         The KRAS gene was deleted completely (total CN == 0)
         TODO: find other situations of this
     """
@@ -406,12 +406,12 @@ def instability_score_one(
         major_cn = total_cn - minor_cn
         # If loh, the gene bearing variants was lost
         if total_cn == 0:  # Unsure how to categorize deletions
-            return "NA"
+            return "ambiguous"
         if major_cn == minor_cn:
             return "balanced"
         if major_cn > minor_cn:  # TODO: is assuming that loh is wt correct?
             return "wt"
-        return "NA"
+        return "ambiguous"
 
     n_vars = v_df.shape[0]
     m_cn: pd.Series = v_df["ML.M.SEGMENT"]
@@ -431,7 +431,7 @@ def instability_score_one(
     wt_greater = v_df["major_C"] > m_cn
     if (wt_greater.sum() / n_vars) > 0.5:
         return "wt"  # TODO: what about situation when WT copies > mutant copies?
-    return "NA"
+    return "ambiguous"
 
 
 GENE_DF_DTYPES: dict = {
@@ -483,7 +483,8 @@ def call_kras_imbalance(
     )
 
     df = manifest.pivot(columns="type", index="sample", values="file")
-    variant_dfs, gene_dfs, summary_dfs = [], [], []
+    variant_dfs, gene_dfs, summary_dfs, warn_dfs = [], [], [], []
+    unreliable_samples: set = set()
     for index, series in df.iterrows():
         assert isinstance(index, str)
         dir = Path(series["purecn"])  # output of predictSomatic
@@ -496,7 +497,6 @@ def call_kras_imbalance(
         for file in (v_result, g_result, summary):
             if not file.exists():
                 raise ValueError(f"PureCN file {file} is missing")
-        summary_dfs.append(pd.read_csv(summary, dtype={"Comment": "string"}))
 
         tmp_subtype["sample"].append(index)
         v_df: pd.DataFrame = pd.read_csv(v_result, dtype=VARIANT_DF_DTYPES)
@@ -513,12 +513,37 @@ def call_kras_imbalance(
         variant_dfs.append(v_df.assign(sample=index))
         gene_dfs.append(g_df.assign(sample=index))
 
+        log = dir / f"{purecn_prefix}{index}.log"
+        summary_dfs.append(
+            pd.read_csv(summary, dtype={"Comment": "string"}).assign(sample=index)
+        )
+        if log.exists():
+            no_cnv: bool = False
+            warning_tmp = {"sample": [], "warning": []}
+            for line in log.read_text().splitlines():
+                if line.startswith("WARN"):
+                    warning_tmp["sample"].append(index)
+                    warning_tmp["warning"].append(line)
+                if (
+                    line.startswith("WARN")
+                    and "No copy number alterations found, purity estimate unreliable."
+                    in line
+                ):
+                    no_cnv = True
+            warn_dfs.append(pd.DataFrame(warning_tmp))
+            if no_cnv:
+                unreliable_samples.add(index)
+                tmp_subtype["KRAS_imbalance_subtype"].append("wt")
+                continue
         tmp_subtype["KRAS_imbalance_subtype"].append(
             instability_score_one(v_df=v_df, g_df=g_df)
         )
     results["kras_genes"] = pd.concat(gene_dfs)
-    results["summary"] = pd.concat(summary_dfs)
+    sdf = pd.concat(summary_dfs)
+    sdf = sdf.assign(purity_estimate_reliable=~sdf["sample"].isin(unreliable_samples))
+    results["summary"] = sdf
     results["subtype"] = pd.DataFrame(tmp_subtype)
+    results["warnings"] = pd.concat(warn_dfs)
     results["kras_variants"] = pd.concat(variant_dfs)
     return results
 
@@ -580,7 +605,7 @@ def add_waddell_classification(manifest: pd.DataFrame, adata: ad.AnnData) -> Non
 
 def classify_waddell_one(
     file: str, schema: pal.DataFrameSchema
-) -> Literal["stable", "scattered", "unstable", "locally_rearranged", "NA"]:
+) -> Literal["stable", "scattered", "unstable", "locally_rearranged", "ambiguous"]:
     df = pl.read_csv(file, separator="\t" if file.endswith(".tsv") else ",")
     if df.is_empty():
         return "stable"
@@ -607,7 +632,7 @@ def classify_waddell_one(
         return "unstable"
     if sv_total > 50 and l_df["locally_rearranged"].any():
         return "locally_rearranged"
-    return "NA"
+    return "ambiguous"
 
 
 def check_locally_rearranged(sv_df: pl.DataFrame) -> pl.DataFrame:
@@ -627,7 +652,6 @@ def check_locally_rearranged(sv_df: pl.DataFrame) -> pl.DataFrame:
         .with_columns(pl.col("chr").replace_strict(CHR_LENGTHS).alias("length"))
         .with_columns((pl.col("n") / pl.col("length") * 10**6).alias("rate_mb"))
     )
-    print(grouped["rate_mb"])
     iqr_val = iqr(grouped["rate_mb"])
     upper_quartile = np.quantile(grouped["rate_mb"], 0.75)
     grouped = grouped.with_columns(
