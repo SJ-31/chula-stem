@@ -12,7 +12,7 @@ import pandas as pd
 import rpy2.robjects as ro
 import scanpy as sc
 from beartype import beartype
-from rpy2.robjects import RObject, numpy2ri, pandas2ri
+from rpy2.robjects import RObject, default_converter, numpy2ri, pandas2ri
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import STAP, InstalledPackage, InstalledSTPackage, importr
 from scipy import sparse, stats
@@ -471,3 +471,21 @@ def tximport(
         layers={"abundance": abundance, "lengths": lengths},
         uns={"countsFromAbundance": ro.r("result$countsFromAbundance")},
     )
+
+
+@r_cleanup
+def tmm(x: ad.AnnData | np.ndarray, log=True) -> np.ndarray:
+    np_cv_rules = default_converter + numpy2ri.converter
+    counts = x.X if isinstance(x, ad.AnnData) else x
+    if not isinstance(counts, np.ndarray) and "toarray" in dir(counts):
+        counts = counts.toarray()
+    assert isinstance(counts, np.ndarray)
+    with np_cv_rules.context():
+        ro.globalenv["mat"] = np.transpose(counts)
+    ro.r("dge <- edgeR::DGEList(mat)")
+    ro.r("dge <- edgeR::normLibSizes(dge)")
+    if log:
+        ro.r("counts <- edgeR::cpm(dge, log = TRUE)")
+    else:
+        ro.r("counts <- edgeR::cpm(dge, log = FALSE)")
+    return np.transpose(np.asarray(ro.r("counts")))
