@@ -570,13 +570,22 @@ plot_purecn_summary <- function(
   palette_d = NULL,
   palette_c = NULL
 ) {
+  if ("purity_estimate_reliable" %in% colnames(tb)) {
+    rel_col <- ifelse(
+      tb$purity_estimate_reliable,
+      "",
+      ";NO CNV FOUND,PURITY UNRELIABLE"
+    )
+    tb <- tb |> mutate(Comment = paste0(Comment, rel_col))
+  }
   flag_tb <- tb |>
     select(Sampleid, Comment, Flagged) |>
     separate_longer_delim(Comment, ";") |>
     mutate(Comment = str_replace(Comment, "POOR GOF .*", "POOR GOF")) |>
-    mutate(Comment = replace_values(Comment, NA ~ ""))
+    mutate(Comment = replace_values(Comment, "NA" ~ ""))
   purity_plot <- ggplot(tb, aes(x = Sampleid, y = Ploidy, fill = Purity)) +
-    geom_bar(stat = "identity")
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90))
   comment_plot <- ggplot(
     flag_tb,
     aes(x = Sampleid, y = Comment, fill = Flagged)

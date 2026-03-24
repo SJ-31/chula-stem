@@ -78,7 +78,7 @@ A pipeline for detecting variants from WES data,  inspired by [[https://nf-co.re
 *** Variant calling
 Find variants with multiple, intended to be used as an additional form of callset quality control (see below). Specific callers can be disabled if needed, but enable at least one from each category
 + Small variants ( [[https://gatk.broadinstitute.org/hc/en-us/articles/360037593851-Mutect2][Mutect2]], [[https://github.com/Illumina/strelka][Strelka2]], [[https://github.com/wwylab/MuSE][MuSE2]], [[https://luntergroup.github.io/octopus/][Octopus]], [[https://github.com/HKU-BAL/ClairS][ClairS]])
-+ Microsatellite instability ([[https://github.com/xjtu-omics/msisensor-pro][MISensorPro]])
++ Microsatellite instability ([[https://github.com/xjtu-omics/msisensor-pro][MSISensorPro]])
 + Structural variants ([[https://github.com/Illumina/manta][Manta]], [[https://github.com/dellytools/delly][delly]], [[https://github.com/PapenfussLab/gridss][gridss]])
 + Copy number variants ([[https://github.com/lima1/PureCN][PureCN]], [[https://github.com/etal/cnvkit][CNVkit]], [[https://github.com/mskcc/facets-suite][facets-suite]])
   * The subworkflow used for PureCN follows the best practices outlined in [2], which uses (unfiltered) Mutect2 calls as the source of SNPs and performs internal segmentation.
