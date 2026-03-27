@@ -6,6 +6,7 @@ from typing import Callable, Literal
 
 import anndata as ad
 import click
+import decoupler as dc
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
@@ -18,6 +19,7 @@ from scipy.special import expit
 from scipy.stats import expon, goodness_of_fit, iqr
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 from chula_stem.r_utils import (
     box_use,
@@ -25,6 +27,7 @@ from chula_stem.r_utils import (
     r_cleanup,
     r_null_if_none,
     source,
+    tmm,
     tximport,
 )
 
@@ -51,6 +54,50 @@ SCHEMA: pa.DataFrameSchema = pa.DataFrameSchema(
 
 # TODO: also wanna collect the PureCN summary files and plot the comments (as a heatmap),
 # and purity + ploidy of the samples
+
+
+def pathway_z_score(
+    data: ad.AnnData, net: pd.DataFrame, inplace: bool = False
+) -> pd.DataFrame | None:
+    """
+      Compute pathway activity scores following [1]
+
+    Notes
+    -----
+    For pathway  p  containing  k  genes and sample  j , the activity level  a_{pj}  defined by =z-score= is
+        a_{pj} = \\sum\\limits_{ i = 1 }^{ k } z_{ij}/sqrt{k}
+    Where  z_ij is the z-standardized expression for gene  i  in sample  j
+        (each gene mean 0, std = 1)
+
+    References
+    ----------
+    [1] Lee E, Chuang H-Y, Kim J-W, Ideker T, Lee D (2008) Inferring Pathway Activity toward Precise Disease Classification. PLoS Comput Biol 4(11): e1000217. https://doi.org/10.1371/journal.pcbi.1000217
+    """
+    schema = pa.DataFrameSchema(
+        {"source": pa.Column("string"), "target": pa.Column("string")}, coerce=True
+    )
+    schema.validate(net)
+    if "toarray" in dir(data.X) and not isinstance(data.X, np.ndarray):
+        arr: np.ndarray = data.X.toarray()
+    else:
+        arr = data.X
+    arr = tmm(arr)
+    var_mask = data.var.index.isin(net["target"])
+    vars = data.var.index[var_mask]
+    arr = arr[:, var_mask]
+    scaler = StandardScaler(with_mean=True, with_std=True)
+    normalized = scaler.fit_transform(arr)
+    tmp = {}
+    grouped = net.groupby("source").agg({"target": set})
+    for source, row in grouped.iterrows():
+        gs = row["target"]
+        mask = vars.isin(gs)
+        tmp[source] = np.matmul(normalized, mask) / np.sqrt(mask.sum())
+    result = pd.DataFrame(tmp)
+    result.set_index(data.obs_names, inplace=True)
+    if not inplace:
+        return result
+    data.obsm["score_zscore_lee"] = result
 
 
 @beartype
@@ -148,6 +195,7 @@ def get_counts(
 # * Moffitt
 
 
+# ** traditional
 class MoffittBasal:
     def __init__(self, threshold: float = 0.5) -> None:
         self.threshold: float = threshold
@@ -297,80 +345,144 @@ class MoffittBasal:
         self.threshold = np.mean(bests)
 
 
+# ** Extended
+
+
+def moffitt_extended_subtypes(
+    adata: ad.AnnData,
+    single_cell: bool = False,
+    scoring_method: Literal["gsva", "zscore_lee"] = "zscore_lee",
+    **kws,
+):
+    signatures = {
+        "Basal A": ["KRT5", "KRT6A", "KRT14", "TP63"],
+        "Basal B": ["CFAP54", "DRC1", "ZBBX"],
+        "Classical B": ["CDH17", "FAM3D", "KRT20", "MYO1A", "REG4", "SPINK4"],
+        "Classical A": [
+            "AGR3",
+            "ANXA10",
+            "CTSE",
+            "GATA4",
+            "GATA6",
+            "HNF1A",
+            "LYZ",
+            "TFF2",
+        ],
+        "Single-Cell Basal": [
+            "AHNAK2",
+            "AQP3",
+            "CAST",
+            "CAV1",
             "CD109",
-            "SLC2A1",
-            "KRT16",
-            "CTSL",  # Was originally CTSL2
+            "COL7A1",
+            "CSTA",
+            "DHRS9",
+            "EMP1",
+            "FAM83A",
+            "FLNA",
+            "GAPDH",
+            "GJB5",
+            "KRT13",
+            "KRT17",
+            "KRT19",
+            "KRT5",
             "KRT6A",
-            "B3GNT5",
-            "MET",
-            "CHST6",
-            "SERPINB5",
-            "DCBLD2",
-            "IL20RB",
-            "PPP1R14C",
-            "NAB1",
-            "MSLN",
+            "KRT7",
+            "LY6D",
+            "MT2A",
+            "MTSS1",
+            "PKP1",
+            "PTPN13",
+            "S100A2",
+            "SEMA3C",
+            "SLC2A1",
+            "SLITRK6",
+            "SPRR1B",
+            "YBX3",
         ],
-        "B": [
-            "GPR160",
+        "Single-Cell IC": [
             "AGR2",
-            "SLC44A4",
-            "TMEM45B",
+            "AGR3",
+            "ALDH2",
+            "ANXA10",
+            "ANXA13",
             "BCAS1",
-            "VSIG2",
-            "TFF3",
-            "PLA2G10",
-            "HPGD",
-            "PLS1",
+            "CAPN5",
+            "CDH17",
+            "CEACAM5",
+            "CEACAM6",
+            "CLDN18",
+            "CTSE",
+            "CYSTM1",
             "FAM3D",
-            "SYTL2",
-            "PLEKHA6",
-            "CAPN9",
+            "GPX2",
+            "IL1R2",
+            "LGALS4",
+            "LYZ",
+            "MUC13",
+            "ONECUT2",
+            "PRSS3",
+            "REG4",
+            "S100A6",
+            "SLC44A4",
+            "SPINK1",
+            "TFF1",
+            "TFF2",
+            "TFF3",
+            "TSPAN8",
+            "VSIG2",
         ],
-        "coeff": [
-            0.87,
-            1.22,
-            0.52,
-            1.43,
-            0.70,
-            0.41,
-            0.72,
-            0.80,
-            0.76,
-            1.40,
-            1.33,
-            1.58,
-            0.41,
-            1.58,
+        "Single-Cell Classical": [
+            "ALPK3",
+            "ATHL1",
+            "BAIAP3",
+            "CAMK2N1",
+            "CX3CL1",
+            "CXCL14",
+            "DPYSL2",
+            "ECE1",
+            "HMHA1",
+            "HOXB2",
+            "IGFBP3",
+            "INPP4B",
+            "KLF6",
+            "KRT23",
+            "LAMB2",
+            "MALAT1",
+            "MEGF6",
+            "MFSD4",
+            "NFAT5",
+            "PADI1",
+            "RILPL2",
+            "SERPINA1",
+            "SNORD89",
+            "SYNE2",
+            "TIMP2",
+            "TMEM139",
+            "TNFAIP2",
+            "TSHZ2",
+            "VCAM1",
+            "WFDC2",
         ],
     }
-    assert isinstance(adata.var, pd.DataFrame)
-    genes: pd.Series = adata.var[gene_col] if gene_col else pd.Series(adata.var_names)
-    x: np.ndarray = adata.X if layer is None else adata.layers[layer]
-    if not isinstance(x, np.ndarray) and "toarray" in dir(x):
-        x = x.toarray()
+    kept_signatures = {
+        k: v
+        for k, v in signatures.items()
+        if (k.startswith("Single-Cell") and single_cell)
+        or (not single_cell and not k.startswith("Single-Cell"))
+    }
+    net = pd.DataFrame(
+        {"source": kept_signatures.keys(), "target": kept_signatures.values()}
+    ).explode("target")
 
-    df = pd.DataFrame(data)
-    for col in ("A", "B"):
-        if not df[col].isin(genes).all():
-            missing = df[col][~df[col].isin(genes)]
-            raise ValueError(
-                f"The following {col} genes are missing from adata: {missing.tolist()}"
-            )
-    # "Estimated Increase in odds of basal class membership when A > B"
-    df.loc[:, "odds_increase"] = np.exp(df["coeff"])
-
-    a_vals = x[:, genes.isin(df["A"])]
-    b_vals = x[:, genes.isin(df["B"])]
-    mask = a_vals > b_vals
-    power = np.matmul(mask, df["odds_increase"].values.reshape((-1, 1)))
-    proba = expit(intercept + power)
-    # print(odds_basal)
-    # proba = (odds_basal / (1 + odds_basal)).flatten()
-    if not inplace:
-        return proba
-    adata.obs.loc[:, "moffitt_pr_basal"] = proba
+    if scoring_method == "zscore_lee":
+        pathway_z_score(adata, net=net, inplace=True)
+        key = "score_zscore_lee"
+    elif scoring_method == "gsva":
+        dc.mt.gsva(adata, net=net, **kws)
+        key = "score_gsva"
+    activity_mat = adata.obsm[key]
+    return activity_mat.idxmax(axis=1)
 
 
 # * KRAS instability
