@@ -194,8 +194,8 @@ workflow whole_exome {
                     4)
     
     to_cnvkit = Utl.delId(paired.map({ it -> it[0..1] + [it[3]] })
-            .join(Utl.getId(QC_SMALL.out.vcf))
-            .join(Utl.getId(PURECN_COMPLETE.out.purity_ploidy)))
+                          .join(Utl.getId(MUTECT2_COMPLETE.out.filtered))
+                          .join(Utl.getId(PURECN_COMPLETE.out.purity_ploidy)))
 
     CNVKIT(to_cnvkit, cnvkit_reference, "hybrid", 5)
 
