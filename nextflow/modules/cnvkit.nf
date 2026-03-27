@@ -1,10 +1,5 @@
 process CNVKIT {
     ext version: "0.9.11"
-    errorStrategy "ignore" // [2025-06-24 Tue] Temporary incompatibility with cnvkit
-    // and the pdac reference file
-
-    // BUG: cnvkit doesn't like the GT format header and having multiple samples
-    // if the data are paired, should get only the tumor sample and clean it up
     
     publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
@@ -31,7 +26,18 @@ process CNVKIT {
     ploidy_val = ploidy ? ploidy : params.defaults.ploidy
     purity_val = purity ? purity : params.defaults.purity
     name = tumor.baseName
+    snp_file = "snps.vcf.gz" ? !params.tumor_only : snps
 
+    if (!params.tumor_only) {
+        prepare_snps = """
+        bcftools query -l ${snps} | grep tumor > samples.txt 
+        bcftools view ${snps} -S samples.txt -O z > ${snp_file}
+        bcftools index ${snp_file}
+        """
+    } else {
+        prepare_snps = ""
+    }
+    
     clonal = !ploidy_val && !purity_val ? "false" : "true"
     if (check.exists()) {
         """
@@ -40,6 +46,10 @@ process CNVKIT {
         """
     } else {
         """
+        bcftools index ${snps}
+        
+        ${prepare_snps}
+        
         cnvkit.py batch \\
                 ${tumor} \\
             -r ${cnn_reference} \\
@@ -55,7 +65,7 @@ process CNVKIT {
         if [[ "${clonal}" == "true" ]]; then
             cnvkit.py call \\
                 "${out}/${out}.call.cns" \\
-                --vcf "${snps}" \\
+                --vcf "${snp_file}" \\
                 --purity "${purity_val}" \\
                 --ploidy "${ploidy_val}" \\
                 --method clonal \\
