@@ -570,10 +570,12 @@ def sigprofiler_fmt(
             excluded: list = f.readlines()
     else:
         excluded: list = []
-    df = pl.read_csv(
+    df: pl.DataFrame = pl.read_csv(
         soln_activities_path, separator="\t", infer_schema_length=None
     ).select(~cs.by_name(*excluded))
     signatures: list = df.columns[1:]
+    if df.is_empty():
+        return []
     sig_cols = pl.col(signatures)
     samples: pl.Series = df["Samples"]
     replace_expr = [

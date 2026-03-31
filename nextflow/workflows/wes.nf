@@ -288,7 +288,6 @@ workflow whole_exome {
     to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report))
         .map({ it -> [it[0], it[1] + it[2]] }).map({ newOutPath(it, "") })
 
-    caches = []
-    REPORT(to_report, caches, "variant_calling", 8)
+    REPORT(to_report, "variant_calling", 8)
 
 }

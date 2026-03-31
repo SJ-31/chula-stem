@@ -30,9 +30,11 @@ from chula_stem.report.variant_calling_report import VariantCallingReport
 def entry_point(report_type: str, specification: str, output: str, tmpdir: str) -> None:
     with open(specification, "r") as f:
         spec: dict = json.load(f)
-    paths: dict = spec.get("paths")
-    if not paths:
-        raise ValueError("`paths` key must be specified!")
+    try:
+        paths: dict = spec["paths"]
+        assert isinstance(paths, dict)
+    except (KeyError, AssertionError):
+        raise ValueError("`paths` map must be specified!")
     out = output if output else paths.get("output")
     shared_keys = {"filename", "metadata", "tmpdir"}
     kwargs: dict = {k: v for k, v in paths.items() if k not in shared_keys}

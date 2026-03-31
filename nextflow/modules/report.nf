@@ -7,7 +7,6 @@ process REPORT {
 
     input:
     tuple val(meta), val(path_map)
-    val(caches) // A list of caches to use
     val(type)
     val(module_number)
     //

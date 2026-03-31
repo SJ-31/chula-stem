@@ -279,6 +279,6 @@ workflow whole_exome_tumor_only {
     //     caches = channel.fromPath(params.ref.civic_cache)
     //         .mix(channel.fromPath(params.ref.pandrugs2_cache)).collect()
     // }
-    caches = [] // <2025-01-08 Wed> for temporary debugging
-    REPORT(to_report, caches, "variant_calling", 8)
+    
+    REPORT(to_report, "variant_calling", 8)
 }
