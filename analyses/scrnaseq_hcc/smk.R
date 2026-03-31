@@ -175,6 +175,15 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
 }
 
 ## * Visualizing DE genes & enriched pathways
+
+write_graph_list_csv <- function(glist, prefix, outdir) {
+  for (n in c("nodes", "edges")) {
+    lapply(glist, \(x) as_tibble(x, n)) |>
+      bind_rows() |>
+      write_csv(glue("{outdir}/{prefix}_{n}.csv"))
+  }
+}
+
 # TODO: you should save this somewhere else
 plot_graphs_into_pdf <- function(glist, plot_fn, output_file) {
   tmp <- tempdir()
@@ -294,6 +303,12 @@ visualize_de_genes <- function() {
         min_interesting = 1,
         kept_nodes = RCONFIG$always_include
       )
+      write_graph_list_csv(
+        tflink_to_plot,
+        glue("{prefix}_tflink_{key}"),
+        outdir
+      )
+
       plot_graphs_into_pdf(
         glist = tflink_to_plot,
         plot_fn = \(g) plot_de_graph(g, palette_c = RCONFIG$palette_c),
@@ -304,6 +319,11 @@ visualize_de_genes <- function() {
         cur_cluster,
         min_interesting = 2,
         kept_nodes = RCONFIG$always_include
+      )
+      write_graph_list_csv(
+        fi_to_plot,
+        glue("{prefix}_fi_{key}"),
+        outdir
       )
       plot_graphs_into_pdf(
         fi_to_plot,
