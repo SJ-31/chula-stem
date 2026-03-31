@@ -25,6 +25,10 @@ tcr_primers = load_file_as_module(
     "tcr", here("snakemake", "tcr", "scripts", "primers.py")
 )
 
+tcr_cons = load_file_as_module(
+    "tcr_cons", here("snakemake", "tcr", "scripts", "construct.py")
+)
+
 
 @pytest.fixture
 def airr_data_test():
@@ -63,7 +67,12 @@ def create_dummy_construct(
     populated. Genes are filled in randomly (do not bother testing the visualization)
     """
     cfg = {"sequences": {"flanking": {}, "c_gene": {}, "leader": {}}}
-    result = {"VJ_1_v_call": "TRA*434", "VDJ_1_v_call": "TRB*423"}
+    result = {
+        "VJ_1_v_call": "TRA*434",
+        "VDJ_1_v_call": "TRB*423",
+        "VDJ_1_j_call": "TRBJ1*01",
+        "VJ_1_j_call": "TRAJ1*01",
+    }
     seq = []
     if five_prime:
         seq.append(five_prime)
@@ -119,13 +128,35 @@ def test_make_construct(five_prime, three_prime, leader, c_gene, linker):
     cfg, airr_data, full = create_dummy_construct(
         five_prime, three_prime, leader, c_gene, linker
     )
-    res = tcr_primers.create_one_construct(airr_data, ("VJ_1", "VDJ_1"), cfg)
+    res = tcr_primers.assemble_one_construct(airr_data, ("VJ_1", "VDJ_1"), cfg)
     cons = res["sequence"]
     assert len(cons) == len(full)
     assert cons == full
 
 
-# TODO: finish this...
-@pytest.mark.parametrize("dct", [{}, {}])
-def test_validate_construct(dct):
-    tcr_primers.validate_construct()
+@pytest.mark.parametrize(
+    "five_prime,three_prime,leader,c_gene,linker",
+    [
+        (None, None, None, None, None),
+        ("ATCGG", None, "GCTAT", "TAGCA", None),
+        (None, "CGATC", "TTGAC", None, "ACGTA"),
+        ("GGCAT", "TCGAA", None, "ATCCG", None),
+        ("GCTT", "GTTAC", "CAGGT", "TCGAG", "TACGG"),
+        ("GCTT", "GTTAC", "CAGGT", "TCGAGTAA", "TACGG"),  # Test for stop codon
+    ],
+)
+def test_make_construct_class(five_prime, three_prime, leader, c_gene, linker):
+    cfg, airr_data, full = create_dummy_construct(
+        five_prime, three_prime, leader, c_gene, linker
+    )
+    c = tcr_cons.TCRConstruct(airr_data, ("VJ_1", "VDJ_1"), cfg)
+    res = c.assemble()
+    cons = res["sequence"]
+    assert len(cons) == len(full)
+    assert cons == full
+
+
+# # TODO: finish this...
+# @pytest.mark.parametrize("dct", [{}, {}])
+# def test_validate_construct(dct):
+#     tcr_primers.validate_construct()

@@ -4,16 +4,19 @@ from pathlib import Path
 
 import anndata as ad
 import chula_stem.pdac_subtyping as pds
+import decoupler as dc
 import h5py
 import numpy as np
 import pandas as pd
+import pandera.pandas as pa
 import plotnine as gg
+import polars as pl
 import scanpy as sc
 from chula_stem.plotting import plot_classifier_curve
 from chula_stem.r_utils import read_geo, tximport
 from chula_stem.sc_rnaseq import annotate_adata_vars
 from pyhere import here
-from scipy import sparse
+from scipy import sparse, stats
 from sklearn.metrics import RocCurveDisplay, roc_curve
 
 # %%
@@ -27,22 +30,10 @@ manifest = pd.read_csv(here(workdir, "manifest.csv"))
 adata_path: Path = here(workdir, "pdac_cohort.h5ad")
 
 if not adata_path.exists():
-    adata = pds.read_manifest(manifest, tx2gene)
-    adata = annotate_adata_vars(
-        adata,
-        savepath=here("analyses", "data", "ensembl_gene_data.csv"),
-        new_index_col="hgnc_symbol",
-        new_index_name="gene",
-    )
-    adata.X = sparse.csc_array(adata.X)
-    adata.obs.loc[:, "sample"] = adata.obs_names
-    adata.write_h5ad(adata_path)
+    raise ValueError("Run get_cohort.py first")
 else:
     adata = ad.read_h5ad(adata_path)
 
-model = pds.MoffittBasal(threshold=0.44)  # From running last time
-model.fit(adata=adata)
-model.predict(inplace=True)
 
 adata.layers["log_abundance"] = adata.layers["abundance"].copy()
 sc.pp.log1p(adata, layer="log_abundance")
@@ -85,3 +76,12 @@ def test_with_moffitt_original():
     )
     plot.show()
     # [2026-03-06 Fri] From running this, you got the best threshold to be 0.44
+
+
+# [2026-03-23 Mon] gene set scoring for moffitt extended subtypes
+
+
+with_vals = adata[adata.obs["rnaseq_available"], :]
+with_vals.X = np.nan_to_num(with_vals.X.toarray(), 0)
+
+pds.moffitt_extended_subtypes(with_vals)
