@@ -29,9 +29,19 @@ read_gs <- function(file) {
 
 
 ## * Table functions
-filter_de_lf <- function(lf, gene_group_col = NULL, cfg, input) {
-  if (!is.null(gene_group_col) && input$gene_group != "---") {
-    lf <- lf$filter(pl$col(gene_group_col) == input$gene_group)
+filter_de_lf <- function(lf, cfg, input) {
+  to_hide <- c()
+  if (!is.null(cfg$categorical_filters)) {
+    for (cf in cat_filters) {
+      cur_cf <- input[[glue("cf_{cf}")]]
+      if (cur_cf != "---") {
+        to_hide <- c(to_hide, cf)
+        lf <- lf$filter(pl$col(cf) == cur_cf)
+      }
+    }
+    if (length(to_hide) > 0) {
+      lf <- lf$drop(to_hide)
+    }
   }
   lf <- lf$filter(pl$col(cfg$lfc_column)$abs() > input$lfc_thresh)
   if (!is.null(cfg$significance_column)) {
@@ -46,13 +56,12 @@ filter_de_lf <- function(lf, gene_group_col = NULL, cfg, input) {
   lf
 }
 
-make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
+make_de_table <- function(lfs, gene_col, cfg, input) {
   lf <- lfs[[input$gs_name]]$filter(pl$col("is_de"))$with_columns(pl$col(
     "gs"
   )$list$join(", "))$drop(c("is_de", "size"))
   lf <- filter_de_lf(
     lf,
-    gene_group_col = gene_group_col,
     cfg = cfg,
     input = input
   )
@@ -63,18 +72,13 @@ make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
       page_size_default = 10,
       use_search = TRUE,
     )
-  if (input$gene_group != "---") {
-    tab <- tab |> cols_hide(gene_group_col)
-  }
-  tab
 }
 
-make_gs_table <- function(lfs, gene_group_col = NULL, cfg, input) {
+make_gs_table <- function(lfs, cfg, input) {
   lfc_col <- cfg$lfc_column
   lf <- lfs[[input$gs_name]]
   lf <- filter_de_lf(
     lf,
-    gene_group_col = gene_group_col,
     cfg = cfg,
     input = input
   )
@@ -131,7 +135,7 @@ set_up_cfg <- function() {
         "gene_sets",
         "gene_column",
         "gene_name_format",
-        "grouping_column",
+        "categorical_filters",
         "lfc_column",
         "significance_column",
         "other_numeric"
@@ -167,7 +171,7 @@ cols_select <- c(
   g_col,
   cfg$lfc_column,
   cfg$significance_column,
-  cfg$grouping_column,
+  cfg$categorical_filters,
   cfg$other_numeric
 )
 
@@ -207,13 +211,14 @@ with_gs <- lapply(cfg$gene_sets, get_gs)
 
 gs_names <- names(with_gs)
 
-g_group_col <- cfg$grouping_column
-if (!is.null(g_group_col)) {
-  g_groups <- de$collect()[[g_group_col]]$unique()$to_r_vector()
-} else {
-  g_groups <- character(0)
+cat_filters <- cfg$categorical_filters
+cat_choices <- NULL
+if (!is.null(cat_filters)) {
+  cat_choices <- lapply(cat_filters, \(x) {
+    de$collect()[[x]]$unique()$to_r_vector()
+  }) |>
+    `names<-`(cat_filters)
 }
-
 
 ## * Application
 
@@ -227,13 +232,6 @@ ui <- page_navbar(
       label = "Gene set definitions",
       choices = gs_names
     ),
-    if (!is.null(g_group_col)) {
-      selectInput(
-        inputId = "gene_group",
-        label = "Group",
-        choices = c("---", g_groups)
-      )
-    },
     numericInput(
       inputId = "lfc_thresh",
       label = "LFC threshold (absolute)",
@@ -250,6 +248,18 @@ ui <- page_navbar(
         inputId = "sig_thresh",
         label = "Significance threshold",
         value = 0.05
+      )
+    },
+    if (!is.null(cat_filters)) {
+      wellPanel(
+        h5("Categorical filters"),
+        lapply(cat_filters, \(cf) {
+          selectInput(
+            inputId = glue("cf_{cf}"),
+            label = cf,
+            choices = c("---", cat_choices[[cf]])
+          )
+        })
       )
     }
   ),
@@ -270,7 +280,6 @@ server <- function(input, output, session) {
     expr = make_de_table(
       lfs = with_gs,
       gene_col = g_col,
-      gene_group_col = g_group_col,
       input = input,
       cfg = cfg
     )
@@ -278,7 +287,6 @@ server <- function(input, output, session) {
   output$gs_table <- render_gt(
     expr = make_gs_table(
       lfs = with_gs,
-      gene_group_col = g_group_col,
       cfg = cfg,
       input = input
     )
