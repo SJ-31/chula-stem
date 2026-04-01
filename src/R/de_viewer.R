@@ -30,7 +30,7 @@ read_gs <- function(file) {
 
 ## * Table functions
 filter_de_lf <- function(lf, gene_group_col = NULL, cfg, input) {
-  if (!is.null(gene_group_col) && input$gene_group != "ALL GROUPS") {
+  if (!is.null(gene_group_col) && input$gene_group != "---") {
     lf <- lf$filter(pl$col(gene_group_col) == input$gene_group)
   }
   lf <- lf$filter(pl$col(cfg$lfc_column)$abs() > input$lfc_thresh)
@@ -56,9 +56,17 @@ make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
     cfg = cfg,
     input = input
   )
-  gt(as_tibble(lf)) |>
-    fmt_number(columns = cfg$other_numeric) |>
-    opt_interactive(page_size_default = 10, use_search = TRUE)
+  tab <- gt(as_tibble(lf)) |>
+    fmt_number(columns = c(cfg$lfc_column, cfg$other_numeric)) |>
+    cols_label(gs = "Gene set") |>
+    opt_interactive(
+      page_size_default = 10,
+      use_search = TRUE,
+    )
+  if (input$gene_group != "---") {
+    tab <- tab |> cols_hide(gene_group_col)
+  }
+  tab
 }
 
 make_gs_table <- function(lfs, gene_group_col = NULL, cfg, input) {
@@ -77,11 +85,18 @@ make_gs_table <- function(lfs, gene_group_col = NULL, cfg, input) {
     pl$col(lfc_col)$mean()$alias("Mean LFC")
   )$with_columns(
     pl$col("gene")$list$unique()$list$len()$alias("n DE")
-  )$with_columns((pl$col("n DE") / pl$col("size"))$alias("% DE"), )$drop("gene")
+  )$with_columns((pl$col("n DE") / pl$col("size"))$alias("% DE"), )$drop(
+    "gene"
+  )$sort("n DE", descending = TRUE)
   numeric_cols <- names(grouped)[-1]
   gt(as_tibble(grouped)) |>
     fmt_number(columns = numeric_cols) |>
-    opt_interactive(page_size_default = 10, use_search = TRUE)
+    fmt_integer(columns = c("n DE", "size")) |>
+    cols_label(size = "Size", gs = "Gene set") |>
+    opt_interactive(
+      page_size_default = 10,
+      use_search = TRUE,
+    )
 }
 
 set_up_cfg <- function() {
@@ -216,7 +231,7 @@ ui <- page_navbar(
       selectInput(
         inputId = "gene_group",
         label = "Group",
-        choices = c("ALL GROUPS", g_groups)
+        choices = c("---", g_groups)
       )
     },
     numericInput(
