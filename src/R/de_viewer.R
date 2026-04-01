@@ -1,4 +1,5 @@
 suppressMessages({
+  options(shiny.autoreload = TRUE)
   library(shiny)
   library(optparse)
   library(bslib)
@@ -34,7 +35,7 @@ make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
     "gs"
   )$list$join(", "))$drop("is_de")
   if (!is.null(gene_group_col) && !is.null(input$gene_group)) {
-    df <- lf$filter(pl$col(gene_group_col) == input$gene_group)
+    lf <- lf$filter(pl$col(gene_group_col) == input$gene_group)
   }
   lf <- lf$filter(pl$col(cfg$lfc_column)$abs() > input$lfc_thresh)
   if (!is.null(cfg$significance_column)) {
@@ -189,32 +190,31 @@ ui <- page_navbar(
       label = "Gene set definitions",
       choices = gs_names
     ),
-    conditionalPanel(
-      condition = !is.null(g_group_col),
+    if (!is.null(g_group_col)) {
       selectInput(
         inputId = "gene_group",
         label = "Group",
         choices = g_groups
       )
-    ),
+    },
     numericInput(
       inputId = "lfc_thresh",
       label = "LFC threshold (absolute)",
-      value = 0
+      value = 0,
+      step = 0.1
     ),
     selectInput(
       inputId = "lfc_direction",
       label = "LFC direction",
       choices = c("Positive", "Negative", "Both")
     ),
-    conditionalPanel(
-      condition = !is.null(cfg$significance_column),
+    if (!is.null(cfg$significance_column)) {
       numericInput(
         inputId = "sig_thresh",
         label = "Significance threshold",
         value = 0.05
       )
-    )
+    }
   ),
   nav_panel(
     "DE genes",
