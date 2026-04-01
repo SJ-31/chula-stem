@@ -29,12 +29,8 @@ read_gs <- function(file) {
 
 
 ## * Table functions
-
-make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
-  lf <- lfs[[input$gs_name]]$filter(pl$col("is_de"))$with_columns(pl$col(
-    "gs"
-  )$list$join(", "))$drop("is_de")
-  if (!is.null(gene_group_col) && !is.null(input$gene_group)) {
+filter_de_lf <- function(lf, gene_group_col = NULL, cfg, input) {
+  if (!is.null(gene_group_col) && input$gene_group != "ALL GROUPS") {
     lf <- lf$filter(pl$col(gene_group_col) == input$gene_group)
   }
   lf <- lf$filter(pl$col(cfg$lfc_column)$abs() > input$lfc_thresh)
@@ -47,20 +43,43 @@ make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
   } else if (input$lfc_direction == "Negative") {
     lf <- lf$filter(pl$col(cfg$lfc_column) < 0)
   }
+  lf
+}
+
+make_de_table <- function(lfs, gene_col, gene_group_col = NULL, cfg, input) {
+  lf <- lfs[[input$gs_name]]$filter(pl$col("is_de"))$with_columns(pl$col(
+    "gs"
+  )$list$join(", "))$drop(c("is_de", "size"))
+  lf <- filter_de_lf(
+    lf,
+    gene_group_col = gene_group_col,
+    cfg = cfg,
+    input = input
+  )
   gt(as_tibble(lf)) |>
     fmt_number(columns = cfg$other_numeric) |>
     opt_interactive(page_size_default = 10, use_search = TRUE)
 }
 
-make_gs_table <- function(lfs, cfg, input) {
+make_gs_table <- function(lfs, gene_group_col = NULL, cfg, input) {
   lfc_col <- cfg$lfc_column
   lf <- lfs[[input$gs_name]]
+  lf <- filter_de_lf(
+    lf,
+    gene_group_col = gene_group_col,
+    cfg = cfg,
+    input = input
+  )
   grouped <- lf$explode("gs")$group_by("gs")$agg(
-    pl$len()$alias("Size"),
+    pl$col("size")$first(),
+    pl$col("gene"),
     pl$col("is_de")$sum()$alias("n DE"),
     pl$col(lfc_col)$max()$alias("Max LFC"),
     pl$col(lfc_col)$mean()$alias("Mean LFC")
-  )$with_columns((pl$col("n DE") / pl$col("Size"))$alias("% DE"))
+  )$with_columns(
+    (pl$col("n DE") / pl$col("size"))$alias("% DE"),
+    pl$col("gene")$list$unique()$list$len()$alias("n DE")
+  )$drop("gene")
   numeric_cols <- names(grouped)[-1]
   gt(as_tibble(grouped)) |>
     fmt_number(columns = numeric_cols) |>
@@ -141,7 +160,7 @@ cols_select <- c(
 
 de <- pl$scan_csv(input, separator = sep)$select(cols_select)
 
-cols_order <- c(cols_select, "gs", "is_de")
+cols_order <- c(cols_select, "gs", "is_de", "size")
 
 all_de_genes <- list(de$collect()[[g_col]]$unique()$to_r_vector())
 
@@ -154,13 +173,16 @@ get_gs <- function(x) {
 
   lf$filter(pl$col(
     "gs"
-  )$is_in(gs_keep))$group_by("gene")$agg(pl$col("gs"))$with_columns(pl$col(
-    "gene"
-  )$is_in(all_de_genes)$alias(
-    "is_de"
-  ))$join(
+  )$is_in(gs_keep))$group_by("gene")$agg(pl$col("gs"))$with_columns(
+    pl$col(
+      "gene"
+    )$is_in(all_de_genes)$alias(
+      "is_de"
+    ),
+    pl$len()$over("gs")$alias("size")
+  )$join(
     de,
-    how = "full",
+    how = "left",
     right_on = "gene",
     left_on = g_col
   )$select(cols_order)
@@ -194,7 +216,7 @@ ui <- page_navbar(
       selectInput(
         inputId = "gene_group",
         label = "Group",
-        choices = g_groups
+        choices = c("ALL GROUPS", g_groups)
       )
     },
     numericInput(
@@ -239,7 +261,12 @@ server <- function(input, output, session) {
     )
   )
   output$gs_table <- render_gt(
-    expr = make_gs_table(lfs = with_gs, cfg = cfg, input = input)
+    expr = make_gs_table(
+      lfs = with_gs,
+      gene_group_col = g_group_col,
+      cfg = cfg,
+      input = input
+    )
   )
 }
 
