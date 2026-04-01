@@ -70,16 +70,14 @@ make_gs_table <- function(lfs, gene_group_col = NULL, cfg, input) {
     cfg = cfg,
     input = input
   )
-  grouped <- lf$explode("gs")$group_by("gs")$agg(
+  grouped <- lf$explode(c("gs", "size"))$group_by("gs")$agg(
     pl$col("size")$first(),
     pl$col("gene"),
-    pl$col("is_de")$sum()$alias("n DE"),
     pl$col(lfc_col)$max()$alias("Max LFC"),
     pl$col(lfc_col)$mean()$alias("Mean LFC")
   )$with_columns(
-    (pl$col("n DE") / pl$col("size"))$alias("% DE"),
     pl$col("gene")$list$unique()$list$len()$alias("n DE")
-  )$drop("gene")
+  )$with_columns((pl$col("n DE") / pl$col("size"))$alias("% DE"), )$drop("gene")
   numeric_cols <- names(grouped)[-1]
   gt(as_tibble(grouped)) |>
     fmt_number(columns = numeric_cols) |>
@@ -165,7 +163,7 @@ cols_order <- c(cols_select, "gs", "is_de", "size")
 all_de_genes <- list(de$collect()[[g_col]]$unique()$to_r_vector())
 
 get_gs <- function(x) {
-  lf <- read_gs(x)
+  lf <- read_gs(x)$with_columns(pl$len()$over("gs")$alias("size"))
   gs_keep <- lf$filter(pl$col("gene")$is_in(all_de_genes))$collect()[[
     "gs"
   ]]$unique()$to_r_vector()
@@ -173,13 +171,15 @@ get_gs <- function(x) {
 
   lf$filter(pl$col(
     "gs"
-  )$is_in(gs_keep))$group_by("gene")$agg(pl$col("gs"))$with_columns(
+  )$is_in(gs_keep))$group_by("gene")$agg(
+    pl$col("gs"),
+    pl$col("size")
+  )$with_columns(
     pl$col(
       "gene"
     )$is_in(all_de_genes)$alias(
       "is_de"
-    ),
-    pl$len()$over("gs")$alias("size")
+    )
   )$join(
     de,
     how = "left",
