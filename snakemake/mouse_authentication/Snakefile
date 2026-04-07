@@ -1,0 +1,162 @@
+from pathlib import Path
+
+
+configfile: "env.yaml"
+
+
+outdir = Path(config["outdir"])
+logdir = Path(config["logdir"])
+ref_genome = Path(config["ref_genome"])
+
+resources = config.get("resources", {})
+
+sample_names = config["samples"].keys()
+suffix = config.get("read_suffix", "fastq")
+
+sample_map = config["samples"]
+
+
+def get_reads(wc, single: bool = False):
+    sample_name = wc["sample"]
+    path = Path(sample_map[sample_name])
+    if not single:
+        return {
+            "reads": [
+                path / f"{sample_name}_1.{suffix}",
+                path / f"{sample_name}_2.{suffix}",
+            ]
+        }
+    return path / f"{sample_name}_{wc.get('strand')}.{suffix}"
+
+
+rule all:
+    input:
+        bams=expand(f"{outdir}/{{s}}/{{s}}.bam", s=sample_names),
+        fastqc=expand(
+            f"{outdir}/{{s}}/{{s}}_{{c}}_fastqc.zip", s=sample_names, c=[1, 2]
+        ),
+
+
+rule fastqc:
+    input:
+        lambda wc: get_reads(wc, True),
+    output:
+        html=f"{outdir}/{{sample}}/{{sample}}_{{strand}}.html",
+        zip=f"{outdir}/{{sample}}/{{sample}}_{{strand}}_fastqc.zip",  # the suffix _fastqc.zip is necessary for multiqc to find the file. If not using multiqc, you are free to choose an arbitrary filename
+    params:
+        extra="--quiet",
+        mem_overhead_factor=0.1,
+    log:
+        f"{logdir}/fastqc/{{sample}}_{{strand}}.log",
+    threads: 1
+    resources:
+        mem_mb=1024,
+    wrapper:
+        "v7.6.0/bio/fastqc"
+
+
+rule bwa_mem2_index:
+    input:
+        ref_genome,
+    output:
+        *[
+            f
+            for f in multiext(
+                str(ref_genome), ".amb", ".ann", ".bwt.2bit.64", ".pac", ".0123"
+            )
+            if f != str(ref_genome)
+        ],
+    resources:
+        **resources.get("bwa_mem2_index", {}),
+    log:
+        f"{logdir}/bwa_mem_index.log",
+    wrapper:
+        "v7.2.0/bio/bwa-mem2/index"
+
+
+rule bwa_mem2_mem:
+    input:
+        unpack(lambda wc: get_reads(wc, False)),
+        idx=multiext(str(ref_genome), ".amb", ".ann", ".bwt.2bit.64", ".pac", ".0123"),
+    output:
+        f"{outdir}/{{sample}}/{{sample}}.bam",
+    log:
+        f"{logdir}/{{sample}}_bwa_mem2.log",
+    resources:
+        **resources.get("bwa_mem2", {}),
+    params:
+        extra=r"-R '@RG\tID:{sample}\tSM:{sample}'",
+        sort="samtools",
+        sort_order="coordinate",
+        sort_extra="",
+    threads: 8
+    wrapper:
+        "v9.4.1/bio/bwa-mem2/mem"
+
+
+rule bamtools_stats:
+    input:
+        f"{outdir}/{{sample}}/{{sample}}.bam",
+    output:
+        f"{outdir}/{{sample}}/{{sample}}.bamstats",
+    params:
+        "-insert",  # optional summarize insert size data
+    log:
+        f"{logdir}/{{sample}}_bamtools_stats.log",
+    wrapper:
+        "v7.0.0/bio/bamtools/stats"
+
+
+strling_indices = {
+    "index": ref_genome.with_suffix(".str"),
+    "fai": ref_genome.with_suffix(".fai"),
+}
+
+
+rule strling_index:
+    input:
+        ref_genome,
+    output:
+        **strling_indices,
+    params:
+        extra="",
+    log:
+        f"{logdir}/strling/index.log",
+    wrapper:
+        "v8.1.1/bio/strling/index"
+
+
+rule strling_extract:
+    input:
+        bam=f"{outdir}/{{sample}}/{{sample}}.bam",
+        bai=f"{outdir}/{{sample}}/{{sample}}.bam.bai",
+        reference=ref_genome,
+        fai=strling_indices["fai"],
+        index=strling_indices["index"],
+    output:
+        f"{outdir}/{{sample}}/strling/{{sample}}.bin",
+    log:
+        f"{logdir}/strling/{{sample}}_extract.log",
+    params:
+        extra="",
+    wrapper:
+        "v8.1.1/bio/strling/extract"
+
+
+rule strling_call:
+    input:
+        bam=f"{outdir}/{{sample}}/{{sample}}.bam",
+        bai=f"{outdir}/{{sample}}/{{sample}}.bam.bai",
+        bin=f"{outdir}/{{sample}}/strling/{{sample}}.bin",
+        reference=ref_genome,
+        fai=strling_indices["fai"],
+    output:
+        f"{outdir}/{{sample}}/strling/{{sample}}-bounds.txt",  # must end with -bounds.txt
+        f"{outdir}/{{sample}}/strling/{{sample}}-genotype.txt",  # must end with -genotype.txt
+        f"{outdir}/{{sample}}/strling/{{sample}}-unplaced.txt",  # must end with -unplaced.txt
+    log:
+        f"{logdir}/strling/{{sample}}_call.log",
+    params:
+        extra="--loci",  # TODO: add the 18 mouse loci
+    wrapper:
+        "v8.1.1/bio/strling/call"
