@@ -1,4 +1,13 @@
 # -*- eval: (jinx-mode -1) -*-
+* mouse_STR
+*Relative Path:* =analyses/data/mouse_STR=
+*Date Added:* <2026-04-07 Tue>
++ Using NGS for STR profiling isn't the norm, and information for the standard 18 mouse loci (specifically STR motif AND genomic coordinates) aren't readily accessible.
+  1. mouse_STR_genomic_locations_patent.csv: Fig 1. [[https://patents.google.com/patent/USRE49835E1/en][USRE49835E1 - Mouse cell line authentication - Google Patents]] (mm38)
+  2. mouse_STR_loci_info.csv Table 3 of the [[https://www.ncbi.nlm.nih.gov/books/NBK144066/][Authentication of Human and Mouse Cell Lines by Short Tandem Repeat (STR) DNA Genotype Analysis - Assay Guidance Manual]] (mm39)
+  3. mouse_STR_primers.csv Table 11 of [[https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0218412][Interlaboratory study to validate a STR profiling method for intraspecies identification of mouse cell lines]] (mm38)
+  4. mouse_STR_sequencing_primers.csv Table S2. of [[https://journals.biologists.com/dmm/article/16/10/dmm050150/334139/Short-tandem-repeat-profiling-via-next-generation][Short tandem repeat profiling via next-generation sequencing for cell line authentication]] (mm38)
+  5. mouse_STR_multiplex_pcr_primers.csv Table 7. of the Assay Guidance Manual (mm39)
 * tcr_imgt_c
 *Relative Path:* =analyses/data/tcr_imgt_c=
 *Date Added:* <2026-03-18 Wed>
