@@ -7,7 +7,7 @@ library(pointblank)
 library(here)
 
 tb <- read_tsv(
-  "/home/shannc/Bio_SDD/stem_synology/chula_mount/shannc/output/PHCase/PHcase_13/annotations/8-PHcase_13-VEP_SV.tsv",
+  "/home/shannc/Bio_SDD/stem_synology/chula_mount/shannc/output/PHCase/PHcase_21/annotations/8-PHcase_21-VEP_SV.tsv",
   col_types = list(Loc = "character")
 ) |>
   distinct(Loc, Alt, Ref, .keep_all = TRUE) |>
@@ -196,5 +196,126 @@ plot <- ggraph(G, "manual", x = x_y$x, y = x_y$y) +
   guides(color = "none") + # TODO: this isn't working for some reason
   theme_void() +
   scale_y_reverse()
+
 plot
 ggsave(here(".scratch", "foobar.pdf"), plot, width = 10)
+
+
+chr_line_plot <- function(
+  tb,
+  chr_col = "chr",
+  alt_col = "Alt",
+  bin_width = 10^6,
+  n_bins = NULL
+) {
+  assert_data_frame(tb, min.rows = 1)
+  expect_col_vals_regex(tb, alt_col, regex = "[\\[\\]]")
+  expect_col_vals_regex(tb, alt_col, regex = ":")
+
+  tb <- rename(tb, chr = chr_col, alt = alt_col) |>
+    distinct(chr, pos, .keep_all = TRUE)
+
+  chrs_present <- c(
+    unique(tb$chr),
+    str_extract(tb$alt, "([1-9]+):", group = 1)
+  )
+  kept_chr <- CHR_LENGTHS[names(CHR_LENGTHS) %in% chrs_present]
+
+  chr_x_map <- local({
+    lvls <- levels(as.factor(names(kept_chr)))
+    seq_along(lvls) |> `names<-`(lvls)
+  })
+
+  chr_table <- enframe(kept_chr, name = "chr", value = "y")
+  chr_table <- bind_rows(chr_table, mutate(chr_table, y = 0))
+
+  bp_table <- select(tb, chr, pos, alt) |>
+    mutate(
+      chr_to = str_extract(alt, "([0-9]+):", group = 1),
+      pos = as.numeric(pos),
+      chr_to_pos = as.numeric(str_extract(alt, ":([0-9]+)", group = 1)),
+      from_x = chr_x_map[chr],
+      to_x = chr_x_map[chr_to],
+      alt = str_replace(alt, ":([0-9]+)", replacement = \(x) {
+        val <- str_remove(x, ":") |> as.numeric()
+        paste0(":", formatC(val, digits = 2, format = "e"))
+      })
+    )
+
+  ggplot(chr_table, aes(x = chr, y = y, color = chr)) +
+    geom_line(linewidth = 3) +
+    geom_segment(
+      data = bp_table,
+      aes(x = from_x, xend = to_x, y = pos, yend = chr_to_pos)
+    ) +
+    geom_label(
+      data = bp_table,
+      aes(x = from_x, label = alt, y = pos),
+      color = "black",
+      fill = "white",
+      hjust = "right"
+    ) +
+    theme_void() +
+    theme(
+      axis.text.y = element_text(),
+      axis.title.y = element_text(face = "bold", angle = 90),
+    ) +
+    scale_y_reverse() +
+    guides(color = guide_legend(title = "Chromosome")) +
+    ylab("Position")
+  bp_table
+}
+# %%
+
+library(circlize)
+
+sv_circos <- function(
+  tb,
+  chr_col = "chr",
+  alt_col = "Alt",
+  genome = "hg38"
+) {
+  tb <- rename(tb, chr = chr_col, alt = alt_col) |>
+    distinct(chr, pos, .keep_all = TRUE)
+
+  chrs_present <- c(
+    unique(tb$chr),
+    str_extract(tb$alt, "([0-9]+):", group = 1)
+  ) |>
+    unique()
+
+  bp_table <- select(tb, chr, pos, alt) |>
+    mutate(
+      chr = if_else(
+        str_starts(chr, "chr"),
+        chr,
+        paste0("chr", chr)
+      ),
+      pos = as.numeric(pos),
+      chr_to = str_extract(alt, "([0-9]+):", group = 1),
+      chr_to = if_else(
+        str_starts(chr_to, "chr"),
+        chr_to,
+        paste0("chr", chr_to)
+      ),
+      pos = as.numeric(pos),
+      chr_to_pos = as.numeric(str_extract(alt, ":([0-9]+)", group = 1)),
+      alt = str_replace(alt, ":([0-9]+)", replacement = \(x) {
+        val <- str_remove(x, ":") |> as.numeric()
+        paste0(":", formatC(val, digits = 2, format = "e"))
+      })
+    )
+
+  to <- bp_table |> select(chr, pos, pos)
+  from <- bp_table |> select(chr_to, chr_to_pos, chr_to_pos)
+
+  circos.initializeWithIdeogram(
+    species = genome,
+    chromosome.index = paste0("chr", chrs_present)
+  )
+  circos.genomicLink(to, from)
+}
+
+# [2026-03-26 Thu] it's alright, but better to use something that displays the joinings
+# clearer
+sv_circos(breakpoints)

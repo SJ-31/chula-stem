@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
+import anndata as ad
 import muon as mu
+import pandas as pd
+import plotnine as gg
+import scanpy as sc
 from pyhere import here
 
 data = mu.read_h5mu(
@@ -26,3 +30,11 @@ print(
     .drop_duplicates("clone_id")
     .tail()
 )
+
+rna = data.mod["rna"]
+obs, var = sc.pp.calculate_qc_metrics(rna)
+
+# Comparison with actual whole-transcriptome data
+# metrics =
+ref_obs = pd.read_csv(here("analyses", "scrnaseq_hcc", "hcc_cohort_obs_2026-03-26.csv"))
+ref_var = pd.read_csv(here("analyses", "scrnaseq_hcc", "hcc_cohort_var_2026-03-26.csv"))
