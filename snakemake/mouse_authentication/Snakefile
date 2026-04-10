@@ -35,6 +35,16 @@ rule all:
         fastqc=expand(
             f"{outdir}/{{s}}/{{s}}_{{c}}_fastqc.zip", s=sample_names, c=[1, 2]
         ),
+        strling=expand(
+            f"{outdir}/{{s}}/strling/{{s}}-{{b}}.txt",
+            s=sample_names,
+            b=["bounds", "genotype", "unplaced"],
+        ),
+        ex_hunter=expand(
+            f"{outdir}/{{s}}/expansion_hunter/{{s}}.{{b}}",
+            s=sample_names,
+            b=["json", "vcf"],
+        ),
 
 
 rule fastqc:
@@ -94,6 +104,20 @@ rule bwa_mem2_mem:
         "v9.4.1/bio/bwa-mem2/mem"
 
 
+rule samtools_index:
+    input:
+        f"{outdir}/{{sample}}/{{sample}}.bam",
+    output:
+        f"{outdir}/{{sample}}/{{sample}}.bam.bai",
+    log:
+        f"{logdir}/{{sample}}_samtools_index.log",
+    params:
+        extra="",
+    threads: 4
+    wrapper:
+        "v9.4.1/bio/samtools/index"
+
+
 rule bamtools_stats:
     input:
         f"{outdir}/{{sample}}/{{sample}}.bam",
@@ -108,8 +132,8 @@ rule bamtools_stats:
 
 
 strling_indices = {
-    "index": ref_genome.with_suffix(".str"),
-    "fai": ref_genome.with_suffix(".fai"),
+    "index": ref_genome.with_name(ref_genome.name + ".str"),
+    "fai": ref_genome.with_name(ref_genome.name + ".fai"),
 }
 
 
