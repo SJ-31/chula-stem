@@ -227,13 +227,16 @@ dotplot:
       - POU5F1 # Oct4
       - KLF4
       - MYC # c-Myc
+    krt:
+      - KRT23
+      - KRT20
+      - KRT7
+      - KRT19
     stemness_surface:
       - CD44
       - CD133
       - CD117
     disco_cholangiocyte:
-      - KRT7
-      - KRT19
       - SPP1
       - ALB
       - SERPINA1

@@ -184,3 +184,29 @@ rule strling_call:
         extra="--loci",  # TODO: add the 18 mouse loci
     wrapper:
         "v8.1.1/bio/strling/call"
+
+
+rule expansion_hunter:
+    input:
+        bam=f"{outdir}/{{sample}}/{{sample}}.bam",
+        bai=f"{outdir}/{{sample}}/{{sample}}.bam.bai",
+        reference=ref_genome,
+        catalog=config["variant_catalog"],
+    output:
+        f"{outdir}/{{sample}}/expansion_hunter/{{sample}}.vcf",
+        f"{outdir}/{{sample}}/expansion_hunter/{{sample}}.json",
+    params:
+        extra="",
+        prefix=lambda wc: wc.get("sample"),
+    log:
+        f"{logdir}/{{sample}}/{{sample}}_expansion_hunter.log",
+    resources:
+        **resources.get("expansion_hunter", {}),
+    shell:
+        """
+        ExpansionHunter --reads {input.bam} \
+                {params.extra} \
+                --reference {input.reference} \
+                --variant-catalog {input.catalog} \
+                --output-prefix {params.prefix}
+        """

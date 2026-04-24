@@ -700,7 +700,7 @@ def validate_construct(sequences: list[DNA]):
             dna_bounds = (stop * 3, stop * 3 + 3)
             query = list(tcr_block.interval_metadata.query([dna_bounds]))
             if query:
-                stop_loc = f"{dna_bounds}, {query[0].metadata['id']}"
+                stop_loc = f"{dna_bounds}, {query[0].metadata.get('id')}"
                 result["inframe_stop_description"].append(stop_loc)
                 result["tcr_block"] = str(tcr_block)
     return result

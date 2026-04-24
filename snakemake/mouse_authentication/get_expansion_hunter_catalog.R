@@ -30,6 +30,7 @@ bed <- tb |>
     bounds = str_extract(`Chromosome Location`, "[0-9]+-[0-9]+"),
   ) |>
   separate_wider_delim(bounds, "-", names = c("start", "end")) |>
+  mutate(end = as.numeric(end), start = as.numeric(start)) |>
   select(chr, start, end, Marker) |>
   mutate(end = end + 550) |> # To accomodate for size increase due to the repeats
   inner_join(
@@ -52,5 +53,6 @@ to_expansion_hunter <- bed |>
     )
   })
 
-to_expansion_hunter |>
-  write_json(catalog_file, pretty = TRUE, autounbox = TRUE)
+write_tsv(bed, here(workdir, "mm39_str.bed"))
+## to_expansion_hunter |>
+##   write_json(catalog_file, pretty = TRUE, autounbox = TRUE)
