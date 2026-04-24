@@ -174,3 +174,7 @@ docs
 /analyses/scrnaseq_hcc/lightning_logs/
 /config/nas_uploads/records/
 /tests/nas_uploads/
+/snakemake/scrnaseq/test/*
+*lightning_logs*
+/analyses/scrnaseq_hcc/hcc_cohort_obs_2026-03-26.csv
+/analyses/scrnaseq_hcc/hcc_cohort_var_2026-03-26.csv

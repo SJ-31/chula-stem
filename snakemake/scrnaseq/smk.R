@@ -177,10 +177,12 @@ make_consensus_plot <- function(obj, prefix, palette = NULL) {
 ## * Visualizing DE genes & enriched pathways
 
 write_graph_list_csv <- function(glist, prefix, outdir) {
-  for (n in c("nodes", "edges")) {
-    lapply(glist, \(x) as_tibble(x, n)) |>
-      bind_rows() |>
-      write_csv(glue("{outdir}/{prefix}_{n}.csv"))
+  if (length(glist) > 1) {
+    for (n in c("nodes", "edges")) {
+      reduce(glist, \(x, y) bind_graphs(x, y)) |>
+        as_tibble(n) |>
+        write_csv(glue("{outdir}/{prefix}_{n}.csv"))
+    }
   }
 }
 
