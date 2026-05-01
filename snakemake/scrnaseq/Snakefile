@@ -1,4 +1,4 @@
-configfile: "cellranger_config.yaml"
+configfile: "env.yaml"
 
 
 combined_file = config["files"]["combined"]
@@ -9,6 +9,7 @@ outdir = config["outdir"]
 anno_out = f"{outdir}/annotations"
 
 from functions import provide_output_from_fs, provide_annotation_output
+import time
 
 gpu_res20 = {
     "mem": "50G",
@@ -36,7 +37,7 @@ for fs in feature_selection_methods:
 other_outs.update(provide_annotation_output(config))
 
 gene_association_plots = []
-for spec in config["find_gene_associations"].get("spec", []):
+for spec in config["find_gene_associations"].get("spec", []) or []:
     n = spec["name"]
     plot_file = f"{outdir}/gene_associations/{n}.pdf"
     other_outs[f"gene_assoc_{n}_PLOT"] = plot_file
@@ -67,12 +68,20 @@ rule all:
         **other_outs,
 
 
-rule prepare_data:
+log_file = time.strftime("%Y-%M-%d_%H:%M_main.log")
+
+
+rule base:
+    params:
+        log=f"{config['logdir']}/{log_file}",
+    script:
+        "smk.py"
+
+
+use rule base as prepare_data with:
     output:
         combined_file,
         permissive_features,
-    script:
-        "smk.py"
 
 
 # TODO: should also add doublet detection and removal
@@ -101,7 +110,7 @@ rule qc_filter:
         failed.write_h5ad(output["failed"])
 
 
-rule do_dimensionality_reduction:
+use rule base as do_dimensionality_reduction with:
     input:
         lambda wc: (
             other_outs[f"{wc.get('fs_name')}-{wc.get('integration')}"]
@@ -112,8 +121,6 @@ rule do_dimensionality_reduction:
         dr_method=lambda wc: wc.get("method"),
         integration_method=lambda wc: wc.get("integration"),
         hp_value=lambda wc: wc.get("val"),
-    log:
-        f"{logdir}/{{fs_name}}_DR_{{integration}}/{{method}}/{{method}}_{{val}}.log",
     resources:
         gres=lambda wc: None if wc.get("method") in dr_use_cpu else "gpu:7g.40gb:1",
         slurm_partition=lambda wc: "cpu" if wc.get("method") in dr_use_cpu else "gpu",
@@ -121,8 +128,6 @@ rule do_dimensionality_reduction:
         qos=lambda wc: "cpu24h" if wc.get("method") in dr_use_cpu else "gpu40g",
     output:
         f"{outdir}/{{fs_name}}/DR_{{integration}}/{{method}}/{{method}}_{{val}}.npy",
-    script:
-        "smk.py"
 
 
 # * Clustering and integration
@@ -141,11 +146,9 @@ rule do_cfs:
         "smk.R"
 
 
-rule integrate:
+use rule base as integrate with:
     input:
         passed_qc,
-    log:
-        f"{logdir}/{{fs_name}}-integration_and_cluster_{{integration}}.log",
     params:
         feature_selection=lambda wc: wc.get("fs_name"),
         integration=lambda wc: wc.get("integration"),
@@ -153,11 +156,9 @@ rule integrate:
         **gpu_res20,
     output:
         f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
-    script:
-        "smk.py"
 
 
-rule cluster_cells:
+use rule base as cluster_cells with:
     input:
         passed_qc,
         f"{outdir}/{{fs_name}}/{{integration}}_integrated.h5ad",
@@ -165,8 +166,6 @@ rule cluster_cells:
         integration=lambda wc: wc.get("integration"),
     output:
         f"{outdir}/{{fs_name}}/{{integration}}_clustering.h5ad",
-    script:
-        "smk.py"
 
 
 rule mark_cluster_complete:
@@ -182,7 +181,7 @@ rule mark_cluster_complete:
         "touch {output}"
 
 
-rule train_scvi_permissive:
+use rule base as train_scvi_permissive with:
     input:
         passed_qc,
         permissive_features,
@@ -190,8 +189,6 @@ rule train_scvi_permissive:
         **gpu_res40,
     output:
         path=directory(f"{outdir}/scVI_permissive"),
-    script:
-        "smk.py"
 
 
 # * DE analysis
@@ -210,7 +207,7 @@ rule cluster_samples:
         "smk.R"
 
 
-rule gather_sample_clusters:
+use rule base as gather_sample_clusters with:
     input:
         clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
         plots=expand(
@@ -220,11 +217,9 @@ rule gather_sample_clusters:
     output:
         f"{outdir}/sample_clusters.csv",
         f"{outdir}/sample_clusters_consensus.pdf",
-    script:
-        "smk.py"
 
 
-rule do_de_samples:
+use rule base as do_de_samples with:
     input:
         adata=passed_qc,
         features=permissive_features,
@@ -238,15 +233,13 @@ rule do_de_samples:
         spec=lambda wc: wc.get("spec"),
     output:
         f"{anno_out}/.sample_de-{{spec}}.csv",
-    script:
-        "smk.py"
 
 
 rule gather_de_samples:
     input:
         expand(
             f"{anno_out}/.sample_de-{{spec}}.csv",
-            spec=config["do_de_samples"].keys(),
+            spec=(config["do_de_samples"] or {}).keys(),
         ),
     output:
         f"{anno_out}/samples_de.csv",
@@ -270,7 +263,7 @@ rule gather_de_samples:
         pd.concat(tmp).to_csv(output[0], index=False)
 
 
-rule find_gene_associations:
+use rule base as find_gene_associations with:
     input:
         clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
         adata=passed_qc,
@@ -280,8 +273,6 @@ rule find_gene_associations:
         name=lambda wc: wc.get("name"),
     output:
         f"{outdir}/gene_associations/{{name}}.pdf",
-    script:
-        "smk.py"
 
 
 # * Annotation routines
@@ -290,7 +281,7 @@ rule find_gene_associations:
 # subset features
 
 
-rule cellassign:
+use rule base as cellassign with:
     input:
         passed_qc,
     params:
@@ -300,11 +291,9 @@ rule cellassign:
     output:
         predictions=other_outs["cellassign_predictions"],
         run_metrics=other_outs["cellassign_run_metrics"],
-    script:
-        "smk.py"
 
 
-rule enrich_clusters:
+use rule base as enrich_clusters with:
     input:
         passed_qc,
         f"{outdir}/.clustering_complete",
@@ -313,11 +302,9 @@ rule enrich_clusters:
         f"{outdir}/annotations/clusters_marker_gene_activity.csv",
     resources:
         mem="50G",
-    script:
-        "smk.py"
 
 
-rule do_de_clusters:
+use rule base as do_de_clusters with:
     input:
         adata=passed_qc,
         check=f"{outdir}/.clustering_complete",
@@ -330,12 +317,10 @@ rule do_de_clusters:
         outdir=anno_out,
     output:
         f"{anno_out}/clusters-{{method}}_de.csv",
-    script:
-        "smk.py"
 
 
 # Enrich DE genes with gprofiler
-rule gprofiler_enrich:
+use rule base as gprofiler_enrich with:
     input:
         sample_level=f"{anno_out}/samples_de.csv",
         cluster_level=expand(
@@ -345,12 +330,10 @@ rule gprofiler_enrich:
     output:
         cluster_level=f"{anno_out}/clusters_de_gprofiler.csv",
         sample_level=f"{anno_out}/samples_de_gprofiler.csv",
-    script:
-        "smk.py"
 
 
 # * Plotting
-rule save_other_dotplots:
+use rule base as save_other_dotplots with:
     input:
         **rules.do_cfs.output,
         **rules.cellassign.output,
@@ -360,18 +343,14 @@ rule save_other_dotplots:
     output:
         f"{outdir}/{{fs_name}}/dotplots.pdf",
         f"{outdir}/{{fs_name}}/cellassign_metrics.pdf",
-    script:
-        "smk.py"
 
 
-rule save_sample_dotplots:
+use rule base as save_sample_dotplots with:
     input:
         clusters=expand(f"{outdir}/.sample_clusters/{{fs}}.csv", fs=sample_cluster_keys),
         adata=passed_qc,
     output:
         f"{outdir}/sample_clusters.pdf",
-    script:
-        "smk.py"
 
 
 rule save_cluster_plots:

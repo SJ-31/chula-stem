@@ -2,7 +2,7 @@
 from collections.abc import Callable
 from functools import reduce
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import anndata as ad
 import chula_stem.sc_rnaseq as sc_utils
@@ -13,14 +13,33 @@ import pymupdf
 import scanpy as sc
 from chula_stem.plotting import plot_associations
 from chula_stem.r_utils import edgeR_wrapper
+from loguru import logger
 from pymupdf import Document
-from snakemake.script import snakemake as smk
+
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
+
+CONFIG = snakemake.config
+PARAMS: dict = snakemake.params
+RCONFIG: dict = snakemake.config.get(snakemake.rule, {})
+RNG: int = snakemake.config.get("rng", 20021031)
+OUT = snakemake.output
+IN = snakemake.input
+
 
 import functions as fn
 
-RNG: int = smk.config["rng"]
-RCONFIG: dict = smk.config.get(smk.rule) or {}
-
+logger.remove()
+logger.add(
+    PARAMS["log"],
+    format=(
+        "[<red>{time:HH:mm:ss}</red>] "
+        "<yellow>{level}</yellow>: "
+        "<cyan>{message}</cyan>"
+        "  {extra}"
+    ),
+    level="TRACE",
+)
 
 # * Utility functions
 
@@ -160,7 +179,7 @@ def add_all_clusters(
 
 
 def gprofiler_enrich():
-    sample_level = pd.read_csv(smk.input["sample_level"])
+    sample_level = pd.read_csv(IN["sample_level"])
     is_scVI = sample_level["analysis_group"].str.startswith("scVI")
     scVI_proba_threshold: float = RCONFIG.pop("scVI_min_prob", 0.8)
     scVI_lfc_threshold: float = RCONFIG.pop("scVI_lfc_threshold", 1.5)
@@ -169,9 +188,9 @@ def gprofiler_enrich():
     )
     sample_level = sample_level.loc[scVI_passed_threshold | ~is_scVI, :]
     sl = fn.profile_de_results(sample_level, grouping_col="analysis_group", **RCONFIG)
-    sl.to_csv(smk.output["sample_level"], index=False)
+    sl.to_csv(OUT["sample_level"], index=False)
     tmp = []
-    for infile in (Path(p) for p in smk.input["cluster_level"]):
+    for infile in (Path(p) for p in IN["cluster_level"]):
         method = infile.stem.removeprefix("clusters-").removesuffix("_de")
         df = pd.read_csv(infile)
         if "scVI_de" in infile.stem:
@@ -180,7 +199,7 @@ def gprofiler_enrich():
             method=method
         )
         tmp.append(cur)
-    pd.concat(tmp).to_csv(smk.output["cluster_level"], index=False)
+    pd.concat(tmp).to_csv(OUT["cluster_level"], index=False)
 
 
 def integrate(adata: ad.AnnData | None = None, cfg: dict | None = None):
@@ -189,40 +208,40 @@ def integrate(adata: ad.AnnData | None = None, cfg: dict | None = None):
     2. Integrate data across batches
     3. Generate cell clusters with Leiden and assess
     """
-    adata = adata or ad.read_h5ad(smk.input[0])
+    adata = adata or ad.read_h5ad(IN[0])
     cfg = cfg or RCONFIG
 
-    batch_key: str = cfg.get("batch_key") or smk.config["batch_key"]
-    fs_name = smk.params["feature_selection"]
+    batch_key: str = cfg.get("batch_key") or CONFIG["batch_key"]
+    fs_name = PARAMS["feature_selection"]
     adata = select_features(
         name=fs_name,
         adata=adata,
-        env=smk.config,
+        env=CONFIG,
         layer="lshift_normalized",
         batch_key=batch_key,
     )
 
-    integration_name = smk.params["integration"]
+    integration_name = PARAMS["integration"]
     extras = {}
     key = integrate_data(
-        adata, batch_key, name=integration_name, extras=extras, env=smk.config
+        adata, batch_key, name=integration_name, extras=extras, env=CONFIG
     )
     if "model" in extras:
         extras["model"].save(
-            **fn.get_scvi_model_path(fs_name, integration_name, smk.config)
+            **fn.get_scvi_model_path(fs_name, integration_name, CONFIG)
         )
     integrated = ad.AnnData(obs=adata.obs, obsm={key: adata.obsm[key]}, var=adata.var)
     del integrated.obs
     del integrated.var
-    integrated.write_h5ad(smk.output[0])
+    integrated.write_h5ad(OUT[0])
 
 
 def cluster_cells(cfg: dict | None = None):
-    adata = ad.read_h5ad(smk.input[0])
-    integration_layer = ad.read_h5ad(smk.input[1])
+    adata = ad.read_h5ad(IN[0])
+    integration_layer = ad.read_h5ad(IN[1])
     adata.obsm.update(integration_layer.obsm)
     cfg = cfg or RCONFIG
-    batch_key: str = cfg.get("batch_key") or smk.config["batch_key"]
+    batch_key: str = cfg.get("batch_key") or CONFIG["batch_key"]
     if to_exclude := cfg.get("exclude"):
         adata = adata[~adata.obs["sample"].isin(to_exclude), :]
 
@@ -230,7 +249,7 @@ def cluster_cells(cfg: dict | None = None):
     for slot in ("obs", "uns", "varp", "obsm"):
         old[slot] = list(getattr(adata, slot).keys())
 
-    key = get_integration_key(smk.params["integration"])
+    key = get_integration_key(PARAMS["integration"])
     sc.external.pp.bbknn(adata, batch_key=batch_key)
 
     if cfg["method"] == "leiden":
@@ -253,52 +272,52 @@ def cluster_cells(cfg: dict | None = None):
 
     del adata.X
     del adata.var
-    adata.write_h5ad(smk.output[0])
+    adata.write_h5ad(OUT[0])
 
 
 def prepare_data():
-    _ = fn.prepare_data(smk.output[0], smk.output[1], smk.config)
+    _ = fn.prepare_data(OUT[0], OUT[1], CONFIG)
 
 
 def cellassign():
-    adata = ad.read_h5ad(smk.input[0])
-    _, markers = fn.get_gs_and_cell_markers(smk.config)
+    adata = ad.read_h5ad(IN[0])
+    _, markers = fn.get_gs_and_cell_markers(CONFIG)
     result = sc_utils.cell_assign_wrapper(
         adata,
         cell_markers=markers,
-        model_path=Path(smk.params["model"]),
+        model_path=Path(PARAMS["model"]),
         **(RCONFIG.get("kws") or {}),
     )
     model = result["model"]
-    result["pred"].reset_index().to_csv(smk.output["predictions"], index=False)
+    result["pred"].reset_index().to_csv(OUT["predictions"], index=False)
     run_metrics = pd.concat([val for val in model.history.values()], axis=1)
-    model.save(smk.params["model"], save_anndata=True, overwrite=True)
-    run_metrics.reset_index().to_csv(smk.output["run_metrics"], index=False)
+    model.save(PARAMS["model"], save_anndata=True, overwrite=True)
+    run_metrics.reset_index().to_csv(OUT["run_metrics"], index=False)
 
 
 def do_dimensionality_reduction():
-    cfg = smk.config["DR"]
-    adata = ad.read_h5ad(smk.input[0])
-    method = smk.params["dr_method"]
-    imethod = smk.params["integration_method"]
+    cfg = CONFIG["DR"]
+    adata = ad.read_h5ad(IN[0])
+    method = PARAMS["dr_method"]
+    imethod = PARAMS["integration_method"]
     kws: dict = cfg["methods"][method].get("kws", {}) or {}
-    hp_value: int | float = smk.params["hp_value"]
+    hp_value: int | float = PARAMS["hp_value"]
     hp_to_vary = cfg["methods"][method]["vary"][0]
     kws[hp_to_vary] = int(hp_value)
     result: np.ndarray = dr_dispatch(adata, method, integration_method=imethod, kws=kws)
-    np.save(smk.output[0], result, allow_pickle=True)
+    np.save(OUT[0], result, allow_pickle=True)
 
 
 def do_de_samples() -> ad.AnnData | None:
-    with open(smk.input["features"], "r") as f:
+    with open(IN["features"], "r") as f:
         feature_idx = f.read().splitlines()
-    clst_df: pd.DataFrame = pd.read_csv(smk.input["clusters"]).astype("string")
-    adata = ad.read_h5ad(smk.input["adata"])
+    clst_df: pd.DataFrame = pd.read_csv(IN["clusters"]).astype("string")
+    adata = ad.read_h5ad(IN["adata"])
     adata = adata[:, adata.var.index.isin(feature_idx)]
     adata.obs = adata.obs.merge(clst_df, on="sample", how="left")
 
-    de_spec = smk.params["spec"]
-    params = smk.config["do_de_samples"][de_spec]
+    de_spec = PARAMS["spec"]
+    params = CONFIG["do_de_samples"][de_spec]
     method = params.get("method", de_spec)
     query = params.get("query")
     kws = params.get("kws") or {}
@@ -308,9 +327,7 @@ def do_de_samples() -> ad.AnnData | None:
     if method == "scVI":
         import scvi
 
-        model: scvi.model.SCVI = scvi.model.SCVI.load(
-            smk.input["model"], adata=adata.copy()
-        )
+        model: scvi.model.SCVI = scvi.model.SCVI.load(IN["model"], adata=adata.copy())
         result = (
             model.differential_expression(mode="change", **kws)
             .reset_index(names="gene")
@@ -324,14 +341,14 @@ def do_de_samples() -> ad.AnnData | None:
         num_de, result = edgeR_wrapper(adata, group=group, **kws)
     else:
         raise NotImplementedError()
-    result.to_csv(smk.output[0], index=False)
+    result.to_csv(OUT[0], index=False)
 
 
 def train_scvi_permissive(
     adata_file: str | None = None,
     feature_idx_file: str | None = None,
     params=RCONFIG,
-    env=smk.config,
+    env=CONFIG,
 ):
     """Helper function for training scVI model after reducing adata to the
     permissive feature set
@@ -339,8 +356,8 @@ def train_scvi_permissive(
     """
     import scvi
 
-    adata_file = adata_file or smk.input[0]
-    feature_idx_file = feature_idx_file or smk.input[1]
+    adata_file = adata_file or IN[0]
+    feature_idx_file = feature_idx_file or IN[1]
 
     adata = ad.read_h5ad(adata_file)
     with open(feature_idx_file, "r") as f:
@@ -350,21 +367,21 @@ def train_scvi_permissive(
     tmp = {}
     integrate_data(adata, batch_key, "", tmp, env, params=params, method="scVI")
     model: scvi.model.SCVI = tmp["model"]
-    model.save(smk.output["path"], save_anndata=False, overwrite=True)
+    model.save(OUT["path"], save_anndata=False, overwrite=True)
 
 
 def save_other_dotplots():
-    adata = ad.read_h5ad(smk.input["adata"])
+    adata = ad.read_h5ad(IN["adata"])
     cols_plot = ["cfs_community", "cellassign_prediction", "patient", "sample"]
     fn.add_cfs_community(
         adata,
-        old_clusters=Path(smk.input["ind_clustering"]),
-        cfs_community_file=Path(smk.input["communities"]),
+        old_clusters=Path(IN["ind_clustering"]),
+        cfs_community_file=Path(IN["communities"]),
         column="cfs_community",
     )
-    cellassign_predictions: pd.DataFrame = pd.read_csv(smk.input["predictions"])
+    cellassign_predictions: pd.DataFrame = pd.read_csv(IN["predictions"])
     cellassign_metrics: pd.DataFrame = (
-        pd.read_csv(smk.input["run_metrics"])
+        pd.read_csv(IN["run_metrics"])
         .melt(id_vars="epoch")
         .rename(columns={"variable": "metric"})
     )
@@ -375,7 +392,7 @@ def save_other_dotplots():
         + gg.ggtitle("Cellassign training metrics")
         + gg.theme(figure_size=(15, 20))
     )
-    metrics_plot.save(smk.output[1])
+    metrics_plot.save(OUT[1])
 
     adata.obs = adata.obs.merge(
         cellassign_predictions.loc[:, ["index", "PREDICTION"]],
@@ -385,53 +402,53 @@ def save_other_dotplots():
     ).rename(columns={"PREDICTION": "cellassign_prediction"})
     fn.make_cluster_dotplots(
         adata,
-        filename=smk.output[0],
+        filename=OUT[0],
         markers={},
-        env=smk.config,
+        env=CONFIG,
         additional_groups=cols_plot,
         group_rotation=90,
     )
 
 
 def enrich_clusters():
-    adata = ad.read_h5ad(smk.input[0])
+    adata = ad.read_h5ad(IN[0])
     fn.enrich_clusters(
         adata,
         cfg=RCONFIG,
-        env=smk.config,
-        gs_out=smk.output[0],
-        marker_out=smk.output[1],
+        env=CONFIG,
+        gs_out=OUT[0],
+        marker_out=OUT[1],
     )
 
 
 def do_de_clusters():
-    method = smk.params["method"]
+    method = PARAMS["method"]
     cfg = RCONFIG.get(method) or {}
-    adata = ad.read_h5ad(smk.input["adata"])
+    adata = ad.read_h5ad(IN["adata"])
     res = fn.do_de_clusters(
         method,
         adata,
         cfg,
-        smk.config,
-        model_file=smk.input["model"],
-        features=smk.input["features"],
+        CONFIG,
+        model_file=IN["model"],
+        features=IN["features"],
     )
     if method == "edgeR":
         res["de_counts"].to_csv(
-            f"{smk.params['outdir']}/edgeR_de_gene_counts.csv", index=False
+            f"{PARAMS['outdir']}/edgeR_de_gene_counts.csv", index=False
         )
-    res["top_de"].to_csv(smk.output[0], index=False)
+    res["top_de"].to_csv(OUT[0], index=False)
 
 
 def save_sample_dotplots():
-    adata = ad.read_h5ad(smk.input["adata"])
-    clst_df, adata = add_all_clusters(smk.input["clusters"], adata)
+    adata = ad.read_h5ad(IN["adata"])
+    clst_df, adata = add_all_clusters(IN["clusters"], adata)
     assert isinstance(adata, ad.AnnData)
     fn.make_cluster_dotplots(
         adata,
-        filename=smk.output[0],
+        filename=OUT[0],
         markers={},
-        env=smk.config,
+        env=CONFIG,
         additional_groups=[c for c in clst_df.columns if c != "sample"],
         group_rotation=90,
         with_samples=False,
@@ -439,25 +456,23 @@ def save_sample_dotplots():
 
 
 def gather_sample_clusters():
-    clst_df, _ = add_all_clusters(smk.input["clusters"])
-    clst_df.to_csv(smk.output[0], index=False)
+    clst_df, _ = add_all_clusters(IN["clusters"])
+    clst_df.to_csv(OUT[0], index=False)
     doc: Document = pymupdf.open()
-    for d in smk.input["plots"]:
+    for d in IN["plots"]:
         doc.insert_file(d)
-    doc.save(smk.output[2])
+    doc.save(OUT[2])
 
 
 def find_gene_associations():
-    adata = ad.read_h5ad(smk.input["adata"])
-    features: list[str] = Path(smk.input["features"]).read_text().splitlines()
-    _, adata = add_all_clusters(
-        smk.input["clusters"], adata, smk.config, to_category=True
-    )
+    adata = ad.read_h5ad(IN["adata"])
+    features: list[str] = Path(IN["features"]).read_text().splitlines()
+    _, adata = add_all_clusters(IN["clusters"], adata, CONFIG, to_category=True)
     assert isinstance(adata, ad.AnnData)
-    outdir: Path = Path(smk.params["outdir"])
+    outdir: Path = Path(PARAMS["outdir"])
     kws: dict = RCONFIG["kws"]
     spec: dict | None = None
-    name = smk.params["name"]
+    name = PARAMS["name"]
     for spec_tmp in RCONFIG["spec"]:
         if name == spec_tmp["name"]:
             spec = spec_tmp
@@ -492,11 +507,12 @@ def find_gene_associations():
         if tmp.exists():
             doc.insert_file(tmp)
             tmp.unlink()
-    doc.save(smk.output[0])
+    doc.save(OUT[0])
 
 
 # * Entry
-if rule_fn := globals().get(smk.rule):
-    rule_fn()
-elif smk.rule.startswith("do_dimensionality_reduction"):
-    do_dimensionality_reduction()
+with logger.contextualize(rule=snakemake.rule, out=[Path(o).name for o in OUT]):
+    if rule_fn := globals().get(snakemake.rule):
+        rule_fn()
+    elif snakemake.rule.startswith("do_dimensionality_reduction"):
+        do_dimensionality_reduction()
