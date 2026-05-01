@@ -20,6 +20,7 @@ from chula_stem.r_utils import edgeR_wrapper
 from chula_stem.sc_rnaseq import annotate_adata_vars, annotate_marker, distance_by_mads
 from chula_stem.utils import read_existing, set_cover_on_dc_results
 from gprofiler import GProfiler
+from loguru import logger
 from pymupdf import Document
 
 # * Data prep/retrieval
@@ -73,7 +74,15 @@ def prepare_data(file, feature_file, env):
         tmp, merge="first", index_unique="-", join="outer", uns_merge="same"
     )
     adata = adata[:, ~adata.var["gene_ids"].isna()]
-    annotate_adata_vars(adata, "gene_ids", savepath=Path(env["gene_reference"]))
+    adata = annotate_adata_vars(
+        adata,
+        "gene_ids",
+        savepath=Path(env["gene_reference"]),
+        meta_id_col="ensembl_gene_id",
+        new_index_col="gene_ids",
+        new_index_name="gene_ids",
+    )
+    adata.var.loc[:, "gene_ids"] = adata.var_names
     marker_genes = env.get("obs_markers_annotate")
     if marker_genes:
         annotate_marker(adata, marker_genes=marker_genes, gene_col="hgnc_symbol")
