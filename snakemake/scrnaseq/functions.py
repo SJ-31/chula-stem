@@ -63,6 +63,7 @@ def prepare_data(file, feature_file, env):
                 print(f"WARNING: Path to extra file {path} does not exist")
                 continue
             current = ad.read_h5ad(path)
+            logger.info("Head gene ids for patient {}: {}", patient, current.var.head())
             assert isinstance(current.obs, pd.DataFrame)
             current.obs.loc[:, "patient"] = patient
             current.obs.loc[:, "sample"] = f"{patient}_{stype}-{treatment}"
@@ -82,10 +83,17 @@ def prepare_data(file, feature_file, env):
         new_index_col="gene_ids",
         new_index_name="gene_ids",
     )
+    logger.info(
+        "Combined chromosome distribution {}",
+        adata.var["chromosome_name"].value_counts(),
+    )
     adata.var.loc[:, "gene_ids"] = adata.var_names
     marker_genes = env.get("obs_markers_annotate")
     if marker_genes:
-        annotate_marker(adata, marker_genes=marker_genes, gene_col="hgnc_symbol")
+        try:
+            annotate_marker(adata, marker_genes=marker_genes, gene_col="hgnc_symbol")
+        except KeyError as e:
+            logger.debug("Missing marker genes in column\nException: {}", e)
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
     # TODO: should you change the grouping col?
     # review after looking at the data unintegrated
@@ -438,6 +446,7 @@ def make_cluster_dotplots(
 
 def qc_plot_patient(adata: ad.AnnData, patient, thresholds=[1, 3, 5], line_alpha=0.5):
     adata = adata[adata.obs["patient"] == patient, :].copy()
+    logger.info("Drawing qc plot for patient {}", patient)
     adata.obs.loc[:, "sample"] = adata.obs["sample"].str.replace(".*_", "")
     plots = {}
     nudge_by = len(set(adata.obs["sample"]))

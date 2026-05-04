@@ -68,7 +68,7 @@ rule all:
         **other_outs,
 
 
-log_file = time.strftime("%Y-%M-%d_%H:%M_main.log")
+log_file = time.strftime("%Y-%m-%d_%H:%M_main.log")
 
 
 rule base:
@@ -392,6 +392,8 @@ rule save_qc_plots:
         combined = ad.read_h5ad(input[0])
         for patient in combined.obs["patient"].unique():
             qc_mads, mads_compare = qc_plot_patient(combined, patient)
+            # BUG: this crashes if one of the qc columns has no
+            # distribution i.e. all values across all cells are the same
             (qc_mads / mads_compare).save(outdir / f"{patient}.pdf")
 
 

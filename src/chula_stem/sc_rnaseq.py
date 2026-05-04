@@ -10,10 +10,13 @@ import pandas as pd
 import scanpy as sc
 import skbio.stats.composition as comp
 import sklearn.metrics as sm
+from loguru import logger
 from numba import jit
 from scipy import sparse, stats
 
 from chula_stem import utils as ut
+
+logger.disable("chula_stem")
 
 
 @click.command()
@@ -254,6 +257,7 @@ def annotate_marker(
 def annotate_adata_vars(
     adata: ad.AnnData,
     merge_on: str = "ensembl_gene_id",
+    meta_id_col: str | None = None,
     new_index_col: str | None = None,
     new_index_name: str = "gene",
     savepath: Path | None = None,
@@ -265,11 +269,10 @@ def annotate_adata_vars(
     else:
         metadata = ut.get_ensembl_gene_data()
         metadata.to_csv(savepath)
+    if meta_id_col is not None:
+        metadata = metadata.rename(columns={meta_id_col: merge_on})
     merged: pd.DataFrame = adata.var.merge(
-        metadata.drop_duplicates(merge_on),
-        left_index=True,
-        right_on=merge_on,
-        how="left",
+        metadata.drop_duplicates(merge_on), on=merge_on, how="left"
     )
     if new_index_col is not None:
         tmp: pd.Series = merged[new_index_col].fillna(merged[merge_on])
