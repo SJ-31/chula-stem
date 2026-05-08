@@ -6,6 +6,7 @@ suppressMessages({
   library(googlesheets4)
   library(reactable)
 })
+gs4_deauth()
 
 link <- "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYIdCfi2GcHPQVc4/edit?gid=870277624#gid=870277624"
 
