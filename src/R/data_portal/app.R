@@ -1,3 +1,8 @@
+if (!requireNamespace("polars", quietly = TRUE)) {
+  Sys.setenv(NOT_CRAN = "true")
+  install.packages("polars", repos = "https://community.r-multiverse.org")
+}
+
 suppressMessages({
   options(shiny.autoreload = TRUE)
   library(shiny)
