@@ -13,7 +13,9 @@ sample_file <- "/home/shannc/Downloads/2026-05-07-record_cases-autogen.csv"
 
 setup_data <- function(manifest) {
   data <- list(cohorts = list(), ttypes = list())
-  df <- pl$read_csv(manifest)
+  df <- pl$read_csv(manifest)$with_columns(pl$col(
+    "tumor_type"
+  )$str$to_uppercase())$drop("date_received")
   modalities <- as.character(df[["modality"]]) |> unique()
   data$dfs <- lapply(modalities, \(x) {
     filtered <- df$filter(pl$col("modality") == x)
@@ -41,13 +43,40 @@ get_selection <- function(input, condition_on, out_col) {
   } else {
     filtered <- choice_df
   }
-  c(unique(as.character(filtered[[out_col]])), "-")
+  sort(c(unique(as.character(filtered[[out_col]])), "-"))
+}
+
+rename_df <- function(df) {
+  df <- df$rename(
+    case_name = "Case",
+    path = "Path",
+    has_pbmc = "PBMC",
+    has_tumor = "Tumor",
+    has_raw = "Raw",
+    has_processed = "Processed"
+  )
+  if ("tumor_type" %in% df$columns) {
+    df <- df$rename(tumor_type = "Tumor Type")
+  }
+  if ("cohort" %in% df$columns) {
+    df <- df$rename(cohort = "Cohort")
+  }
+  df
+}
+
+select_filter <- function(values, name) {
+  tags$select(
+    onchange = sprintf(
+      "Reactable.setFilter('main_tab', '%s', event.target.value || undefined)",
+      name
+    ),
+    tags$option(value = "", "All"),
+    lapply(unique(values), tags$option)
+  )
 }
 
 make_sample_table <- function(input) {
   df <- D$dfs[[clean_modality(input$nav)]]
-
-  print(df)
 
   cohort <- input$cohort
   tumor_type <- input$tumor_type
@@ -63,7 +92,19 @@ make_sample_table <- function(input) {
   } else {
     filtered <- df
   }
-  reactable(as.data.frame(filtered))
+  reactable(
+    as.data.frame(rename_df(filtered)),
+    pagination = FALSE,
+    searchable = TRUE,
+    columns = list(
+      PBMC = colDef(filterable = TRUE, filterInput = select_filter),
+      Raw = colDef(filterable = TRUE, filterInput = select_filter),
+      Processed = colDef(filterable = TRUE, filterInput = select_filter),
+      Tumor = colDef(filterable = TRUE, filterInput = select_filter),
+      Path = colDef(filterable = FALSE)
+    ),
+    elementId = "main_tab"
+  )
 }
 
 ## plot_samples <- function(df) {
@@ -71,6 +112,7 @@ make_sample_table <- function(input) {
 ## }
 
 ui <- page_navbar(
+  theme = bs_theme(bootswatch = "flatly"),
   id = "nav",
   nav_panel("Exome", reactableOutput("t1")),
   nav_panel("RNA-seq", reactableOutput("t2")),
@@ -90,7 +132,8 @@ ui <- page_navbar(
       label = "Tumor Type",
       choices = "-"
     ),
-  )
+  ),
+  title = "Modalities"
 )
 
 server <- function(input, output, session) {
