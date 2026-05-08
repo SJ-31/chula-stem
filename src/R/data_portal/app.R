@@ -8,23 +8,17 @@ suppressMessages({
   library(shiny)
   library(bslib)
   library(tidyverse)
+  library(googlesheets4)
   library(polars)
   library(reactable)
 })
 
 link <- "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYIdCfi2GcHPQVc4/edit?gid=870277624#gid=870277624"
 
-read_sheet(
-  link,
-  col_types = "c"
-)
 
-sample_file <- "/home/shannc/Downloads/2026-05-07-record_cases-autogen.csv"
-
-
-setup_data <- function(manifest) {
+setup_data <- function() {
   data <- list(cohorts = list(), ttypes = list())
-  df <- pl$read_csv(manifest)$with_columns(pl$col(
+  df <- as_polars_df(read_sheet(link))$with_columns(pl$col(
     "tumor_type"
   )$str$to_uppercase())$drop("date_received")
   cols <- c(discard(df$columns, \(x) x == "path"), "path")
