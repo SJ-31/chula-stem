@@ -1,15 +1,9 @@
-if (!requireNamespace("polars", quietly = TRUE)) {
-  Sys.setenv(NOT_CRAN = "true")
-  install.packages("polars", repos = "https://community.r-multiverse.org")
-}
-
 suppressMessages({
   options(shiny.autoreload = TRUE)
   library(shiny)
   library(bslib)
   library(tidyverse)
   library(googlesheets4)
-  library(polars)
   library(reactable)
 })
 
@@ -18,22 +12,21 @@ link <- "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYId
 
 setup_data <- function() {
   data <- list(cohorts = list(), ttypes = list())
-  df <- as_polars_df(read_sheet(link))$with_columns(pl$col(
-    "tumor_type"
-  )$str$to_uppercase())$drop("date_received")
-  cols <- c(discard(df$columns, \(x) x == "path"), "path")
-  df <- df$select(cols)
+  df <- read_sheet(link) |>
+    mutate(tumor_type = str_to_upper(tumor_type)) |>
+    select(-date_received) |>
+    relocate(path, .after = everything())
   modalities <- as.character(df[["modality"]]) |> unique()
   data$dfs <- lapply(modalities, \(x) {
-    filtered <- df$filter(pl$col("modality") == x)
-    data$selections[[x]] <<- filtered$select(c("cohort", "tumor_type"))$unique()
-    filtered$drop("modality")
+    filtered <- df |> filter(modality == x)
+    data$selections[[x]] <<- select(df, c("cohort", "tumor_type")) |> distinct()
+    filtered |> select(-modality)
   }) |>
     `names<-`(modalities)
   data
 }
 
-D <- setup_data(sample_file)
+D <- setup_data()
 
 
 clean_modality <- function(name) {
@@ -44,9 +37,8 @@ get_selection <- function(input, condition_on, out_col) {
   choice_df <- D$selections[[clean_modality(input$nav)]]
 
   if (input[[condition_on]] != "-") {
-    filtered <- choice_df$filter(
-      pl$col(condition_on) == input[[condition_on]]
-    )
+    mask <- choice_df[[condition_on]] == input[[condition_on]]
+    filtered <- choice_df[mask, ]
   } else {
     filtered <- choice_df
   }
@@ -54,19 +46,20 @@ get_selection <- function(input, condition_on, out_col) {
 }
 
 rename_df <- function(df) {
-  df <- df$rename(
-    case_name = "Case",
-    path = "Path",
-    has_pbmc = "PBMC",
-    has_tumor = "Tumor",
-    has_raw = "Raw",
-    has_processed = "Processed"
-  )
-  if ("tumor_type" %in% df$columns) {
-    df <- df$rename(tumor_type = "Tumor Type")
+  df <- df |>
+    rename(
+      Case = "case_name",
+      Path = "path",
+      PBMC = "has_pbmc",
+      Tumor = "has_tumor",
+      Raw = "has_raw",
+      Processed = "has_processed"
+    )
+  if ("tumor_type" %in% colnames(df)) {
+    df <- df |> rename("Tumor Type" = "tumor_type")
   }
-  if ("cohort" %in% df$columns) {
-    df <- df$rename(cohort = "Cohort")
+  if ("cohort" %in% colnames(df)) {
+    df <- df |> rename(Cohort = "cohort")
   }
   df
 }
@@ -94,17 +87,23 @@ bool_col <- colDef(
 make_sample_table <- function(input) {
   df <- D$dfs[[clean_modality(input$nav)]]
 
-  cohort <- input$cohort
-  tumor_type <- input$tumor_type
+  cohort_val <- input$cohort
+  ttype_val <- input$tumor_type
 
-  if (cohort != "-" && tumor_type != "-") {
-    filtered <- df$filter(
-      pl$col("cohort") == cohort & pl$col("tumor_type") == tumor_type
-    )$drop(c("cohort", "tumor_type"))
-  } else if (cohort != "-") {
-    filtered <- df$filter(pl$col("cohort") == cohort)$drop("cohort")
-  } else if (tumor_type != "-") {
-    filtered <- df$filter(pl$col("tumor_type") == tumor_type)$drop("tumor_type")
+  if (cohort_val != "-" && ttype_val != "-") {
+    filtered <- df |>
+      filter(
+        cohort == cohort_val & tumor_type == ttype_val
+      ) |>
+      select(-cohort, -tumor_type)
+  } else if (cohort_val != "-") {
+    filtered <- df |>
+      filter(cohort == cohort_val) |>
+      select(-cohort)
+  } else if (ttype_val != "-") {
+    filtered <- df |>
+      filter(tumor_type == ttype_val) |>
+      select(-tumor_type)
   } else {
     filtered <- df
   }
