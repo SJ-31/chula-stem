@@ -5,8 +5,14 @@ suppressMessages({
   library(tidyverse)
   library(polars)
   library(reactable)
-  library(glue)
 })
+
+link <- "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYIdCfi2GcHPQVc4/edit?gid=870277624#gid=870277624"
+
+read_sheet(
+  link,
+  col_types = "c"
+)
 
 sample_file <- "/home/shannc/Downloads/2026-05-07-record_cases-autogen.csv"
 
@@ -16,6 +22,8 @@ setup_data <- function(manifest) {
   df <- pl$read_csv(manifest)$with_columns(pl$col(
     "tumor_type"
   )$str$to_uppercase())$drop("date_received")
+  cols <- c(discard(df$columns, \(x) x == "path"), "path")
+  df <- df$select(cols)
   modalities <- as.character(df[["modality"]]) |> unique()
   data$dfs <- lapply(modalities, \(x) {
     filtered <- df$filter(pl$col("modality") == x)
@@ -75,6 +83,15 @@ select_filter <- function(values, name) {
   )
 }
 
+bool_col <- colDef(
+  filterable = TRUE,
+  filterInput = select_filter,
+  align = "center",
+  cell = \(v) {
+    if (v == "F") "\u274c" else "\u2714\ufe0f"
+  }
+)
+
 make_sample_table <- function(input) {
   df <- D$dfs[[clean_modality(input$nav)]]
 
@@ -96,14 +113,27 @@ make_sample_table <- function(input) {
     as.data.frame(rename_df(filtered)),
     pagination = FALSE,
     searchable = TRUE,
+    showPagination = TRUE,
+    resizable = TRUE,
+    wrap = FALSE,
     columns = list(
-      PBMC = colDef(filterable = TRUE, filterInput = select_filter),
-      Raw = colDef(filterable = TRUE, filterInput = select_filter),
-      Processed = colDef(filterable = TRUE, filterInput = select_filter),
-      Tumor = colDef(filterable = TRUE, filterInput = select_filter),
+      PBMC = bool_col,
+      Raw = bool_col,
+      Processed = bool_col,
+      Tumor = bool_col,
       Path = colDef(filterable = FALSE)
     ),
-    elementId = "main_tab"
+    elementId = "main_tab",
+    columnGroups = list(
+      colGroup(
+        name = "Available Data",
+        columns = c("Processed", "Raw")
+      ),
+      colGroup(
+        name = "Available Samples",
+        columns = c("Tumor", "PBMC")
+      )
+    )
   )
 }
 
