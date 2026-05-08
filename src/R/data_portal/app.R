@@ -20,7 +20,8 @@ setup_data <- function() {
   modalities <- as.character(df[["modality"]]) |> unique()
   data$dfs <- lapply(modalities, \(x) {
     filtered <- df |> filter(modality == x)
-    data$selections[[x]] <<- select(df, c("cohort", "tumor_type")) |> distinct()
+    data$selections[[x]] <<- select(filtered, c("cohort", "tumor_type")) |>
+      distinct()
     filtered |> select(-modality)
   }) |>
     `names<-`(modalities)
