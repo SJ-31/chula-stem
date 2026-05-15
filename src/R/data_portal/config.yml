@@ -1,0 +1,4 @@
+default:
+  data_sheets:
+    samples: "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYIdCfi2GcHPQVc4/edit?gid=870277624#gid=870277624"
+    other: "https://docs.google.com/spreadsheets/d/1eNsxUPIf3X3l7W5wR4uIB-_TRWiB8yQry36zCxqlo0U/edit?gid=0#gid=0"

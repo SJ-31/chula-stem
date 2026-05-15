@@ -1,9 +1,18 @@
 library(tidyverse)
 library(crosstalk)
+library(checkmate)
 
-SAMPLE_SHEET <- "https://docs.google.com/spreadsheets/d/1h8aGAyhQk1IL2MALBZqmARUjvurcYIdCfi2GcHPQVc4/edit?gid=870277624#gid=870277624"
+##  Validate config
+local({
+  data_sheets <- config::get("data_sheets")
+  assert_subset(
+    names(data_sheets),
+    choices = c("samples", "other")
+  )
+  assert_string(data_sheets$samples)
+  assert_string(data_sheets$other)
+})
 
-OTHER_SHEET <- "https://docs.google.com/spreadsheets/d/1eNsxUPIf3X3l7W5wR4uIB-_TRWiB8yQry36zCxqlo0U/edit?gid=0#gid=0"
 
 JOIN_ON <- c(
   "tumor_type",
@@ -53,7 +62,9 @@ rename_df <- function(df) {
 
 D <- local({
   data <- list()
-  df <- read_sheet(SAMPLE_SHEET) |>
+  sheets <- config::get("data_sheets")
+  other_sheet <- sheets$other
+  df <- read_sheet(sheets$samples) |>
     mutate(
       tumor_type = str_to_upper(tumor_type),
       modality = replace_values(
@@ -71,10 +82,10 @@ D <- local({
     group_by(cohort, case_name, tumor_type) |>
     summarise(Modality = paste0(modality, collapse = "; "))
   data$all <- rename_df(df) |> SharedData$new(group = "tables")
-  data$clinical <- read_from_other(OTHER_SHEET, "clinical", grouped) |>
+  data$clinical <- read_from_other(other_sheet, "clinical", grouped) |>
     rename_df() |>
     SharedData$new(group = "tables")
-  data$meta <- read_from_other(OTHER_SHEET, "metadata", grouped) |>
+  data$meta <- read_from_other(other_sheet, "metadata", grouped) |>
     rename_df() |>
     SharedData$new(group = "tables")
   data
