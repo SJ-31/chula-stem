@@ -388,18 +388,23 @@ def make_cluster_dotplots(
     if len(group_cols) == 0:
         raise ValueError("No grouping columns could be specified")
     cfg: dict = env.get("dotplot") or {}
-    kws = cfg.get("kws") or {}
+    kws = cfg.get("kws", {}) or {}
     totals_kws = cfg.get("totals_kws") or {}
     if isinstance(markers, dict) and (from_cfg := cfg.get("markers")):
         print(f"INFO: Adding additional markers from dotplot configuration: {from_cfg}")
         markers.update(from_cfg)
+    var_names = (
+        set(adata.var_names)
+        if not kws.get("gene_symbols")
+        else set(adata.var[kws["gene_symbols"]])
+    )
     for k, genes in markers.items():
-        not_in_adata = [g for g in genes if g not in adata.var_names]
+        not_in_adata = [g for g in genes if g not in var_names]
         if not_in_adata:
             print(f"""
-            WARNING: the following genes in the marker set {k} are not present in adata.var
+            WARNING: the following genes in the marker set {k} are not present in adata.var {not_in_adata}
             """)
-            markers[k] = [g for g in genes if g in adata.var_names]
+            markers[k] = [g for g in genes if g in var_names]
 
     doc: Document = pymupdf.open()
     transpose = kws.get("swap_axes", False)
