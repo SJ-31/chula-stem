@@ -226,11 +226,6 @@ TYPE_ORDER <- tmb_merged |>
   pluck("key")
 TYPE_ORDER_TITLE <- str_to_title(TYPE_ORDER) |> str_replace_all("_", " ")
 
-order <- replicate_figure$SYMBOL |>
-  table() |>
-  sort(decreasing = TRUE) |>
-  names()
-replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
 
 sample_freq <- replicate_figure |>
   filter(sample %in% samples_with_wes) |>
@@ -243,6 +238,18 @@ sample_freq <- replicate_figure |>
       paste0(., " %")
   ) |>
   arrange(desc(freq_raw))
+
+if (
+  !is.null(config$variant_calling$order_by_config) &&
+    config$variant_calling$order_by_config
+) {
+  order <- rev(names(config$wanted_genes))
+} else {
+  order <- rev(sample_freq$SYMBOL)
+}
+
+replicate_figure$SYMBOL <- factor(replicate_figure$SYMBOL, levels = order)
+
 
 sbs_plot <- sbs |>
   ggplot(aes(x = sample, y = count, fill = type)) +
@@ -324,7 +331,7 @@ counts_plot <- replicate_figure |>
   prettify() |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
-  scale_y_discrete(limits = rev(sample_freq$SYMBOL), labels = \(old) {
+  scale_y_discrete(limits = order, labels = \(old) {
     paste0(deframe(select(sample_freq, SYMBOL, freq))[old], " ")
   }) +
   theme_void() +
@@ -367,7 +374,7 @@ r1 <- replicate_figure |>
     fill = factor(type, levels = TYPE_ORDER_TITLE)
   )) |>
   vaf_heatmap() +
-  scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
+  scale_y_discrete(limits = order) +
   scale_fill_paletteer_d(rep_theme, drop = FALSE) +
   guides(fill = "none") +
   theme(
@@ -383,9 +390,9 @@ if (add_groupings) {
     replicate_figure |>
       mutate(
         group = case_when(
-          is_paired & sample %in% extra ~ "tumor-only",
-          is_paired & !sample %in% extra ~ "paired",
-          !is_paired & sample %in% extra ~ "tumor-only",
+          is_paired & (sample %in% extra) ~ "tumor-only",
+          is_paired & (!sample %in% extra) ~ "paired",
+          !is_paired & (sample %in% extra) ~ "tumor-only",
           .default = "paired"
         )
       )
@@ -420,7 +427,7 @@ heatmap_helper <- function(tb) {
       fill = VAF,
     )) |>
     vaf_heatmap() +
-    scale_y_discrete(limits = rev(sample_freq$SYMBOL)) +
+    scale_y_discrete(limits = order) +
     scale_fill_paletteer_c("ggthemes::Blue") +
     theme(
       axis.title.x = element_blank(),
