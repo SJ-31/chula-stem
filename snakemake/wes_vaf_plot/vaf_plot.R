@@ -332,7 +332,9 @@ counts_plot <- replicate_figure |>
   ggplot(aes(y = SYMBOL, fill = factor(type, levels = TYPE_ORDER_TITLE))) +
   geom_bar() +
   scale_y_discrete(limits = order, labels = \(old) {
-    paste0(deframe(select(sample_freq, SYMBOL, freq))[old], " ")
+    val <- paste0(deframe(select(sample_freq, SYMBOL, freq))[old], " ") |>
+      str_trim()
+    ifelse(val == "NA", "0%", val)
   }) +
   theme_void() +
   theme(
