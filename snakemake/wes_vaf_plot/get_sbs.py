@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 from subprocess import run
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
 
 import polars as pl
 
@@ -60,9 +61,9 @@ def get_substitution_types(
     return df
 
 
-data_mapping: dict[str, str] = smk.params["data_mapping"]
-target = str(smk.output)
-cases = smk.params["cases"]
+data_mapping: dict[str, str] = snakemake.params["data_mapping"]
+target = str(snakemake.output)
+cases = snakemake.params["cases"]
 
 dfs: list[pl.DataFrame] = []
 cwd = os.getcwd()
