@@ -57,6 +57,11 @@ variant_table:
 
 only_curated: False # Only allow named variants, regardless of type
 
+accepted_significance: # Only variants with the following ClinVar clinical significance codes
+  # If null, allow all variants regardless of clinical significance
+  - uncertain_significance
+  - likely_pathogenic
+
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
   # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html

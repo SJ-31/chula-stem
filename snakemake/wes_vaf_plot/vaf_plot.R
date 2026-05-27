@@ -66,7 +66,11 @@ if (!is.null(label_spec)) {
 }
 
 
-accepted_consequence <- config$accepted_consequence
+variant_filters <- list(
+  Consequence = config$accepted_consequence,
+  CLIN_SIG = config$accepted_significance
+)
+
 min_alt_depth <- config$variant_calling$min_alt_depth
 CURATED_VARIANTS <- config$allowed_variants
 ONLY_CURATED <- config$only_curated
@@ -207,16 +211,21 @@ if (!is.null(min_alt_depth)) {
 }
 
 
-if (!ONLY_CURATED) {
-  replicate_figure <- mutate(
-    replicate_figure,
-    Consequence = lapply(
-      Consequence,
-      \(csqs) keep(csqs, \(x) x %in% accepted_consequence)
-    )
-  ) |>
-    filter(unlist(lapply(Consequence, length)) >= 1)
-  tmb_merged <- filter(tmb_merged, key %in% accepted_consequence)
+for (filter_name in names(variant_filters)) {
+  accepted <- variant_filters[[filter_name]]
+  if (!is.null(accepted) && !ONLY_CURATED) {
+    replicate_figure <- mutate(
+      replicate_figure,
+      !!as.symbol(filter_name) := lapply(
+        !!as.symbol(filter_name),
+        \(val) keep(val, \(x) x %in% accepted)
+      )
+    ) |>
+      filter(unlist(lapply(!!as.symbol(filter_name), length)) >= 1)
+    if (filter_name == "Consequence") {
+      tmb_merged <- filter(tmb_merged, key %in% accepted)
+    }
+  }
 }
 
 TYPE_ORDER <- tmb_merged |>
