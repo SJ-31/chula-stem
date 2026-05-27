@@ -150,6 +150,22 @@ if (config$variant_calling$protein_only %||% FALSE) {
   log_info("Count after: {nrow(combined_vep)}")
 }
 
+if (config$variant_calling$somatic_only %||% FALSE) {
+  log_info("Filtering by somatic variants...")
+  log_info("Count before: {nrow(combined_vep)}")
+  combined_vep <- filter(
+    combined_vep,
+    map_lgl(SOMATIC, \(x) {
+      if (!is.na(x)) {
+        "1" %in% str_split_1(x, "&")
+      } else {
+        FALSE
+      }
+    })
+  )
+  log_info("Count after: {nrow(combined_vep)}")
+}
+
 replicate_figure <- combined_vep |>
   filter(apply(combined_vep, 1, \(row) {
     if (ONLY_CURATED) {

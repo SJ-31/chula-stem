@@ -38,6 +38,7 @@ variant_calling:
   min_alt_depth: 10 # Minimum depth that variants are counted in the plot
   protein_only: True # If true, only allow variants that affect proteins
 plot:
+  somatic_only: True # If true, only allow somatic variants (must have `1` in the SOMATIC column of VEP output)
   dpi: 500
   width: 15
   height: 10
