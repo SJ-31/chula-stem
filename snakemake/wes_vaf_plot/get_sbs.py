@@ -7,7 +7,9 @@ from subprocess import run
 from tempfile import TemporaryDirectory
 
 import polars as pl
-from snakemake.script import snakemake as smk
+
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
 
 
 def bcftools_stats(input, output) -> None:

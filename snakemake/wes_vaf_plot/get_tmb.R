@@ -1,16 +1,33 @@
 library(tidyverse)
 library(glue)
-if (!is.null(snakemake@config$conda)) {
-  reticulate::use_condaenv(snakemake@config$conda)
-}
-py_utils <- new.env()
-reticulate::source_python(glue("{snakemake@config$src$py}/utils.py"), py_utils)
-tmp <- snakemake@output$temp
 outfile <- snakemake@output[[1]]
 
+parse_multiqc_vep <- function(file) {
+  cols <- c(
+    "Variant classes",
+    "Consequences (most severe)",
+    "Consequences (all)",
+    "Coding consequences",
+    "Variants by chromosome",
+    "Position in protein",
+    "General statistics"
+  )
+  read_tsv(file) |>
+    mutate(across(all_of(cols), \(col) {
+      lapply(col, \(x) {
+        rep <- str_replace_all(x, "'", "\"")
+        jsonlite::parse_json(rep)
+      })
+    })) |>
+    pivot_longer(-Sample, names_to = "category") |>
+    rename(sample = "Sample") |>
+    unnest(value) |>
+    mutate(key = names(value), value = unlist(value, use.names = FALSE))
+}
+
+
 lapply(snakemake@input, \(x) {
-  py_utils$parse_multiqc_vep(x) |>
-    as_tibble() |>
+  parse_multiqc_vep(x) |>
     mutate(sample = str_extract(sample, "[87]-(.*)-VEP_small", group = 1)) |>
     filter(category == "Consequences (all)")
 }) |>
