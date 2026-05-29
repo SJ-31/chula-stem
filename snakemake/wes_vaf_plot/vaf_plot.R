@@ -166,6 +166,31 @@ if (config$variant_calling$somatic_only %||% FALSE) {
   log_info("Count after: {nrow(combined_vep)}")
 }
 
+
+for (filter_name in names(variant_filters)) {
+  accepted <- variant_filters[[filter_name]]
+  if (!is.null(accepted) && !ONLY_CURATED) {
+    if (filter_name == "Consequence") {
+      combined_vep <- filter(
+        combined_vep,
+        !!as.symbol(filter_name) %in% accepted
+      )
+      tmb_merged <- filter(tmb_merged, key %in% accepted)
+    } else {
+      combined_vep <- filter(
+        combined_vep,
+        map_lgl(!!as.symbol(filter_name), \(val) {
+          if (!is.na(val)) {
+            length(intersect(str_split_1(val, "&"), accepted)) >= 1
+          } else {
+            FALSE
+          }
+        })
+      )
+    }
+  }
+}
+
 replicate_figure <- combined_vep |>
   filter(apply(combined_vep, 1, \(row) {
     if (ONLY_CURATED) {
@@ -226,23 +251,6 @@ if (!is.null(min_alt_depth)) {
   replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
 }
 
-
-for (filter_name in names(variant_filters)) {
-  accepted <- variant_filters[[filter_name]]
-  if (!is.null(accepted) && !ONLY_CURATED) {
-    replicate_figure <- mutate(
-      replicate_figure,
-      !!as.symbol(filter_name) := lapply(
-        !!as.symbol(filter_name),
-        \(val) keep(val, \(x) x %in% accepted)
-      )
-    ) |>
-      filter(unlist(lapply(!!as.symbol(filter_name), length)) >= 1)
-    if (filter_name == "Consequence") {
-      tmb_merged <- filter(tmb_merged, key %in% accepted)
-    }
-  }
-}
 
 TYPE_ORDER <- tmb_merged |>
   group_by(key) |>
