@@ -394,9 +394,8 @@ counts_plot <- replicate_figure |>
 replicate_figure |>
   unnest(cols = c(Consequence)) |>
   separate_longer_delim(HGVSp, ";") |>
-  prettify() |>
-  distinct(sample, SYMBOL, type, HGVSp, .keep_all = TRUE) |>
-  select(-c(Consequence, CLIN_SIG)) |>
+  mutate(CLIN_SIG = map_chr(CLIN_SIG, \(x) paste0(x, collapse = ";"))) |>
+  distinct(sample, SYMBOL, HGVSp, .keep_all = TRUE) |>
   write_tsv(snakemake@output$plot_data)
 
 ## *** Heatmap
