@@ -58,6 +58,12 @@ no_data_label: "no data"
 add_label_samples: false # Add any samples that are found in the label files, but not
 # in the exome pipeline (will be marked with `no_data_label`)
 
+accepted_significance:
+  - likely_pathogenic
+  - pathogenic
+  # - uncertain_significance
+  - risk_factor
+
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
   # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
@@ -89,6 +95,7 @@ vars_to_summarize:
 
 wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   TP53: "17:7661779-7687546"
+  SMAD4: "18:51030213-51085042"
   APC: "5:112707518-112846239"
   AIM2: "1:159056129-159187843" # may contribute to immune escape
   PIK3CA: "3:179148114-179240093" # "double somatic" sCRC
@@ -101,6 +108,42 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   MSH6: "2:47695530-47810063"
   PMS2: "7:5970925-6009130"
   EPCAM: "2:47345158-47387601"
+  # Genes from the reports
+  FOXA1: "14:37589552-37596059"
+  RTEL1: "20:63657810-63696253"
+  DNMT3B: "20:32762385-32809359"
+  LRP1B: "2:140231423-142131016"
+  SF3B1: "2:197388515-197435079"
+  FUBP1: "1:77944055-77979527"
+  NKX2-1: "14:36516392-36521149"
+  NOTCH3: "19:15159038-15200996"
+  BCL11A: "2:60450520-60554467"
+  EPHA5: "4:65319563-65670495"
+  BCL9: "1:147541501-147626216"
+  ERBB3: "12:56076799-56103505"
+  ABCB1: "7:87503017-87713375"
+  NCOA2: "8:70109772-70404191"
+  PRDM16: "1:3069168-3438621"
+  PRSS1: "7:142749468-142753072"
+  SAMD9L: "7:93130056-93148385"
+  YY1AP1: "1:155659446-155689334"
+  NBN: "8:89924515-90003228"
+  CDK4: "12:57747722-57756013"
+  MDM2: "12:68808175-68845544"
+  LRP6: "12:12116025-12267185"
+  NF1: "17:31094927-31382116"
+  ARID4A: "14:58298504-58373887"
+  LRRK2: "12:40196744-40369285"
+  NFIB: "9:14081843-14398983"
+  BRAF: "7:140719327-140924976"
+  GPS2: "17:7311324-7315564"
+  KMT2C: "7:152134922-152436644"
+  MAP2K4: "17:12020828-12143830"
+  NUTM1: "15:34343315-34357737"
+  WT1: "11:32387775-32435564"
+  ATRX: "X:77504880-77786233"
+  STAG1: "3:136336234-136752432"
+  HSP90AB1: "6:44247101-44253883"
 
 allowed_variants: # Mapping of gene symbols to a list of specific variants
   # variant identifiers can be in either HGVSp or HGVSg format
