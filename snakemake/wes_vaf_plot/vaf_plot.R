@@ -71,6 +71,25 @@ variant_filters <- list(
   CLIN_SIG = config$accepted_significance
 )
 
+filter_specific_symbols <- function(annotations, symbols, spec, split = NULL) {
+  map2_lgl(annotations, symbols, \(x, y) {
+    if (is.null(spec$symbols)) {
+      FALSE
+    } else if (y %in% names(spec$symbols)) {
+      vals <- spec$symbols[[y]]
+      if (is.null(vals)) {
+        TRUE
+      } else if (!is.null(split)) {
+        length(intersect(str_split_1(x, split), vals)) >= 1
+      } else {
+        x %in% vals
+      }
+    } else {
+      FALSE
+    }
+  })
+}
+
 min_alt_depth <- config$variant_calling$min_alt_depth
 CURATED_VARIANTS <- config$allowed_variants
 ONLY_CURATED <- config$only_curated
@@ -169,23 +188,31 @@ if (config$variant_calling$somatic_only %||% FALSE) {
 
 for (filter_name in names(variant_filters)) {
   accepted <- variant_filters[[filter_name]]
-  if (!is.null(accepted) && !ONLY_CURATED) {
+  defaults <- accepted$default
+  if (!is.null(defaults) && !ONLY_CURATED) {
     if (filter_name == "Consequence") {
       combined_vep <- filter(
         combined_vep,
-        !!as.symbol(filter_name) %in% accepted
+        !!as.symbol(filter_name) %in% defaults |
+          filter_specific_symbols(!!as.symbol(filter_name), SYMBOL, accepted)
       )
-      tmb_merged <- filter(tmb_merged, key %in% accepted)
+      tmb_merged <- filter(tmb_merged, key %in% defaults)
     } else {
       combined_vep <- filter(
         combined_vep,
         map_lgl(!!as.symbol(filter_name), \(val) {
           if (!is.na(val)) {
-            length(intersect(str_split_1(val, "&"), accepted)) >= 1
+            length(intersect(str_split_1(val, "&"), defaults)) >= 1
           } else {
             FALSE
           }
-        })
+        }) |
+          filter_specific_symbols(
+            !!as.symbol(filter_name),
+            SYMBOL,
+            accepted,
+            split = "&"
+          )
       )
     }
   }
