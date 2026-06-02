@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Literal
 
 import cattrs
 import pandera.polars as pa
 import polars as pl
-import yte
 from attrs import define, field, validators
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+from loguru import logger
+from yte import process_yaml
 
 from chula_stem.databases import Civic
 from chula_stem.utils import format_vep_vcf_internal
@@ -22,7 +25,10 @@ class Config:
     )
     output: Path
     previous: Path | None = None
-    mode: Literal["update", "new"] = field(validator=validators.in_(["update", "new"]))
+    workdir: Path | None = None
+    mode: Literal["update", "new"] = field(
+        validator=validators.in_(["update", "new"]), default="update"
+    )
     symbol_col: str = "SYMBOL"
     hgvsc_col: str = "HGVSc"
 
@@ -42,7 +48,11 @@ class Config:
                 input=file, tumor_sample=file.stem, variant_class="small"
             ).rename({"SYMBOL": self.symbol_col, "HGVSc": self.hgvsc_col})
         else:
-            df = pl.read_csv(file, separator="\t" if file.stem != ".csv" else ",")
+            df = pl.read_csv(
+                file,
+                separator="\t" if file.stem != ".csv" else ",",
+                infer_schema_length=None,
+            )
         df = df.select([self.symbol_col, self.hgvsc_col]).unique(
             [self.symbol_col, self.hgvsc_col]
         )
@@ -64,6 +74,7 @@ class CivicVariants:
             fetch_schema_from_transport=True,
         )
     )
+    workdir: Path | None = None
     query = gql("""
         query ($entrez_symbol: String, $next_page: String) {
         gene(entrezSymbol: $entrez_symbol) {
@@ -159,6 +170,7 @@ class CivicVariants:
             else:
                 break
         if not dfs:
+            logger.warning("No variants found for gene {}", symbol)
             return pl.DataFrame({"HGVSc": hgvscs}).with_columns(
                 pl.lit(symbol).alias("symbol"), pl.lit(False).alias("in_civic")
             )
@@ -188,7 +200,13 @@ class CivicVariants:
         results = []
         for symbol, grouped in df.group_by(symbol_col):
             assert isinstance(symbol[0], str)
-            cur = self._get_symbol_variants(symbol[0], list(grouped[hgvsc_col]))
+            prev = workdir / f"{symbol[0]}.csv"
+            if workdir is not None and prev.exists():
+                cur = pl.read_csv(prev)
+            else:
+                cur = self._get_symbol_variants(symbol[0], list(grouped[hgvsc_col]))
+            if workdir is not None:
+                cur.write_csv(prev)
             results.append(cur)
         if previous is None:
             return pl.concat(results, how="vertical_relaxed")
@@ -206,7 +224,7 @@ if __name__ == "__main__":
         prev = pl.read_csv(
             cfg.output, separator="\t" if cfg.output.stem != ".csv" else ","
         )
-    elif cfg.previous.exists() and cfg.mode == "new":
+    elif cfg.previous is not None and cfg.previous.exists() and cfg.mode == "new":
         prev = pl.read_csv(
             cfg.previous, separator="\t" if cfg.previous.stem != ".csv" else ","
         )
@@ -216,7 +234,8 @@ if __name__ == "__main__":
         [cfg.parse_input(i) for i in cfg.input], how="vertical_relaxed"
     )
     to_look_up = to_look_up.unique([cfg.symbol_col, cfg.hgvsc_col])
-    cv = CivicVariants()
+    logger.info("Looking up {} new variants", to_look_up.height)
+    cv = CivicVariants(workdir=cfg.workdir)
     sep = "\t" if cfg.output.suffix != ".csv" else ","
     result: pl.DataFrame = cv(
         to_look_up, symbol_col=cfg.symbol_col, hgvsc_col=cfg.hgvsc_col, previous=prev
