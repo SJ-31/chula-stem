@@ -1,5 +1,6 @@
 library(tidyverse)
 library(checkmate)
+library(logger)
 library(here)
 library(glue)
 source(here("src", "R", "utils.R"))
