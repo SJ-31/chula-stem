@@ -1,13 +1,54 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+from typing import Literal
 
+import cattrs
 import pandera.polars as pa
 import polars as pl
-from attrs import define, field
-from chula_stem.databases import Civic
+import yte
+from attrs import define, field, validators
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+
+from chula_stem.databases import Civic
+from chula_stem.utils import format_vep_vcf_internal
+
+
+@define
+class Config:
+    input: list[Path] = field(
+        validator=validators.deep_iterable(member_validator=lambda _, __, x: x.exists())
+    )
+    output: Path
+    previous: Path | None = None
+    mode: Literal["update", "new"] = field(validator=validators.in_(["update", "new"]))
+    symbol_col: str = "SYMBOL"
+    hgvsc_col: str = "HGVSc"
+
+    @classmethod
+    def new(cls, data: str | dict, with_yte: bool = True) -> Config:
+        if isinstance(data, str):
+            assert Path(data).exists() and (
+                data.endswith(".yaml") or data.endswith(".yml")
+            ), "Must pass a yaml file"
+            with open(data, "r") as f:
+                data = process_yaml(f) if with_yte else yaml.safe_load(f)
+        return cattrs.structure(data, Config)
+
+    def parse_input(self, file: Path) -> pl.DataFrame:
+        if file.suffix == ".vcf":
+            df = format_vep_vcf_internal(
+                input=file, tumor_sample=file.stem, variant_class="small"
+            ).rename({"SYMBOL": self.symbol_col, "HGVSc": self.hgvsc_col})
+        else:
+            df = pl.read_csv(file, separator="\t" if file.stem != ".csv" else ",")
+        df = df.select([self.symbol_col, self.hgvsc_col]).unique(
+            [self.symbol_col, self.hgvsc_col]
+        )
+        return df.filter(
+            pl.col(self.symbol_col).is_not_null() & pl.col(self.hgvsc_col).is_not_null()
+        )
 
 
 @define
@@ -154,29 +195,30 @@ class CivicVariants:
         return pl.concat(results + [previous], how="vertical_relaxed")
 
 
-def parse_args():
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", nargs="+")
-    parser.add_argument("-o", "--output", type=Path)
-    parser.add_argument(
-        "-s",
-        "--symbol_column",
-        default="SYMBOL",
-        help="Column in input tsv files containing HGNC symbols",
-        action="store",
-    )
-    parser.add_argument(
-        "-v",
-        "--hgvsc_col",
-        default="HGVSc",
-        help="Column in input tsv files containing HGVSc string for variants",
-        action="store",
-    )
+    parser.add_argument("config")
     args = vars(parser.parse_args())
-    return args
-
-
-if __name__ == "__main__":
-    args = parse_args()
+    cfg = Config.new(args["config"])
+    if cfg.output.exists() and cfg.mode == "update":
+        prev = pl.read_csv(
+            cfg.output, separator="\t" if cfg.output.stem != ".csv" else ","
+        )
+    elif cfg.previous.exists() and cfg.mode == "new":
+        prev = pl.read_csv(
+            cfg.previous, separator="\t" if cfg.previous.stem != ".csv" else ","
+        )
+    else:
+        prev = None
+    to_look_up = pl.concat(
+        [cfg.parse_input(i) for i in cfg.input], how="vertical_relaxed"
+    )
+    to_look_up = to_look_up.unique([cfg.symbol_col, cfg.hgvsc_col])
+    cv = CivicVariants()
+    sep = "\t" if cfg.output.suffix != ".csv" else ","
+    result: pl.DataFrame = cv(
+        to_look_up, symbol_col=cfg.symbol_col, hgvsc_col=cfg.hgvsc_col, previous=prev
+    )
+    result.write_csv(output, separator=sep)
