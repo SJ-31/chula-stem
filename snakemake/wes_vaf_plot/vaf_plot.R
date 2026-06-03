@@ -30,22 +30,52 @@ TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
 ## * Get extra sample labels
 add_missing <- config$add_label_samples %||% TRUE
 
+has_variant_re <- function(hgvsp_re) {
+  combined_vep |>
+    select(subject, HGVSp) |>
+    rename(sample = subject) |>
+    distinct() |>
+    group_by(sample) |>
+    summarise(label = list(HGVSp)) |>
+    mutate(
+      label = map_chr(label, \(x) {
+        x <- unique(x) |>
+          discard(is.na) |>
+          discard(is.null)
+        if (length(x) == 0) {
+          NA
+        } else if (any(str_detect(x, hgvsp_re$target))) {
+          x <- x[str_detect(x, hgvsp_re$target)]
+          str_remove(head(x, n = 1), "ENSP.*:")
+        } else if (any(str_detect(x, hgvsp_re$other))) {
+          "other"
+        } else {
+          NA
+        }
+      })
+    )
+}
+
 if (!is.null(label_spec)) {
   assert_list(label_spec, names = "unique")
   extra_labels <- lapply(label_spec, \(spec) {
     assert_list(spec)
-    assert_names(names(spec), must.include = c("palette", "file"))
-    tb <- read_tsv(spec$file) |> mutate(label = as.character(label))
-    others <- samples |> discard(\(s) s %in% tb$sample)
-    new_samples <- tb |>
-      pluck("sample") |>
-      discard(\(s) s %in% samples)
-    tb <- bind_rows(tb, tibble(sample = others, label = NA))
-    if (add_missing) {
-      samples <<- unique(c(samples, new_samples))
-      with_no_data <<- unique(c(with_no_data, new_samples))
+    assert_names(names(spec), must.include = c("palette"))
+    if ("HGVSp" %in% names(spec)) {
+      tb <- has_variant_re(spec$HGVSp)
     } else {
-      tb |> filter(sample %in% samples_with_wes)
+      tb <- read_tsv(spec$file) |> mutate(label = as.character(label))
+      others <- samples |> discard(\(s) s %in% tb$sample)
+      new_samples <- tb |>
+        pluck("sample") |>
+        discard(\(s) s %in% samples)
+      tb <- bind_rows(tb, tibble(sample = others, label = NA))
+      if (add_missing) {
+        samples <<- unique(c(samples, new_samples))
+        with_no_data <<- unique(c(with_no_data, new_samples))
+      } else {
+        tb |> filter(sample %in% samples_with_wes)
+      }
     }
   })
   label_palettes <- lapply(label_spec, \(s) s$palette)
@@ -158,7 +188,7 @@ add_groupings <- FALSE
 
 extra <- c()
 if ("cases" %in% names(config$extra) && length(config$extra$cases) != 0) {
-  add_groupings <- TRUE
+  add_groupings <- FALSE # BUG: [2026-05-22 Fri] weird
   extra <- config$extra$cases
 }
 
