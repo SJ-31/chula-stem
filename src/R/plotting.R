@@ -517,7 +517,8 @@ ggsave_graph_dynamic <- function(G, plot, filename) {
 
 combine_sample_label_plots <- function(
   label_tbs,
-  palettes = list()
+  palettes = list(),
+  with_frequency = TRUE
 ) {
   assert_list(label_tbs, names = "named")
   if (length(palettes) > 1) {
@@ -527,6 +528,20 @@ combine_sample_label_plots <- function(
 
   plot_one <- function(tb, title, lpos, last = FALSE, palette = NULL) {
     assert_data_frame(tb)
+    if (with_frequency) {
+      freqs <- ((table(tb$label) / nrow(tb)) * 100) |> round(2)
+      na_count <- (sum(is.na(tb$label)) / nrow(tb) * 100) |> round(2)
+      tb <- mutate(
+        tb,
+        label = map_chr(label, \(x) {
+          if (is.na(x)) {
+            NA
+          } else {
+            glue("{x} ({freqs[x]}%)")
+          }
+        })
+      )
+    }
     plot <- ggplot(tb, aes(x = sample, y = 1, fill = label)) +
       TILE_CALL +
       theme_minimal() +
