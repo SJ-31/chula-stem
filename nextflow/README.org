@@ -110,7 +110,7 @@ params.qc = ["accepted_filters": ["PASS"],
   * Small variants: Mutect2, Octopus, [[https://github.com/HKU-BAL/ClairS-TO][ClairS-TO]]
   * Structural variants: gridss, Manta
   * Copy number variants: cnvkit, PureCN
-    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [1]
+    * Without tumor samples, copy number calls will have lower accuracy, but large-scale CNVs should still be detected [cite:@talevichCNVkitGenomeWideCopy2016]
     * PureCN requires a normaldb generated from process-matched normal samples, which can be generated automatically from a run of the paired mode
 * RNA-seq
 TODO
@@ -124,9 +124,8 @@ TODO
 + =kallisto= - a pseudoalignment program that quantifies reads at the transcript level
   * These will be collapsed into gene-level abundance estimates with [[https://bioconductor.org/packages/release/bioc/html/tximport.html][tximport]]
 *** Fusion detection
-
+TODO: [2026-04-10 Fri] possible replacement if somatic variant callers stop working https://github.com/nygenome/Lancet2
 * VAR
 :REFERENCES:
-+ [1] [[https://cnvkit.readthedocs.io/en/stable/pipeline.html#with-no-control-samples][CNVkit documentation: Copy number calling pipeline]]
 + [2] [[https://bioconductor.org/packages/release/bioc/vignettes/PureCN/inst/doc/Quick.html#2_Prepare_environment_and_assay-specific_reference_files][PureCN best practices]]
 :END:

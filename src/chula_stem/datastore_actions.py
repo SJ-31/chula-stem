@@ -29,7 +29,7 @@ def dir_is_empty(dir: Path) -> bool:
     return next(dir.iterdir(), None) is None
 
 
-def find_cases(tumor_dir: Path, modality: str, date: str) -> pd.DataFrame:
+def find_cases(tumor_dir: Path, modality: str, date: str, root: Path) -> pd.DataFrame:
     data = {
         "cohort": [],
         "case_name": [],
@@ -68,7 +68,7 @@ def find_cases(tumor_dir: Path, modality: str, date: str) -> pd.DataFrame:
             data["case_name"].append(case_dir.stem)
             data["cohort"].append(cohort.stem)
             data["tumor_type"].append(tumor_dir.stem)
-            data["path"].append(str(case_dir.absolute()))
+            data["path"].append(str(case_dir.relative_to(root)))
             data["date_received"].append(date)
     return pd.DataFrame(data)
 
@@ -87,7 +87,9 @@ def get_entry_df(root: Path, date: str) -> pd.DataFrame:
     for modality in get_dirs(root):
         for tumor_type in modality.iterdir():
             dfs.append(
-                find_cases(tumor_dir=tumor_type, modality=modality.stem, date=date)
+                find_cases(
+                    tumor_dir=tumor_type, modality=modality.stem, date=date, root=root
+                )
             )
     return pd.concat(dfs)
 
