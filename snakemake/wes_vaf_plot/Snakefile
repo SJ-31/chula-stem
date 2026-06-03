@@ -31,7 +31,7 @@ def samples_setup() -> tuple[pd.DataFrame, dict]:
         if extra := spec.get("extra"):
             df = pd.concat([df, pd.DataFrame({"patient": extra, "root": root})])
         cases = df["patient"]
-        to_ignore = set()
+        to_ignore = set(spec.get("ignore", [])) or set()
         for c in cases:
             if not Path(f"{root}/{c}/annotations/7-{c}-VEP_small.vcf.gz").exists():
                 to_ignore.add(c)
@@ -71,7 +71,7 @@ else:
     TARGETS = VAF_OUT
 
 
-for gene in config["individual_gene_plots"].get("wanted"):
+for gene in config["individual_gene_plots"].get("wanted", []):
     TARGETS[f"{gene}_individual"] = f"{outdir}/{gene}_variants.png"
 
 
@@ -150,7 +150,7 @@ rule variant_table:
     input:
         rules.get_vep.output.combined,
     output:
-        VAF_OUT["variant_table"],
+        VAF_OUT.get("variant_table", ""),
     script:
         "variant_table.R"
 
@@ -159,7 +159,7 @@ rule variant_summary:
     input:
         rules.get_vep.output.combined,
     output:
-        VAF_OUT["variant_summary_table"],
+        VAF_OUT.get("variant_summary_table", ""),
     script:
         "variant_table.R"
 
