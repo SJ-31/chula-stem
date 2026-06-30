@@ -31,3 +31,7 @@ PHcase_17,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_C_1.fq.gz,/data/proje
 PHcase_17,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-17_B_2.fq.gz,normal,1,ILLUMINA,PHcase_17-normal,PHcase_17-normal
 PHcase_21,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_21-tumor,PHcase_21-tumor
 PHcase_21,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-21_B_2.fq.gz,normal,1,ILLUMINA,PHcase_21-normal,PHcase_21-normal
+PHcase_22,/data/project/stemcell/shannc/PDAC/raw/PHcase-22_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-22_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_22-tumor,PHcase_22-tumor
+PHcase_22,/data/project/stemcell/shannc/PDAC/raw/PHcase-22_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-22_B_2.fq.gz,normal,1,ILLUMINA,PHcase_22-normal,PHcase_22-normal
+PHcase_20,/data/project/stemcell/shannc/PDAC/raw/PHcase-20_C_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-20_C_2.fq.gz,tumor,1,ILLUMINA,PHcase_20-tumor,PHcase_20-tumor
+PHcase_20,/data/project/stemcell/shannc/PDAC/raw/PHcase-20_B_1.fq.gz,/data/project/stemcell/shannc/PDAC/raw/PHcase-20_B_2.fq.gz,normal,1,ILLUMINA,PHcase_20-normal,PHcase_20-normal

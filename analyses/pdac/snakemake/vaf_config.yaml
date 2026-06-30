@@ -24,6 +24,17 @@ sample_spec:
   - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_phcase1.csv"
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
+    ignore:
+      - PHcase_8
+      - PHcase_11
+      - PHcase_18
+      - PHcase_19
+      - PHcase_21
+      - PHcase_1
+      - PHcase_2
+      - PHcase_4
+      - PHcase_12
+      - PHcase_15
 
 manifest:
 src: # source directories
@@ -44,12 +55,18 @@ plot:
 only_curated: False # Only allow named variants, regardless of type
 
 sample_labels:
-  "Waddell Class":
-    palette: "Manu::Korora"
-    file: ?f"{proj_root}/analyses/pdac_subtyping/waddell_subtype.tsv"
-  "KRAS subtype":
-    palette: "Manu::Hoiho"
-    file: ?f"{proj_root}/analyses/pdac_subtyping/KRAS_imbalance_subtype.tsv"
+  # "Waddell Class":
+  #   palette: "Manu::Korora"
+  #   file: ?f"{proj_root}/analyses/pdac_subtyping/waddell_subtype.tsv"
+  # "KRAS subtype":
+  #   palette: "Manu::Hoiho"
+  #   file: ?f"{proj_root}/analyses/pdac_subtyping/KRAS_imbalance_subtype.tsv"
+  "KRAS G12 variant":
+    palette: "tidyquant::tq_light"
+    symbol: "KRAS"
+    HGVSp:
+      target: "ENSP00000256078.5:p.Gly12.*"
+      other: "ENSP00000256078.5:.*"
   "Moffitt is basal-like":
     palette: "Manu::Hihi"
     file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal.tsv"
@@ -59,28 +76,32 @@ add_label_samples: false # Add any samples that are found in the label files, bu
 # in the exome pipeline (will be marked with `no_data_label`)
 
 accepted_significance:
-  - likely_pathogenic
-  - pathogenic
-  # - uncertain_significance
-  - risk_factor
+  default:
+    - likely_pathogenic
+    - pathogenic
+    # - uncertain_significance
+    - risk_factor
+  symbols: # symbol-specific filters. Leave null for no filtering
+    SMAD4:
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
   # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
-  - "missense_variant"
-  - "frameshift_variant"
-  - "downstream_gene_variant"
-  - "upstream_gene_variant"
-  - "intron_variant"
-  - "3_prime_UTR_variant"
-  - "stop_gained"
-  - "splice_region_variant"
-  - "inframe_deletion"
-  - "splice_donor_5th_base_variant"
-  - "NMD_transcript_variant"
+  default:
+    - "missense_variant"
+    - "frameshift_variant"
+    - "downstream_gene_variant"
+    - "upstream_gene_variant"
+    - "intron_variant"
+    - "3_prime_UTR_variant"
+    - "stop_gained"
+    - "splice_region_variant"
+    - "inframe_deletion"
+    - "splice_donor_5th_base_variant"
+    - "NMD_transcript_variant"
 
 individual_gene_plots:
-  wanted: ["TP53", "KRAS"]
+  wanted: ["TP53", "KRAS", "SMAD4", "CDKN2A"]
   palette_c:
   width: 20
   palette_d:
@@ -108,6 +129,11 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   MSH6: "2:47695530-47810063"
   PMS2: "7:5970925-6009130"
   EPCAM: "2:47345158-47387601"
+  # From https://onlinelibrary.wiley.com/doi/full/10.1002/cam4.5871
+  CDKN2A: "9:21967752-21995301"
+  RNF43: "17:58353676-58417735"
+  EGFR: "7:55018820-55211628"
+
   # Genes from the reports
   FOXA1: "14:37589552-37596059"
   RTEL1: "20:63657810-63696253"
@@ -121,7 +147,7 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   EPHA5: "4:65319563-65670495"
   BCL9: "1:147541501-147626216"
   ERBB3: "12:56076799-56103505"
-  ABCB1: "7:87503017-87713375"
+  # ABCB1: "7:87503017-87713375" # [2026-06-02 Tue] has germline
   NCOA2: "8:70109772-70404191"
   PRDM16: "1:3069168-3438621"
   PRSS1: "7:142749468-142753072"
@@ -133,9 +159,17 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   LRP6: "12:12116025-12267185"
   NF1: "17:31094927-31382116"
   ARID4A: "14:58298504-58373887"
+  ARID1A: "1:26693236-26782104"
+  FLT1: "13:28300346-28495145"
+  KAT6B: "10:74824912-75032631"
+  CHD4: "12:6570081-6614982"
+  EBF1: "5:158695920-159099951"
+  MAP3K13: "3:185282941-185489094"
+  PHLPP1: "18:62715464-62980433"
   LRRK2: "12:40196744-40369285"
   NFIB: "9:14081843-14398983"
   BRAF: "7:140719327-140924976"
+  BAX: "19:48954815-48961798"
   GPS2: "17:7311324-7315564"
   KMT2C: "7:152134922-152436644"
   MAP2K4: "17:12020828-12143830"
