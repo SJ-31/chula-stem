@@ -29,10 +29,12 @@ combined = ad.read_h5ad(
 )
 combined = combined[combined.obs["treatment"] == "control", :]
 
-external_geo_file: Path = here(
-    data, "output", "HCC", "SCRNASEQ", "cohort", "external_combined.h5ad"
-)
-
+external_files: dict[str, Path] = {
+    "cellxgene": here(
+        data, "output", "HCC", "SCRNASEQ", "cohort", "external_cellxgene.h5ad"
+    ),
+    "geo": here(data, "output", "HCC", "SCRNASEQ", "cohort", "external_geo.h5ad"),
+}
 max_mito_pct = 20
 filter_cells_kws = {"min_genes": 200}
 
@@ -45,65 +47,104 @@ filter_cells_kws = {"min_genes": 200}
 
 # * Data import
 
+
+def annotate_filter_routine(adata: ad.AnnData, name: str) -> ad.AnnData:
+    adata = annotate_adata_vars(
+        adata,
+        merge_on="gene_ids",
+        savepath=gene_reference,
+        meta_id_col="ensembl_gene_id",
+    )
+    logger.info("Succesfully annotated {} adata\n{}", name, adata.var)
+    sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
+    logger.info("{} before filtering: {}", name, adata.shape)
+    adata = adata[adata.obs["pct_counts_mito"] < max_mito_pct, :]
+    logger.info("{} after filtering mito: {}", name, adata.shape)
+    sc.pp.filter_cells(adata, **filter_cells_kws)
+    logger.info("{} after filtering cells: {}", name, adata.shape)
+    return adata
+
+
 # ** Organoid resources
 #
 # *** From GEO
 
 geo_dirs = {
     "GSE166589": ["GSM5075991", "GSM5075992", "GSM5075993"],
-    # "GSE154883": None, can't use, is multiplexed with diseased samples
+    "GSE154883": "adata.h5ad",
+    # Run "expression_comparison_external.R" to get the file above
     "GSM4633164": None,
 }
 
 
 def collect_from_geo() -> list[ad.AnnData]:
     adatas = []
-    for series, samples in geo_dirs.items():
+    for series, spec in geo_dirs.items():
         series_dir = geo_dir / series
-        if samples is None:
+        if spec is None:
             adata = sc.read_10x_mtx(series_dir)
             adata.obs["source"] = series
             adatas.append(adata)
+        elif isinstance(spec, str):
+            adata = ad.read_h5ad(series_dir / spec)
+            adata.obs["source"] = series
+            adatas.append(adata)
         else:
-            for sample in samples:
+            for sample in spec:
                 sample_dir = series_dir / sample
                 adata = sc.read_10x_mtx(sample_dir)
-                adata.obs["source"] = sample
+                adata.obs["sample"] = sample
+                adata.obs["source"] = series
                 adatas.append(adata)
     return adatas
 
 
-if not external_geo_file.exists():
+if not external_files["geo"].exists():
     geo_adatas = collect_from_geo()
-    external_geo: ad.AnnData = ad.concat(geo_adatas, axis="obs", merge="first")
-    external_geo.obs_names_make_unique()
-    external_geo = annotate_adata_vars(
-        external_geo,
-        merge_on="gene_ids",
-        savepath=gene_reference,
-        meta_id_col="ensembl_gene_id",
+    external_geo: ad.AnnData = ad.concat(
+        geo_adatas, axis="obs", merge="first", join="outer"
     )
-    logger.info("Succesfully annotated GEO adata\n{}", external_geo.var)
-    sc.pp.calculate_qc_metrics(external_geo, inplace=True, qc_vars=["mito"])
-    logger.info("GEO before filtering: {}", external_geo.shape)
-    external_geo = external_geo[external_geo.obs["pct_counts_mito"] < max_mito_pct, :]
-    logger.info("GEO after filtering mito: {}", external_geo.shape)
-    sc.pp.filter_cells(external_geo, **filter_cells_kws)
-    logger.info("GEO after filtering cells: {}", external_geo.shape)
-    external_geo.write_h5ad(external_geo_file)
+    external_geo.obs_names_make_unique()
+    external_geo = annotate_filter_routine(external_geo, "GEO")
+    external_geo.write_h5ad(external_files["geo"])
 else:
-    external_geo = ad.read_h5ad(external_geo_file, backed=True)
+    external_geo = ad.read_h5ad(external_files["geo"], backed=True)
 
 
 # *** From cellxgene
 
+# [2026-06-30 Tue] No organoid data with hepatocytes available on cellxgene
+# closest thing are hepatoblasts
+
+# if not external_files["cellxgene"].exists():
+#     with cellxgene_census.open_soma() as census:
+#         normal_tissues = cellxgene_census.get_anndata(
+#             census=census,
+#             organism="Homo sapiens",
+#             census_version="2025-11-08",
+#             obs_value_filter="tissue == 'hepatocyte'",
+#             obs_column_names={
+#                 "obs": ["assay", "cell_type", "tissue", "disease", "tissue_general"]
+#             },
+#         )
+# else:
+#     external_cellxgene = ad.read_h5ad(external_files["cellxgene"], backed=True)
+
+
+# ** Primary tissue
+
 # with cellxgene_census.open_soma() as census:
-#     normal_tissues = cellxgene_census.get_anndata(
+#     external_tissue = cellxgene_census.get_anndata(
 #         census=census,
 #         organism="Homo sapiens",
 #         census_version="2025-11-08",
 #         obs_value_filter="cell_type == 'hepatocyte'",
 #         obs_column_names={
-#             "obs": ["assay", "cell_type", "tissue", "tissue_general", "suspension_type"]
+#             "obs": [
+#                 "cell_type",
+#                 "tissue",
+#                 "tissue_general",
+#                 "dataset_id",
+#             ]
 #         },
 #     )
