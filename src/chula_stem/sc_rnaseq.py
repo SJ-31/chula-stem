@@ -263,6 +263,23 @@ def annotate_adata_vars(
     savepath: Path | None = None,
     **kws,
 ) -> ad.AnnData:
+    """Add ensembl gene data to adata.var
+
+    Parameters
+    ----------
+    meta_id_col : str
+        Column in adata.var containing gene ids
+    merge_on : str
+        Column in METADATA file to merge with meta_id_col
+    new_index_col : str | None
+        If not None, create a new index column from this column
+    new_index_name : str
+        Name for the new index column
+
+    Returns
+    -------
+    adata object with annotated var
+    """
     assert isinstance(adata.var, pd.DataFrame)
     if savepath and savepath.exists():
         metadata: pd.DataFrame = pd.read_csv(savepath)
@@ -283,6 +300,8 @@ def annotate_adata_vars(
         merged.index = tmp
         merged.index.set_names(new_index_name)
         merged.drop(new_index_col, inplace=True, axis="columns")
+    else:
+        merged.index = adata.var.index.copy()
     adata.var = merged
     if "chromosome_name" in adata.var.columns:
         adata.var.loc[:, "mito"] = (adata.var["chromosome_name"] == "MT").fillna(False)
