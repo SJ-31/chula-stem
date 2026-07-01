@@ -623,7 +623,8 @@ dotplot <- function(
   var_names,
   group_by,
   group_labels = list(),
-  palette = "ggthemes::Red-Green Diverging"
+  palette = "ggthemes::Red-Green Diverging",
+  layer = NULL
 ) {
   box::use(
     dplyr[summarize, group_by, across, all_of, mutate, inner_join],
@@ -648,12 +649,16 @@ dotplot <- function(
   }
 
   if ("anndata._core.anndata.AnnData" %in% class(obj)) {
-    x <- tmp[, rownames(tmp$var) %in% var_names]$X |>
-      as.matrix() |>
+    if (!is.null(layer)) {
+      x <- obj[, rownames(obj$var) %in% var_names]$layers[[layer]]
+    } else {
+      x <- obj[, rownames(obj$var) %in% var_names]$X
+    }
+    x <- as.matrix(x) |>
       as_tibble() |>
       `colnames<-`(var_names) |>
-      bind_cols(tmp$obs[, c(group_by, names(group_labels))]) |>
-      mutate(cell_id = rownames(tmp$obs))
+      bind_cols(obj$obs[, c(group_by, names(group_labels))]) |>
+      mutate(cell_id = rownames(obj$obs))
   } else {
     stop("Not implemented yet")
   }
