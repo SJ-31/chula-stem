@@ -616,3 +616,104 @@ plot_purecn_summary <- function(
   }
   comment_plot / purity_plot + plot_layout(heights = c(1, 5))
 }
+
+#' @export
+dotplot <- function(
+  obj,
+  var_names,
+  group_by,
+  group_labels = list(),
+  palette = "ggthemes::Red-Green Diverging"
+) {
+  box::use(
+    dplyr[summarize, group_by, across, all_of, mutate, inner_join],
+    checkmate[assert_list],
+    ggplot2[
+      geom_point,
+      aes,
+      theme,
+      xlab,
+      ylab,
+      theme_minimal,
+      theme_void,
+      guides,
+      guide_legend,
+      element_text
+    ]
+  )
+  checkmate::assert_list(group_labels)
+  if (is.null(names(group_labels))) {
+    group_labels <- rep("ggsci::default_igv", length(group_labels)) |>
+      `names<-`(group_labels)
+  }
+
+  if ("anndata._core.anndata.AnnData" %in% class(obj)) {
+    x <- tmp[, rownames(tmp$var) %in% var_names]$X |>
+      as.matrix() |>
+      as_tibble() |>
+      `colnames<-`(var_names) |>
+      bind_cols(tmp$obs[, c(group_by, names(group_labels))]) |>
+      mutate(cell_id = rownames(tmp$obs))
+  } else {
+    stop("Not implemented yet")
+  }
+  joined <- local({
+    means <- x |>
+      group_by(!!as.symbol(group_by)) |>
+      summarize(across(all_of(var_names), mean)) |>
+      pivot_longer(
+        -!!as.symbol(group_by),
+        names_to = "gene",
+        values_to = "mean"
+      )
+
+    meta <- x |>
+      group_by(!!as.symbol(group_by)) |>
+      summarize(across(all_of(names(group_labels)), first))
+    percent_expr <- x |>
+      group_by(!!as.symbol(group_by)) |>
+      summarize(across(all_of(var_names), \(e) sum(e > 0) / n())) |>
+      pivot_longer(
+        -!!as.symbol(group_by),
+        names_to = "gene",
+        values_to = "percent_expr"
+      )
+    inner_join(means, percent_expr, by = c(group_by, "gene")) |>
+      inner_join(meta, by = join_by(!!as.symbol(group_by)))
+  })
+
+  dplot <- ggplot(
+    joined,
+    aes(x = !!as.symbol(group_by), y = gene, size = percent_expr, color = mean)
+  ) +
+    geom_point() +
+    theme_minimal() +
+    paletteer::scale_color_paletteer_c(palette) +
+    xlab(group_by) +
+    ylab("Gene") +
+    guides(
+      fill = guide_legend("Mean expression"),
+      size = guide_legend("Fraction of cells with expression")
+    ) +
+    theme(axis.text.x = element_text(angle = 90))
+
+  if (length(group_labels) > 0) {
+    label_plots <- lapply(names(group_labels), \(gl) {
+      ggplot(
+        joined,
+        aes(x = !!as.symbol(group_by), y = "1", fill = !!as.symbol(gl))
+      ) +
+        paletteer::scale_fill_paletteer_d(group_labels[[gl]]) +
+        geom_tile() +
+        theme_void()
+    })
+    patchwork::wrap_plots(
+      c(dplot, label_plots),
+      nrow = length(group_labels) + 1,
+      heights = c(5, rep(0.3, length(group_labels)))
+    ) +
+      patchwork::plot_layout(guides = "collect")
+  } else {
+    dplot
+  }
+}
