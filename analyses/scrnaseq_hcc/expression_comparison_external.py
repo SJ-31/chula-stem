@@ -3,11 +3,13 @@
 from pathlib import Path
 
 import anndata as ad
+import pandas as pd
 
 # import cellxgene_census   # BUG: can't use this on cuaim
 import plotnine as gg
 import scanpy as sc
 import yte
+from chula_stem.r_utils import edgeR_wrapper
 from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
 from chula_stem.utils import read_existing
 from loguru import logger
@@ -31,6 +33,7 @@ external_files: dict[str, Path] = {
     "geo": outdir / "external_geo.h5ad",
 }
 combined_file = outdir / "combined.h5ad"
+scvi_model_dir = outdir / "scvi_model"
 max_mito_pct = 20
 filter_cells_kws = {"min_genes": 200}
 
@@ -182,6 +185,10 @@ def combine_all(f):
     sc.pp.pca(combined)
     sc.pp.neighbors(combined)
     sc.tl.umap(combined)
+    sc.pp.highly_variable_genes(combined, n_top_genes=5000, flavor="seurat_v3")
+    combined = combined[
+        :, combined.var["highly_variable"] | combined.var.index.isin(wanted_genes)
+    ]
     combined.layers["x_norm"] = sc.pp.normalize_total(
         combined, target_sum=1e6, inplace=False
     )["X"]
@@ -190,8 +197,61 @@ def combine_all(f):
     return combined
 
 
-combined = read_existing(
-    combined_file, combine_all, lambda x: ad.read_h5ad(x, backed=True)
-)
+combined: ad.AnnData = read_existing(combined_file, combine_all, ad.read_h5ad)
 tmp_plots = sc.pl.umap(combined, color=["batch", "source", "type"], return_fig=True)
 tmp_plots.figure.savefig(outdir / "umap_before_integration.pdf")
+
+
+# * DE analysis
+
+# ** With scvi
+
+
+def train_scvi(f):
+    import scvi
+
+    combined: ad.AnnData = read_existing(combined_file, combine_all, ad.read_h5ad)
+
+    scvi.model.SCVI.setup_anndata(combined, batch_key="batch")
+    model = scvi.model.SCVI(combined, gene_likelihood="nb")
+    model.train(
+        check_val_every_n_epoch=1,
+        max_epochs=400,
+        early_stopping=True,
+        early_stopping_patience=20,
+        early_stopping_monitor="elbo_validation",
+    )
+    model.save(f, save_anndata=False, overwrite=True)
+    return model
+
+
+def edgeR_de(f):
+    agg_obs = combined.obs.groupby("sample").agg("first")
+    adata = sc.get.aggregate(combined, by="sample", func="sum")
+    adata.obs = agg_obs
+    adata.X = adata.layers["sum"]
+    num_de, result = edgeR_wrapper(adata, group="type", treat=False)
+    return result
+
+
+def scvi_de(f):
+    import scvi
+
+    scvi_model: scvi.model.SCVI = read_existing(
+        scvi_model_dir,
+        train_scvi,
+        lambda x: scvi.model.SCVI.load(x, adata=combined),
+    )
+    result: pd.DataFrame = scvi_model.differential_expression(
+        groupby="sample",
+        mode="change",
+        batch_correction=True,
+        idx1=combined.obs["type"] == "tumor",
+        idx2=combined.obs["type"] == "normal",
+    ).reset_index(names="gene")
+    result.to_csv(f, index=False)
+    return result
+
+
+edger_de_results = read_existing(outdir / "edger_de_results.csv", edgeR_de, pd.read_csv)
+scvi_de_results = read_existing(outdir / "scvi_de_results.csv", scvi_de, pd.read_csv)

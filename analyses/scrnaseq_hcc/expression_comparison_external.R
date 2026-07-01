@@ -81,10 +81,12 @@ norm_plot <- dotplot(
     "type" = "Redmonder::qMSOBu",
     "source" = "pals::glasbey"
   ),
-  layer = "x_norm"
+  layer = "x_norm",
+  sort = "type"
 )
 ggsave(
   here(data_dir, "dotplot_normalized.pdf"),
+  width = 12,
   plot = norm_plot
 )
 
@@ -95,9 +97,11 @@ raw_plot <- dotplot(
   group_labels = list(
     "type" = "Redmonder::qMSOBu",
     "source" = "pals::glasbey"
-  )
+  ),
+  sort = "type"
 )
 ggsave(
   here(data_dir, "dotplot_raw.pdf"),
-  plot = norm_plot
+  width = 12,
+  plot = raw_plot
 )
