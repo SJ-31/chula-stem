@@ -617,6 +617,18 @@ plot_purecn_summary <- function(
   comment_plot / purity_plot + plot_layout(heights = c(1, 5))
 }
 
+#' Dotplot
+#'
+#' @param obj Adata object (reticulate) or ...
+#' @param var_names Genes to include in dot plot
+#' @param group_by Grouping column for cells
+#' @param palette paletteer palette to use for continuous expression values
+#' @param group_labels list of cell observations to additionally
+#' label each group with. If a named list is provided,
+#' values are interpreted as discrete paletteer palettes and names are
+#' columns
+#' @param layer Layer or assay name to take expression from
+#' @param sort Column in `group_labels` to sort x axis with
 #' @export
 dotplot <- function(
   obj,
@@ -624,7 +636,8 @@ dotplot <- function(
   group_by,
   group_labels = list(),
   palette = "ggthemes::Red-Green Diverging",
-  layer = NULL
+  layer = NULL,
+  sort = NULL
 ) {
   box::use(
     dplyr[summarize, group_by, across, all_of, mutate, inner_join],
@@ -686,6 +699,14 @@ dotplot <- function(
     inner_join(means, percent_expr, by = c(group_by, "gene")) |>
       inner_join(meta, by = join_by(!!as.symbol(group_by)))
   })
+  if (!is.null(sort)) {
+    ordering <- joined |>
+      dplyr::select(all_of(c(group_by, sort))) |>
+      dplyr::distinct() |>
+      dplyr::arrange(!!as.symbol(sort)) |>
+      purrr::pluck(group_by)
+    joined[[group_by]] <- factor(joined[[group_by]], levels = ordering)
+  }
 
   dplot <- ggplot(
     joined,
