@@ -3,16 +3,18 @@
 from pathlib import Path
 
 import anndata as ad
-import cellxgene_census
+
+# import cellxgene_census   # BUG: can't use this on cuaim
 import plotnine as gg
 import scanpy as sc
 import yte
 from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
+from chula_stem.utils import read_existing
 from loguru import logger
 from pyhere import here
 
 data = here("analyses", "data_all")
-outdir: Path = here("analyses", "output", "scrnaseq_hcc")
+outdir = here(data, "output", "HCC", "SCRNASEQ", "cohort", "compare_external")
 geo_dir = here(data, "public_data", "GEO")
 gene_reference: Path = here("analyses/data/ensembl_gene_data.csv")
 
@@ -24,26 +26,17 @@ wanted_genes = [
     "AFP",  # Alpha-fetoprotein
 ]
 
-combined = ad.read_h5ad(
-    here(data, "output", "HCC", "SCRNASEQ/cohort/filtered.h5ad"), backed=True
-)
-combined = combined[combined.obs["treatment"] == "control", :]
-
 external_files: dict[str, Path] = {
-    "cellxgene": here(
-        data, "output", "HCC", "SCRNASEQ", "cohort", "external_cellxgene.h5ad"
-    ),
-    "geo": here(data, "output", "HCC", "SCRNASEQ", "cohort", "external_geo.h5ad"),
+    "cellxgene": outdir / "external_cellxgene.h5ad",
+    "geo": outdir / "external_geo.h5ad",
 }
+combined_file = outdir / "combined.h5ad"
 max_mito_pct = 20
 filter_cells_kws = {"min_genes": 200}
-
 
 # CD147, GPC3 as well as all of the other genes plotted previously
 # Compare with normal hepatocytes (ideally in hepatic organoids) transcriptomes.
 
-
-# Use cellxgene to get hepatocytes from normal tissues
 
 # * Data import
 
@@ -84,10 +77,14 @@ def collect_from_geo() -> list[ad.AnnData]:
         if spec is None:
             adata = sc.read_10x_mtx(series_dir)
             adata.obs["source"] = series
+            if "sample" not in adata.obs.columns:
+                adata.obs["sample"] = series
             adatas.append(adata)
         elif isinstance(spec, str):
             adata = ad.read_h5ad(series_dir / spec)
             adata.obs["source"] = series
+            if "sample" not in adata.obs.columns:
+                adata.obs["sample"] = series
             adatas.append(adata)
         else:
             for sample in spec:
@@ -99,16 +96,15 @@ def collect_from_geo() -> list[ad.AnnData]:
     return adatas
 
 
-if not external_files["geo"].exists():
+def get_geo(f):
     geo_adatas = collect_from_geo()
-    external_geo: ad.AnnData = ad.concat(
-        geo_adatas, axis="obs", merge="first", join="outer"
-    )
-    external_geo.obs_names_make_unique()
-    external_geo = annotate_filter_routine(external_geo, "GEO")
-    external_geo.write_h5ad(external_files["geo"])
-else:
-    external_geo = ad.read_h5ad(external_files["geo"], backed=True)
+    adata: ad.AnnData = ad.concat(geo_adatas, axis="obs", merge="first", join="outer")
+    adata.obs["type"] = "normal"
+    adata.obs["batch"] = adata.obs["source"]
+    adata.obs_names_make_unique()
+    adata = annotate_filter_routine(adata, "GEO")
+    adata.write_h5ad(f)
+    return adata
 
 
 # *** From cellxgene
@@ -132,6 +128,7 @@ else:
 
 
 # ** Primary tissue
+# Use cellxgene to get hepatocytes from normal tissues
 
 # with cellxgene_census.open_soma() as census:
 #     external_tissue = cellxgene_census.get_anndata(
@@ -148,3 +145,49 @@ else:
 #             ]
 #         },
 #     )
+
+# * Combine with all
+
+
+def combine_all(f):
+    kept_cols = [
+        "sample",
+        "source",
+        "type",
+        "batch",
+        "log1p_n_genes_by_counts",
+        "total_counts",
+        "log1p_total_counts",
+        "pct_counts_in_top_50_genes",
+        "pct_counts_in_top_100_genes",
+        "pct_counts_in_top_200_genes",
+        "pct_counts_in_top_500_genes",
+        "total_counts_mito",
+        "log1p_total_counts_mito",
+        "pct_counts_mito",
+        "lshift_size_factors",
+    ]
+    chula = ad.read_h5ad(here(data, "output", "HCC", "SCRNASEQ/cohort/filtered.h5ad"))
+    chula = chula[
+        (chula.obs["treatment"] == "control") & (chula.obs["type"] == "tumor"), :
+    ]
+    chula.obs["source"] = "Chula"
+    chula.obs["batch"] = chula.obs["flowcell"]
+    chula.obs = chula.obs.loc[:, kept_cols]
+    external_geo = read_existing(external_files["geo"], get_geo, ad.read_h5ad)
+    shared_cols = set(external_geo.var.columns) & set(chula.var.columns)
+    chula.var = chula.var.loc[:, list(shared_cols)]
+    combined = ad.concat([chula, external_geo], axis="obs", merge="first", join="outer")
+    combined.var["mito"] = combined.var["mito"].astype(bool)
+    sc.pp.pca(combined)
+    sc.pp.neighbors(combined)
+    sc.tl.umap(combined)
+    combined.write_h5ad(f)
+    return combined
+
+
+combined = read_existing(
+    combined_file, combine_all, lambda x: ad.read_h5ad(x, backed=True)
+)
+tmp_plots = sc.pl.umap(combined, color=["batch", "source", "type"], return_fig=True)
+tmp_plots.figure.savefig(outdir / "umap_before_integration.pdf")

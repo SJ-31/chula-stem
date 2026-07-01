@@ -1,19 +1,30 @@
 library(here)
 library(reticulate)
 library(tidyverse)
-library(Seurat)
-
+options(box.path = here("src"))
+box::use(R / plotting[dotplot])
 use_condaenv("stem-base")
-
 ad <- import("anndata")
 
 data <- here("analyses", "data_all")
 outdir <- here("analyses", "output", "scrnaseq_hcc")
+data_dir <- here(
+  data,
+  "output",
+  "HCC",
+  "SCRNASEQ",
+  "cohort",
+  "compare_external"
+)
 geo <- here(data, "public_data", "GEO")
 gene_reference <- here("analyses/data/ensembl_gene_data.csv")
+combined_file <- here(data_dir, "combined.h5ad")
+
+## * Collect misc. data
 
 gse154883_file <- here(geo, "GSE154883", "adata.h5ad")
 if (!file.exists(gse154883_file)) {
+  library(Seurat)
   load(here(
     geo,
     "GSE154883",
@@ -46,3 +57,24 @@ if (!file.exists(gse154883_file)) {
   )
   gse154883$write_h5ad(gse154883_file)
 }
+
+## * Plotting
+
+wanted_genes <- c(
+  "BSG", # CD147
+  "LIN28A",
+  "LIN28B",
+  "GPC3", # glypican 3
+  "AFP" # Alpha-fetoprotein
+)
+
+tmp <- ad$read_h5ad(
+  "/home/shannc/Bio_SDD/chula-stem/analyses/scrnaseq_hcc/expression_comparison_external_toy.h5ad"
+)
+
+dotplot(
+  obj = tmp,
+  var_names = wanted_genes,
+  group_by = "sample",
+  group_labels = list("type" = "Redmonder::qMSOBu", "patient" = "pals::glasbey")
+)
