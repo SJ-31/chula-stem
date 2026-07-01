@@ -182,6 +182,10 @@ def combine_all(f):
     sc.pp.pca(combined)
     sc.pp.neighbors(combined)
     sc.tl.umap(combined)
+    combined.layers["x_norm"] = sc.pp.normalize_total(
+        combined, target_sum=1e6, inplace=False
+    )["X"]
+    sc.pp.log1p(combined, layer="x_norm")
     combined.write_h5ad(f)
     return combined
 

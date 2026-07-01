@@ -1,13 +1,15 @@
-library(here)
-library(reticulate)
-library(tidyverse)
-options(box.path = here("src"))
-box::use(R / plotting[dotplot])
-use_condaenv("stem-base")
-ad <- import("anndata")
+suppressMessages({
+  library(here)
+  library(reticulate)
+  library(ggplot2)
+  library(tidyverse)
+  options(box.path = here("src"))
+  box::use(R / plotting[dotplot])
+  use_condaenv("stem-base")
+  ad <- import("anndata")
+})
 
 data <- here("analyses", "data_all")
-outdir <- here("analyses", "output", "scrnaseq_hcc")
 data_dir <- here(
   data,
   "output",
@@ -68,13 +70,34 @@ wanted_genes <- c(
   "AFP" # Alpha-fetoprotein
 )
 
-tmp <- ad$read_h5ad(
-  "/home/shannc/Bio_SDD/chula-stem/analyses/scrnaseq_hcc/expression_comparison_external_toy.h5ad"
-)
 
-dotplot(
-  obj = tmp,
+combined <- ad$read_h5ad(combined_file)
+
+norm_plot <- dotplot(
+  obj = combined,
   var_names = wanted_genes,
   group_by = "sample",
-  group_labels = list("type" = "Redmonder::qMSOBu", "patient" = "pals::glasbey")
+  group_labels = list(
+    "type" = "Redmonder::qMSOBu",
+    "source" = "pals::glasbey"
+  ),
+  layer = "x_norm"
+)
+ggsave(
+  here(data_dir, "dotplot_normalized.pdf"),
+  plot = norm_plot
+)
+
+raw_plot <- dotplot(
+  obj = combined,
+  var_names = wanted_genes,
+  group_by = "sample",
+  group_labels = list(
+    "type" = "Redmonder::qMSOBu",
+    "source" = "pals::glasbey"
+  )
+)
+ggsave(
+  here(data_dir, "dotplot_raw.pdf"),
+  plot = norm_plot
 )
