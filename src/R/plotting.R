@@ -682,10 +682,14 @@ dotplot <- function(
 
   obs_cols <- c(group_by, names(group_labels))
   if ("anndata._core.anndata.AnnData" %in% class(obj)) {
+    var_index <- mutate(obj$var, index = seq_len(nrow(obj$var)))[
+      var_names,
+    ]$index -
+      1 # R indexing adjustment
     if (!is.null(layer)) {
-      x <- obj[, rownames(obj$var) %in% var_names]$layers[[layer]]
+      x <- obj[, var_index]$layers[[layer]]
     } else {
-      x <- obj[, rownames(obj$var) %in% var_names]$X
+      x <- obj[, var_index]$X
     }
     x <- as.matrix(x) |>
       as_tibble() |>
@@ -738,7 +742,7 @@ dotplot <- function(
         dplyr::arrange(Group) |>
         purrr::pluck("v")
     } else {
-      var_ordering <- var_meta[rownames(var_meta) %in% var_names, var_sort] |>
+      var_ordering <- var_meta[var_names, ] |>
         tibble::rownames_to_column(var = "v") |>
         dplyr::arrange(!!as.symbol(var_sort)) |>
         purrr::pluck("v")
