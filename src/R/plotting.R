@@ -635,15 +635,18 @@ dotplot <- function(
   var_names,
   group_by,
   group_labels = list(),
+  var_labels = list(),
   palette = "ggthemes::Red-Green Diverging",
   layer = NULL,
-  sort = NULL
+  sort = NULL,
+  var_sort = NULL
 ) {
   box::use(
     dplyr[summarize, group_by, across, all_of, mutate, inner_join],
     checkmate[assert_list],
     ggplot2[
       geom_point,
+      geom_tile,
       aes,
       theme,
       xlab,
@@ -655,6 +658,15 @@ dotplot <- function(
       element_text
     ]
   )
+  var_groups <- NULL
+  if (checkmate::test_list(var_names)) {
+    var_groups <- lapply(names(var_names), \(n) {
+      tibble::tibble(v = var_names[[n]], Group = n)
+    }) |>
+      dplyr::bind_rows()
+    var_names <- unlist(var_names, use.names = FALSE)
+  }
+
   checkmate::assert_list(group_labels)
   if (is.null(names(group_labels))) {
     group_labels <- rep("ggsci::default_igv", length(group_labels)) |>
@@ -672,6 +684,7 @@ dotplot <- function(
       `colnames<-`(var_names) |>
       bind_cols(obj$obs[, c(group_by, names(group_labels))]) |>
       mutate(cell_id = rownames(obj$obs))
+    var_meta <- obj$var
   } else {
     stop("Not implemented yet")
   }
@@ -707,10 +720,38 @@ dotplot <- function(
       purrr::pluck(group_by)
     joined[[group_by]] <- factor(joined[[group_by]], levels = ordering)
   }
+  if (!is.null(var_groups) || !is.null(var_sort)) {
+    if (is.null(var_sort)) {
+      var_ordering <- var_groups |>
+        dplyr::arrange(Group) |>
+        purrr::pluck("v")
+    } else {
+      var_ordering <- var_meta[rownames(var_meta) %in% var_names, var_sort] |>
+        tibble::rownames_to_column(var = "v") |>
+        dplyr::arrange(!!as.symbol(var_sort)) |>
+        purrr::pluck("v")
+    }
+    var_groups$v <- factor(var_groups$v, levels = var_ordering)
+    joined$gene <- factor(joined$gene, levels = var_ordering)
+  } else {
+    var_ordering <- NULL
+  }
+
+  joined$unexpressed <- ifelse(
+    joined$percent_expr != 0,
+    "false",
+    "true"
+  )
 
   dplot <- ggplot(
     joined,
-    aes(x = !!as.symbol(group_by), y = gene, size = percent_expr, color = mean)
+    aes(
+      x = !!as.symbol(group_by),
+      y = gene,
+      size = percent_expr,
+      color = mean,
+      shape = unexpressed
+    )
   ) +
     geom_point() +
     theme_minimal() +
@@ -718,27 +759,95 @@ dotplot <- function(
     xlab(group_by) +
     ylab("Gene") +
     guides(
-      fill = guide_legend("Mean expression"),
-      size = guide_legend("Fraction of cells with expression")
+      color = guide_legend("Mean expression"),
+      size = guide_legend("Fraction of cells with expression"),
+      shape = guide_legend("No expression")
     ) +
     theme(axis.text.x = element_text(angle = 90))
 
+  # Add var labels. If `var_names` is a list, the list names will take priority when sorting the y-axis
+  if (!is.null(var_groups) || length(var_labels) > 0) {
+    if (length(var_labels) > 0) {
+      var_groups_from_labels <- var_meta[
+        rownames(var_meta) %in% var_names,
+        names(var_labels)
+      ] |>
+        tibble::rownames_to_column(var = "v")
+      if (!is.null(var_ordering)) {
+        var_groups_from_labels$v <- factor(
+          var_groups_from_labels$v,
+          levels = var_ordering
+        )
+      }
+    } else {
+      var_groups_from_labels <- NULL
+    }
+    if (is.null(var_groups)) {
+      var_groups <- var_groups_from_labels
+    } else if (length(var_labels) > 0) {
+      var_groups <- inner_join(
+        var_groups,
+        var_groups_from_labels,
+        by = dplyr::join_by(v)
+      )
+    }
+    apply_over <- colnames(var_groups)[colnames(var_groups) != "v"]
+    var_label_plot <- lapply(apply_over, \(a) {
+      ggplot(var_groups, aes(y = v, x = "1", fill = !!as.symbol(a))) +
+        geom_tile() +
+        guides(fill = guide_legend(paste0("Var: ", a))) +
+        theme_void()
+    }) |>
+      patchwork::wrap_plots(ncol = length(apply_over))
+  } else {
+    var_label_plot <- NULL
+  }
+
+  # Add group labels
   if (length(group_labels) > 0) {
-    label_plots <- lapply(names(group_labels), \(gl) {
+    label_plot <- lapply(names(group_labels), \(gl) {
       ggplot(
         joined,
         aes(x = !!as.symbol(group_by), y = "1", fill = !!as.symbol(gl))
       ) +
         paletteer::scale_fill_paletteer_d(group_labels[[gl]]) +
         geom_tile() +
-        theme_void()
-    })
+        theme_void() +
+        guides(fill = guide_legend(paste0("Obs: ", gl)))
+    }) |>
+      patchwork::wrap_plots(nrow = length(group_labels))
+  } else {
+    label_plot <- NULL
+  }
+
+  if (!is.null(label_plot) && is.null(var_label_plot)) {
     patchwork::wrap_plots(
-      c(dplot, label_plots),
-      nrow = length(group_labels) + 1,
-      heights = c(5, rep(0.3, length(group_labels)))
+      c(dplot, label_plot),
+      nrow = 2,
+      heights = c(5, 1)
     ) +
       patchwork::plot_layout(guides = "collect")
+  } else if (!is.null(var_label_plot) && is.null(label_plot)) {
+    patchwork::wrap_plots(
+      c(var_label_plot, dplot),
+      ncol = 2,
+      widths = c(1, 7)
+    ) +
+      patchwork::plot_layout(guides = "collect")
+  } else if (!is.null(var_label_plot) && !is.null(label_plot)) {
+    layout <- "
+CA
+#B
+"
+    dplot +
+      label_plot +
+      var_label_plot +
+      patchwork::plot_layout(
+        design = layout,
+        guides = "collect",
+        widths = c(1, 7),
+        heights = c(5, 1)
+      )
   } else {
     dplot
   }
