@@ -620,15 +620,17 @@ plot_purecn_summary <- function(
 #' Dotplot
 #'
 #' @param obj Adata object (reticulate) or ...
-#' @param var_names Genes to include in dot plot
+#' @param var_names Genes to include in dot plot. Can be a character vector or a named list of genes
+#' If a named list is provided, names are used to group genes
 #' @param group_by Grouping column for cells
 #' @param palette paletteer palette to use for continuous expression values
 #' @param group_labels list of cell observations to additionally
-#' label each group with. If a named list is provided,
-#' values are interpreted as discrete paletteer palettes and names are
-#' columns
+#' label each group with.
+#' values are interpreted as discrete paletteer palettes and names are columns
 #' @param layer Layer or assay name to take expression from
 #' @param sort Column in `group_labels` to sort x axis with
+#' @param var_labels The equivalent of `group_labels`, but for variables
+#' @param var_palette Discrete color palette used in the variable grouping guide.
 #' @export
 dotplot <- function(
   obj,
@@ -639,10 +641,11 @@ dotplot <- function(
   palette = "ggthemes::Red-Green Diverging",
   layer = NULL,
   sort = NULL,
-  var_sort = NULL
+  var_sort = NULL,
+  var_palette = "ggthemes::Classic_20"
 ) {
   box::use(
-    dplyr[summarize, group_by, across, all_of, mutate, inner_join],
+    dplyr[summarize, group_by, across, all_of, mutate, inner_join, select],
     checkmate[assert_list],
     ggplot2[
       geom_point,
@@ -672,7 +675,12 @@ dotplot <- function(
     group_labels <- rep("ggsci::default_igv", length(group_labels)) |>
       `names<-`(group_labels)
   }
+  if (is.null(names(var_labels))) {
+    var_labels <- rep("ggsci::category20_d3", length(var_labels)) |>
+      `names<-`(var_labels)
+  }
 
+  obs_cols <- c(group_by, names(group_labels))
   if ("anndata._core.anndata.AnnData" %in% class(obj)) {
     if (!is.null(layer)) {
       x <- obj[, rownames(obj$var) %in% var_names]$layers[[layer]]
@@ -682,7 +690,7 @@ dotplot <- function(
     x <- as.matrix(x) |>
       as_tibble() |>
       `colnames<-`(var_names) |>
-      bind_cols(obj$obs[, c(group_by, names(group_labels))]) |>
+      bind_cols(select(obj$obs, all_of(obs_cols))) |>
       mutate(cell_id = rownames(obj$obs))
     var_meta <- obj$var
   } else {
@@ -698,9 +706,6 @@ dotplot <- function(
         values_to = "mean"
       )
 
-    meta <- x |>
-      group_by(!!as.symbol(group_by)) |>
-      summarize(across(all_of(names(group_labels)), first))
     percent_expr <- x |>
       group_by(!!as.symbol(group_by)) |>
       summarize(across(all_of(var_names), \(e) sum(e > 0) / n())) |>
@@ -709,8 +714,15 @@ dotplot <- function(
         names_to = "gene",
         values_to = "percent_expr"
       )
-    inner_join(means, percent_expr, by = c(group_by, "gene")) |>
-      inner_join(meta, by = join_by(!!as.symbol(group_by)))
+    tb <- inner_join(means, percent_expr, by = c(group_by, "gene"))
+    if (length(group_labels) > 0) {
+      meta <- x |>
+        group_by(!!as.symbol(group_by)) |>
+        summarize(across(all_of(names(group_labels)), first))
+      inner_join(tb, meta, by = join_by(!!as.symbol(group_by)))
+    } else {
+      tb
+    }
   })
   if (!is.null(sort)) {
     ordering <- joined |>
@@ -770,8 +782,8 @@ dotplot <- function(
     if (length(var_labels) > 0) {
       var_groups_from_labels <- var_meta[
         rownames(var_meta) %in% var_names,
-        names(var_labels)
       ] |>
+        dplyr::select(all_of(names(var_labels))) |>
         tibble::rownames_to_column(var = "v")
       if (!is.null(var_ordering)) {
         var_groups_from_labels$v <- factor(
@@ -791,12 +803,14 @@ dotplot <- function(
         by = dplyr::join_by(v)
       )
     }
-    apply_over <- colnames(var_groups)[colnames(var_groups) != "v"]
+    apply_over <- colnames(var_groups)[colnames(var_groups) != "v"] |> rev()
     var_label_plot <- lapply(apply_over, \(a) {
+      pal <- ifelse(a == "Group", var_palette, var_labels[[a]])
       ggplot(var_groups, aes(y = v, x = "1", fill = !!as.symbol(a))) +
         geom_tile() +
         guides(fill = guide_legend(paste0("Var: ", a))) +
-        theme_void()
+        theme_void() +
+        paletteer::scale_fill_paletteer_d(pal)
     }) |>
       patchwork::wrap_plots(ncol = length(apply_over))
   } else {
