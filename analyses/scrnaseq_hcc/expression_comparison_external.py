@@ -128,8 +128,18 @@ def annotate_filter_routine(adata: ad.AnnData, name: str) -> ad.AnnData:
 geo_dirs = {
     "GSE166589": ["GSM5075991", "GSM5075992", "GSM5075993"],
     "GSE154883": "adata.h5ad",
-    # Run "expression_comparison_external.R" to get the file above
-    "GSM4633164": None,
+    "GSE264261": "adata.h5ad",
+    "GSE182604": "adata.h5ad",
+    "GSE188541": None,
+    "GSE130073": None,
+    "GSE207889": ["GSM6822571"],
+    "GSE210059": ["GSM6415980", "GSM6415982"],
+    # Run "expression_comparison_external.R" to get the adata files if they don't exist
+    # "GSM4633164": None, # REVIEW: data are weird, exclude for now
+}
+filters: dict[
+    str, Callable[[ad.AnnData], ad.AnnData]
+] = {  # Filter functions to apply each data source
 }
 
 
@@ -242,9 +252,19 @@ def combine_all(f):
     chula = chula[
         (chula.obs["treatment"] == "control") & (chula.obs["type"] == "tumor"), :
     ]
+    chula_doublets = []
+    for p in chula.obs["patient"].unique():
+        current = chula[chula.obs["patient"] == p, :]
+        doublets = sc.pp.scrublet(current, copy=True)
+        chula_doublets.append(
+            doublets.obs.loc[:, ["doublet_score", "predicted_doublet"]]
+        )
     chula.obs["source"] = "Chula"
     chula.obs["batch"] = chula.obs["flowcell"]
     chula.obs = chula.obs.loc[:, kept_cols]
+    chula.obs = chula.obs.merge(
+        pd.concat(chula_doublets), left_index=True, right_index=True
+    )
     external_geo = read_existing(external_files["geo"], get_geo, ad.read_h5ad)
     shared_cols = set(external_geo.var.columns) & set(chula.var.columns)
     chula.var = chula.var.loc[:, list(shared_cols)]
@@ -254,6 +274,19 @@ def combine_all(f):
     sc.pp.neighbors(combined)
     sc.tl.umap(combined)
     sc.pp.highly_variable_genes(combined, n_top_genes=5000, flavor="seurat_v3")
+    lib_size = combined.X.sum(1)
+    combined.obs["size_factor"] = lib_size / np.mean(lib_size)
+    cellassign_results = cell_assign_wrapper(
+        combined,
+        cell_markers=get_markers(),
+        model_path=outdir / "cellassign",
+        size_factor_key="size_factor",
+    )
+    combined.obs = combined.obs.merge(
+        cellassign_results["pred"]["PREDICTION"], left_index=True, right_index=True
+    ).rename({"PREDICTION": "cellassign_prediction"})
+    if not (outdir / "cellassign").exists():
+        cellassign_results["model"].save(outdir / "cellassign")
     combined = combined[
         :, combined.var["highly_variable"] | combined.var.index.isin(wanted_genes)
     ]
@@ -269,6 +302,36 @@ combined: ad.AnnData = read_existing(combined_file, combine_all, ad.read_h5ad)
 tmp_plots = sc.pl.umap(combined, color=["batch", "source", "type"], return_fig=True)
 tmp_plots.figure.savefig(outdir / "umap_before_integration.pdf")
 
+dotplot_check = sc.pl.dotplot(
+    combined,
+    groupby="sample",
+    layer="x_norm",
+    return_fig=True,
+    var_names={
+        "main": (
+            "BSG",  # CD147
+            "LIN28A",
+            "LIN28B",
+            "GPC3",  # glypican 3
+            "AFP",
+        ),  # Alpha-fetoprotein
+        "edgeR_DE": (
+            # Genes DE with edgeR
+            "SDF2L1",
+            "NUDT14",
+            "SCAND1",
+            "MRPL55",
+            "RPL28",
+            "C4orf48",
+            "HCFC1R1",
+            "ABHD17A",
+            "GRINA",
+            "MEA1",
+        ),
+        "scVI_DE": ("GAL", "TAGLN", "MYL9", "RFLNB"),
+    },
+)
+dotplot_check.savefig(outdir / "dotplot_scanpy.pdf")
 
 # * DE analysis
 
@@ -299,6 +362,7 @@ def edgeR_de(f):
     adata.obs = agg_obs
     adata.X = adata.layers["sum"]
     num_de, result = edgeR_wrapper(adata, group="type", treat=False)
+    result.to_csv(f, index=False)
     return result
 
 
