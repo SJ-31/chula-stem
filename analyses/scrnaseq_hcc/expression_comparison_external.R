@@ -24,9 +24,55 @@ combined_file <- here(data_dir, "combined.h5ad")
 
 ## * Collect misc. data
 
+get_GSE207889 <- function(f, dir) {
+  # [2026-07-02 Thu] ehh don't bother with this one. Very few hepatocytes
+  library(Seurat)
+  library(HGNChelper)
+  library(openxlsx)
+  obj <- CreateSeuratObject(counts = Read10X(here(dir, "GSM6822571")))
+  obj <- NormalizeData(
+    obj,
+    normalization.method = "LogNormalize",
+    scale.factor = 10000
+  )
+  obj <- FindVariableFeatures(obj, selection.method = "vst", nfeatures = 2000)
+  obj <- ScaleData(obj, features = rownames(obj))
+  obj <- RunPCA(obj, features = VariableFeatures(object = obj))
+  obj <- FindNeighbors(obj, dims = 1:10)
+  obj <- FindClusters(
+    obj,
+    resolution = 0.8,
+    algorithm = 4,
+    leiden_method = "igraph"
+  )
+
+  # Recommended preprocessing with seurat
+  source(
+    "https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/gene_sets_prepare.R"
+  )
+  source(
+    "https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/sctype_score_.R"
+  )
+  gs_list <- gene_sets_prepare(
+    "https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/ScTypeDB_short.xlsx",
+    "Liver"
+  )
+  score <- sctype_score(
+    scRNAseqData = as.matrix(obj[["RNA"]]$scale.data),
+    scaled = TRUE,
+    gs = gs_list$gs_positive,
+    gs2 = gs_list$gs_negative
+  )
+  annotation <- tibble(
+    celltype = rownames(score)[max.col(t(score))],
+    barcode = colnames(score)
+  )
+  # TODO: could wrap this up in another function. Figure out
+  # what Seurat ScaleData does and see if scanpy can do something similar
+}
+
 ## ** GSE154883
-gse154883_file <- here(geo, "GSE154883", "adata.h5ad")
-if (!file.exists(gse154883_file)) {
+get_GSE154883 <- function(f, dir) {
   library(Seurat)
   load(here(
     geo,
@@ -58,19 +104,14 @@ if (!file.exists(gse154883_file)) {
       row.names = colnames(imported)
     )
   )
-  gse154883$write_h5ad(gse154883_file)
+  gse154883$write_h5ad(f)
 }
 
 ## ** GSE264261
 
-gse264261_file <- here(geo, "GSE264261", "adata.h5ad")
-if (!exists()) {
+get_GSE264261 <- function(f, dir) {
   sc <- import("scanpy")
-  adata <- sc$read_10x_h5(here(
-    geo,
-    "GSE264261",
-    "GSM8215174_filtered_feature_bc_matrix.h5"
-  ))
+  adata <- sc$read_10x_h5(here(dir, "GSM8215174_filtered_feature_bc_matrix.h5"))
   obs <- read_tsv(here(geo, "GSE264261", "GSM8215174_clusters.tsv.gz")) |>
     column_to_rownames(var = "barcode")
   adata$obs <- merge(adata$obs, obs, by = "row.names") |>
@@ -82,7 +123,38 @@ if (!exists()) {
     "GSE264261_cluster1"
   )
   adata$obs <- select(adata$obs, sample)
-  adata$write_h5ad(gse264261_file)
+  adata$write_h5ad(f)
+}
+
+## ** GSE182604
+
+get_GSE182604 <- function(f, dir) {
+  df <- read_csv(here(dir, "GSE182604_PHH_scRNA_RawCount.csv.gz")) |>
+    column_to_rownames(var = "...1")
+  samples <- str_extract(colnames(df), "PHH.*") |> unique()
+
+  adata <- lapply(samples, \(s) {
+    cur <- df[, grepl(s, colnames(df))] |> t()
+    obs <- data.frame(row.names = rownames(cur))
+    obs$sample <- s
+    ad$AnnData(X = cur, obs = obs)
+  }) |>
+    ad$concat(axis = "obs")
+  adata$write_h5ad(f)
+}
+
+
+## ** Runner
+extra_geo <- list(
+  GSE154883 = get_GSE154883,
+  GSE264261 = get_GSE264261,
+  GSE182604 = get_GSE182604
+)
+for (gd in names(extra_geo)) {
+  geo_file <- here(geo, gd, "adata.h5ad")
+  if (!file.exists(geo_file)) {
+    extra_geo[[gd]](geo_file, here(geo, gd))
+  }
 }
 
 ## * Plotting
