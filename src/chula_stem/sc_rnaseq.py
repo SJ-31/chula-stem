@@ -59,7 +59,7 @@ def cell_assign_wrapper(
     cell_markers: pd.DataFrame | dict,
     model_path: Path = None,
     layer=None,
-    size_factor_key="size_factors",
+    size_factor_key: str | None = "size_factors",
     train_kws: dict | None = None,
     **kws,
 ) -> dict:
@@ -75,12 +75,8 @@ def cell_assign_wrapper(
 
     Returns
     -------
-    Dictionary of results for CellAssign
-    Includes
-
-
-    Notes
-    -----
+    Dictionary of results for CellAssign, including its predictions
+    and the model itself
 
     """
     from scvi.external import CellAssign
@@ -502,7 +498,7 @@ def distance_by_mads(
     else:
         dfs = []
         for group, idx in adata.obs.groupby(group_keys):
-            cur = adata[idx, :].obs
+            cur = adata[idx.index, :].obs
             if cur.shape[0] > 0:
                 cur_df = helper(cur, group=group)
                 dfs.append(cur_df)
