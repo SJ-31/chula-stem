@@ -308,17 +308,119 @@ def annotate_adata_vars(
     return adata
 
 
-# def add_var_metadata(adata: ad.AnnData, gene_meta: pd.DataFrame) -> None:
-#     assert isinstance(adata, pd.DataFrame)
-#     adata.var = adata.var.merge(
-#         gene_meta.drop_duplicates("ensembl_gene_id"),
-#         left_index=True,
-#         right_on="ensembl_gene_id",
-#         how="left",
-#         sort=True,
-#     )
-#     adata.var_names = adata.var["hgnc_symbol"].fillna(adata.var["ensembl_gene_id"])
-#     adata.var_names.set_names("gene", inplace=True)
+def mads_qc_plot_batch(
+    adata: ad.AnnData,
+    batch_name,
+    thresholds=[1, 3, 5],
+    line_alpha=0.5,
+    batch_col: str = "batch",
+    sample_col: str = "sample",
+    obsm: str = "mads",
+    vars: tuple[str] = ("total_counts", "n_genes_by_counts", "pct_counts_mito"),
+    vars_compare: tuple[int, int, int] = (0, 1, 2),
+    palette: str = "coolwarm",
+) -> tuple[gg.ggplot, gg.ggplot]:
+    """Plot QC variables based on MADs for a specific batch
+    Must run `distance_by_mads` first
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+    batch_name : str
+        Name of the batch to plot. Must be present in adata.obs[batch_col]
+    sample_col : str
+        Sample column. Every sample in the batch will be plotted
+    obsm : str
+        Name of key in adata.obsm containing the distance from MADs
+    vars : str
+        Name of variables to plot MADs distances for
+    vars_compare : tuple
+        Tuple of indices denoting (x, y, color) for the joint plot
+    palette : str
+        Name of plotnine continuous palette to use
+
+    Returns
+    -------
+    Tuple of plot for each of the 3 metrics and joint plot showing their
+    relationship
+    """
+    assert obsm in adata.obsm, f"`{obsm}` must be present in adata.obsm"
+    assert len(vars) == 3, "Must provide 3 exactly qc variables"
+    adata = adata[adata.obs[batch] == batch_name, :].copy()
+    logger.info("Drawing qc plot for {} {}", batch, batch_name)
+    plots = {}
+    nudge_by = len(set(adata.obs[sample_col]))
+    for i, col in enumerate(vars):
+        plot = (
+            gg.ggplot(
+                adata.obs,
+                gg.aes(x=sample_col, y=adata.obsm[obsm][col], fill=sample_col),
+            )
+            + gg.geom_violin(position=gg.position_nudge(x=nudge_by))
+            + gg.theme(figure_size=(15, 20), axis_title_x=gg.element_blank())
+            + gg.guides(alpha="none")
+            + gg.geom_point(
+                gg.aes(color=col, alpha=0.1),
+                position=gg.position_jitter(),
+                fill=None,
+                size=0.3,
+            )
+            + gg.scale_color_continuous("cool")
+            + gg.ylab(f"{col} (MADs distance from median)")
+        )
+        if i == 0:
+            plot = plot + gg.ggtitle(f"{groupby}: {batch_name}")
+        if i != 2:
+            plot = plot + gg.theme(
+                axis_text_x=gg.element_blank(), axis_ticks_major_x=gg.element_blank()
+            )
+        col_max, col_min = adata.obsm[obsm][col].max(), adata.obsm[obsm][col].min()
+        for threshold in thresholds:
+            if col_max > threshold:
+                plot = plot + gg.geom_hline(yintercept=threshold, alpha=line_alpha)
+            if col_min < -threshold:
+                plot = plot + gg.geom_hline(yintercept=-threshold, alpha=line_alpha)
+        plots[i] = plot
+    c_x = vars[vars_compare[0]]
+    c_y = vars[vars_compare[1]]
+    c_color = vars[vars_compare[2]]
+    cplot = (
+        gg.ggplot(
+            pd.concat([adata.obsm[obsm], adata.obs.loc[:, [sample_col]]], axis=1),
+            gg.aes(x=c_x, y=c_y, color=c_color),
+        )
+        + gg.geom_point(position=gg.position_jitter())
+        + gg.scale_color_continuous(palette)
+        + gg.facet_wrap(sample_col, scales="free")
+        + gg.theme(figure_size=(15, 20))
+        + gg.ggtitle("Relationship between QC variables (expressed as MADs distances)")
+    )
+    y_max, y_min = (
+        adata.obsm[obsm][c_y].max(),
+        adata.obsm[obsm][c_y].min(),
+    )
+    x_max, x_min = (
+        adata.obsm[obsm][c_x].max(),
+        adata.obsm[obsm][c_x].min(),
+    )
+    for threshold in thresholds:
+        if y_max > threshold:
+            cplot = cplot + gg.geom_hline(
+                yintercept=threshold, alpha=line_alpha, linetype="dashed"
+            )
+        if y_min < -threshold:
+            cplot = cplot + gg.geom_hline(
+                yintercept=-threshold, alpha=line_alpha, linetype="dashed"
+            )
+        if x_max > threshold:
+            cplot = cplot + gg.geom_vline(
+                xintercept=threshold, alpha=line_alpha, linetype="dotted"
+            )
+        if x_min < -threshold:
+            cplot = cplot + gg.geom_vline(
+                xintercept=-threshold, alpha=line_alpha, linetype="dotted"
+            )
+    return plots[0] / plots[1] / plots[2], cplot
 
 
 def distance_by_mads(
@@ -326,6 +428,7 @@ def distance_by_mads(
     keys: Sequence | str | dict[str, str],
     group_keys: Sequence | str | None = None,
     inplace: bool = False,
+    obsm_key: str = "mads",
 ) -> tuple[pd.DataFrame, dict] | None:
     """For each key, compute the distance of its values from the median in terms
         of its MAD i.e. (x - median(x)) / MAD(x)
@@ -367,8 +470,8 @@ def distance_by_mads(
     result = dict(result)
     if not inplace:
         return df, result
-    adata.uns["mads"] = result
-    adata.obsm["mads"] = df
+    adata.uns[obsm_key] = result
+    adata.obsm[obsm_key] = df
 
 
 # * Clustering utils
