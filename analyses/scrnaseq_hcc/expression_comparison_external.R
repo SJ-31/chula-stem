@@ -136,10 +136,12 @@ get_GSE182604 <- function(f, dir) {
   adata <- lapply(samples, \(s) {
     cur <- df[, grepl(s, colnames(df))] |> t()
     obs <- data.frame(row.names = rownames(cur))
+    var <- data.frame(row.names = rownames(df), gene_ids = rownames(df))
     obs$sample <- s
-    ad$AnnData(X = cur, obs = obs)
+    ad$AnnData(X = cur, obs = obs, var = var)
   }) |>
-    ad$concat(axis = "obs")
+    ad$concat(axis = "obs", merge = "first", join = "outer")
+
   adata$write_h5ad(f)
 }
 
