@@ -193,7 +193,7 @@ has_variant_re <- function(hgvsp_re) {
   tmp |>
     bind_rows(tibble(
       sample = discard(samples, \(x) x %in% tmp$sample),
-      HGVSp = NA
+      HGVSp = NA_character_
     )) |>
     distinct() |>
     group_by(sample) |>
