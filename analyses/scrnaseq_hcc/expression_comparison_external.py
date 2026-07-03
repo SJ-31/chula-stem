@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from collections.abc import Callable
 from pathlib import Path
 
 import anndata as ad
@@ -10,13 +11,19 @@ import plotnine as gg
 import scanpy as sc
 import yte
 from chula_stem.r_utils import edgeR_wrapper
-from chula_stem.sc_rnaseq import annotate_adata_vars, distance_by_mads
+from chula_stem.sc_rnaseq import (
+    annotate_adata_vars,
+    distance_by_mads,
+    mads_qc_plot_batch,
+    sc_distribution_plot,
+)
 from chula_stem.utils import read_existing
 from loguru import logger
 from pyhere import here
 
 data = here("analyses", "data_all")
 outdir = here(data, "output", "HCC", "SCRNASEQ", "cohort", "compare_external")
+(outdir / "qc").mkdir(exist_ok=True)
 geo_dir = here(data, "public_data", "GEO")
 gene_reference: Path = here("analyses/data/ensembl_gene_data.csv")
 
@@ -53,6 +60,42 @@ def annotate_filter_routine(adata: ad.AnnData, name: str) -> ad.AnnData:
     )
     logger.info("Succesfully annotated {} adata\n{}", name, adata.var)
     sc.pp.calculate_qc_metrics(adata, inplace=True, qc_vars=["mito"])
+    for metric in ["n_genes_by_counts", "total_counts", "pct_counts_mito"]:
+        qc_axes = sc.pl.violin(
+            adata,
+            metric,
+            jitter=0.4,
+            show=False,
+            rotation=90.0,
+            groupby="source",
+        )
+        qc_axes.figure.savefig(
+            outdir / "qc" / f"geo_{metric}.pdf", bbox_inches="tight", dpi=500
+        )
+    distance_by_mads(
+        adata,
+        keys=["n_genes_by_counts", "total_counts", "pct_counts_mito"],
+        group_keys="source",
+        inplace=True,
+    )
+    for source in adata.obs["source"].unique():
+        qc, compare = mads_qc_plot_batch(
+            adata, source, batch_col="source", sample_col="sample"
+        )
+        (qc / compare).save(outdir / "qc" / f"{source}_mads.pdf")
+
+        metrics_plot = (
+            sc_distribution_plot(
+                adata[adata.obs["source"] == source, :],
+                keys=["n_genes_by_counts", "total_counts", "pct_counts_mito"],
+                groupby="sample",
+                fill="predicted_doublet",
+            )
+            + gg.ggtitle(f"Metrics for source {source}")
+            + gg.theme(axis_text_x=gg.element_text(rotation=90))
+        )
+        metrics_plot.save(outdir / "qc" / f"{source}_main.pdf", dpi=500)
+
     logger.info("{} before filtering: {}", name, adata.shape)
     adata = adata[adata.obs["pct_counts_mito"] < max_mito_pct, :]
     logger.info("{} after filtering mito: {}", name, adata.shape)
