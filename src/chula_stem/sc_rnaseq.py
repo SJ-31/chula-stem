@@ -7,6 +7,7 @@ import anndata as ad
 import click
 import numpy as np
 import pandas as pd
+import plotnine as gg
 import scanpy as sc
 import skbio.stats.composition as comp
 import sklearn.metrics as sm
@@ -306,6 +307,45 @@ def annotate_adata_vars(
     if "chromosome_name" in adata.var.columns:
         adata.var.loc[:, "mito"] = (adata.var["chromosome_name"] == "MT").fillna(False)
     return adata
+
+
+def sc_distribution_plot(
+    adata: ad.AnnData,
+    keys: str | Sequence[str],
+    groupby: str,
+    fill: str | None = None,
+    violin: bool = False,
+    with_points: bool = True,
+    point_size: int = 1,
+    point_alpha: float = 0.3,
+    **jitter_kws,
+) -> gg.ggplot:
+    wanted_cols = keys + [groupby]
+    id_vars = [groupby]
+    aes_kws = {"x": groupby, "y": "value"}
+    if fill is not None:
+        wanted_cols.append(fill)
+        id_vars.append(fill)
+        aes_kws["fill"] = fill
+    df = doublets.obs.loc[:, wanted_cols].melt(
+        id_vars=id_vars, value_vars=keys, var_name="Metric"
+    )
+    plot = gg.ggplot(df, gg.aes(**aes_kws))
+    if violin:
+        plot = plot + gg.geom_violin()
+    else:
+        plot = plot + gg.geom_boxplot()
+    plot = plot + gg.facet_wrap("Metric", scales="free_y")
+    point_kws = {"size": point_size, "alpha": point_alpha}
+    if with_points:
+        if fill:
+            jitter_kws["dodge_width"] = jitter_kws.get("dodge_width", 0.8)
+            point_kws["position"] = gg.position_jitterdodge(**jitter_kws)
+        else:
+            jitter_kws["width"] = jitter_kws.get("width", 0.8)
+            point_kws["position"] = gg.position_jitter(**jitter_kws)
+        plot = plot + gg.geom_point(**point_kws)
+    return plot
 
 
 def mads_qc_plot_batch(
