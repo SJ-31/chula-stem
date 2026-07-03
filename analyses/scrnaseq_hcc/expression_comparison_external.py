@@ -13,6 +13,7 @@ import yte
 from chula_stem.r_utils import edgeR_wrapper
 from chula_stem.sc_rnaseq import (
     annotate_adata_vars,
+    cell_assign_wrapper,
     distance_by_mads,
     mads_qc_plot_batch,
     sc_distribution_plot,
@@ -44,8 +45,24 @@ scvi_model_dir = outdir / "scvi_model"
 max_mito_pct = 20
 filter_cells_kws = {"min_genes": 200}
 
+
 # CD147, GPC3 as well as all of the other genes plotted previously
 # Compare with normal hepatocytes (ideally in hepatic organoids) transcriptomes.
+
+
+def get_markers():  # Use only cellmarker 3.0 markers from experimental
+    # evidence
+    marker_df = pd.read_csv(here("analyses", "data", "human_cell_marker.txt"), sep="\t")
+    marker_df = marker_df.loc[~marker_df["symbol"].isna(), :]
+    marker_df = marker_df.loc[marker_df["marker_source"] == "Experiment", :]
+    marker_df = marker_df.loc[marker_df["tissue_type"] == "Liver", :]
+    marker_df = marker_df.loc[marker_df["tissue_class"] == "Liver", :]
+    marker_df = marker_df.loc[marker_df["disease"] == "Normal", :]
+    counts = marker_df["cell_name"].value_counts()
+    marker_df = marker_df.loc[marker_df["cell_name"].isin(counts[counts > 5].index), :]
+    return marker_df.loc[:, ["cell_name", "symbol"]].rename(
+        {"cell_name": "cell", "symbol": "gene"}
+    )
 
 
 # * Data import
@@ -125,20 +142,29 @@ def collect_from_geo() -> list[ad.AnnData]:
             adata.obs["source"] = series
             if "sample" not in adata.obs.columns:
                 adata.obs["sample"] = series
-            adatas.append(adata)
         elif isinstance(spec, str):
             adata = ad.read_h5ad(series_dir / spec)
             adata.obs["source"] = series
             if "sample" not in adata.obs.columns:
                 adata.obs["sample"] = series
-            adatas.append(adata)
         else:
+            tmp = []
             for sample in spec:
                 sample_dir = series_dir / sample
-                adata = sc.read_10x_mtx(sample_dir)
-                adata.obs["sample"] = sample
-                adata.obs["source"] = series
-                adatas.append(adata)
+                cur = sc.read_10x_mtx(sample_dir)
+                cur.obs["sample"] = sample
+                cur.obs["source"] = series
+                cur.obs_names_make_unique()
+                cur.var_names_make_unique()
+                tmp.append(cur)
+            adata = ad.concat(tmp, axis="obs", merge="first", join="outer")
+        sc.pp.scrublet(adata, copy=False)
+        if filter_expr := filters.get(series):
+            adata = filter_expr(adata)
+        logger.info("series {}, head of var index", series, adata.var.index)
+        adata.obs_names_make_unique()
+        adata.var_names_make_unique()
+        adatas.append(adata)
     return adatas
 
 
@@ -147,7 +173,6 @@ def get_geo(f):
     adata: ad.AnnData = ad.concat(geo_adatas, axis="obs", merge="first", join="outer")
     adata.obs["type"] = "normal"
     adata.obs["batch"] = adata.obs["source"]
-    adata.obs_names_make_unique()
     adata = annotate_filter_routine(adata, "GEO")
     adata.write_h5ad(f)
     return adata
