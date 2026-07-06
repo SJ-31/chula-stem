@@ -1,5 +1,7 @@
 suppressMessages({
   library(patchwork)
+  library(icecream)
+  options(icecream.max.lines = 10, icecream.peeking.function = head)
   library(checkmate)
   library(glue)
   library(ggplot2)
@@ -23,6 +25,25 @@ suppressMessages({
 })
 
 print(glue("Available samples: {paste0(samples, collapse = ',')}"))
+
+if (!is.null(config$custom_sample_file)) {
+  custom_samples <- read_tsv(config$custom_sample_file)
+  samples_with_wes <- c(samples_with_wes, custom_samples$subject)
+  samples <- c(samples, custom_samples$subject)
+  assert_names(
+    colnames(custom_samples),
+    subset.of = c(
+      "HGVSp",
+      "HGVSc",
+      "HGVSg",
+      "SYMBOL",
+      "subject",
+      "Consequence",
+      "CLIN_SIG"
+    )
+  )
+  combined_vep <- bind_rows(combined_vep, custom_samples)
+}
 
 with_no_data <- c()
 TILE_CALL <- geom_tile(width = 0.95, height = 0.95)
@@ -300,7 +321,7 @@ replicate_figure <- combined_vep |>
     VAF = mean(AF),
     Alt_depth = mean(
       map_dbl(AD, \(x) {
-        if (x == ".") {
+        if (is.na(x) || x == ".") {
           NA
         } else {
           splits <- str_split_1(x, ",")
@@ -314,11 +335,19 @@ replicate_figure <- combined_vep |>
   dplyr::rename(sample = subject) |>
   distinct()
 
-
 if (!is.null(min_alt_depth)) {
-  replicate_figure <- filter(replicate_figure, Alt_depth >= min_alt_depth)
+  if (!is.null(config$custom_sample_file)) {
+    replicate_figure <- filter(
+      replicate_figure,
+      Alt_depth >= min_alt_depth | sample %in% custom_samples$subject
+    )
+  } else {
+    replicate_figure <- filter(
+      replicate_figure,
+      Alt_depth >= min_alt_depth
+    )
+  }
 }
-
 
 TYPE_ORDER <- tmb_merged |>
   group_by(key) |>

@@ -14,6 +14,12 @@ __definitions__:
 outdir: ?f"{proj_root}/analyses/output/pdac" # Root path for output
 conda: ?conda_env # conda environment for reticulate
 
+custom_sample_file: ?f"{proj_root}/analyses/pdac/snakemake/custom_samples.tsv"
+# A TSV file containing samples to manually add to the VAF plot e.g.
+# if no VCF data are available
+# Columns must follow VEP's column naming format, with four required columns:
+# Consequence, SYMBOL, HGVSc, and HGVSp
+
 sample_spec:
   - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
     root: ?f"{data_root}/output/PDAC" # Root path of wes results
@@ -25,16 +31,17 @@ sample_spec:
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
     ignore:
-      - PHcase_8
-      - PHcase_11
-      - PHcase_18
-      - PHcase_19
-      - PHcase_21
-      - PHcase_1
-      - PHcase_2
-      - PHcase_4
-      - PHcase_12
-      - PHcase_15
+      # - PHcase_12
+      # - PHcase_15
+      # - PHcase_1
+      # - PHcase_4
+      # - PHcase_2
+      # The below aren't pdac
+      - PHcase_8 # Breast
+      - PHcase_11 # Breast
+      - PHcase_18 # Sarcoma
+      - PHcase_19 # Kidney
+      - PHcase_21 # Colorectal
 
 manifest:
 src: # source directories
