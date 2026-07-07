@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import anndata as ad
+import numpy as np
 import pandas as pd
 
 # import cellxgene_census   # BUG: can't use this on cuaim
@@ -16,10 +17,12 @@ from chula_stem.sc_rnaseq import (
     cell_assign_wrapper,
     distance_by_mads,
     mads_qc_plot_batch,
+    obsm_filters,
     sc_distribution_plot,
 )
 from chula_stem.utils import read_existing
 from loguru import logger
+from matplotlib.pyplot import axis
 from pyhere import here
 
 data = here("analyses", "data_all")
@@ -27,6 +30,8 @@ outdir = here(data, "output", "HCC", "SCRNASEQ", "cohort", "compare_external")
 (outdir / "qc").mkdir(exist_ok=True)
 geo_dir = here(data, "public_data", "GEO")
 gene_reference: Path = here("analyses/data/ensembl_gene_data.csv")
+
+# /home/shannc/Bio_SDD/stem_synology/chula_mount/shannc/output/HCC/SCRNASEQ/cohort/compare_external
 
 wanted_genes = [
     "BSG",  # CD147
@@ -60,8 +65,12 @@ def get_markers():  # Use only cellmarker 3.0 markers from experimental
     marker_df = marker_df.loc[marker_df["disease"] == "Normal", :]
     counts = marker_df["cell_name"].value_counts()
     marker_df = marker_df.loc[marker_df["cell_name"].isin(counts[counts > 5].index), :]
-    return marker_df.loc[:, ["cell_name", "symbol"]].rename(
-        {"cell_name": "cell", "symbol": "gene"}
+    return (
+        marker_df.loc[:, ["cell_name", "symbol"]]
+        .rename({"cell_name": "cell", "symbol": "gene"}, axis=1)
+        .assign(value=1)
+        .pivot_table(index="gene", columns="cell", values="value", fill_value=0)
+        .astype(int)
     )
 
 
@@ -95,24 +104,30 @@ def annotate_filter_routine(adata: ad.AnnData, name: str) -> ad.AnnData:
         group_keys="source",
         inplace=True,
     )
+    passed_index = []
     for source in adata.obs["source"].unique():
         qc, compare = mads_qc_plot_batch(
             adata, source, batch_col="source", sample_col="sample"
         )
         (qc / compare).save(outdir / "qc" / f"{source}_mads.pdf")
-
         metrics_plot = (
             sc_distribution_plot(
                 adata[adata.obs["source"] == source, :],
                 keys=["n_genes_by_counts", "total_counts", "pct_counts_mito"],
                 groupby="sample",
                 fill="predicted_doublet",
+                with_points=False,
             )
             + gg.ggtitle(f"Metrics for source {source}")
             + gg.theme(axis_text_x=gg.element_text(rotation=90))
         )
         metrics_plot.save(outdir / "qc" / f"{source}_main.pdf", dpi=500)
+        if filter_expr := filters.get(source):
+            passed_index.extend(
+                list(filter_expr(adata[adata.obs["source"] == source, :]).obs_names)
+            )
 
+    adata = adata[passed_index, :]
     logger.info("{} before filtering: {}", name, adata.shape)
     adata = adata[adata.obs["pct_counts_mito"] < max_mito_pct, :]
     logger.info("{} after filtering mito: {}", name, adata.shape)
@@ -125,21 +140,50 @@ def annotate_filter_routine(adata: ad.AnnData, name: str) -> ad.AnnData:
 #
 # *** From GEO
 
+
+def make_mads_filter_fn(spec):
+    def f(adata: ad.AnnData) -> ad.AnnData:
+        passed, failed = obsm_filters(adata, spec, "mads", reduction="any")
+        return passed
+
+    return f
+
+
 geo_dirs = {
     "GSE166589": ["GSM5075991", "GSM5075992", "GSM5075993"],
+    # GSE166589 clearly has two cell populations
     "GSE154883": "adata.h5ad",
     "GSE264261": "adata.h5ad",
     "GSE182604": "adata.h5ad",
     "GSE188541": None,
+    "GSE141183": None,
     "GSE130073": None,
     "GSE207889": ["GSM6822571"],
-    "GSE210059": ["GSM6415980", "GSM6415982"],
+    "GSE210059": [
+        # "GSM6415980", # Excluded due to low cell count (see QC plots)
+        "GSM6415982"
+    ],
     # Run "expression_comparison_external.R" to get the adata files if they don't exist
-    # "GSM4633164": None, # REVIEW: data are weird, exclude for now
+    # "GSM4633164": None, # Excluded due to abnormal gene expression
 }
 filters: dict[
     str, Callable[[ad.AnnData], ad.AnnData]
 ] = {  # Filter functions to apply each data source
+    "GSE130073": make_mads_filter_fn(
+        {"pct_counts_mito": [None, 2], "n_genes_by_counts": [-3, None]}
+    ),
+    "GSE154883": make_mads_filter_fn(
+        {"n_genes_by_counts": [-2, 4], "total_counts": [None, 6]}
+    ),
+    "GSE166589": make_mads_filter_fn({"pct_counts_mito": [None, 5]}),
+    "GSE182604": make_mads_filter_fn(
+        {"pct_counts_mito": [None, 3], "total_counts": [-2, 5]}
+    ),
+    "GSE188541": make_mads_filter_fn({"n_genes_by_counts": [-1, None]}),
+    "GSE207889": make_mads_filter_fn(
+        {"n_genes_by_counts": [-1.5, 3], "total_counts": [-1, 5]}
+    ),
+    "GSE264261": make_mads_filter_fn({"pct_counts_mito": [None, 4]}),
 }
 
 
@@ -169,9 +213,6 @@ def collect_from_geo() -> list[ad.AnnData]:
                 tmp.append(cur)
             adata = ad.concat(tmp, axis="obs", merge="first", join="outer")
         sc.pp.scrublet(adata, copy=False)
-        if filter_expr := filters.get(series):
-            adata = filter_expr(adata)
-        logger.info("series {}, head of var index", series, adata.var.index)
         adata.obs_names_make_unique()
         adata.var_names_make_unique()
         adatas.append(adata)
@@ -181,9 +222,11 @@ def collect_from_geo() -> list[ad.AnnData]:
 def get_geo(f):
     geo_adatas = collect_from_geo()
     adata: ad.AnnData = ad.concat(geo_adatas, axis="obs", merge="first", join="outer")
+    adata.obs_names_make_unique()
     adata.obs["type"] = "normal"
     adata.obs["batch"] = adata.obs["source"]
     adata = annotate_filter_routine(adata, "GEO")
+    adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(bool)
     adata.write_h5ad(f)
     return adata
 
@@ -255,7 +298,7 @@ def combine_all(f):
     chula_doublets = []
     for p in chula.obs["patient"].unique():
         current = chula[chula.obs["patient"] == p, :]
-        doublets = sc.pp.scrublet(current, copy=True)
+        doublets: ad.Anndata = sc.pp.scrublet(current, copy=True)
         chula_doublets.append(
             doublets.obs.loc[:, ["doublet_score", "predicted_doublet"]]
         )
@@ -265,6 +308,7 @@ def combine_all(f):
     chula.obs = chula.obs.merge(
         pd.concat(chula_doublets), left_index=True, right_index=True
     )
+    chula.obs["predicted_doublet"] = chula.obs["predicted_doublet"].astype(bool)
     external_geo = read_existing(external_files["geo"], get_geo, ad.read_h5ad)
     shared_cols = set(external_geo.var.columns) & set(chula.var.columns)
     chula.var = chula.var.loc[:, list(shared_cols)]
@@ -320,13 +364,11 @@ dotplot_check = sc.pl.dotplot(
             "SDF2L1",
             "NUDT14",
             "SCAND1",
-            "MRPL55",
             "RPL28",
             "C4orf48",
             "HCFC1R1",
             "ABHD17A",
             "GRINA",
-            "MEA1",
         ),
         "scVI_DE": ("GAL", "TAGLN", "MYL9", "RFLNB"),
     },

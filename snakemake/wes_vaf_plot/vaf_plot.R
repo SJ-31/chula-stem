@@ -28,8 +28,8 @@ print(glue("Available samples: {paste0(samples, collapse = ',')}"))
 
 if (!is.null(config$custom_sample_file)) {
   custom_samples <- read_tsv(config$custom_sample_file)
-  samples_with_wes <- c(samples_with_wes, custom_samples$subject)
-  samples <- c(samples, custom_samples$subject)
+  samples_with_wes <- c(samples_with_wes, unique(custom_samples$subject))
+  samples <- c(samples, unique(custom_samples$subject))
   assert_names(
     colnames(custom_samples),
     subset.of = c(
