@@ -99,6 +99,7 @@ pyrvinium <- local({
 # Goal: determine relationship between gene expression and IC80 in PDAC
 
 # TODO: read up on common ways of handling IC values
+# TODO: check if you should scale and center
 
 ## * DE analysis
 
@@ -108,15 +109,14 @@ obs <- left_join(
   by = join_by(sample)
 ) |>
   filter(!is.na(IC80)) |>
-  mutate(across(starts_with("IC"), as.double))
+  mutate(across(starts_with("IC"), as.double)) |>
+  filter(IC80 > 0)
 
-# [2026-07-15 Wed] NOTE: taking logarithm of IC80 doesn't change anything
-# TODO: experiment with
 
 dds <- DESeqDataSetFromMatrix(
   countData = counts[, obs$sample],
   colData = column_to_rownames(obs, "sample"),
-  design = ~ 0 + cohort + IC80
+  design = ~ 0 + cohort + log2(IC80)
 )
 dds <- dds[rowSums(counts >= 10) >= 5, ]
 dds <- DESeq(dds)
@@ -124,7 +124,9 @@ dds <- DESeq(dds)
 # Important to note that non-PHcase samples were prepared with
 # salmon counts
 
-ic80_res <- results(dds, name = "IC80")
+# Fold-change of the covariate is the per-unit increase in the covariate
+ic80_res <- results(dds)
+ic80_res <- ic80_res[ic80_res$padj <= 0.05, ] |> as.data.frame()
 
 ## * Visualizations
 # normalized data
@@ -141,3 +143,14 @@ bplot <- obs |>
   ggplot(aes(y = sample, x = value)) +
   geom_bar(stat = "identity") +
   facet_wrap(~name, scales = "free_x")
+
+
+# TODO: automate plots of the following as verification
+
+tibble(
+  expr = assay(vsd)["RPS4Y1", ],
+  IC80 = colData(vsd)$IC80,
+  cohort = colData(vsd)$cohort
+) |>
+  ggplot(aes(x = log2(IC80), y = expr, color = cohort)) +
+  geom_point()
