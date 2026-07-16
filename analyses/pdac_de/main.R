@@ -12,6 +12,7 @@ suppressMessages({
   set.seed(240)
 })
 
+
 workdir <- here("analyses", "pdac_de")
 data <- here("analyses", "data_all")
 
@@ -235,6 +236,35 @@ ggsave(
   dpi = 500
 )
 
+ic80_heatmap <- as.data.frame(assay(vsd)[rownames(ic80_res), ]) |>
+  `colnames<-`(colnames(vsd)) |>
+  rownames_to_column(var = "gene") |>
+  as_tibble() |>
+  pivot_longer(-gene, names_to = "sample", values_to = "expr") |>
+  inner_join(rownames_to_column(ic80_res, "gene"), by = join_by(gene)) |>
+  inner_join(
+    rownames_to_column(as.data.frame(colData(vsd)), "sample"),
+    by = join_by(sample)
+  ) |>
+  ggplot(
+    aes(
+      x = cut(log(IC80), breaks = 10),
+      y = factor(gene, levels = names(enrich_list)),
+      fill = expr
+    )
+  ) +
+  geom_tile(width = 0.98) +
+  theme_minimal() +
+  scale_fill_paletteer_c("grDevices::Sunset") +
+  guides(fill = guide_legend("Normalized expression")) +
+  xlab("Binned log(IC80)") +
+  ylab("Gene")
+ggsave(
+  plot = ic80_heatmap,
+  filename = here(workdir, "ic80_heatmap.pdf"),
+  height = 10,
+  width = 15
+)
 
 lapply(rownames(ic80_res), \(gene) {
   lfc <- ic80_res[gene, ]["log2FoldChange"] |> round(3)
@@ -253,3 +283,50 @@ lapply(rownames(ic80_res), \(gene) {
     )
   ggsave(filename = here(workdir, glue("gene_plots/{gene}.pdf")), plot = plot)
 })
+
+## * GATA6
+
+# TODO: Gata6 level, normalized against housekeeping genes. In pdac
+# Just make it a bar plot and facet by the housekeeping gene that was normalized
+# Use ALR on the raw counts
+housekeeping <- c("MLF2", "SF3B1", "GNB1", "CTBP1", "MYH9")
+# Took the top 5 genes in pancreas from HRT atlas, sorting by lowest STD
+
+normalize_housekeeping <- function(obj, target, housekeeping) {
+  lapply(housekeeping, \(hk) {
+    normalized <- log(assay(obj)[target, ], assay(obj)[hk, ])
+    tibble(
+      sample = names(normalized),
+      n_expr = normalized,
+      housekeeping = hk
+    ) |>
+      mutate(rank = rank(-n_expr))
+  }) |>
+    bind_rows()
+}
+
+h2 <- c("FOXH1", "TMEM269", "CD2BP2", "KRT8P33", "RHOQP1", "FREY1")
+
+gata6_hk_plot <- normalize_housekeeping(
+  dds[, str_detect(colnames(dds), "PHcase")],
+  housekeeping = housekeeping,
+  target = "GATA6"
+) |>
+  ggplot(aes(x = sample, y = housekeeping, fill = n_expr)) +
+  geom_tile() +
+  geom_text(aes(label = rank), color = "white", size = 6) +
+  xlab("Sample") +
+  ylab("Housekeeping gene") +
+  guides(fill = guide_legend("Normalized expression\n(additive log ratio)")) +
+  labs(
+    title = "GATA6 Expression"
+  )
+gata6_hk_plot
+
+ggsave(
+  here(workdir, "gata6_hk.png"),
+  gata6_hk_plot,
+  height = 12,
+  width = 12,
+  dpi = 500
+)
