@@ -1,16 +1,30 @@
 suppressMessages({
+  library(clusterProfiler)
+  library(DESeq2)
   library(tidyverse)
   library(here)
-  library(DESeq2)
+  library(glue)
+  library(paletteer)
   library(patchwork)
+  library(org.Hs.eg.db)
   options(box.path = here("src"))
-  suppressWarnings(box::use(R / utils[read_existing]))
+  suppressWarnings(box::use(R / utils[read_existing], dplyr[select, filter]))
+  set.seed(240)
 })
 
 workdir <- here("analyses", "pdac_de")
 data <- here("analyses", "data_all")
 
-tx2gene <- read_tsv(here("analyses", "data", "tx2gene.tsv"))
+hallmark <- read_csv(
+  here("analyses", "data", "hallmark2symbol.csv"),
+  col_names = c("term", "symbol")
+)
+reactome <- read_csv(
+  here("analyses", "data", "reactome2symbol.csv"),
+  col_names = c("term", "symbol")
+)
+
+## tx2gene <- read_tsv(here("analyses", "data", "tx2gene.tsv"))
 
 get_counts <- function(f) {
   library(reticulate)
@@ -101,7 +115,9 @@ pyrvinium <- local({
 # TODO: read up on common ways of handling IC values
 # TODO: check if you should scale and center
 
-## * DE analysis
+## * Analysis
+
+## ** DE
 
 obs <- left_join(
   tibble(sample = colnames(counts)),
@@ -116,7 +132,7 @@ obs <- left_join(
 dds <- DESeqDataSetFromMatrix(
   countData = counts[, obs$sample],
   colData = column_to_rownames(obs, "sample"),
-  design = ~ 0 + cohort + log2(IC80)
+  design = ~ 0 + cohort + scale(log(IC80))
 )
 dds <- dds[rowSums(counts >= 10) >= 5, ]
 dds <- DESeq(dds)
@@ -128,29 +144,112 @@ dds <- DESeq(dds)
 ic80_res <- results(dds)
 ic80_res <- ic80_res[ic80_res$padj <= 0.05, ] |> as.data.frame()
 
+ic80_res |>
+  rownames_to_column(var = "symbol") |>
+  write_csv(here(workdir, "de_genes.csv"))
+
+## ** Enrichment
+
+enrich_list <- ic80_res$log2FoldChange |>
+  `names<-`(rownames(ic80_res)) |>
+  sort(decreasing = TRUE)
+
+## gse_res <- gseGO(
+##   gene = enrich_list,
+##   OrgDb = org.Hs.eg.db,
+##   keyType = "SYMBOL",
+##   ont = "ALL"
+## )
+## min(gse_res$p.adjust, na.rm = TRUE) # 0.1725709
+## [2026-07-16 Thu] No significant terms identified with gsea
+
+res_list <- list(
+  downreg = ic80_res[ic80_res$log2FoldChange < 0, ],
+  upreg = ic80_res[ic80_res$log2FoldChange > 0, ]
+)
+
+do_enrichment <- function(f) {
+  tb <- lapply(names(res_list), \(g) {
+    genes <- rownames(res_list[[g]])
+    ora_go <- enrichGO(
+      gene = genes,
+      OrgDb = org.Hs.eg.db,
+      keyType = "SYMBOL",
+      ont = "ALL",
+      universe = rownames(dds)
+    ) |>
+      as_tibble() |>
+      mutate(group = paste0("GO:", ONTOLOGY)) |>
+      select(-ONTOLOGY)
+    ora_hallmark <- enricher(
+      genes,
+      TERM2GENE = hallmark,
+      universe = rownames(dds)
+    ) |>
+      as_tibble() |>
+      mutate(group = "hallmark")
+    ora_reactome <- enricher(
+      genes,
+      TERM2GENE = reactome,
+      universe = rownames(dds)
+    ) |>
+      as_tibble() |>
+      mutate(group = "Reactome")
+    bind_rows(ora_hallmark, ora_reactome, ora_go) |> mutate(Direction = g)
+  }) |>
+    bind_rows()
+  write_csv(tb, f)
+  tb
+}
+
+enrich_res <- read_existing(
+  here(workdir, "enrichment.csv"),
+  do_enrichment,
+  read_csv
+)
+
 ## * Visualizations
 # normalized data
 vsd <- vst(dds, blind = FALSE)
-cohort_plot <- plotPCA(vsd, intgroup = c("cohort"))
-# Batch separation is clear
+vsd$log_IC80 <- log(vsd$IC80)
 
-## plotPCA(vsd, intgroup = c("IC80"))
+cohort_plot <- plotPCA(vsd[rownames(ic80_res), ], intgroup = c("cohort")) +
+  guides(color = guide_legend("cohort"))
+ic80_plot <- plotPCA(vsd[rownames(ic80_res), ], intgroup = c("log_IC80")) +
+  scale_color_paletteer_c("ggthemes::Green-Gold") +
+  guides(color = guide_legend("log(IC80)")) +
+  theme(axis.text.y = element_blank(), axis.title.y = element_blank())
 
-bplot <- obs |>
-  mutate(log2_IC80 = log2(IC80)) |>
-  select(sample, IC80, log2_IC80) |>
-  pivot_longer(-sample) |>
-  ggplot(aes(y = sample, x = value)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~name, scales = "free_x")
+pca_plot <- cohort_plot +
+  ic80_plot +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title = "PCA of PDAC samples",
+    subtitle = "After subsetting by DE genes"
+  )
+ggsave(
+  filename = here(workdir, "pca_plot.png"),
+  plot = pca_plot,
+  height = 10,
+  width = 10,
+  dpi = 500
+)
 
 
-# TODO: automate plots of the following as verification
-
-tibble(
-  expr = assay(vsd)["RPS4Y1", ],
-  IC80 = colData(vsd)$IC80,
-  cohort = colData(vsd)$cohort
-) |>
-  ggplot(aes(x = log2(IC80), y = expr, color = cohort)) +
-  geom_point()
+lapply(rownames(ic80_res), \(gene) {
+  lfc <- ic80_res[gene, ]["log2FoldChange"] |> round(3)
+  p_val <- ic80_res[gene, ]["padj"] |> round(4)
+  plot <- tibble(
+    expr = assay(vsd)[gene, ],
+    IC80 = colData(vsd)$IC80,
+    cohort = colData(vsd)$cohort
+  ) |>
+    ggplot(aes(x = log(IC80), y = expr, color = cohort)) +
+    geom_point() +
+    ylab("Normalized expression") +
+    labs(
+      title = gene,
+      subtitle = glue("log2FoldChange: {lfc}, p-value: {p_val}")
+    )
+  ggsave(filename = here(workdir, glue("gene_plots/{gene}.pdf")), plot = plot)
+})
