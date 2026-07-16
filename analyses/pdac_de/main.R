@@ -120,6 +120,39 @@ pyrvinium <- local({
 
 ## ** DE
 
+high <- c(
+  "P4",
+  "P34",
+  "P80",
+  "P20_2",
+  "P70",
+  "P32",
+  "P20",
+  "P12-3",
+  "P18-1",
+  "P31",
+  "P50",
+  "P12-1",
+  "PHcase_3",
+  "PHcase_22"
+)
+
+low <- c(
+  "P40",
+  "PHcase_13",
+  "PHcase_16",
+  "P14-1",
+  "P45",
+  "P24",
+  "PHcase_15",
+  "PHcase_9",
+  "PHcase_14",
+  "P50",
+  "P73",
+  "P79",
+  "P78"
+)
+
 obs <- left_join(
   tibble(sample = colnames(counts)),
   pyrvinium,
@@ -127,15 +160,28 @@ obs <- left_join(
 ) |>
   filter(!is.na(IC80)) |>
   mutate(across(starts_with("IC"), as.double)) |>
-  filter(IC80 > 0)
-
+  filter(IC80 > 0) |>
+  mutate(
+    category = case_when(
+      sample %in% high ~ "high",
+      sample %in% low ~ "low",
+      .default = NA
+    ),
+    category = factor(category, levels = c("low", "high"))
+  )
 
 dds <- DESeqDataSetFromMatrix(
-  countData = counts[, obs$sample],
-  colData = column_to_rownames(obs, "sample"),
-  design = ~ 0 + cohort + scale(log(IC80))
+  # New design
+  countData = counts[, obs[!is.na(obs$category), ]$sample],
+  colData = column_to_rownames(obs[!is.na(obs$category), ], "sample"),
+  design = ~ 0 + cohort + category
 )
-dds <- dds[rowSums(counts >= 10) >= 5, ]
+## dds <- DESeqDataSetFromMatrix(
+##   countData = counts[, obs$sample],
+##   colData = column_to_rownames(obs, "sample"),
+##   design = ~ 0 + cohort + scale(log(IC80))
+## )
+dds <- dds[rowSums(counts >= 10) >= 3, ]
 dds <- DESeq(dds)
 
 # Important to note that non-PHcase samples were prepared with
@@ -143,7 +189,8 @@ dds <- DESeq(dds)
 
 # Fold-change of the covariate is the per-unit increase in the covariate
 ic80_res <- results(dds)
-ic80_res <- ic80_res[ic80_res$padj <= 0.05, ] |> as.data.frame()
+ic80_res <- ic80_res[replace_na(ic80_res$padj <= 0.05, FALSE), ] |>
+  as.data.frame()
 
 ic80_res |>
   rownames_to_column(var = "symbol") |>
@@ -236,7 +283,8 @@ ggsave(
   dpi = 500
 )
 
-ic80_heatmap <- as.data.frame(assay(vsd)[rownames(ic80_res), ]) |>
+
+into_heatmap <- as.data.frame(assay(vsd)[rownames(ic80_res), ]) |>
   `colnames<-`(colnames(vsd)) |>
   rownames_to_column(var = "gene") |>
   as_tibble() |>
@@ -245,22 +293,57 @@ ic80_heatmap <- as.data.frame(assay(vsd)[rownames(ic80_res), ]) |>
   inner_join(
     rownames_to_column(as.data.frame(colData(vsd)), "sample"),
     by = join_by(sample)
-  ) |>
-  ggplot(
-    aes(
-      x = cut(log(IC80), breaks = 10),
-      y = factor(gene, levels = names(enrich_list)),
-      fill = expr
-    )
-  ) +
-  geom_tile(width = 0.98) +
-  theme_minimal() +
-  scale_fill_paletteer_c("grDevices::Sunset") +
-  guides(fill = guide_legend("Normalized expression")) +
-  xlab("Binned log(IC80)") +
-  ylab("Gene")
+  )
+
+add_theming <- function(plot) {
+  plot +
+    geom_tile(width = 0.98) +
+    theme_minimal() +
+    scale_fill_paletteer_c("grDevices::Sunset") +
+    guides(fill = guide_legend("Normalized expression")) +
+    ylab("Gene")
+}
+
+cat_box <- ggplot(
+  mutate(
+    into_heatmap,
+    gene = paste0(gene, " (", round(log2FoldChange, 4), ")")
+  ),
+  aes(
+    x = factor(category, levels = c("low", "high")),
+    color = factor(category, levels = c("low", "high")),
+    y = expr
+  )
+) +
+  geom_boxplot() +
+  geom_jitter() +
+  facet_wrap(~gene, nrow = 2) +
+  xlab("IC80 Pyrvinium grouping") +
+  ylab("Normalized expression") +
+  guides(color = "none") +
+  labs(
+    title = "DE genes",
+    subtitle = "Values in parentheses denote log2FoldChange in shifting from low to high groups"
+  )
 ggsave(
-  plot = ic80_heatmap,
+  plot = cat_box,
+  filename = here(workdir, "ic80_box.pdf"),
+  height = 10,
+  width = 12
+)
+
+
+binned_heatmap <- ggplot(
+  into_heatmap,
+  aes(
+    x = cut(log(IC80), breaks = 10),
+    y = factor(gene, levels = names(enrich_list)),
+    fill = expr
+  )
+) +
+  xlab("Binned log(IC80)") |> add_theming()
+ggsave(
+  plot = binned_heatmap,
   filename = here(workdir, "ic80_heatmap.pdf"),
   height = 10,
   width = 15
