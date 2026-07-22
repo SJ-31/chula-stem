@@ -53,21 +53,35 @@ variant_filters <- list(
   CLIN_SIG = config$accepted_significance
 )
 
-filter_specific_symbols <- function(annotations, symbols, spec, split = NULL) {
+filter_specific_symbols <- function(
+  annotations,
+  symbols,
+  spec,
+  defaults,
+  split = NULL
+) {
   map2_lgl(annotations, symbols, \(x, y) {
+    if (is.na(x)) {
+      in_defaults <- FALSE
+    } else if (!is.null(split)) {
+      in_defaults <- length(intersect(str_split_1(x, split), defaults)) >= 1
+    } else {
+      in_defaults <- x %in% defaults
+    }
+
     if (is.null(spec$symbols)) {
-      FALSE
+      in_defaults
     } else if (y %in% names(spec$symbols)) {
       vals <- spec$symbols[[y]]
       if (is.null(vals)) {
         TRUE
-      } else if (!is.null(split)) {
+      } else if (!is.null(split) && !is.na(x)) {
         length(intersect(str_split_1(x, split), vals)) >= 1
       } else {
         x %in% vals
       }
     } else {
-      FALSE
+      in_defaults
     }
   })
 }
@@ -177,26 +191,24 @@ for (filter_name in names(variant_filters)) {
     if (filter_name == "Consequence") {
       combined_vep <- filter(
         combined_vep,
-        !!as.symbol(filter_name) %in% defaults |
-          filter_specific_symbols(!!as.symbol(filter_name), SYMBOL, accepted)
+        filter_specific_symbols(
+          !!as.symbol(filter_name),
+          SYMBOL,
+          accepted,
+          defaults = defaults
+        )
       )
       tmb_merged <- filter(tmb_merged, key %in% defaults)
     } else {
       combined_vep <- filter(
         combined_vep,
-        map_lgl(!!as.symbol(filter_name), \(val) {
-          if (!is.na(val)) {
-            length(intersect(str_split_1(val, "&"), defaults)) >= 1
-          } else {
-            FALSE
-          }
-        }) |
-          filter_specific_symbols(
-            !!as.symbol(filter_name),
-            SYMBOL,
-            accepted,
-            split = "&"
-          )
+        filter_specific_symbols(
+          !!as.symbol(filter_name),
+          SYMBOL,
+          accepted,
+          split = "&",
+          defaults = defaults
+        )
       )
     }
   }
