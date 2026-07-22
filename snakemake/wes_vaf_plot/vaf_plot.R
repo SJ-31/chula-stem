@@ -26,6 +26,10 @@ suppressMessages({
 
 print(glue("Available samples: {paste0(samples, collapse = ',')}"))
 
+null_or_t <- function(x) {
+  is.null(x) || x
+}
+
 if (!is.null(config$custom_sample_file)) {
   custom_samples <- read_tsv(config$custom_sample_file)
   samples_with_wes <- c(samples_with_wes, unique(custom_samples$subject))
@@ -611,27 +615,96 @@ to_arrange <- list(
 if (!is.null(label_plot)) {
   to_arrange[[2]] <- r1 +
     theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-  guide_area <- guide_area()
-  label_plot <- label_plot + xlab("Sample")
+  guide_area <- guide_area() # 8
+  label_plot <- label_plot + xlab("Sample") # 7
   to_arrange <- c(to_arrange, label_plot, guide_area)
-  design <- "
+  if (null_or_t(config$plot$with_sbs) && null_or_t(config$plot$with_sbs)) {
+    design <- "
 #1##
 8233
 87##
 846#
 85##
 "
-  heights <- c(3, 12, 3, 3, 5)
-  widths <- c(2, 10, 0.3, 4)
+    heights <- c(3, 12, 3, 3, 5)
+    widths <- c(2, 10, 0.3, 4)
+  } else if (
+    !null_or_t(config$plot$with_sbs) && null_or_t(config$plot$with_sbs)
+  ) {
+    design <- "
+#1##
+8233
+87##
+85##
+"
+    heights <- c(3, 12, 3, 5)
+    widths <- c(2, 10, 0.3, 4)
+  } else if (
+    (null_or_t(config$plot$with_sbs) && !null_or_t(config$plot$with_sbs))
+  ) {
+    design <- "
+8233
+87##
+846#
+85##
+"
+    heights <- c(12, 3, 3, 5)
+    widths <- c(2, 10, 0.3, 4)
+  } else {
+    # TODO: need to do this for all the other cases...
+    to_arrange <- list(
+      to_arrange[[2]], # 1
+      to_arrange[[3]], # 2
+      to_arrange[[5]], # 3
+      to_arrange[[7]], # 4
+      to_arrange[[8]] # 5
+    )
+    design <- "
+5122
+54##
+53##
+"
+    heights <- c(12, 3, 5)
+    widths <- c(2, 10, 0.3, 4)
+  }
 } else {
-  design <- "
+  if (null_or_t(config$plot$with_sbs) && null_or_t(config$plot$with_tmb)) {
+    design <- "
 1##
 233
 46#
 5##
 "
-  widths <- c(10, 0.3, 4)
-  heights <- c(3, 10, 3, 5)
+    heights <- c(3, 10, 3, 5)
+    widths <- c(10, 0.3, 4)
+  } else if (
+    !null_or_t(config$plot$with_sbs) && null_or_t(config$plot$with_tmb)
+  ) {
+    design <- "
+1##
+233
+5##
+"
+    heights <- c(3, 10, 5)
+    widths <- c(10, 0.3, 4)
+  } else if (
+    null_or_t(config$plot$with_sbs) && !null_or_t(config$plot$with_tmb)
+  ) {
+    design <- "
+233
+46#
+5##
+"
+    heights <- c(10, 3, 5)
+    widths <- c(10, 0.3, 4)
+  } else {
+    design <- "
+233
+5##
+"
+    heights <- c(10, 5)
+    widths <- c(10, 0.3, 4)
+  }
 }
 
 final_rep <- wrap_plots(

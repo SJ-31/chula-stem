@@ -21,22 +21,22 @@ custom_sample_file: ?f"{proj_root}/analyses/pdac/snakemake/custom_samples.tsv"
 # Consequence, SYMBOL, HGVSc, and HGVSp
 
 sample_spec:
-  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
-    root: ?f"{data_root}/output/PDAC" # Root path of wes results
-    cohort: "cohort"
-  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_prev.csv"
-    root: ?f"{data_root}/output/PDAC" # Root path of wes results
-    cohort: "prev_cohort"
+  # - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
+  #   root: ?f"{data_root}/output/PDAC" # Root path of wes results
+  #   cohort: "cohort"
+  # - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_prev.csv"
+  #   root: ?f"{data_root}/output/PDAC" # Root path of wes results
+  #   cohort: "prev_cohort"
   - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_phcase1.csv"
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
     ignore:
       # - PHcase_12
       # - PHcase_15
-      # - PHcase_1
-      # - PHcase_4
       # - PHcase_2
       # The below aren't pdac
+      - PHcase_1 # no tissue confirmed
+      - PHcase_4 # no tissue confirmed
       - PHcase_8 # Breast
       - PHcase_11 # Breast
       - PHcase_18 # Sarcoma
@@ -58,6 +58,8 @@ plot:
   dpi: 500
   width: 20
   height: 10
+  with_sbs: False
+  with_tmb: False
 
 only_curated: False # Only allow named variants, regardless of type
 
@@ -106,6 +108,18 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
     - "inframe_deletion"
     - "splice_donor_5th_base_variant"
     - "NMD_transcript_variant"
+  symbols:
+    SMAD4:
+      - "missense_variant"
+      - "frameshift_variant"
+      - "downstream_gene_variant"
+      - "upstream_gene_variant"
+      - "3_prime_UTR_variant"
+      - "stop_gained"
+      - "splice_region_variant"
+      - "inframe_deletion"
+      - "splice_donor_5th_base_variant"
+      - "NMD_transcript_variant"
 
 individual_gene_plots:
   wanted: ["TP53", "KRAS", "SMAD4", "CDKN2A"]

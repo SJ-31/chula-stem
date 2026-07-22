@@ -50,6 +50,8 @@ plot:
   dpi: 500
   width: 15
   height: 10
+  with_sbs: False # Include SBS plot below sample names (default: true)
+  with_tmb: True # Include tmb plot above heatmap (default: true)
 
 alignment_plot:
   reference_genome: "/data/project/stemcell/shannc/reference/genomes/GRCh38.p14_filtered.fasta" # Path to reference genome fasta file
@@ -68,23 +70,27 @@ only_curated: False # Only allow named variants, regardless of type
 
 accepted_significance: # Only variants with the following ClinVar clinical significance codes
   # If null, allow all variants regardless of clinical significance
-  - uncertain_significance
-  - likely_pathogenic
+  defaults:
+    - uncertain_significance
+    - likely_pathogenic
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
   # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
-  - "missense_variant"
-  - "frameshift_variant"
-  - "downstream_gene_variant"
-  - "upstream_gene_variant"
-  - "intron_variant"
-  - "3_prime_UTR_variant"
-  - "stop_gained"
-  - "splice_region_variant"
-  - "inframe_deletion"
-  - "splice_donor_5th_base_variant"
-  - "NMD_transcript_variant"
+  defaults:
+    - "missense_variant"
+    - "frameshift_variant"
+    - "downstream_gene_variant"
+    - "upstream_gene_variant"
+    - "intron_variant"
+    - "3_prime_UTR_variant"
+    - "stop_gained"
+    - "splice_region_variant"
+    - "inframe_deletion"
+    - "splice_donor_5th_base_variant"
+    - "NMD_transcript_variant"
+  symbols:
+    KRAS: # Symbol-specific filters
 
 wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   TP53: "17:7661779-7687546"
