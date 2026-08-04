@@ -59,12 +59,29 @@ def get_markers():  # Use only cellmarker 3.0 markers from experimental
     # evidence
     marker_df = pd.read_csv(here("analyses", "data", "human_cell_marker.txt"), sep="\t")
     marker_df = marker_df.loc[~marker_df["symbol"].isna(), :]
-    marker_df = marker_df.loc[marker_df["marker_source"] == "Experiment", :]
     marker_df = marker_df.loc[marker_df["tissue_type"] == "Liver", :]
     marker_df = marker_df.loc[marker_df["tissue_class"] == "Liver", :]
-    marker_df = marker_df.loc[marker_df["disease"] == "Normal", :]
+    cells_experimental = [
+        "Mesenchymal cell",
+        "Hepatic progenitor cell",
+        "Endothelial cell",
+        "Kupffer cell",
+        "Cholangiocyte",
+        "Natural killer cell",
+        "T cell",
+        "B cell",
+    ]
+    cells_review = ["Hepatocyte"]
+    query_str = "(marker_source == 'Review' and cell_name in @cells_review) or (marker_source == 'Experiment' and cell_name in @cells_experimental)"
+    query_str = (
+        query_str
+        + " or (cell_name == 'Liver sinusoidal endothelial cell' and marker_source != 'Method')"
+        + " or (cell_name == 'Stellate cell' and marker_source != 'Method')"
+    )
+    marker_df = marker_df.query(query_str)
     counts = marker_df["cell_name"].value_counts()
     marker_df = marker_df.loc[marker_df["cell_name"].isin(counts[counts > 5].index), :]
+    # marker_df = marker_df.replace({"cell_name": {"Hepatic cell": "Hepatocyte"}})
     return (
         marker_df.loc[:, ["cell_name", "symbol"]]
         .rename({"cell_name": "cell", "symbol": "gene"}, axis=1)
@@ -73,6 +90,10 @@ def get_markers():  # Use only cellmarker 3.0 markers from experimental
         .astype(int)
     )
 
+
+# [2026-07-08 Wed] investigating the overlap between cell labels and their gene sets
+#
+# of_interest = marker_df.query("cell_name in ['Hepatic cell', 'Hepatocyte', 'Mesenchymal cell', 'Neutrophil', 'Hepatic progenitor cell'] ")
 
 # * Data import
 
@@ -320,15 +341,21 @@ def combine_all(f):
     sc.pp.highly_variable_genes(combined, n_top_genes=5000, flavor="seurat_v3")
     lib_size = combined.X.sum(1)
     combined.obs["size_factor"] = lib_size / np.mean(lib_size)
+    marker_df: pd.DataFrame = get_markers()
+    marker_df.reset_index().to_csv(outdir / "cellassign_markers.csv", index=False)
     cellassign_results = cell_assign_wrapper(
         combined,
-        cell_markers=get_markers(),
+        cell_markers=marker_df,
         model_path=outdir / "cellassign",
         size_factor_key="size_factor",
+    )
+    cellassign_results["pred"].reset_index().to_csv(
+        outdir / "cellassign_results.csv", index=False
     )
     combined.obs = combined.obs.merge(
         cellassign_results["pred"]["PREDICTION"], left_index=True, right_index=True
     ).rename({"PREDICTION": "cellassign_prediction"})
+    combined.obsm["cellassign"] = cellassign_results["pred"]
     if not (outdir / "cellassign").exists():
         cellassign_results["model"].save(outdir / "cellassign")
     combined = combined[

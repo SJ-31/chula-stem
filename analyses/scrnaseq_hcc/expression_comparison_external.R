@@ -170,23 +170,26 @@ wanted_genes <- list(
     "AFP"
   ), # Alpha-fetoprotein
   edgeR_DE = c(
-    # Genes DE with edgeR
-    "SDF2L1",
-    "NUDT14",
-    "SCAND1",
-    "MRPL55",
-    "RPL28",
-    "C4orf48",
-    "HCFC1R1",
-    "ABHD17A",
+    "H1F0",
+    "DARS",
     "GRINA",
-    "MEA1"
+    "MARCH6",
+    "IMPAD1",
+    "TARS",
+    "SDF2L1",
+    "CASC4",
+    "TTC37",
+    "FAM126A"
   ),
   scVI_DE = c(
-    "GAL",
-    "TAGLN",
-    "MYL9",
-    "RFLNB"
+    "PAGE2B",
+    "CRYAB",
+    "NKX2-3",
+    "PGM5-AS1",
+    "MYOD1",
+    "HAND1",
+    "PRPH",
+    "ANKRD65"
   )
 )
 

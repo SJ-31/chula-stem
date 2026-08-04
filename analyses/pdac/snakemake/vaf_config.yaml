@@ -31,17 +31,18 @@ sample_spec:
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
     ignore:
+      []
       # - PHcase_12
       # - PHcase_15
       # - PHcase_2
       # The below aren't pdac
-      - PHcase_1 # no tissue confirmed
-      - PHcase_4 # no tissue confirmed
-      - PHcase_8 # Breast
-      - PHcase_11 # Breast
-      - PHcase_18 # Sarcoma
-      - PHcase_19 # Kidney
-      - PHcase_21 # Colorectal
+      # - PHcase_1 # no tissue confirmed
+      # - PHcase_4 # no tissue confirmed
+      # - PHcase_8 # Breast
+      # - PHcase_11 # Breast
+      # - PHcase_18 # Sarcoma
+      # - PHcase_19 # Kidney
+      # - PHcase_21 # Colorectal
 
 manifest:
 src: # source directories
@@ -92,6 +93,8 @@ accepted_significance:
     - risk_factor
   symbols: # symbol-specific filters. Leave null for no filtering
     SMAD4:
+    UGT1A1:
+    DPYD:
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
   # follows naming convention for variant consequences used by VEP
@@ -109,6 +112,8 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
     - "splice_donor_5th_base_variant"
     - "NMD_transcript_variant"
   symbols:
+    DPYD:
+    UGT1A1:
     SMAD4:
       - "missense_variant"
       - "frameshift_variant"
@@ -154,6 +159,14 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   CDKN2A: "9:21967752-21995301"
   RNF43: "17:58353676-58417735"
   EGFR: "7:55018820-55211628"
+
+  # [2026-07-23 Thu] New targets
+  DPYD: "1:97077743-97995000"
+  # Specifically DPYD variants Cys29Arg
+  UGT1A1: "2:233760270-233773300"
+  EXO1: "1:241847967-241889939"
+  XRCC1: "19:43543311-43580473"
+  DCLRE1A: "10:113834725-113854383"
 
   # Genes from the reports
   FOXA1: "14:37589552-37596059"
