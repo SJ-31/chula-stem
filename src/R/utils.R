@@ -4,6 +4,57 @@ read_with_filename <- function(x, col = "filename") {
   read_tsv(x) |> mutate(!!col := basename(x))
 }
 
+#' Helper function to swap gene ids in count data with a different
+#' scheme
+#'
+#' @param counts tibble/data frame of count data
+#' @param id_mapping tibble mapping old names to new names
+#' @param counts_join column in `counts` containing old names
+#' @param target column in `id_mapping` containing new names
+#' @param mapping_join column in `id_mapping` containing old names
+#' set to `counts_join` by default
+swap_ids <- function(
+  counts,
+  id_mapping,
+  counts_join,
+  target,
+  mapping_join = NULL
+) {
+  if (is.null(mapping_join)) {
+    mapping_join <- counts_join
+  }
+  id_mapping <- id_mapping[, c(mapping_join, target)] |>
+    dplyr::rename(!!as.symbol(counts_join) := mapping_join)
+  dplyr::inner_join(
+    counts,
+    id_mapping,
+    by = dplyr::join_by(!!as.symbol(counts_join))
+  ) |>
+    dplyr::filter(!is.na(!!as.symbol(target))) |>
+    dplyr::distinct(!!as.symbol(target), .keep_all = TRUE) |>
+    dplyr::select(-all_of(counts_join)) |>
+    tibble::column_to_rownames(var = target)
+}
+
+
+#' Use ALR to normalize counts of `target` by counts of `ref_genes`
+#'
+#' @param target gene to normalize
+#' @param ref_genes vector of genes to use for normalization e.g.
+#' housekeeping genes
+#'
+alr_normalize <- function(obj, target, ref_genes) {
+  lapply(ref_genes, \(hk) {
+    normalized <- log(assay(obj)[target, ] / assay(obj)[hk, ])
+    tibble::tibble(
+      sample = names(normalized),
+      n_expr = unlist(normalized),
+      reference = hk
+    )
+  }) |>
+    dplyr::bind_rows()
+}
+
 t2tb <- function(x, names = "rowname") {
   t(x) |>
     as.data.frame() |>

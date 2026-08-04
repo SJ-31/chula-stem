@@ -8,7 +8,10 @@ suppressMessages({
   library(patchwork)
   library(org.Hs.eg.db)
   options(box.path = here("src"))
-  suppressWarnings(box::use(R / utils[read_existing], dplyr[select, filter]))
+  suppressWarnings(box::use(
+    R / utils[read_existing, alr_normalize],
+    dplyr[select, filter]
+  ))
   set.seed(240)
 })
 
@@ -375,22 +378,9 @@ lapply(rownames(ic80_res), \(gene) {
 housekeeping <- c("MLF2", "SF3B1", "GNB1", "CTBP1", "MYH9")
 # Took the top 5 genes in pancreas from HRT atlas, sorting by lowest STD
 
-normalize_housekeeping <- function(obj, target, housekeeping) {
-  lapply(housekeeping, \(hk) {
-    normalized <- log(assay(obj)[target, ], assay(obj)[hk, ])
-    tibble(
-      sample = names(normalized),
-      n_expr = normalized,
-      housekeeping = hk
-    ) |>
-      mutate(rank = rank(-n_expr))
-  }) |>
-    bind_rows()
-}
-
 h2 <- c("FOXH1", "TMEM269", "CD2BP2", "KRT8P33", "RHOQP1", "FREY1")
 
-gata6_hk_plot <- normalize_housekeeping(
+gata6_hk_plot <- alr_normalize(
   dds[, str_detect(colnames(dds), "PHcase")],
   housekeeping = housekeeping,
   target = "GATA6"
