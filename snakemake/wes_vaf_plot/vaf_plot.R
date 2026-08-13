@@ -47,6 +47,16 @@ if (!is.null(config$custom_sample_file)) {
     )
   )
   combined_vep <- bind_rows(combined_vep, custom_samples)
+} else {
+  custom_samples <- tibble(
+    subject = NA_character_,
+    Consequence = NA_character_,
+    SYMBOL = NA_character_,
+    HGVSc = NA_character_,
+    HGVSp = NA_character_,
+    HGVSg = NA_character_,
+    CLIN_SIG = NA_character_
+  )
 }
 
 with_no_data <- c()
@@ -267,7 +277,7 @@ if (!is.null(label_spec)) {
       new_samples <- tb |>
         pluck("sample") |>
         discard(\(s) s %in% samples)
-      tb <- bind_rows(tb, tibble(sample = others, label = NA))
+      tb <- bind_rows(tb, tibble(sample = others, label = NA_character_))
       if (add_missing) {
         samples <<- unique(c(samples, new_samples))
         with_no_data <<- unique(c(with_no_data, new_samples))
