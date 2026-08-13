@@ -210,8 +210,10 @@ class MoffittBasal:
     ):
         # Was CTSL2 in the original paper
         self.adata = adata
-        ctsl = "CTSL" if "CTSL" in adata.var_names else "CTSL2"
-        self.genes = pd.Index(adata.var[gene_col]) if gene_col else adata.var_names
+        self.genes = (
+            pd.Index(adata.var[gene_col].values) if gene_col else adata.var_names
+        )
+        ctsl = "CTSL" if "CTSL" in self.genes else "CTSL2"
         data = {
             "A": [
                 "CD109",
