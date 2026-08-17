@@ -870,3 +870,111 @@ CA
     dplot
   }
 }
+
+do_expr_plot <- function(
+  expr,
+  meta,
+  genes,
+  cfg,
+  labels_to_add
+) {
+  box::use(
+    ggplot2[aes, theme, element_blank, geom_tile, ggplot],
+    paletteer[scale_color_paletteer_c],
+    dplyr[filter]
+  )
+  checkmate::assert_list(cfg)
+  labels_to_add <- c(
+    "Cohort" = "cohort",
+    "Tumor type" = "tumor_type",
+    "Treatment" = "treatment",
+    "Patient" = "patient"
+  )
+  long <- expr |>
+    filter(gene_id %in% genes) |>
+    tidyr::pivot_longer(-gene_id, names_to = "sample") |>
+    dplyr::left_join(meta, by = dplyr::join_by(sample))
+
+  # Get greatest number of factors before filtering
+  n_labels_per <- lapply(labels_to_add, \(x) length(unique(long[[x]]))) |>
+    `names<-`(labels_to_add)
+
+  expr_palette <- cfg$expression %||% "ggthemes::Red-Gold"
+
+  top_theming <- theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank()
+  )
+  bot_theming <- theme(
+    axis.text.x = ggplot2::element_text(angle = 90, hjust = 1),
+    axis.title.x = ggplot2::element_text(size = 15)
+  )
+
+  if (length(genes) >= 2) {
+    expr_plot <- ggplot(
+      long,
+      aes(x = sample, y = gene_id, fill = value)
+    ) +
+      geom_tile(width = 0.90) +
+      theme(panel.grid = element_blank()) +
+      paletteer::scale_fill_paletteer_c(expr_palette) +
+      ggplot2::guides(fill = ggplot2::guide_legend("Normalized expression")) +
+      ggplot2::ylab("Gene")
+  } else {
+    expr_plot <- ggplot(long, aes(x = sample, y = value)) +
+      ggplot2::geom_bar(stat = "identity") +
+      ggplot2::ylab("Normalized expression")
+  }
+
+  plot_list <- list(expr_plot)
+
+  for (i in seq_along(labels_to_add)) {
+    label_col <- labels_to_add[i]
+    legend_display <- names(labels_to_add[i])
+    n_labels <- n_labels_per[[label_col]]
+    if (n_labels > 1) {
+      plot_list[[length(plot_list) + 1]] <- ggplot(
+        meta,
+        aes(x = sample, fill = !!as.symbol(label_col), y = "1")
+      )
+    }
+  }
+
+  nrows <- length(plot_list)
+  for (j in seq_along(plot_list)) {
+    plot <- plot_list[[j]]
+    if (j == length(plot_list)) {
+      plot_list[[j]] <- plot + bot_theming + ggplot2::xlab("Sample")
+    } else {
+      plot_list[[j]] <- plot + top_theming
+    }
+  }
+
+  heights <- local({
+    b <- rep(0.05, nrows - 1)
+    c(1 - sum(b), b)
+  })
+
+  patchwork::wrap_plots(
+    plot_list,
+    nrow = nrows,
+    heights = heights,
+    guides = "collect"
+  )
+}
+
+counts_violin <- function(obj, transform = "vst", ...) {
+  if (!inherits(obj, "DESeqTransform") && transform == "vst") {
+    obj <- vst(obj, ...)
+  } else if (!inherits(obj, "DESeqTransform")) {
+    obj <- rlog(obj, ...)
+  }
+  long <- assay(obj) |>
+    as.data.frame() |>
+    tidyr::pivot_longer(dplyr::everything(), names_to = "sample")
+  long <- merge(long, colData(obj), by.x = "sample", by.y = "row.names")
+  long |>
+    ggplot2::ggplot(ggplot2::aes(x = sample, y = value)) +
+    ggplot2::geom_violin()
+}
