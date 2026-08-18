@@ -964,7 +964,7 @@ do_expr_plot <- function(
   )
 }
 
-counts_violin <- function(obj, transform = "vst", ...) {
+counts_violin <- function(obj, transform = "vst", fill = NULL, ...) {
   if (!inherits(obj, "DESeqTransform") && transform == "vst") {
     obj <- vst(obj, ...)
   } else if (!inherits(obj, "DESeqTransform")) {
@@ -974,7 +974,35 @@ counts_violin <- function(obj, transform = "vst", ...) {
     as.data.frame() |>
     tidyr::pivot_longer(dplyr::everything(), names_to = "sample")
   long <- merge(long, colData(obj), by.x = "sample", by.y = "row.names")
-  long |>
-    ggplot2::ggplot(ggplot2::aes(x = sample, y = value)) +
-    ggplot2::geom_violin()
+  if (is.null(fill)) {
+    long |>
+      ggplot2::ggplot(ggplot2::aes(x = sample, y = value)) +
+      ggplot2::geom_violin()
+  } else {
+    long |>
+      ggplot2::ggplot(ggplot2::aes(
+        x = sample,
+        y = value,
+        fill = !!as.symbol(fill)
+      )) +
+      ggplot2::geom_violin()
+  }
+}
+
+volcano_plot <- function(
+  df,
+  p_col = "padj",
+  lfc_col = "log2FoldChange",
+  threshold = 0.05
+) {
+  df$significant <- df[[p_col]] <= threshold
+  ggplot(
+    df,
+    aes(
+      y = -log10(!!as.symbol(p_col)),
+      x = !!as.symbol(lfc_col),
+      color = significant
+    )
+  ) +
+    geom_point()
 }
