@@ -47,9 +47,9 @@ prcomp_wrapper <- function(obj, ntop = 500) {
 
 ## [2026-08-18 Tue] 'status' to check kras status,
 ## 'cluster' to check the weird clusterings
-design_variable <- "status"
+## design_variable <- "status"
 ## design_variable <- "random"
-## design_variable <- "cluster"
+design_variable <- "cluster"
 wanted_var_cols <- c("GENENAME", "GENEBIOTYPE")
 workdir <- here("analyses", "pdac_subtyping")
 rdir <- here(workdir, paste0("de_", design_variable))
@@ -217,9 +217,10 @@ biotype_counts <- ggplot(
   facet_wrap(~GENEBIOTYPE, scales = "free_y", ncol = 4) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90)) +
-  guides(fill = "none")
+  guides(fill = "none") +
+  ggtitle(paste("Grouping variable: ", design_variable))
 ggsave(
-  here(rdir, "biotype_counts.pdf"),
+  here(rdir, "biotype_counts.png"),
   biotype_counts,
   width = 10,
   height = 15
