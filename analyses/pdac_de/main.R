@@ -4,6 +4,7 @@ suppressMessages({
   library(tidyverse)
   library(here)
   library(glue)
+  library(pheatmap)
   library(paletteer)
   library(patchwork)
   library(org.Hs.eg.db)
@@ -226,6 +227,7 @@ if (!args$regress) {
         )
       )
     levels <- c("normal", "outlier_low", "outlier_high")
+    obs$category <- factor(obs$category, levels = levels)
 
     outlier_plot <- ggplot(obs, aes(x = (!!as.symbol(args$variable)))) +
       geom_histogram() +
@@ -245,16 +247,15 @@ if (!args$regress) {
   }
 
   dds <- DESeqDataSetFromMatrix(
-    # New design
     countData = counts[, obs[!is.na(obs$category), ]$sample],
     colData = column_to_rownames(obs[!is.na(obs$category), ], "sample"),
-    design = ~ 0 + cohort + category
+    design = ~ cohort + category
   )
 } else {
   dds <- DESeqDataSetFromMatrix(
     countData = counts[, obs$sample],
     colData = column_to_rownames(obs, "sample"),
-    design = as.formula(glue("~ 0 + cohort + scale(log({args$variable}))"))
+    design = as.formula(glue("~ cohort + scale(log({args$variable}))"))
   )
 }
 
@@ -266,6 +267,12 @@ dds <- DESeq(dds)
 
 # Fold-change of the covariate is the per-unit increase in the covariate
 res <- results(dds)
+res <- lfcShrink(
+  dds,
+  coef = tail(resultsNames(dds), n = 1),
+  res = res,
+  type = "apeglm"
+)
 res <- res[replace_na(res$padj <= 0.05, FALSE), ] |>
   as.data.frame()
 
@@ -378,6 +385,7 @@ into_heatmap <- as.data.frame(assay(vsd)[rownames(res), ]) |>
     by = join_by(sample)
   )
 
+
 add_theming <- function(plot) {
   plot +
     geom_tile(width = 0.98) +
@@ -394,20 +402,20 @@ if (!args$regress) {
       gene = paste0(gene, " (", round(log2FoldChange, 4), ")")
     ),
     aes(
-      x = factor(category, levels = normal),
-      color = factor(category, levels = normal),
+      x = factor(category, levels = levels),
+      color = factor(category, levels = levels),
       y = expr
     )
   ) +
     geom_boxplot() +
     geom_jitter() +
-    facet_wrap(~gene, nrow = 2) +
+    facet_wrap(~gene, scales = "free_y") +
     xlab(paste0(args$variable, args$drug_name, "grouping")) +
     ylab("Normalized expression") +
     guides(color = "none") +
     labs(
       title = "DE genes",
-      subtitle = "Values in parentheses denote log2FoldChange in shifting from low to high groups"
+      subtitle = "Values in parentheses denote log2FoldChange"
     )
 
   ggsave(
@@ -416,6 +424,29 @@ if (!args$regress) {
     height = 10,
     width = 12
   )
+
+  col_order <- colData(vsd) |>
+    as.data.frame() |>
+    select(category) |>
+    arrange(category) |>
+    rownames()
+  row_order <- res |>
+    arrange(abs(log2FoldChange)) |>
+    rownames()
+
+  pdf(here(results_dir, "heatmap.pdf"), width = 10, height = 12)
+  pheatmap(
+    as.data.frame(assay(vsd)[row_order, col_order]),
+    cluster_cols = FALSE,
+    cluster_rows = FALSE,
+    annotation_row = res |> select(log2FoldChange, lfcSE, padj),
+    annotation_col = colData(vsd) |>
+      as.data.frame() |>
+      select(category, cohort)
+  )
+  dev.off()
+
+  #
 } else {
   binned_heatmap <- ggplot(
     into_heatmap,
