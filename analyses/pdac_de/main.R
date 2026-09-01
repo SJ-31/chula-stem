@@ -27,7 +27,6 @@ reactome <- read_csv(
 
 if (sys.nframe() == 0 && !interactive()) {
   library("optparse")
-  print("hello")
   parser <- OptionParser()
   parser <- add_option(
     parser,
@@ -48,13 +47,14 @@ if (sys.nframe() == 0 && !interactive()) {
     c("-g", "--group_comparison"),
     type = "character",
     help = "Method of determining groups for comparison",
-    default = NULL
+    default = "mad_outlier"
   )
   parser <- add_option(
     parser,
     c("-r", "--regress"),
     type = "logical",
-    help = "Regress on dependent variable instead use groupings"
+    help = "Regress on dependent variable instead use groupings",
+    default = FALSE
   )
   args <- parse_args(parser)
 } else {
@@ -207,8 +207,6 @@ obs <- left_join(
   mutate(across(starts_with("IC"), as.double)) |>
   filter(!!as.symbol(args$variable) > 0)
 
-ggplot(obs, aes(x = IC80)) +
-  geom_histogram(bins = 50)
 
 if (!args$regress) {
   if (args$group_comparison == "mad_outlier") {
@@ -293,9 +291,13 @@ gse_res <- gseGO(
   ont = "ALL"
 )
 
-gse_res |>
+gse_res <- gse_res |>
   as.data.frame() |>
+  filter(p.adjust <= 0.05)
+
+if (nrow(gse_res) > 0) {
   write_csv(here(results_dir, "gse.csv"))
+}
 
 res_list <- list(
   downreg = res[res$log2FoldChange < 0, ],
@@ -373,6 +375,8 @@ ggsave(
   dpi = 500
 )
 
+# After shrinking LFCs might not be worth investigating any more
+res <- res |> filter(abs(log2FoldChange) >= 0.1)
 
 into_heatmap <- as.data.frame(assay(vsd)[rownames(res), ]) |>
   `colnames<-`(colnames(vsd)) |>
@@ -420,7 +424,7 @@ if (!args$regress) {
 
   ggsave(
     plot = cat_box,
-    filename = here(results_dir, glue("{args$variable}_box.pdf")),
+    filename = here(results_dir, "box_plot.pdf"),
     height = 10,
     width = 12
   )
@@ -434,7 +438,6 @@ if (!args$regress) {
     arrange(abs(log2FoldChange)) |>
     rownames()
 
-  pdf(here(results_dir, "heatmap.pdf"), width = 10, height = 12)
   pheatmap(
     as.data.frame(assay(vsd)[row_order, col_order]),
     cluster_cols = FALSE,
@@ -442,9 +445,11 @@ if (!args$regress) {
     annotation_row = res |> select(log2FoldChange, lfcSE, padj),
     annotation_col = colData(vsd) |>
       as.data.frame() |>
-      select(category, cohort)
+      select(category, cohort),
+    filename = here(results_dir, "heatmap.png"),
+    width = 10,
+    height = 12
   )
-  dev.off()
 
   #
 } else {
