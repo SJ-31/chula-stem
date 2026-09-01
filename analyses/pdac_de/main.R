@@ -15,10 +15,6 @@ suppressMessages({
   set.seed(240)
 })
 
-
-workdir <- here("analyses", "pdac_de")
-data <- here("analyses", "data_all")
-
 hallmark <- read_csv(
   here("analyses", "data", "hallmark2symbol.csv"),
   col_names = c("term", "symbol")
@@ -28,7 +24,31 @@ reactome <- read_csv(
   col_names = c("term", "symbol")
 )
 
-## tx2gene <- read_tsv(here("analyses", "data", "tx2gene.tsv"))
+if (sys.nframe() == 0) {
+  library("optparse")
+  parser <- OptionParser()
+  parser <- add_option(
+    parser,
+    c("-v", "--variable"),
+    type = "character",
+    help = "IC50, IC80 or IC90",
+    default = "IC80"
+  )
+  parser <- add_option(
+    parser,
+    c("-r", "--regress"),
+    type = "logical",
+    help = "Regress on dependent variable instead use groupings"
+  )
+  args <- parse_args(parser)
+} else {
+  args <- list(regress = FALSE, variable = "IC80")
+}
+
+workdir <- here("analyses", "pdac_de")
+results_dir <- here(workdir, args$variable)
+dir.create(results_dir)
+data <- here("analyses", "data_all")
 
 get_counts <- function(f) {
   library(reticulate)
@@ -114,11 +134,6 @@ pyrvinium <- local({
   )
 
 
-# Goal: determine relationship between gene expression and IC80 in PDAC
-
-# TODO: read up on common ways of handling IC values
-# TODO: check if you should scale and center
-
 ## * Analysis
 
 ## ** DE
@@ -161,29 +176,34 @@ obs <- left_join(
   pyrvinium,
   by = join_by(sample)
 ) |>
-  filter(!is.na(IC80)) |>
+  filter(!is.na(!!as.symbol(args$variable))) |>
   mutate(across(starts_with("IC"), as.double)) |>
-  filter(IC80 > 0) |>
-  mutate(
-    category = case_when(
-      sample %in% high ~ "high",
-      sample %in% low ~ "low",
-      .default = NA
-    ),
-    category = factor(category, levels = c("low", "high"))
-  )
+  filter(!!as.symbol(args$variable) > 0)
 
-dds <- DESeqDataSetFromMatrix(
-  # New design
-  countData = counts[, obs[!is.na(obs$category), ]$sample],
-  colData = column_to_rownames(obs[!is.na(obs$category), ], "sample"),
-  design = ~ 0 + cohort + category
-)
-## dds <- DESeqDataSetFromMatrix(
-##   countData = counts[, obs$sample],
-##   colData = column_to_rownames(obs, "sample"),
-##   design = ~ 0 + cohort + scale(log(IC80))
-## )
+if (!args$regress) {
+  obs <- obs |>
+    mutate(
+      category = case_when(
+        sample %in% high ~ "high",
+        sample %in% low ~ "low",
+        .default = NA
+      ),
+      category = factor(category, levels = c("low", "high"))
+    )
+  dds <- DESeqDataSetFromMatrix(
+    # New design
+    countData = counts[, obs[!is.na(obs$category), ]$sample],
+    colData = column_to_rownames(obs[!is.na(obs$category), ], "sample"),
+    design = ~ 0 + cohort + category
+  )
+} else {
+  dds <- DESeqDataSetFromMatrix(
+    countData = counts[, obs$sample],
+    colData = column_to_rownames(obs, "sample"),
+    design = as.formula(glue("~ 0 + cohort + scale(log({args$variable}))"))
+  )
+}
+
 dds <- dds[rowSums(counts >= 10) >= 3, ]
 dds <- DESeq(dds)
 
@@ -191,32 +211,34 @@ dds <- DESeq(dds)
 # salmon counts
 
 # Fold-change of the covariate is the per-unit increase in the covariate
-ic80_res <- results(dds)
-ic80_res <- ic80_res[replace_na(ic80_res$padj <= 0.05, FALSE), ] |>
+res <- results(dds)
+res <- res[replace_na(res$padj <= 0.05, FALSE), ] |>
   as.data.frame()
 
-ic80_res |>
+res |>
   rownames_to_column(var = "symbol") |>
-  write_csv(here(workdir, "de_genes.csv"))
+  write_csv(here(results_dir, "de_genes.csv"))
 
 ## ** Enrichment
 
-enrich_list <- ic80_res$log2FoldChange |>
-  `names<-`(rownames(ic80_res)) |>
+enrich_list <- res$log2FoldChange |>
+  `names<-`(rownames(res)) |>
   sort(decreasing = TRUE)
 
-## gse_res <- gseGO(
-##   gene = enrich_list,
-##   OrgDb = org.Hs.eg.db,
-##   keyType = "SYMBOL",
-##   ont = "ALL"
-## )
-## min(gse_res$p.adjust, na.rm = TRUE) # 0.1725709
-## [2026-07-16 Thu] No significant terms identified with gsea
+gse_res <- gseGO(
+  gene = enrich_list,
+  OrgDb = org.Hs.eg.db,
+  keyType = "SYMBOL",
+  ont = "ALL"
+)
+
+gse_res |>
+  as.data.frame() |>
+  write_csv(here(results_dir, "gse.csv"))
 
 res_list <- list(
-  downreg = ic80_res[ic80_res$log2FoldChange < 0, ],
-  upreg = ic80_res[ic80_res$log2FoldChange > 0, ]
+  downreg = res[res$log2FoldChange < 0, ],
+  upreg = res[res$log2FoldChange > 0, ]
 )
 
 do_enrichment <- function(f) {
@@ -254,32 +276,36 @@ do_enrichment <- function(f) {
 }
 
 enrich_res <- read_existing(
-  here(workdir, "enrichment.csv"),
+  here(results_dir, "enrichment.csv"),
   do_enrichment,
   read_csv
 )
 
 ## * Visualizations
+
 # normalized data
 vsd <- vst(dds, blind = FALSE)
-vsd$log_IC80 <- log(vsd$IC80)
+vsd[[paste0("log_", args$variable)]] <- log(vsd[[args$variable]])
 
-cohort_plot <- plotPCA(vsd[rownames(ic80_res), ], intgroup = c("cohort")) +
+cohort_plot <- plotPCA(vsd[rownames(res), ], intgroup = c("cohort")) +
   guides(color = guide_legend("cohort"))
-ic80_plot <- plotPCA(vsd[rownames(ic80_res), ], intgroup = c("log_IC80")) +
+ic_plot <- plotPCA(
+  vsd[rownames(res), ],
+  intgroup = c(glue("log_{args$variable}"))
+) +
   scale_color_paletteer_c("ggthemes::Green-Gold") +
-  guides(color = guide_legend("log(IC80)")) +
+  guides(color = guide_legend(glue("log({args$variable})"))) +
   theme(axis.text.y = element_blank(), axis.title.y = element_blank())
 
 pca_plot <- cohort_plot +
-  ic80_plot +
+  ic_plot +
   plot_layout(guides = "collect") +
   plot_annotation(
-    title = "PCA of PDAC samples",
+    title = "PCA of samples",
     subtitle = "After subsetting by DE genes"
   )
 ggsave(
-  filename = here(workdir, "pca_plot.png"),
+  filename = here(results_dir, "pca_plot.png"),
   plot = pca_plot,
   height = 10,
   width = 10,
@@ -287,12 +313,12 @@ ggsave(
 )
 
 
-into_heatmap <- as.data.frame(assay(vsd)[rownames(ic80_res), ]) |>
+into_heatmap <- as.data.frame(assay(vsd)[rownames(res), ]) |>
   `colnames<-`(colnames(vsd)) |>
   rownames_to_column(var = "gene") |>
   as_tibble() |>
   pivot_longer(-gene, names_to = "sample", values_to = "expr") |>
-  inner_join(rownames_to_column(ic80_res, "gene"), by = join_by(gene)) |>
+  inner_join(rownames_to_column(res, "gene"), by = join_by(gene)) |>
   inner_join(
     rownames_to_column(as.data.frame(colData(vsd)), "sample"),
     by = join_by(sample)
@@ -307,99 +333,75 @@ add_theming <- function(plot) {
     ylab("Gene")
 }
 
-cat_box <- ggplot(
-  mutate(
-    into_heatmap,
-    gene = paste0(gene, " (", round(log2FoldChange, 4), ")")
-  ),
-  aes(
-    x = factor(category, levels = c("low", "high")),
-    color = factor(category, levels = c("low", "high")),
-    y = expr
-  )
-) +
-  geom_boxplot() +
-  geom_jitter() +
-  facet_wrap(~gene, nrow = 2) +
-  xlab("IC80 Pyrvinium grouping") +
-  ylab("Normalized expression") +
-  guides(color = "none") +
-  labs(
-    title = "DE genes",
-    subtitle = "Values in parentheses denote log2FoldChange in shifting from low to high groups"
-  )
-ggsave(
-  plot = cat_box,
-  filename = here(workdir, "ic80_box.pdf"),
-  height = 10,
-  width = 12
-)
-
-
-binned_heatmap <- ggplot(
-  into_heatmap,
-  aes(
-    x = cut(log(IC80), breaks = 10),
-    y = factor(gene, levels = names(enrich_list)),
-    fill = expr
-  )
-) +
-  xlab("Binned log(IC80)") |> add_theming()
-ggsave(
-  plot = binned_heatmap,
-  filename = here(workdir, "ic80_heatmap.pdf"),
-  height = 10,
-  width = 15
-)
-
-lapply(rownames(ic80_res), \(gene) {
-  lfc <- ic80_res[gene, ]["log2FoldChange"] |> round(3)
-  p_val <- ic80_res[gene, ]["padj"] |> round(4)
-  plot <- tibble(
-    expr = assay(vsd)[gene, ],
-    IC80 = colData(vsd)$IC80,
-    cohort = colData(vsd)$cohort
-  ) |>
-    ggplot(aes(x = log(IC80), y = expr, color = cohort)) +
-    geom_point() +
-    ylab("Normalized expression") +
-    labs(
-      title = gene,
-      subtitle = glue("log2FoldChange: {lfc}, p-value: {p_val}")
+if (!args$regress) {
+  cat_box <- ggplot(
+    mutate(
+      into_heatmap,
+      gene = paste0(gene, " (", round(log2FoldChange, 4), ")")
+    ),
+    aes(
+      x = factor(category, levels = c("low", "high")),
+      color = factor(category, levels = c("low", "high")),
+      y = expr
     )
-  ggsave(filename = here(workdir, glue("gene_plots/{gene}.pdf")), plot = plot)
-})
+  ) +
+    geom_boxplot() +
+    geom_jitter() +
+    facet_wrap(~gene, nrow = 2) +
+    xlab(paste0(args$variable, args$drug_name, "grouping")) +
+    ylab("Normalized expression") +
+    guides(color = "none") +
+    labs(
+      title = "DE genes",
+      subtitle = "Values in parentheses denote log2FoldChange in shifting from low to high groups"
+    )
 
-## * GATA6
-
-# TODO: Gata6 level, normalized against housekeeping genes. In pdac
-# Just make it a bar plot and facet by the housekeeping gene that was normalized
-# Use ALR on the raw counts
-housekeeping <- c("MLF2", "SF3B1", "GNB1", "CTBP1", "MYH9")
-# Took the top 5 genes in pancreas from HRT atlas, sorting by lowest STD
-
-h2 <- c("FOXH1", "TMEM269", "CD2BP2", "KRT8P33", "RHOQP1", "FREY1")
-
-gata6_hk_plot <- alr_normalize(
-  dds[, str_detect(colnames(dds), "PHcase")],
-  housekeeping = housekeeping,
-  target = "GATA6"
-) |>
-  ggplot(aes(x = sample, y = housekeeping, fill = n_expr)) +
-  geom_tile() +
-  geom_text(aes(label = rank), color = "white", size = 6) +
-  xlab("Sample") +
-  ylab("Housekeeping gene") +
-  guides(fill = guide_legend("Normalized expression\n(additive log ratio)")) +
-  labs(
-    title = "GATA6 Expression"
+  ggsave(
+    plot = cat_box,
+    filename = here(results_dir, glue("{args$variable}_box.pdf")),
+    height = 10,
+    width = 12
   )
-gata6_hk_plot
+} else {
+  binned_heatmap <- ggplot(
+    into_heatmap,
+    aes(
+      x = cut(log(!!as.symbol(args$variable)), breaks = 10),
+      y = factor(gene, levels = names(enrich_list)),
+      fill = expr
+    )
+  ) +
+    xlab(glue("Binned log({args$variable})")) |> add_theming()
+  ggsave(
+    plot = binned_heatmap,
+    filename = here(results_dir, glue("{args$variable}_heatmap.pdf")),
+    height = 10,
+    width = 15
+  )
 
-ggsave(
-  here(workdir, "gata6_hk.png"),
-  gata6_hk_plot,
-  height = 12,
-  width = 12,
-  dpi = 500
-)
+  lapply(rownames(res), \(gene) {
+    lfc <- res[gene, ]["log2FoldChange"] |> round(3)
+    p_val <- res[gene, ]["padj"] |> round(4)
+    tb <- tibble(
+      expr = assay(vsd)[gene, ],
+      cohort = colData(vsd)$cohort
+    )
+    tb[[args$variable]] <- colData(vsd)[[args$variable]]
+    plot <- tb |>
+      ggplot(aes(
+        x = log(!!as.symbol(args$variable)),
+        y = expr,
+        color = cohort
+      )) +
+      geom_point() +
+      ylab("Normalized expression") +
+      labs(
+        title = gene,
+        subtitle = glue("log2FoldChange: {lfc}, p-value: {p_val}")
+      )
+    ggsave(
+      filename = here(results_dir, glue("gene_plots/{gene}.pdf")),
+      plot = plot
+    )
+  })
+}
