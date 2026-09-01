@@ -24,8 +24,9 @@ reactome <- read_csv(
   col_names = c("term", "symbol")
 )
 
-if (sys.nframe() == 0) {
+if (sys.nframe() == 0 && !interactive()) {
   library("optparse")
+  print("hello")
   parser <- OptionParser()
   parser <- add_option(
     parser,
@@ -36,14 +37,35 @@ if (sys.nframe() == 0) {
   )
   parser <- add_option(
     parser,
+    c("-d", "--drug_name"),
+    type = "character",
+    help = "",
+    default = "pyrvinium"
+  )
+  parser <- add_option(
+    parser,
+    c("-g", "--group_comparison"),
+    type = "character",
+    help = "Method of determining groups for comparison",
+    default = NULL
+  )
+  parser <- add_option(
+    parser,
     c("-r", "--regress"),
     type = "logical",
     help = "Regress on dependent variable instead use groupings"
   )
   args <- parse_args(parser)
 } else {
-  args <- list(regress = FALSE, variable = "IC80")
+  args <- list(
+    regress = FALSE,
+    variable = "IC80",
+    drug_name = "pyrvinium",
+    group_comparison = "mad_outlier"
+  )
 }
+
+suffix <- ifelse(args$regress, "_regress", "")
 
 workdir <- here("analyses", "pdac_de")
 results_dir <- here(workdir, args$variable)
@@ -155,6 +177,10 @@ high <- c(
   "PHcase_22"
 )
 
+# Cutoff determination
+# low: ICX < 1mg/L
+# high: ICX >= 1mg/L
+
 low <- c(
   "P40",
   "PHcase_13",
@@ -180,16 +206,44 @@ obs <- left_join(
   mutate(across(starts_with("IC"), as.double)) |>
   filter(!!as.symbol(args$variable) > 0)
 
+ggplot(obs, aes(x = IC80)) +
+  geom_histogram(bins = 50)
+
 if (!args$regress) {
-  obs <- obs |>
-    mutate(
-      category = case_when(
-        sample %in% high ~ "high",
-        sample %in% low ~ "low",
-        .default = NA
-      ),
-      category = factor(category, levels = c("low", "high"))
-    )
+  if (args$group_comparison == "mad_outlier") {
+    median <- median(obs[[args$variable]])
+    mad <- median(abs(obs[[args$variable]] - median))
+    cutoff <- 2.5
+
+    obs <- obs |>
+      mutate(
+        category = case_when(
+          (!!as.symbol(args$variable) - median) / mad <= -cutoff ~
+            "outlier_low",
+          (!!as.symbol(args$variable) - median) / mad >= cutoff ~
+            "outlier_high",
+          .default = "normal"
+        )
+      )
+    levels <- c("normal", "outlier_low", "outlier_high")
+
+    outlier_plot <- ggplot(obs, aes(x = (!!as.symbol(args$variable)))) +
+      geom_histogram() +
+      geom_vline(
+        xintercept = median,
+        color = "green",
+        linewidth = 2
+      ) +
+      geom_vline(xintercept = median - mad * cutoff) +
+      geom_vline(xintercept = median + mad * cutoff)
+
+    ggsave(here(results_dir, "outlier_plot.png"))
+
+    #
+  } else {
+    stop("Group comparison method not recognized")
+  }
+
   dds <- DESeqDataSetFromMatrix(
     # New design
     countData = counts[, obs[!is.na(obs$category), ]$sample],
@@ -217,7 +271,7 @@ res <- res[replace_na(res$padj <= 0.05, FALSE), ] |>
 
 res |>
   rownames_to_column(var = "symbol") |>
-  write_csv(here(results_dir, "de_genes.csv"))
+  write_csv(here(results_dir, glue("de_genes{suffix}.csv")))
 
 ## ** Enrichment
 
@@ -340,8 +394,8 @@ if (!args$regress) {
       gene = paste0(gene, " (", round(log2FoldChange, 4), ")")
     ),
     aes(
-      x = factor(category, levels = c("low", "high")),
-      color = factor(category, levels = c("low", "high")),
+      x = factor(category, levels = normal),
+      color = factor(category, levels = normal),
       y = expr
     )
   ) +
@@ -374,7 +428,7 @@ if (!args$regress) {
     xlab(glue("Binned log({args$variable})")) |> add_theming()
   ggsave(
     plot = binned_heatmap,
-    filename = here(results_dir, glue("{args$variable}_heatmap.pdf")),
+    filename = here(results_dir, glue("{args$variable}_heatmap{suffix}.pdf")),
     height = 10,
     width = 15
   )
