@@ -15,8 +15,22 @@ suppressMessages({
 
 ## * Utilities
 
-format_long <- function(obj, genes) {
-  expr <- assay(obj)[genes, ] |>
+gm_mean <- function(x, na.rm = TRUE) {
+  exp(sum(log(x[x > 0]), na.rm = na.rm) / length(x))
+}
+
+clr <- function(obj) {
+  gmeans <- apply(assay(obj), 2, gm_mean)
+  log(assay(obj) / gmeans)
+}
+
+format_long <- function(obj, genes, assay = NULL) {
+  if (!is.null(assay)) {
+    vals <- assay(obj)[[assay]][, genes]
+  } else {
+    vals <- assay(obj)[genes, ]
+  }
+  expr <- vals |>
     as.data.frame() |>
     rownames_to_column("gene_id") |>
     tidyr::pivot_longer(-gene_id, names_to = "sample")
@@ -48,8 +62,8 @@ prcomp_wrapper <- function(obj, ntop = 500) {
 ## [2026-08-18 Tue] 'status' to check kras status,
 ## 'cluster' to check the weird clusterings
 ## design_variable <- "status"
-## design_variable <- "random"
-design_variable <- "cluster"
+design_variable <- "random"
+## design_variable <- "cluster"
 wanted_var_cols <- c("GENENAME", "GENEBIOTYPE")
 workdir <- here("analyses", "pdac_subtyping")
 rdir <- here(workdir, paste0("de_", design_variable))
@@ -65,19 +79,41 @@ cluster_status <- read_csv(here(workdir, "cluster_2026-08-18.csv")) |>
 
 ad <- import("anndata")
 adata <- ad$read_h5ad(here(workdir, "cohort.h5ad"))
-adata$obs <- merge(adata$obs, kras_status, on = "Case_ID")
-adata$obs <- merge(adata$obs, cluster_status, on = "Case_ID")
+adata$obs$order <- seq_len(nrow(adata$obs))
+adata$obs <- merge(
+  adata$obs,
+  kras_status,
+  by.x = "sample",
+  by.y = "Case_ID",
+  all.x = TRUE
+)
+adata$obs <- merge(
+  adata$obs,
+  cluster_status,
+  by.x = "sample",
+  by.y = "Case_ID",
+  all.x = TRUE
+)
+adata$obs <- adata$obs[order(adata$obs$order), ]
 adata <- adata[
-  !is.na(adata$obs$status) & adata$obs$Project_ID == "CHULA_PHcase",
-  !is.na(adata$var$GENENAME)
-] # [2026-08-14 Fri]
+  str_starts(adata$obs$sample, "PHcase") & adata$obs$rnaseq_available,
+]
+
 
 obj <- local({
-  obs <- adata$obs
-  rownames(obs) <- obs$Case_ID
+  obs <- adata$obs |> select(-status)
+  rownames(obs) <- obs$sample
   x <- t(as.matrix(adata$X))
+  x[is.na(x)] <- 0
   storage.mode(x) <- "integer"
   rownames(x) <- rownames(adata$var)
+  if (design_variable == "random") {
+    obs$random <- sample(
+      c("a", "b", "c", "d"),
+      size = nrow(obs),
+      replace = TRUE
+    )
+  }
   DESeqDataSetFromMatrix(
     countData = x,
     colData = obs,
@@ -86,13 +122,14 @@ obj <- local({
     metadata = list(var_cols = colnames(adata$var))
   )
 })
+
 obj <- filter_min_expr(obj, 10, 3)
 
 ## * DE
 
 dds <- DESeq(obj)
 vsd <- varianceStabilizingTransformation(obj)
-pca_plot <- plotPCA(vsd, "status")
+pca_plot <- plotPCA(vsd, "cluster")
 
 counts_plot <- counts_violin(vsd, fill = "cluster") +
   theme(axis.text.x = element_text(angle = 90))
@@ -123,9 +160,6 @@ ggsave(
 pca_details <- prcomp_wrapper(vsd)
 write_csv(pca_details$vars, here(workdir, "phcase_pca_greatest_vars.csv"))
 
-included <- greatest_vars |>
-  filter(GENEBIOTYPE != "protein_coding") |>
-  pluck("rowname")
 
 # Results for status 1 vs. 0
 res <- results(dds)
@@ -195,10 +229,11 @@ res_tb |>
 # [2026-08-18 Tue] lncRNAs, TEC, miRNA are basically all downregulated
 # in cluster 1 compared to 2
 
+assays(vsd)$clr <- clr(obj)
+rlog <- rlog(obj)
+
 colData(vsd)$random <- sample(c("A", "B"), ncol(vsd), TRUE)
-all_rna <- format_long(
-  vsd
-) |>
+all_rna <- format_long(rlog) |>
   left_join(res_tb, by = join_by(x$gene_id == y$Row.names)) |>
   filter(!is.na(GENEBIOTYPE)) |>
   mutate(biotype = GENEBIOTYPE) |>
@@ -219,6 +254,7 @@ biotype_counts <- ggplot(
   theme(axis.text.x = element_text(angle = 90)) +
   guides(fill = "none") +
   ggtitle(paste("Grouping variable: ", design_variable))
+
 ggsave(
   here(rdir, "biotype_counts.png"),
   biotype_counts,

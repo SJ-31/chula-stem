@@ -8,7 +8,10 @@ suppressMessages({
   library(paletteer)
   library(patchwork)
   library(org.Hs.eg.db)
-  options(box.path = here("src"))
+  options(
+    box.path = here("src"),
+    reticulate.conda_binary = system2("which", "conda", stdout = TRUE)
+  )
   suppressWarnings(box::use(
     R / utils[read_existing, alr_normalize],
     dplyr[select, filter]
