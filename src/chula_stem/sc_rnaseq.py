@@ -1,5 +1,6 @@
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from functools import reduce
 from pathlib import Path
 from typing import Literal
 
@@ -324,14 +325,18 @@ def sc_distribution_plot(
     point_alpha: float = 0.3,
     **jitter_kws,
 ) -> gg.ggplot:
-    wanted_cols = keys + [groupby]
+    wanted_cols = [groupby]
+    if isinstance(keys, str):
+        wanted_cols.append(keys)
+    else:
+        wanted_cols.extend(keys)
     id_vars = [groupby]
     aes_kws = {"x": groupby, "y": "value"}
     if fill is not None:
         wanted_cols.append(fill)
         id_vars.append(fill)
         aes_kws["fill"] = fill
-    df = doublets.obs.loc[:, wanted_cols].melt(
+    df = adata.obs.loc[:, wanted_cols].melt(
         id_vars=id_vars, value_vars=keys, var_name="Metric"
     )
     plot = gg.ggplot(df, gg.aes(**aes_kws))
@@ -360,7 +365,11 @@ def mads_qc_plot_batch(
     batch_col: str = "batch",
     sample_col: str = "sample",
     obsm: str = "mads",
-    vars: tuple[str] = ("total_counts", "n_genes_by_counts", "pct_counts_mito"),
+    vars: tuple[str, str, str] = (
+        "total_counts",
+        "n_genes_by_counts",
+        "pct_counts_mito",
+    ),
     vars_compare: tuple[int, int, int] = (0, 1, 2),
     palette: str = "coolwarm",
 ) -> tuple[gg.ggplot, gg.ggplot]:
@@ -390,8 +399,8 @@ def mads_qc_plot_batch(
     """
     assert obsm in adata.obsm, f"`{obsm}` must be present in adata.obsm"
     assert len(vars) == 3, "Must provide 3 exactly qc variables"
-    adata = adata[adata.obs[batch] == batch_name, :].copy()
-    logger.info("Drawing qc plot for {} {}", batch, batch_name)
+    adata = adata[adata.obs[batch_col] == batch_name, :].copy()
+    logger.info("Drawing qc plot for {} {}", batch_col, batch_name)
     plots = {}
     nudge_by = len(set(adata.obs[sample_col]))
     for i, col in enumerate(vars):
@@ -413,7 +422,7 @@ def mads_qc_plot_batch(
             + gg.ylab(f"{col} (MADs distance from median)")
         )
         if i == 0:
-            plot = plot + gg.ggtitle(f"{groupby}: {batch_name}")
+            plot = plot + gg.ggtitle(f"{batch_col}: {batch_name}")
         if i != 2:
             plot = plot + gg.theme(
                 axis_text_x=gg.element_blank(), axis_ticks_major_x=gg.element_blank()
@@ -517,6 +526,48 @@ def distance_by_mads(
     adata.uns[obsm_key] = result
     adata.obsm[obsm_key] = df
 
+
+def obsm_filters(
+    adata: ad.AnnData,
+    filters: dict[str, tuple[float | None, float | None]],
+    obsm_key: str,
+    reduction: Literal["all", "any"] = "all",
+) -> tuple[ad.AnnData, ad.AnnData]:
+    """Remove outliers based on values in obsm
+
+    Parameters
+    ----------
+    filters : dict
+            COLNAME: [<OUTLIER_LOW>, <OUTLIER_HIGH>]
+
+    Returns
+    -------
+    tuple of adata_passing, adata_failed
+    """
+    obsm_df: pd.DataFrame = adata.obsm[obsm_key]
+    assert isinstance(
+        obsm_df, pd.DataFrame
+    ), f"The value stored under {obsm_key} must be a dataframe"
+    masks = []
+    for col, pair in filters.items():
+        low, high = pair
+        vals = obsm_df[col]
+        if low is not None and high is not None:
+            masks.append((vals > high) | (vals < low))
+        elif low is not None:
+            masks.append(vals < low)
+        elif high is not None:
+            masks.append(vals > high)
+    if reduction == "all":
+        is_outlier = reduce(lambda x, y: x & y, masks)
+    else:
+        is_outlier = reduce(lambda x, y: x | y, masks)
+    filtered = adata[~is_outlier, :]
+    failed = adata[is_outlier]
+    return filtered, failed
+
+
+# def filter_by_obsm():
 
 # * Clustering utils
 
