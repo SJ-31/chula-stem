@@ -285,9 +285,17 @@ def annotate_adata_vars(
         metadata.to_csv(savepath)
     if meta_id_col is not None:
         metadata = metadata.rename(columns={meta_id_col: merge_on})
-    merged: pd.DataFrame = adata.var.merge(
-        metadata.drop_duplicates(merge_on), on=merge_on, how="left"
-    )
+    if merge_on in adata.var.columns:
+        merged: pd.DataFrame = adata.var.merge(
+            metadata.drop_duplicates(merge_on), on=merge_on, how="left"
+        )
+    else:
+        merged: pd.DataFrame = adata.var.merge(
+            metadata.drop_duplicates(merge_on),
+            left_index=True,
+            right_on=merge_on,
+            how="left",
+        )
     if new_index_col is not None:
         tmp: pd.Series = merged[new_index_col].fillna(merged[merge_on])
         to_remove: np.ndarray = tmp.duplicated().values
