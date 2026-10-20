@@ -4,7 +4,7 @@ process CROSS_REFERENCE {
     // Takes output from ClassifyCNV and the get_msisensor.bash script and adds the
     // metadata columns "accession", "source", "p_overlap" and "ClinGen_report"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:

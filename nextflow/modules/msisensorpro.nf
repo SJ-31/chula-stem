@@ -1,7 +1,7 @@
 process MSISENSORPRO {
     ext version: "1.3.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
     publishDir "$meta.log", mode: "copy", pattern: "*.log"
 
     input:
@@ -64,7 +64,7 @@ process MSISENSORPRO {
 
 process MSISENSORPRO_COLLECT {
 
-    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
 
     input:
     tuple val(meta), path(summaries)

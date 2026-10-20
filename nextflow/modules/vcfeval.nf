@@ -1,7 +1,7 @@
 process VCFEVAL {
     ext version: "3.12.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:

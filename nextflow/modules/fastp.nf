@@ -1,7 +1,7 @@
 process FASTP {
     ext version: "0.23.4"
     
-    publishDir "$meta.out", mode: "copy", saveAs: params.saveFn
+    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
     publishDir "$meta.log", mode: 'copy', pattern: "*.log"
     errorStrategy "ignore" // BUG: [2025-07-24 Thu] a weird result for one sample causes
     // this to fail

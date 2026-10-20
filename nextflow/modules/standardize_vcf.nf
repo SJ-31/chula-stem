@@ -17,7 +17,7 @@ process STANDARDIZE_VCF {
     // BUG: <2025-01-03 Fri> gatk has an Invalid File pointer error
     // when trying to read the recal bam file it produced...
 
-    publishDir "${meta.out}", mode:"copy", saveAs: params.saveFn
+    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
     publishDir "${meta.log}", mode: "copy", pattern: "*.log"
 
     input:
