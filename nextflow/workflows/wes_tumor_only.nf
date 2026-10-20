@@ -36,6 +36,12 @@ include { REPORT } from "../modules/report.nf"
 include { PURECN_COMPLETE } from "../subworkflows/purecn_complete.nf" 
 include { GET_THERAPY_CACHE } from "../modules/get_therapy_cache.nf"
 
+def toConcat(suffix, outdir_name, val) {
+ [val[0] + ["suffix": suffix,
+                  "out": "${params.outdir}/${val[0].id}/${outdir_name}",
+                  "log": "${params.logdir}/${val[0].id}/${outdir_name}"]] + [val[1..-1]]
+}
+
 workflow whole_exome_tumor_only {
 
     main:
@@ -92,12 +98,6 @@ workflow whole_exome_tumor_only {
                                        MUTECT2_COMPLETE.out.filtered])
 
     CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
-
-    def toConcat = { suffix, outdir_name, it ->
-        [it[0] + ["suffix": suffix,
-                  "out": "${params.outdir}/${it[0].id}/${outdir_name}",
-                  "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
-    }
 
     // Combine variants by type
     small_variants_to_oct = Utl.joinFirst(

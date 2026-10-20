@@ -34,6 +34,17 @@ include { DELLY_CNV } from '../modules/delly_cnv.nf'
 include { PANEL_OF_NORMALS_FROM_BAM } from "../subworkflows/panel_of_normals_from_bam.nf"
 
 
+def toConcat(suffix, outdir_name, val) {
+ [val[0] + ["suffix": suffix,
+                  "out": "${params.outdir}/${val[0].id}/${outdir_name}",
+                  "log": "${params.logdir}/${val[0].id}/${outdir_name}"]] + [val[1..-1]]
+}
+
+def newOutPath(ch, path) {
+        [ch[0] + ["out": "${params.outdir}/${ch[0].id}/${path}",
+                   "log": "${params.logdir}/${ch[0].id}/${path}"]] + ch[1..-1]     
+}
+
 workflow whole_exome {
 
     main:
@@ -42,16 +53,6 @@ workflow whole_exome {
         tumor: it[0].type == "cancer" || it[0].type == "tumor"
         normal: it[0].type == "normal"
     }
-    def toConcat = { suffix, outdir_name, it ->
-        [it[0] + ["suffix": suffix,
-                  "out": "${params.outdir}/${it[0].id}/${outdir_name}",
-                  "log": "${params.logdir}/${it[0].id}/${outdir_name}"]] + [it[1..-1]]
-    }
-    def nullIfNotNum = { it -> it.text.isNumber() ? it.text : null }
-    def newOutPath = { ch, path ->
-        [ch[0] + ["out": "${params.outdir}/${ch[0].id}/${path}",
-                   "log": "${params.logdir}/${ch[0].id}/${path}"]] + ch[1..-1] }
-
     def cohortTopLevel = { it -> [["out": params.outdir, "log": params.logdir,
                              "filename": cohort_name], it] }
     /*
