@@ -146,6 +146,8 @@ workflow whole_exome_tumor_only {
         PURECN_COMPLETE(MUTECT2_COMPLETE.out.unfiltered,
                         PREPROCESS_FASTQ.out.bam_with_index,
                         channel.empty(),
+                        panel_of_normals,
+                        cohort_name,
                         4)
         purity_ploidy = Utl.getId(PURECN_COMPLETE.out.purity_ploidy)
     } else {
