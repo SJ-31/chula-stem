@@ -32,7 +32,7 @@ params.ref = ["genome": "/data/project/stemcell/shannc/reference/genomes/GRCh38.
               "targets": "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted_renamed.bed.gz",
               "baits": "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted_renamed.bed.gz", // Bait information not available
               "baits_il": "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/Covered.interval_list",
-              "targets_il": "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted_renamed.interval_list"
+              "targets_il": "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted_renamed.interval_list",
               "baits_unzipped": "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted_renamed.bed.gz",
               "panel_of_normals": null,
               "snp_blacklist": null,

@@ -1,4 +1,4 @@
-miniforge3 = "/data/project/stemcell/shannc"
+params.miniforge3 = "/data/project/stemcell/shannc"
 
 process {
     withName: "VEP" {
@@ -26,12 +26,12 @@ process {
 
     withName: "GRIDSS" {
         label = "mid_mem"
-        conda = "${miniforge3}/envs/gridss"
+        conda = "${params.miniforge3}/envs/gridss"
         cpus = 8 // Default is 8
     }
 
     withName: "CNVKIT|CNVKIT_PREP" {
-        conda = "${miniforge3}/envs/cnvkit"
+        conda = "${params.miniforge3}/envs/cnvkit"
     }
 
     withName: "MUSE2" {
@@ -81,7 +81,7 @@ process {
     }
 
     withName: "SIGPROFILERASSIGNMENT" {
-        conda = "${miniforge3}/envs/SigProfiler"
+        conda = "${params.miniforge3}/envs/SigProfiler"
         ext.volume = "/data/project/stemcell/shannc/reference/tool_specific/sigprofiler"
     }
 
@@ -107,7 +107,7 @@ process {
     }
 
     withName: "STRELKA2|MANTA" {
-        conda = "${miniforge3}/envs/strelka_manta"
+        conda = "${params.miniforge3}/envs/strelka_manta"
         ext.args = ["--exome"]
     }
 
