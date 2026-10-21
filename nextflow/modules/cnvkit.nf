@@ -1,26 +1,26 @@
 process CNVKIT {
     ext version: "0.9.11"
     
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(tumor), path(snps), val(purity), val(ploidy)
     val(cnn_reference)
     // A copy number reference file (".cnn") created with the pooled normal samples
     val(omics_type) // hybrid, amplicon or wgs
-    val(module_number)
+    
     //
 
     output:
     tuple val(with_caller), path("${out}/${out}.call.cns"), emit: cns
     tuple val(with_caller), path("${out}/${out}.cnr"), emit: cnr
     path(out), emit: all
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    out = Utl.getName(module_number, meta, "Cnvkit")
+    out = Utl.getName(meta, "Cnvkit")
     check = file("${meta.out}/${out}")
     with_caller = meta + ["caller": "cnvkit"]
     ploidy_val = ploidy ? ploidy : params.defaults.ploidy

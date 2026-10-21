@@ -3,8 +3,8 @@ process CALLSET_QC {
     // as well as with the FILTER column, e.g. checking for 'PASS'
     ext version: "1.21"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
@@ -15,16 +15,16 @@ process CALLSET_QC {
     // - min_VAF: minimum variant allele frequency in the tumor (FORMAT/VAF)
     // - accepted_filters: A list of FILTER flags that calls must have to be accepted
     val(panel_of_normals)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: vcf
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "QC", "vcf.gz")
+    output = Utl.getName(meta, "QC", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     ndepth = qc.max_normal_depth ? "FORMAT/AD[@normal.txt:1-] <= ${qc.max_normal_depth}" : ""

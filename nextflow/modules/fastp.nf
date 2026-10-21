@@ -1,14 +1,14 @@
 process FASTP {
     ext version: "0.23.4"
     
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+    
+    
     errorStrategy "ignore" // BUG: [2025-07-24 Thu] a weird result for one sample causes
     // this to fail
 
     input:
     tuple val(meta), val(reads)
-    val(module_number) // Helper for tracking module output
+    
     //
 
     output:
@@ -16,7 +16,7 @@ process FASTP {
     path("*fail.fastq.gz"), optional: true, emit: failed_reads
     path("*.html")
     path("*.json"), emit: json
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
@@ -24,7 +24,7 @@ process FASTP {
     n1 = reads[1].baseName.replaceAll(".fastq", "")
     output1 = "${module_number}-${n0}.fastp.fastq.gz"
     output2 = "${module_number}-${n1}.fastp.fastq.gz"
-    prefix = Utl.getName(module_number, meta, "fastp")
+    prefix = Utl.getName(meta, "fastp")
     check1 = file("${meta.out}/$output1")
     check2 = file("${meta.out}/$output2")
     args = task.ext.args.join(" ")

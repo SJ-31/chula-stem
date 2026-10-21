@@ -1,14 +1,14 @@
 process MANTA {
     ext version: "1.6.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
     val(target_intervals)
-    val(module_number)
+    
     //
 
     output:
@@ -16,7 +16,7 @@ process MANTA {
     tuple val(meta), path(callfile), emit: somatic
     tuple val(meta.id), path("${module_number}-${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     path(out)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     // Produces 4 files
     // - diploidSV: variants called under a diploid model, i.e. the normal sample only
     // - somaticSV: variants called under somatic model, considering paired vs. normal
@@ -24,12 +24,12 @@ process MANTA {
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
 
     script:
-    out = Utl.getName(module_number, meta, "MantaOut")
+    out = Utl.getName(meta, "MantaOut")
     call_suffix = !params.tumor_only ? "somaticSV_Manta" : "tumorSV_Manta"
-    callfile = Utl.getName(module_number, meta, call_suffix, "vcf.gz")
+    callfile = Utl.getName(meta, call_suffix, "vcf.gz")
     check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
-    prefix = Utl.getName(module_number, meta)
+    prefix = Utl.getName(meta)
     n = !params.tumor_only ? meta.RGSM_normal : "none"
     normal_flag = !params.tumor_only ? " --normalBam ${normal} " : ""
     args = task.ext.args.join(" ")

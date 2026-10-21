@@ -4,26 +4,26 @@ process GRIDSS {
     // the vcf file correctly
 
     label "big_mem"
-    publishDir "$meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
     val(blacklist) // list of genomic regions to exclude, gridss docs recommends using
     // ENCODE blacklists
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(filtered), emit: variants
     path(all)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    all = Utl.getName(module_number, meta, "Gridss_all", "vcf.gz")
-    filtered = Utl.getName(module_number, meta, "Gridss_confident", "vcf.gz")
+    all = Utl.getName(meta, "Gridss_all", "vcf.gz")
+    filtered = Utl.getName(meta, "Gridss_confident", "vcf.gz")
     check1 = file("${meta.out}/${all}")
     check2 = file("${meta.out}/${filtered}")
     args = task.ext.args.join(" ")

@@ -1,8 +1,8 @@
 process MUSE2 {
     ext version: "2.1.2"
 
-    publishDir "$meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
     label "mid_mem"
 
     input:
@@ -10,17 +10,17 @@ process MUSE2 {
     val(reference)
     val(dbsnp) // Docs ask for dbSNP vcf specifically
     val(omics_type)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: variants
     path("${prefix}.MuSE.txt")
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta)
+    prefix = Utl.getName(meta)
     output = "${prefix}-MuSE.vcf.gz"
     check = file("${meta.out}/${output}")
     if (omics_type == "wgs") {

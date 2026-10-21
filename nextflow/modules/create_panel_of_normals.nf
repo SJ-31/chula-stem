@@ -1,27 +1,27 @@
 process CREATE_PANEL_OF_NORMALS {
     ext version: "1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), val(vcfs)
     val(minimum)
     val(reference)
     val(other_vcfs)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: pon // Empty pon with no sample information
     tuple val(meta), path(output_ws), emit: pon_ws
     path("*.tbi")
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "PON", "vcf.gz")
-    output_ws = Utl.getName(module_number, meta, "PON_ws", "vcf.gz")
+    output = Utl.getName(meta, "PON", "vcf.gz")
+    output_ws = Utl.getName(meta, "PON_ws", "vcf.gz")
     to_sample_spec = vcfs.toList().join("\n")
     to_sample_spec = "${to_sample_spec}\n"
     other_flag = other_vcfs ? " -v other.txt " : "" 

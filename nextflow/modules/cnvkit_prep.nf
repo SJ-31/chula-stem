@@ -2,8 +2,8 @@
 process CNVKIT_PREP {
     ext version: "0.9.11"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(cohort, arity: "1..*") // To analyze cohort sequenced on single platform, documentation recommends
@@ -15,7 +15,7 @@ process CNVKIT_PREP {
     val(with_normals) // If true, reference is constructed from provided normal files
     // in `cohort`. Otherwise, the a flat reference is made
     val(omics_type)  // wes|amplicon|wgs
-    val(module_number)
+    
     //
 
     output:
@@ -23,11 +23,11 @@ process CNVKIT_PREP {
     tuple path(target), path(antitarget)
     path(access)
     path(bins), emit: autobin, optional: true
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "CnvkitPrep")
+    prefix = Utl.getName(meta, "CnvkitPrep")
     out = "${prefix}_reference.cnn"
     target = "${prefix}_target.bed"
     antitarget = "${prefix}_antitarget.bed"

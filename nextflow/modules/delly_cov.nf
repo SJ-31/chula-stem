@@ -1,23 +1,23 @@
 process DELLY_COV {
     ext version: "1.3.1"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam), path(indices, arity: "1..*")
     val(reference)
     val(mappability)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: cov
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Delly", "cov.gz")
+    output = Utl.getName(meta, "Delly", "cov.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

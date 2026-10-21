@@ -1,24 +1,24 @@
 process SIGPROFILERASSIGNMENT {
     ext version: "0.1.9"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcfs)
     val(is_exome)
     val(exclude_file)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: data
     tuple val(meta), path(activities_file), emit: activities
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "SigProfilerAssignment")
+    output = Utl.getName(meta, "SigProfilerAssignment")
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args.join(" ")
@@ -65,11 +65,11 @@ process SIGPROFILERASSIGNMENT {
 }
 
 process SIGPROFILERASSIGNMENT_COLLECT {
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
+    
 
     input:
     tuple val(meta), path(activities, stageAs: "?/*")
-    val(module_number)
+    
     //
 
     output:
@@ -77,7 +77,7 @@ process SIGPROFILERASSIGNMENT_COLLECT {
     //
 
     script:
-    output = Utl.getName(module_number, meta, "SigProfilerAssignment_activities", "tsv")
+    output = Utl.getName(meta, "SigProfilerAssignment_activities", "tsv")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         """

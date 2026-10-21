@@ -1,24 +1,24 @@
 process DUPRADAR {
     ext version: params.bcftools_version
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam)
     val(reference) // GTF reference
     val(strandedness)
     val(paired)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path(output), emit: plots
     tuple val(meta), path("${output}/${output}.tsv"), emit: tsv
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Dupradar")
+    output = Utl.getName(meta, "Dupradar")
     check = file("${meta.out}/${output}")
     paired_flag = paired ? "" : " --unpaired "
     if (check.exists()) {

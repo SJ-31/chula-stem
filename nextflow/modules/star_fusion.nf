@@ -1,24 +1,24 @@
 process STAR_FUSION {
     ext version: "1.13.0"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(chimeric_junction)
     val(genome_lib) // Library containing fusion annotation info
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(fusion)
     path(abridged)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    fusion = Utl.getName(module_number, meta, "Star_Fusion", "tsv")
-    abridged = Utl.getName(module_number, meta, "Star_Fusion_abridged", "tsv")
+    fusion = Utl.getName(meta, "Star_Fusion", "tsv")
+    abridged = Utl.getName(meta, "Star_Fusion_abridged", "tsv")
     check1 = file("${meta.out}/${fusion}")
     check2 = file("${meta.out}/${abridged}")
     if (check1.exists() && check2.exists()) {

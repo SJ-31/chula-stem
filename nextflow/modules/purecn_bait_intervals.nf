@@ -1,20 +1,20 @@
 process PURECN_BAIT_INTERVALS {
     ext version: "2.16.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), val(genome)
     val(baits)
     val(mappability)
-    val(module_number)
+    
     //
 
     output:
     path(o1), emit: baits
     path(o2), emit: baits_optimized
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

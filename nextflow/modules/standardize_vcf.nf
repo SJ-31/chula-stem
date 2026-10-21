@@ -17,22 +17,22 @@ process STANDARDIZE_VCF {
     // BUG: <2025-01-03 Fri> gatk has an Invalid File pointer error
     // when trying to read the recal bam file it produced...
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf), path(normal_bam), path(tumor_bam)
     val(reference)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path(output), emit: vcf
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
     suffix = meta.suffix ? meta.suffix : "Standardized"
-    output = Utl.getName(module_number, meta, "Standardize", "vcf.gz")
+    output = Utl.getName(meta, "Standardize", "vcf.gz")
     check = file("${meta.out}/${output}")
     to_clear = [
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],

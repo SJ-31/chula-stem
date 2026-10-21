@@ -1,22 +1,22 @@
 process BCFTOOLS_STATS {
     ext version: params.bcftools_version
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
     val(target_intervals)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path(output), emit: plots
     path("${output}/${output}.py"), emit: py
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Bcftools_stats")
+    output = Utl.getName(meta, "Bcftools_stats")
     check = file("${meta.out}/${output}")
     region_flag = target_intervals != "" ? "--regions-file ${target_intervals}" : ""
     if (check.exists()) {

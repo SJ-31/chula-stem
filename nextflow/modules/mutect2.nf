@@ -1,9 +1,6 @@
 process MUTECT2 {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
-
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
@@ -12,20 +9,20 @@ process MUTECT2 {
     val(panel_of_normals)
     val(interval_padding)
     val(tumor_only)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(out), emit: variants
     tuple val(meta), path(raw), emit: raw
     tuple val(meta), path(stats), emit: stats
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    out = Utl.getName(module_number, meta, "Mutect2", "vcf.gz")
+    out = Utl.getName(meta, "Mutect2", "vcf.gz")
     stats = "${out}.stats"
-    raw = Utl.getName(module_number, meta, "Mutect2_raw", "tar.gz")
+    raw = Utl.getName(meta, "Mutect2_raw", "tar.gz")
     target_flag = target_intervals ? " --intervals ${target_intervals} " : ""
     check = file("${meta.out}/${out}")
     normal_flag = !tumor_only ? "-I ${normal} -normal ${meta.RGSM_normal} " : ""

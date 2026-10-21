@@ -1,23 +1,23 @@
 process CALCULATE_CONTAMINATION {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(pileup)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(contamination), emit: c
     tuple val(meta), path(segmentation), emit: s
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    segmentation = Utl.getName(module_number, meta, "Segmentation", "table")
-    contamination = Utl.getName(module_number, meta, "Contamination", "table")
+    segmentation = Utl.getName(meta, "Segmentation", "table")
+    contamination = Utl.getName(meta, "Contamination", "table")
     check1 = file("${meta.out}/${segmentation}")
     check2 = file("${meta.out}/${contamination}")
     args = task.ext.args.join(" ")

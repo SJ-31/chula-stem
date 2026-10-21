@@ -3,21 +3,21 @@ process CONTROL_FREEC {
 
     // ABANDONED
     label "mid_mem"
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
     val(known_snps) // Specifically asks for file with known snps
     val(targets) // Target interval bed file for exome data
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(cnvs), emit: cnvs
     path(prefix)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

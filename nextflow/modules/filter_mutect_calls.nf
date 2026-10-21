@@ -5,22 +5,22 @@ process FILTER_MUTECT_CALLS {
     //  - whether or not a read is "well-formed", see https://gatk.broadinstitute.org/hc/en-us/articles/360042911951-WellformedReadFilter
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf), path(ro_model), path(contamination), path(segmentation), path(stats)
     val(reference)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: filtered
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Mutect2_filtered", "vcf.gz")
+    output = Utl.getName(meta, "Mutect2_filtered", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     args_flag = task.ext.args ? "-a ${args}" : ""

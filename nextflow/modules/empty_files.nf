@@ -2,8 +2,8 @@ process EMPTY_FILES {
     ext version: "1"
     // Generate empty files to meet process input requirements when they don't actually need it
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(file)

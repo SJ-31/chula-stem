@@ -1,12 +1,12 @@
 process MULTIQC {
     ext version: "1.25.1"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(files)
-    val(module_number)
+    
     // Will aggregate metrics from
     // - fastp
     //      from json file
@@ -27,8 +27,8 @@ process MULTIQC {
     //
 
     script:
-    out = Utl.getName(module_number, meta, "MultiQC", "html")
-    data = Utl.getName(module_number, meta, "MultiQC_data")
+    out = Utl.getName(meta, "MultiQC", "html")
+    data = Utl.getName(meta, "MultiQC_data")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${data}")
     if (check.exists()) {

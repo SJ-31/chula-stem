@@ -1,25 +1,25 @@
 process HTSEQ_COUNT {
     ext version: "2.0.5"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(alignments)
     val(reference) // Wants genome reference as gtf
     val(sort_order) // pos (position) or name
     val(strandedness)
-    val(module_number)
+    
 
     //
 
     output:
     tuple val(meta), path(output)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "HTSeq_count", "tsv")
+    output = Utl.getName(meta, "HTSeq_count", "tsv")
     check = file("${meta.out}/${output}")
     if (strandedness == "forward") {
         strandedness_flag = "yes"

@@ -1,8 +1,8 @@
 process GET_THERAPY_CACHE {
     ext version: "1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(files)
@@ -12,7 +12,7 @@ process GET_THERAPY_CACHE {
     path("therapy_cache/${civic}"), emit: civic
     path("therapy_cache/${pandrugs2}"), emit: pandrugs2
     path(not_in)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

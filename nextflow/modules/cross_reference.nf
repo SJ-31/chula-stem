@@ -4,24 +4,24 @@ process CROSS_REFERENCE {
     // Takes output from ClassifyCNV and the get_msisensor.bash script and adds the
     // metadata columns "accession", "source", "p_overlap" and "ClinGen_report"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(cnv_or_msi)
     val(type) // Either "CNV" or "MSI"
     val(clingen)
     val(reference)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(out), emit: tsv
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    out = Utl.getName(module_number, meta, "CR", "tsv")
+    out = Utl.getName(meta, "CR", "tsv")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

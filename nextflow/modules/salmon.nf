@@ -1,8 +1,8 @@
 process SALMON {
     ext version: "1.10.3"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.{log,json}"
+    
+    
 
     input:
     tuple val(meta), val(reads_or_bam)
@@ -12,19 +12,19 @@ process SALMON {
     val(gene_map) // GTF/GFF file mapping transcripts to genes
     val(strandedness) // foward, reverse or null
     val(relative_orientation) // inward,outward or matching
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(sf), emit: transcripts
     tuple val(meta), path(sf_genes), emit: genes
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    sf = Utl.getName(module_number, meta, "salmon", "sf")
-    sf_genes = Utl.getName(module_number, meta, "salmon.genes", "sf")
-    logfile = Utl.getName(module_number, meta, "salmon", "log")
+    sf = Utl.getName(meta, "salmon", "sf")
+    sf_genes = Utl.getName(meta, "salmon.genes", "sf")
+    logfile = Utl.getName(meta, "salmon", "log")
     checks = [sf, sf_genes].collect({ file("${meta.out}/${it}") })
     args = task.ext.args.join(" ")
 

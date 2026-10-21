@@ -1,28 +1,28 @@
 process VEP {
     ext version: "113"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
     val(reference)
     val(panel_of_normals)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: vcf
     path("*.html"), emit: report
     tuple val(meta), path(tsv), emit: tsv
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "VEP", "vcf.gz")
-    tsv = Utl.getName(module_number, meta, "VEP", "tsv")
-    logfile = Utl.getName(module_number, meta, "VEP", "log")
-    html = Utl.getName(module_number, meta, "VEP_summary", "html")
+    output = Utl.getName(meta, "VEP", "vcf.gz")
+    tsv = Utl.getName(meta, "VEP", "tsv")
+    logfile = Utl.getName(meta, "VEP", "log")
+    html = Utl.getName(meta, "VEP_summary", "html")
     check = file("$meta.out/$output")
     check2 = file("$meta.out/$tsv")
     variant_class = meta.variant_class ? meta.variant_class : "small"

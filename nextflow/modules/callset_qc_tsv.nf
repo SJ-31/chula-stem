@@ -4,8 +4,8 @@ process CALLSET_QC_TSV {
     //
     ext version: "1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(tsv), path(ignore_regions)
@@ -30,17 +30,17 @@ process CALLSET_QC_TSV {
     //  - canonical: keep only canonical transcripts whenever possible
     //  - informative: keep transcripts with the least number of NA VEP cols
     //  - impact: keep transcripts with the highest impact
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: tsv
     tuple val(meta), path(minimal)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "QC", "tsv")
+    output = Utl.getName(meta, "QC", "tsv")
     minimal = "${output.replace(".tsv", "")}_minimal.tsv"
     check = file("${meta.out}/${output}")
     check2 = file("${meta.out}/${minimal}")

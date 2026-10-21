@@ -2,8 +2,8 @@ process BQSR {
     ext version: params.gatk_version
 
     label "big_mem"
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     // Recalibrate and also obtain covariate plot
     input:
@@ -11,17 +11,17 @@ process BQSR {
     val(reference)
     val(known_sites) // Array containing known sites
     val(record_recal)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path(recal), emit: bam
     path(report), optional: true
     path(recal_dir)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
 
     script:
-    recal = Utl.getName(module_number, meta, "recal", "bam")
-    report = Utl.getName(module_number, meta, "AnalyzeCovariates", "pdf")
+    recal = Utl.getName(meta, "recal", "bam")
+    report = Utl.getName(meta, "AnalyzeCovariates", "pdf")
     recal_dir = "${module_number}-recalibration_tables"
     check = file("${meta.out}/$recal")
     check2 = file("${meta.out}/$report")

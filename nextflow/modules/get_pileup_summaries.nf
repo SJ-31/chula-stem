@@ -2,23 +2,23 @@ process GET_PILEUP_SUMMARIES {
     ext version: params.gatk_version
 
     label "big_mem"
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam), path(indices, arity: "1..*")
     val(variants) // Commmon germline variant sites, with only biallelic SNPs
-    val(module_number)
+    
 
     //
 
     output:
     tuple val(meta), path(output), emit: pileup
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Pileup", "table")
+    output = Utl.getName(meta, "Pileup", "table")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

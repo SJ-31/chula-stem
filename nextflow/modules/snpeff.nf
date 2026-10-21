@@ -1,26 +1,26 @@
 process SNPEFF {
     ext version: "5.2e"
     
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
     val(reference)
     val(is_somatic)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path("${output}.gz"), emit: vcf
     tuple val(meta), path("*.html"), path("*.txt"), emit: report
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "snpeFF", "vcf")
-    report = Utl.getName(module_number, meta, "snpEff_summary", "html")
-    genes_file = Utl.getName(module_number, meta, "snpEff_genes", "txt")
+    output = Utl.getName(meta, "snpeFF", "vcf")
+    report = Utl.getName(meta, "snpEff_summary", "html")
+    genes_file = Utl.getName(meta, "snpEff_genes", "txt")
     check = file("$meta.out/${output}.gz")
     args = task.ext.args.join(" ")
     if (check.exists()) {

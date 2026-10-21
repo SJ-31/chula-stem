@@ -2,8 +2,8 @@ process OCTOPUS {
     ext version: "0.7.4"
 
     label "big_mem"
-    publishDir "$meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(previous_variants)
@@ -12,18 +12,18 @@ process OCTOPUS {
     val(reference) // Must have ".fasta" extension
     val(target_intervals) // (bgzipped) BED file of target intervals
     val(tumor_only)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(somatic), emit: variants
     path(output)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Octopus_all", "vcf.gz")
-    somatic = Utl.getName(module_number, meta, "Octopus", "vcf.gz")
+    output = Utl.getName(meta, "Octopus_all", "vcf.gz")
+    somatic = Utl.getName(meta, "Octopus", "vcf.gz")
     check1 = file("${meta.out}/${output}")
     prev_flag = previous_variants.size() != 0 ? "--source-candidates ${previous_variants}" : ""
     if (!tumor_only) {

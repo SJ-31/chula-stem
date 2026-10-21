@@ -1,8 +1,8 @@
 process PICARD {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam), path(index)
@@ -12,16 +12,16 @@ process PICARD {
     val(bait_intervals)
     val(strandedness)
     val(gene_annotations_refFlat)
-    val(module_number)
+    
     // Both baits and targets must be in interval list format
 
     output:
     tuple path(out), path(out2), emit: metrics
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
 
     script:
-    out = Utl.getName(module_number, meta, "Picard_alignment_metrics", "txt")
-    out2 = Utl.getName(module_number, meta, "Picard_${omics_type}_metrics", "txt")
+    out = Utl.getName(meta, "Picard_alignment_metrics", "txt")
+    out2 = Utl.getName(meta, "Picard_${omics_type}_metrics", "txt")
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${out2}")
     if (strandedness == "reverse" ) {

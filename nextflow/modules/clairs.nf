@@ -1,23 +1,23 @@
 process CLAIRS {
     ext version: "0.4.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(previous_variants)
     val(reference)
     val(target_intervals)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: variants
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "ClairS", "vcf.gz")
+    output = Utl.getName(meta, "ClairS", "vcf.gz")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
     prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""

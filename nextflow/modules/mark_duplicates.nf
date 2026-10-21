@@ -2,21 +2,21 @@ process MARK_DUPLICATES {
     ext version: params.gatk_version
     
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode:'copy', pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(aligned)
     val(reference)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path(out), emit: dedup
     tuple val(meta), path(txt), emit: qc
 
     script:
-    out = Utl.getName(module_number, meta, "dedup", "bam")
-    txt = Utl.getName(module_number, meta, "dedup_metrics", "txt")
+    out = Utl.getName(meta, "dedup", "bam")
+    txt = Utl.getName(meta, "dedup_metrics", "txt")
     check = file("${meta.out}/${out}")
     if (check.exists()) {
         """

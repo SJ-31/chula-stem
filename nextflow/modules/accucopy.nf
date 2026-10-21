@@ -1,18 +1,18 @@
 process ACCUCOPY {
     ext version: "c58cf6bd-7L0B04WU-debug"
 
-    publishDir "$meta.out", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(reference)
     val(variants) // Common snps associated with the reference, in BED format
-    val(module_number)
+    
     //
 
     output:
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

@@ -2,23 +2,22 @@ process BWA {
     ext version: "2.2.1"
    
     label "big_mem"
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
     // Align reads in an alt-aware manner https://gatk.broadinstitute.org/hc/en-us/articles/360037498992--How-to-Map-reads-to-a-reference-with-alternate-contigs-like-GRCH38#1
 
     input:
     tuple val(meta), val(reads)
     val(reference)
-    val(module_number)
     //
 
     output:
     tuple val(meta), path(out), emit: mapped
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    out = Utl.getName(module_number, meta, null, "bam")
+    out = Utl.getName(meta, null, "bam")
     check = file("${meta.out}/$out")
     if (check.exists()) {
         """

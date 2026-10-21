@@ -1,21 +1,21 @@
 process LEARN_READ_ORIENTATION {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(raw)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: ro
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "RO_model", "tar.gz")
+    output = Utl.getName(meta, "RO_model", "tar.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

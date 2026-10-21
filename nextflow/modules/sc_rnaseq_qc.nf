@@ -5,25 +5,25 @@
 process SC_RNASEQ_QC {
     ext version: "1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(counts)
     val(reference) // Path to sqlite of reference gff, generated with
     // ensembledb::ensDbFromGff
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: counts
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "QC", "h5ad")
+    output = Utl.getName(meta, "QC", "h5ad")
     check = file("${meta.out}/${output}")
-    extras = Utl.getName(module_number, meta, "QC_extras")
+    extras = Utl.getName(meta, "QC_extras")
     args = task.ext.args.join(" ")
     if (check.exists()) {
         """

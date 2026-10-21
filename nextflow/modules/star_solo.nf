@@ -2,8 +2,8 @@ process STAR_SOLO {
     ext version: "2.7.11b"
     label "big_mem"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), val(reads) // reads
@@ -12,24 +12,24 @@ process STAR_SOLO {
     val(count) // Boolean value for whether or not to count reads
     val(gtf) // Genome gtf or gff file for counting reads
     val(barcodes) // 10x Genomics barcode whitelist
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: mapped
     tuple val(meta), path(counts), emit: counts, optional: true
     tuple val(meta), path(chimeric_junction), emit: chimeric, optional: true
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, null, "bam")
+    output = Utl.getName(meta, null, "bam")
 
     j_suffix = params.detect_fusion ? "out.junction" : "empty"
     c_suffix = count && gtf ? "tsv" : "empty"
 
-    chimeric_junction = Utl.getName(module_number, meta, "STAR_Chimeric", j_suffix)
-    counts = Utl.getName(module_number, meta, "STAR_Counts", c_suffix)
+    chimeric_junction = Utl.getName(meta, "STAR_Chimeric", j_suffix)
+    counts = Utl.getName(meta, "STAR_Counts", c_suffix)
 
     check1 = file("${meta.out}/${output}")
     check2 = file("${meta.out}/${chimeric_junction}")

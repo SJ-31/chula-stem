@@ -1,13 +1,13 @@
 process FACETS {
     ext version: "2"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(counts_file) // Output from facets_pileup
     val(cnvkit_autobin) // estimate of bin size produced by `cnvkit.py autobin` stdout
-    val(module_number)
+    
     //
 
     output:
@@ -15,11 +15,11 @@ process FACETS {
     tuple val(with_caller), path("${prefix}/${prefix}_hisens.rds"), emit: rds
     tuple val(meta), path("${prefix}/purity.txt"), path("${prefix}/ploidy.txt"), emit: purity_ploidy
     path(tsv)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "Facets")
+    prefix = Utl.getName(meta, "Facets")
     check = file("${meta.out}/${prefix}")
     tsv = "${prefix}/${prefix}_hisens.tsv"
     check2 = file("${meta.out}/${tsv}")

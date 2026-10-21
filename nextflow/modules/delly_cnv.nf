@@ -1,25 +1,25 @@
 process DELLY_CNV {
     ext version: "1.3.1"
  
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(covfile), val(purity), val(ploidy)
     val(reference)
     val(mappability)
-    val(module_number)
+    
     //
 
     output:
     tuple val(with_caller), path(out)
     path(segmentation)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    out = Utl.getName(module_number, meta, "DellyCNV", ".vcf.gz")
-    segmentation = Utl.getName(module_number, meta, "DellySegmentation", "vcf.gz")
+    out = Utl.getName(meta, "DellyCNV", ".vcf.gz")
+    segmentation = Utl.getName(meta, "DellySegmentation", "vcf.gz")
     with_caller = meta + ["caller": "dellyCNV"]
     check = file("${meta.out}/${out}")
     check2 = file("${meta.out}/${segmentation}")

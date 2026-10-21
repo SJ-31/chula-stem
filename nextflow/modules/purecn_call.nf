@@ -1,8 +1,8 @@
 process PURECN_CALL {
     ext version: "2.16.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(coverage), path(mutect2_vcf)
@@ -12,17 +12,17 @@ process PURECN_CALL {
     val(snp_blacklist)
     val(default_purity)
     val(default_ploidy)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: call
     tuple val(meta), eval("head purity.txt"), eval("head ploidy.txt"), emit: purity_ploidy
-    path("*.log"), optional: true
+    tuple val(meta), path("*.log"), emit: log, optional: true
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Call", "")
+    output = Utl.getName(meta, "Call", "")
     check = file("${meta.out}/${output}")
     blacklist_flag = snp_blacklist ? " --snp-blacklist ${snp_blacklist}" : ""
     mb_flag = mapping_bias ? " --mapping-bias-file ${mapping_bias}" : ""

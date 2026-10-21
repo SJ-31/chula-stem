@@ -1,8 +1,8 @@
 process SOMATICSEQ {
     ext version: ""
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(tumor), path(normal), path(vcfs), \
@@ -12,11 +12,11 @@ process SOMATICSEQ {
     val(target_intervals)
     val(snp_classifier)
     val(indel_classifier)
-    val(module_number)
+    
     //
 
     output:
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
@@ -30,7 +30,7 @@ process SOMATICSEQ {
         found[0]
     }
 
-    output = Utl.getName(module_number, "Somaticseq")
+    output = Utl.getName("Somaticseq")
     check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --inclusion-region ${target_intervals} " : ""
     blacklist_flag = blacklist != "" ? " --exclusion-region ${blacklist} " : ""

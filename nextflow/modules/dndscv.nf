@@ -1,8 +1,8 @@
 process DNDSCV {
     ext version: "0.1.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
@@ -11,7 +11,7 @@ process DNDSCV {
     // We generate this directly from the vcf (dndscv supports snps and indels)
 
     output:
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

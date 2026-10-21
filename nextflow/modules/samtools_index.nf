@@ -1,8 +1,8 @@
 process SAMTOOLS_INDEX {
     ext version: "1.21"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam)
@@ -10,7 +10,7 @@ process SAMTOOLS_INDEX {
 
     output:
     tuple val(meta), path(output), emit: index
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

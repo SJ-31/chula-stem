@@ -2,22 +2,22 @@ process MOSDEPTH {
     ext version: "0.3.9"
  
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: 'copy', pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bam), path(index)
     val(target_regions)
-    val(module_number)
+    
 
     output:
     tuple val(meta), path("${prefix}*")
     path(out), emit: dist
-    path("*log")
+    tuple val(meta), path("*log")
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "Mosdepth")
+    prefix = Utl.getName(meta, "Mosdepth")
     if (target_regions) {
         out = "${prefix}.mosdepth.region.dist.txt"
     } else {

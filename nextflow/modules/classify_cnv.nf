@@ -1,12 +1,12 @@
 process CLASSIFY_CNV {
     ext version: "1.1.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(bed)
-    val(module_number)
+    
     //
     // Input format for the BED file is to have the columns below
     // 1. chromosome
@@ -17,11 +17,11 @@ process CLASSIFY_CNV {
     output:
     tuple val(meta), path(tsv), emit: tsv
     path(intermediate)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "ClassifyCNV")
+    prefix = Utl.getName(meta, "ClassifyCNV")
     tsv = "${prefix}.tsv"
     intermediate = "${prefix}_intermediate"
     check = file("${meta.out}/${tsv}")

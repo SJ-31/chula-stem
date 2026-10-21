@@ -1,23 +1,23 @@
 process FACETS_PILEUP {
     ext version: "2"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
     val(snps) // "should contain polymorphic SNPs, so that FACETS can infer changes in allelic configuration at genomic loci from changes in allele ratios"
     // Docs recommend dbSNP
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: pileup
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "Facets")
+    prefix = Utl.getName(meta, "Facets")
     output = "${prefix}.snp_pileup.gz"
     check = file("${meta.out}/${output}")
     if (check.exists()) {

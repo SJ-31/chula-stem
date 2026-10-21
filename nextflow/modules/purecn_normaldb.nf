@@ -1,13 +1,13 @@
 process PURECN_NORMALDB {
     ext version: "2.16.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normals)
     val(pon)
-    val(module_number)
+    
     //
 
     output:
@@ -16,7 +16,7 @@ process PURECN_NORMALDB {
     path(mapping_bias_hq), optional: true
     path(png)
     path(low_cov)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:

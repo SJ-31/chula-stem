@@ -2,23 +2,23 @@
 process TXIMPORT {
     ext version: "1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(abundance)
     val(type)
     path(reference)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "imported", "tsv")
+    output = Utl.getName(meta, "imported", "tsv")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     if (check.exists()) {

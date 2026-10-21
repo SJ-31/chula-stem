@@ -1,25 +1,25 @@
 process SNPSIFT {
     ext version: "5.2e"
   
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcf)
     val(known_variants) // List of known somatic variants e.g.
     val(sample_definition)
-    val(module_number)
+    
     //
 
     output:
     path("${output}.gz")
     path("*.html")
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
     def annotate_expr = known_variants.join(" ")
-    output = Utl.getName(module_number, meta, "SnpSift", "vcf")
+    output = Utl.getName(meta, "SnpSift", "vcf")
     check = file("$meta.out/${output}.gz")
     if (check.exists()) {
         """

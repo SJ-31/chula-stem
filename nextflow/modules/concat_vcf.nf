@@ -2,21 +2,21 @@ process CONCAT_VCF {
     ext version: "1.21"
     // Concatenate groups vcf files of the same samples
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcfs, arity: "2..*")
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output), emit: vcf
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "All", "vcf.gz")
+    output = Utl.getName(meta, "All", "vcf.gz")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         """

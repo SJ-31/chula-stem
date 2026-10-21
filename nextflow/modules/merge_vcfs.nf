@@ -1,21 +1,21 @@
 process MERGE_VCFS {
     ext version: params.gatk_version
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(vcfs)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "All_annotations", "vcf.gz")
+    output = Utl.getName(meta, "All_annotations", "vcf.gz")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     def file_list = []

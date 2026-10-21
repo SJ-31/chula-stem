@@ -1,22 +1,22 @@
 process VCFEVAL {
     ext version: "3.12.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(baseline), path(query)
     val(reference) // Genome reference in SDF format
     val(regions)
-    val(module_number)
+    
     //
 
     output:
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "vcfeval")
+    output = Utl.getName(meta, "vcfeval")
     check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     regions_flag = regions ? " --bed-regions=${regions} " : ""

@@ -1,26 +1,26 @@
 process KALLISTO {
     ext version: "0.51.1"
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.{log,json}"
+    
+    
 
     input:
     tuple val(meta), val(reads)
     val(index) // Kallisto index of transcriptome fasta file
     val(strandedness) // foward, reverse or null
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(tsv), emit: tsv
     tuple val(meta), path(h5), emit: h5
     path("*.json")
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    tsv = Utl.getName(module_number, meta, "kallisto", "tsv")
-    h5 = Utl.getName(module_number, meta, "kallisto", "h5")
+    tsv = Utl.getName(meta, "kallisto", "tsv")
+    h5 = Utl.getName(meta, "kallisto", "h5")
     check1 = file("${meta.out}/${tsv}")
     check2 = file("${meta.out}/${h5}")
     if (strandedness == "forward") {

@@ -2,23 +2,23 @@ process REPORT {
     ext version: "1"
     maxForks 1 // Limit parallel execution to limit API calls
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "${meta.log}", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), val(path_map)
     val(type)
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path(output)
     path("report_tmp")
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Report", "pdf")
+    output = Utl.getName(meta, "Report", "pdf")
     check = file("${meta.out}/${output}")
     paths = path_map.collectEntries( {
         k, v -> [(k): v instanceof Path ? v.toString() : v]

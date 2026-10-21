@@ -1,8 +1,8 @@
 process MSISENSORPRO {
     ext version: "1.3.0"
 
-    publishDir "$meta.out", mode: "copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
-    publishDir "$meta.log", mode: "copy", pattern: "*.log"
+    
+    
 
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
@@ -10,18 +10,18 @@ process MSISENSORPRO {
     // with msisensor-pro scan -d <reference genome> -o <tsv>
     val(omics_type) // Either exome or wgs
     val(gff) // Path to genome gff file to identify genes in repetitive regions
-    val(module_number)
+    
     //
 
     output:
     tuple val(meta), path("${prefix}/${unstable}.tsv"), emit: tsv
     path("${prefix}/${prefix}_summary.tsv"), emit: summary
     path(prefix)
-    path("*.log")
+    tuple val(meta), path("*.log"), emit: log
     //
 
     script:
-    prefix = Utl.getName(module_number, meta, "Msisensor") // Is the prefix, but also the summary file
+    prefix = Utl.getName(meta, "Msisensor") // Is the prefix, but also the summary file
     all = "${prefix}_all"
     unstable = "${prefix}_unstable" // Sites in "all" with statistically significant p-values
     distribution_file = "${prefix}_dis"
@@ -64,11 +64,11 @@ process MSISENSORPRO {
 
 process MSISENSORPRO_COLLECT {
 
-    publishDir "${meta.out}", mode:"copy", saveAs: { x -> x ==~ /.*\.log/ || !task.ext.publish ? null : x }
+    
 
     input:
     tuple val(meta), path(summaries)
-    val(module_number)
+    
     //
 
     output:
@@ -76,7 +76,7 @@ process MSISENSORPRO_COLLECT {
     //
 
     script:
-    output = Utl.getName(module_number, meta, "Msisensor_summaries", "tsv")
+    output = Utl.getName(meta, "Msisensor_summaries", "tsv")
     check = file("${meta.out}/${output}")
     if (check.exists()) {
         """
