@@ -40,4 +40,14 @@ workflow MUTECT2_COMPLETE {
     emit:
     unfiltered = MUTECT2.out.variants
     filtered = FILTER_MUTECT_CALLS.out.filtered
+    stats = MUTECT2.out.stats
+    contamination = CALCULATE_CONTAMINATION.out.c
+    read_orientation = LEARN_READ_ORIENTATION.out.ro
+    pileup = GET_PILEUP_SUMMARIES.out.pileup
+    segmentation = CALCULATE_CONTAMINATION.out.s
+    call_log = MUTECT2.out.log
+    filter_log = FILTER_MUTECT_CALLS.out.log
+    contamination_log = CALCULATE_CONTAMINATION.out.log
+    read_orientation_log = LEARN_READ_ORIENTATION.out.log
+    pileup_log = GET_PILEUP_SUMMARIES.out.log
 }
