@@ -1,21 +1,18 @@
 process GET_THERAPY_CACHE {
     ext version: "1"
 
-    
-    
-
     input:
     tuple val(meta), path(files)
-    //
 
     output:
-    path("therapy_cache/${civic}"), emit: civic
-    path("therapy_cache/${pandrugs2}"), emit: pandrugs2
-    path(not_in)
-    tuple val(meta), path("*.log"), emit: log
     //
+    path ("therapy_cache/${civic}"), emit: civic
+    path ("therapy_cache/${pandrugs2}"), emit: pandrugs2
+    path not_in
+    tuple val(meta), path("*.log"), emit: log
 
     script:
+    //
     civic = "civic_cache.json"
     pandrugs2 = "pandrugs2_cache.json"
     not_in = "not_in_databases.txt"
@@ -25,7 +22,8 @@ process GET_THERAPY_CACHE {
         cp -r ${check} .
         ln -sr ${meta.log}/therapy_cache.log .
         """
-    } else {
+    }
+    else {
         """
         mkdir therapy_cache
 

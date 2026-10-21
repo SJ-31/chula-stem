@@ -4,15 +4,14 @@ process CALLSET_QC_TSV {
     //
     ext version: "1"
 
-    
-    
-
     input:
     tuple val(meta), path(tsv), path(ignore_regions)
     // Will remove variants in locations that were called by the repetitive
     //      element tools, as those are likely to be more accurate in such cases
     //      Can be disabled by just sending an empty file
-    val(qc)
+    val qc
+
+    output:
     // Meta can also have a key "qc" whose value is a map specifying filters to apply
     // Currently supported are..
     // -- General
@@ -30,20 +29,16 @@ process CALLSET_QC_TSV {
     //  - canonical: keep only canonical transcripts whenever possible
     //  - informative: keep transcripts with the least number of NA VEP cols
     //  - impact: keep transcripts with the highest impact
-    
-    //
 
-    output:
+    //
     tuple val(meta), path(output), emit: tsv
     tuple val(meta), path(minimal)
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "QC", "tsv")
     minimal = "${output.replace(".tsv", "")}_minimal.tsv"
-    check = file("${meta.out}/${output}")
-    check2 = file("${meta.out}/${minimal}")
     args = task.ext.args.join(" ")
     outlog = "${output}_qc_tsv.log"
 
@@ -55,37 +50,32 @@ process CALLSET_QC_TSV {
     if (accepted_filters) {
         joined = accepted_filters.join(",")
         filter_flag = "--accepted_filters ${joined}"
-    } else {
+    }
+    else {
         filter_flag = ""
     }
-    all = qc_copy.collect({ k, v ->
-        if (k in flags) {
-            v ? "--${k}" : ""
-        } else {
-            v ? "--${k} ${v}" : ""
+    all = qc_copy
+        .collect { k, v ->
+            if (k in flags) {
+                v ? "--${k}" : ""
+            }
+            else {
+                v ? "--${k} ${v}" : ""
+            }
         }
-    }).join(" ")
+        .join(" ")
 
-    if (check.exists() && check2.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${check2} .
-        ln -sr ${meta.log}/${outlog} .
-        """
-    } else {
-        """
-        callset_qc -i ${tsv} \\
-            ${ignore_flag} \\
-            --tool_source_tag "${params.source_name}" \\
-            -o ${output} \\
-            -m ${minimal} \\
-            ${args} \\
-            ${filter_flag} \\
-            ${all}
+    """
+    callset_qc -i ${tsv} \\
+        ${ignore_flag} \\
+        --tool_source_tag "${params.source_name}" \\
+        -o ${output} \\
+        -m ${minimal} \\
+        ${args} \\
+        ${filter_flag} \\
+        ${all}
 
-        get_nextflow_log.bash ${outlog}
-        echo "QC flags\n${all}" >> ${outlog}
-        """
-    }
-    //
+    get_nextflow_log.bash ${outlog}
+    echo "QC flags\n${all}" >> ${outlog}
+    """
 }

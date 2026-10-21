@@ -1,37 +1,35 @@
 process VCFEVAL {
     ext version: "3.12.1"
 
-    
-    
-
     input:
     tuple val(meta), path(baseline), path(query)
-    val(reference) // Genome reference in SDF format
-    val(regions)
-    
-    //
+    val reference // Genome reference in SDF format
+    val regions
 
     output:
-    tuple val(meta), path("*.log"), emit: log
+
     //
+    tuple val(meta), path("*.log"), emit: log
 
     script:
+    //
     output = Utl.getName(meta, "vcfeval")
-    check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     regions_flag = regions ? " --bed-regions=${regions} " : ""
     if (task.ext.rename_chrs) {
-    // For when baseline and query use different chromosome naming conventions
+        // For when baseline and query use different chromosome naming conventions
         rename_file = task.ext.rename_chrs.file
-          // File of "old_name new_name\n" pairs
+        // File of "old_name new_name\n" pairs
         target = task.ext.rename_chrs.rename_target == "base" ? baseline : query
         chr_rename = "bcftools annotate --rename-chrs ${rename_file} ${target} -O z > temp1.vcf.gz"
         if (target == query) {
             query = "temp1.vcf.gz"
-        } else {
+        }
+        else {
             baseline = "temp1.vcf.gz"
         }
-    } else {
+    }
+    else {
         chr_rename = ""
     }
 
@@ -44,39 +42,34 @@ process VCFEVAL {
             sample_rename = "${rename_query}; ${rename_base}"
             query = "query.vcf.gz"
             baseline = "base.vcf.gz"
-        } else {
+        }
+        else {
             target = task.ext.rename_samples.rename_target == "base" ? baseline : query
             sample_rename = "bcftools reheader --samples ${rename_file} ${target} -O z > temp2.vcf.gz"
             if (target == query) {
                 query = "temp2.vcf.gz"
-            } else {
+            }
+            else {
                 baseline = "temp2.vcf.gz"
             }
         }
-    } else {
+    }
+    else {
         sample_rename = ""
     }
-    if (check.exists()) {
-        """
-        cp -r ${check} .
-        ln -sr ${meta.log}/vcfeval.log .
-        """
-    } else {
-        """
-        ${chr_rename}
+    """
+    ${chr_rename}
 
-        ${sample_rename}
+    ${sample_rename}
 
-        rtg vcfeval \\
-            ${args} \\
-            ${regions_flag} \\
-            --output=${output} \\
-            --baseline=${baseline} \\
-            --calls=${query} \\
-            --template=${reference}
+    rtg vcfeval \\
+        ${args} \\
+        ${regions_flag} \\
+        --output=${output} \\
+        --baseline=${baseline} \\
+        --calls=${query} \\
+        --template=${reference}
 
-        get_nextflow_log.bash vcfeval.log
-        """
-    }
-    //
+    get_nextflow_log.bash vcfeval.log
+    """
 }

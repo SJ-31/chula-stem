@@ -1,61 +1,48 @@
 process MANTA {
     ext version: "1.6.0"
 
-    
-    
-
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
-    val(reference)
-    val(target_intervals)
-    
-    //
+    val reference
+    val target_intervals
 
     output:
+
+    //
     tuple val(meta), path("*_Manta.vcf.gz"), emit: variants
     tuple val(meta), path(callfile), emit: somatic
     tuple val(meta), path("${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     tuple val(meta), path(out), emit: dir
     tuple val(meta), path("*.log"), emit: log
+
+    script:
     // Produces 4 files
     // - diploidSV: variants called under a diploid model, i.e. the normal sample only
     // - somaticSV: variants called under somatic model, considering paired vs. normal
     // - candidateSV: unscored SV and indel candidates
     // - candidateSmallIndels: subset of candidateSV with only small indels (less than 50 by default)
-
-    script:
     out = Utl.getName(meta, "MantaOut")
     call_suffix = !params.tumor_only ? "somaticSV_Manta" : "tumorSV_Manta"
     callfile = Utl.getName(meta, call_suffix, "vcf.gz")
-    check = file("${meta.out}/${out}")
     target_flag = target_intervals != "" ? " --callRegions=${target_intervals} " : ""
     prefix = Utl.getName(meta)
     n = !params.tumor_only ? meta.RGSM_normal : "none"
     normal_flag = !params.tumor_only ? " --normalBam ${normal} " : ""
     args = task.ext.args.join(" ")
-    if (check.exists()) {
-        """
-        cp -r ${check} .
-        ln -sr ${meta.out}/*_Manta.vcf.gz .
-        ln -sr ${meta.log}/manta.log .
-        """
-    } else {
-        """
-        configManta.py \\
-            ${normal_flag} \\
-            --tumorBam ${tumor} \\
-            --referenceFasta ${reference} \\
-            ${target_flag} \\
-            ${args} \\
-            --runDir ${out}
+    """
+    configManta.py \\
+        ${normal_flag} \\
+        --tumorBam ${tumor} \\
+        --referenceFasta ${reference} \\
+        ${target_flag} \\
+        ${args} \\
+        --runDir ${out}
 
-        ${out}/runWorkflow.py
+    ${out}/runWorkflow.py
 
-        rename_manta.bash -n "${n}" -t "${meta.RGSM_tumor}" \\
-            -o "${out}" -e "${params.source_name}" \\
-            -d "${params.source_description}" -p "${prefix}"
-        get_nextflow_log.bash manta.log
-        """
-    }
-    //
+    rename_manta.bash -n "${n}" -t "${meta.RGSM_tumor}" \\
+        -o "${out}" -e "${params.source_name}" \\
+        -d "${params.source_description}" -p "${prefix}"
+    get_nextflow_log.bash manta.log
+    """
 }

@@ -1,21 +1,18 @@
 process EMPTY_FILES {
     ext version: "1"
-    // Generate empty files to meet process input requirements when they don't actually need it
-
-    
-    
 
     input:
+    // Generate empty files to meet process input requirements when they don't actually need it
     tuple val(meta), path(file)
-    val(name)
-    val(count)
-    //
+    val name
+    val count
 
     output:
-    tuple val(meta), path("*.empty")
     //
+    tuple val(meta), path("*.empty")
 
     script:
+    //
     n = name ? name : file.baseName
     """
     for i in \$(seq 1 ${count}); do

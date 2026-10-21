@@ -1,67 +1,55 @@
 process DEEPSOMATIC {
     ext version: "0.4.1"
 
-    
-    
-
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2")
-    val(reference)
-    val(target_intervals)
-    
-    //
+    val reference
+    val target_intervals
 
     output:
+
+    //
     tuple val(meta), path(output)
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "Deepsomatic", "vcf.gz")
-    check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --regions ${target_intervals} " : ""
     args = task.ext.args.join(" ")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/deepsomatic.log .
-        """
-    } else {
-        """
-        run_deepsomatic ${args} \\
-            --model_type ${task.ext.model} \\
-            --reads_normal ${normal} \\
-            --reads_tumor ${tumor} \\
-            --ref ${reference} \\
-            ${target_flag} \\
-            --sample_name_normal ${meta.RGSM_normal} \\
-            --sample_name_tumor ${meta.RGSM_tumor} \\
-            --process_somatic true \\
-            --output_vcf temp.vcf.gz
+    """
+    run_deepsomatic ${args} \\
+        --model_type ${task.ext.model} \\
+        --reads_normal ${normal} \\
+        --reads_tumor ${tumor} \\
+        --ref ${reference} \\
+        ${target_flag} \\
+        --sample_name_normal ${meta.RGSM_normal} \\
+        --sample_name_tumor ${meta.RGSM_tumor} \\
+        --process_somatic true \\
+        --output_vcf temp.vcf.gz
 
-        echo -e "${meta.RGSM_tumor}\t${meta.RGSM_normal}" > rename.txt
+    echo -e "${meta.RGSM_tumor}\t${meta.RGSM_normal}" > rename.txt
 
-        bcftools filter -i 'FILTER~\"GERMLINE\"' temp.vcf.gz -O z | \\
-            bcftools reheader -s rename.txt > germline.vcf.gz
+    bcftools filter -i 'FILTER~\"GERMLINE\"' temp.vcf.gz -O z | \\
+        bcftools reheader -s rename.txt > germline.vcf.gz
 
-        bcftools index germline.vcf.gz
+    bcftools index germline.vcf.gz
 
-        bcftools filter -i 'FILTER!~\"GERMLINE\"' temp.vcf.gz -O z > somatic.vcf.gz
+    bcftools filter -i 'FILTER!~\"GERMLINE\"' temp.vcf.gz -O z > somatic.vcf.gz
 
-        bcftools index somatic.vcf.gz
+    bcftools index somatic.vcf.gz
 
-        bcftools merge germline.vcf.gz somatic.vcf.gz | \\
-            bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" | \\
-            vcf_info_add_tag.bash -n ${params.source_name} \\
-                -d "$params.source_description" \\
-                -b '.' \\
-                -t String \\
-                -a deepsomatic \\
-                -o ${output}
+    bcftools merge germline.vcf.gz somatic.vcf.gz | \\
+        bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" | \\
+        vcf_info_add_tag.bash -n ${params.source_name} \\
+            -d "${params.source_description}" \\
+            -b '.' \\
+            -t String \\
+            -a deepsomatic \\
+            -o ${output}
 
-        get_nextflow_log.bash deepsomatic.log
-        """
-    }
-    //
+    get_nextflow_log.bash deepsomatic.log
+    """
 }
 // TODO: can be used with panel of normals
