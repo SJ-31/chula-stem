@@ -1,16 +1,16 @@
 import groovy.json.JsonOutput
 
 class Utl {
-    public static String getName(Integer module_number, Map meta, String suffix = null, String ext = null) {
+    public static String getName(Map meta, String suffix = null, String ext = null) {
         def suf = meta.suffix ? meta.suffix : suffix
         if (!ext && suffix) {
-            return "${module_number}-${meta.filename}-${suf}"
+            return "${meta.filename}-${suf}"
         } else if (ext && suf) {
-            return "${module_number}-${meta.filename}-${suf}.${ext}"
+            return "${meta.filename}-${suf}.${ext}"
         } else if (!suf && !ext) {
-            return "${module_number}-${meta.filename}"
+            return "${meta.filename}"
         } else {
-            return "${module_number}-${meta.filename}.${ext}"
+            return "${meta.filename}.${ext}"
         }
     }
 
