@@ -22,8 +22,8 @@ process FASTP {
     script:
     n0 = reads[0].baseName.replaceAll(".fastq", "")
     n1 = reads[1].baseName.replaceAll(".fastq", "")
-    output1 = "${module_number}-${n0}.fastp.fastq.gz"
-    output2 = "${module_number}-${n1}.fastp.fastq.gz"
+    output1 = "${n0}.fastp.fastq.gz"
+    output2 = "${n1}.fastp.fastq.gz"
     prefix = Utl.getName(meta, "fastp")
     check1 = file("${meta.out}/$output1")
     check2 = file("${meta.out}/$output2")

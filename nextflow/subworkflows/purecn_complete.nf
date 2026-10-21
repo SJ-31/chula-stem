@@ -14,10 +14,8 @@ workflow PURECN_COMPLETE {
     normal_bam
     panel_of_normals
     cohort_name
-    module_number
 
     main:
-
     tumor_bam.dump(tag: "purecn_tumor")
     normal_bam.dump(tag: "purecn_normal")
 
@@ -26,24 +24,23 @@ workflow PURECN_COMPLETE {
                                 "log": "${params.outdir}/PureCN_ref"],
                               params.ref.genome],
                               params.ref.baits,
-                              params.ref.mappability,
-                              module_number)
+                              params.ref.mappability)
         bait_intervals = PURECN_BAIT_INTERVALS.out.baits
     } else {
         bait_intervals = params.ref.purecn_bait_intervals
     }
 
-    COVERAGE_TUMOR(tumor_bam, bait_intervals, false, module_number)
+    COVERAGE_TUMOR(tumor_bam, bait_intervals, false)
 
     if (!params.ref.purecn_normaldb) {
-        COVERAGE_NORMAL(normal_bam, bait_intervals, false, module_number)
+        COVERAGE_NORMAL(normal_bam, bait_intervals, false)
         normal_files = COVERAGE_NORMAL.out.loess.map({ it -> it[1] }).toList()
         def to_normaldb = channel.of(["filename": cohort_name,
                                       "out": "${params.outdir}/PureCN_ref",
                                       "log": "${params.outdir}/PureCN_ref"])
             .merge(normal_files) { meta, cov -> tuple(meta, tuple(cov)) }
         to_normaldb.dump(tag: "purecn_normaldb")
-        PURECN_NORMALDB(to_normaldb, panel_of_normals, module_number)
+        PURECN_NORMALDB(to_normaldb, panel_of_normals)
         normaldb = PURECN_NORMALDB.out.db.first()
         mapping_bias = PURECN_NORMALDB.out.mapping_bias.first()
     } else {
@@ -68,8 +65,7 @@ workflow PURECN_COMPLETE {
                 mapping_bias,
                 params.ref.snp_blacklist ?: "",
                 params.defaults.purity,
-                params.defaults.ploidy,
-                module_number + 1)
+                params.defaults.ploidy)
 
     emit:
     purity_ploidy = PURECN_CALL.out.purity_ploidy

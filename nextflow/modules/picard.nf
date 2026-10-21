@@ -1,9 +1,6 @@
 process PICARD {
     ext version: params.gatk_version
 
-    
-    
-
     input:
     tuple val(meta), path(bam), path(index)
     val(omics_type) // One of `hs` (exome), `wgs` or `rnaseq`

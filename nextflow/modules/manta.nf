@@ -14,7 +14,7 @@ process MANTA {
     output:
     tuple val(meta), path("*_Manta.vcf.gz"), emit: variants
     tuple val(meta), path(callfile), emit: somatic
-    tuple val(meta.id), path("${module_number}-${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
+    tuple val(meta.id), path("${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     path(out)
     tuple val(meta), path("*.log"), emit: log
     // Produces 4 files

@@ -15,14 +15,14 @@ process BQSR {
 
     output:
     tuple val(meta), path(recal), emit: bam
-    path(report), optional: true
-    path(recal_dir)
+    path(report), emit: report, optional: true
+    tuple val(meta), path(recal_dir), emit: recal_tables
     tuple val(meta), path("*.log"), emit: log
 
     script:
     recal = Utl.getName(meta, "recal", "bam")
     report = Utl.getName(meta, "AnalyzeCovariates", "pdf")
-    recal_dir = "${module_number}-recalibration_tables"
+    recal_dir = "recalibration_tables"
     check = file("${meta.out}/$recal")
     check2 = file("${meta.out}/$report")
     def sites_command = known_sites.collect{"--known-sites $it"}.join(' ')

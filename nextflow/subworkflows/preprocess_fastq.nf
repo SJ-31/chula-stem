@@ -10,18 +10,13 @@ include { SC_RNASEQ_QC } from "../modules/sc_rnaseq_qc.nf"
 workflow PREPROCESS_FASTQ {
     take:
     manifest
-    outdir
-    logdir
     omics_type
-    offset // Offset for module number
 
     main:
     input = channel.fromPath(manifest)
         .splitCsv(header: true)
         .map { it -> [["id": it.patient,
-                "out": "${outdir}/${it.patient}/${it.source}",
                 "type": it.source,
-                "log": "${logdir}/${it.patient}/${it.source}",
                 "filename": "${it.patient}_${it.source}", // Output filename
                 "RGLB": it.read_group_library, // Read group info used by GATK tools
                 "RGPL": it.read_group_platform,
@@ -29,25 +24,25 @@ workflow PREPROCESS_FASTQ {
                 "RGSM": it.read_group_sample_name
             ], [file(it.fastq_1), file(it.fastq_2)]] }
 
-    FASTP(input, offset + 1)
+    FASTP(input)
     if (omics_type == "rnaseq") {
         STAR(FASTP.out.passed, params.ref.star_index, params.strandedness,
-             "UniqueIdenticalNotMulti", true, params.ref.genome_gff, offset + 2)
+             "UniqueIdenticalNotMulti", true, params.ref.genome_gff)
         bams = STAR.out.mapped
         chimeric_junction = STAR.out.chimeric
         counts = STAR.out.counts
     } else if (omics_type == "sc_rnaseq") {
         STAR_SOLO(FASTP.out.passed, params.ref.star_index, params.strandedness, true,
-                  params.ref.genome_gff, params.ref.barcodes, offset + 2)
+                  params.ref.genome_gff, params.ref.barcodes)
         bams = STAR_SOLO.out.mapped
         chimeric_junction = STAR_SOLO.out.chimeric
-        SC_RNASEQ_QC(STAR_SOLO.out.counts, params.ref.genome_gff_sqlite, offset + 3)
+        SC_RNASEQ_QC(STAR_SOLO.out.counts, params.ref.genome_gff_sqlite)
         counts = SC_RNASEQ_QC.out.counts
     } else {
-        BWA(FASTP.out.passed, params.ref.genome, offset + 2)
-        MARK_DUPLICATES(BWA.out.mapped, params.ref.genome, offset + 3)
+        BWA(FASTP.out.passed, params.ref.genome)
+        MARK_DUPLICATES(BWA.out.mapped, params.ref.genome)
         BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants,
-             false, offset + 4)
+             false)
         bams = BQSR.out.bam
         chimeric_junction = channel.empty()
         counts = channel.empty()

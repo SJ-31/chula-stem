@@ -29,7 +29,7 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
                                 "log": "${params.outdir}/cnvkit_reference"])
                     .merge(collected_normals) { meta, b -> tuple(meta, tuple(b)) },
                     params.ref.genome, params.ref.baits_unzipped,
-                    params.ref.genome_blacklist, true, "hybrid", 4)
+                    params.ref.genome_blacklist, true, "hybrid")
     }
     
     to_mutect2 = Utl.joinFirst(empty_bams, [bams, bam_indices, empty_indices_1])
@@ -42,16 +42,15 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
             params.ref.targets,
             params.ref.germline, "",
             params.interval_padding ? params.interval_padding : 0,
-            true,
-            5)
-    CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets, 5)
-    OCTOPUS(to_oct, params.ref.genome, params.ref.targets, true, 5)
+            true)
+    CLAIRS_TO(to_clairs, params.ref.genome, params.ref.targets)
+    OCTOPUS(to_oct, params.ref.genome, params.ref.targets, true)
 
     to_concat = Utl.joinFirst(MUTECT2.out.variants,
                               [CLAIRS_TO.out.variants, OCTOPUS.out.variants])
         .map({ it -> [it[0], it[1..-1]] })
 
-    CONCAT_VCF(to_concat, 5)
+    CONCAT_VCF(to_concat)
 
     // BUG: <2025-01-22 Wed> db_import isn't working, will try see if it's due to
     // handling the vcfs of the other callers
@@ -63,7 +62,7 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
 
     min_samples = params.minimum_samples ? params.minimum_samples : 2
     add_to_pon = params.ref.add_to_pon ? params.ref.add_to_pon : []
-    CREATE_PANEL_OF_NORMALS(to_pon, min_samples, params.ref.genome, add_to_pon, 7)
+    CREATE_PANEL_OF_NORMALS(to_pon, min_samples, params.ref.genome, add_to_pon)
 
     emit:
     pon = CREATE_PANEL_OF_NORMALS.out.pon
