@@ -1,68 +1,57 @@
 process CLAIRS {
     ext version: "0.4.1"
 
-    
-    
-
     input:
     tuple val(meta), path(normal), path(tumor), path(indices, arity: "2"), path(previous_variants)
-    val(reference)
-    val(target_intervals)
-    
-    //
+    val reference
+    val target_intervals
 
     output:
+
+    //
     tuple val(meta), path(output), emit: variants
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "ClairS", "vcf.gz")
-    check = file("${meta.out}/${output}")
     target_flag = target_intervals != "" ? " --bed_fn ${target_intervals} " : ""
     prev_flag = previous_variants ? "--hybrid_mode_vcf_fn ${previous_variants}" : ""
     args = task.ext.args.join(" ")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/clairs.log .
-        """
-    } else {
-        """
-        run_clairs ${args} \\
-            --tumor_bam_fn ${tumor} \\
-            --normal_bam_fn ${normal} \\
-            --ref_fn ${reference} \\
-            --threads ${task.cpus} \\
-            --platform ${task.ext.platform} \\
-            --sample_name ${meta.RGSM_tumor} \\
-            ${prev_flag} \\
-            ${target_flag} \\
-            --output_dir .
+    """
+    run_clairs ${args} \\
+        --tumor_bam_fn ${tumor} \\
+        --normal_bam_fn ${normal} \\
+        --ref_fn ${reference} \\
+        --threads ${task.cpus} \\
+        --platform ${task.ext.platform} \\
+        --sample_name ${meta.RGSM_tumor} \\
+        ${prev_flag} \\
+        ${target_flag} \\
+        --output_dir .
 
-        echo -e "${meta.RGSM_tumor}\t${meta.RGSM_normal}" > rename.txt
-        bcftools filter -i 'FILTER~\"Germline\"' output.vcf.gz -O z | \\
-            bcftools reheader -s rename.txt > germline.vcf.gz
+    echo -e "${meta.RGSM_tumor}\t${meta.RGSM_normal}" > rename.txt
+    bcftools filter -i 'FILTER~\"Germline\"' output.vcf.gz -O z | \\
+        bcftools reheader -s rename.txt > germline.vcf.gz
 
-        bcftools index germline.vcf.gz
-        bcftools filter -i 'FILTER!~\"Germline\"' output.vcf.gz -O z > somatic.vcf.gz
-        bcftools index somatic.vcf.gz
+    bcftools index germline.vcf.gz
+    bcftools filter -i 'FILTER!~\"Germline\"' output.vcf.gz -O z > somatic.vcf.gz
+    bcftools index somatic.vcf.gz
 
-        bcftools merge germline.vcf.gz somatic.vcf.gz | \\
-            bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" | \\
-            vcf_info_add_tag.bash -n ${params.source_name} \\
-                -d "$params.source_description" \\
-                -b '.' \\
-                -t String \\
-                -a clairs \\
-                -o ${output}
+    bcftools merge germline.vcf.gz somatic.vcf.gz | \\
+        bcftools view -s "${meta.RGSM_normal},${meta.RGSM_tumor}" | \\
+        vcf_info_add_tag.bash -n ${params.source_name} \\
+            -d "${params.source_description}" \\
+            -b '.' \\
+            -t String \\
+            -a clairs \\
+            -o ${output}
 
-        get_nextflow_log.bash clairs.log
-        """
-    }
+    get_nextflow_log.bash clairs.log
+    """
 }
 // On the rename procedure:
-    // ClairS combines both somatic and germline calls under the same sample name in the vcf
+// ClairS combines both somatic and germline calls under the same sample name in the vcf
 // The germline calls are extracted by checking for the 'Germline' filter, then placed into a separate file - germline.vcf.gz
 // In germline.vcf.gz, sample is correctly renamed to be the germline sample. Then
 // both germline and somatic files are merged together

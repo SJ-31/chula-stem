@@ -14,8 +14,8 @@ process MANTA {
     output:
     tuple val(meta), path("*_Manta.vcf.gz"), emit: variants
     tuple val(meta), path(callfile), emit: somatic
-    tuple val(meta.id), path("${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
-    path(out)
+    tuple val(meta), path("${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
+    tuple val(meta), path(out), emit: dir
     tuple val(meta), path("*.log"), emit: log
     // Produces 4 files
     // - diploidSV: variants called under a diploid model, i.e. the normal sample only

@@ -1,12 +1,11 @@
 process MULTIQC {
     ext version: "1.25.1"
 
-    
-    
-
     input:
     tuple val(meta), path(files)
-    
+
+    output:
+
     // Will aggregate metrics from
     // - fastp
     //      from json file
@@ -19,32 +18,18 @@ process MULTIQC {
     //    from plot.py
     // - VEP
     //  from html summary file
-
-    output:
-    path(out)
-    path(data)
-    path("multiqc.log")
-    //
+    path (out), emit: html
+    path (data), emit: data
+    path ("multiqc.log"), emit: log
 
     script:
+    //
     out = Utl.getName(meta, "MultiQC", "html")
     data = Utl.getName(meta, "MultiQC_data")
-    check = file("${meta.out}/${out}")
-    check2 = file("${meta.out}/${data}")
-    if (check.exists()) {
-        """
-        cp -r ${check2} .
-        ln -sr ${check} .
-        ln -sr "${meta.log}/multiqc.log" .
-        """
-    } else {
-        """
-        multiqc . --config "$params.configdir/multiqc_config.yaml" \\
-            --filename ${out}
+    """
+    multiqc . --config "${params.configdir}/multiqc_config.yaml" \\
+        --filename ${out}
 
-        get_nextflow_log.bash multiqc.log
-        """
-    }
-
-    //
+    get_nextflow_log.bash multiqc.log
+    """
 }

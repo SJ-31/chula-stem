@@ -13,61 +13,47 @@
 
 process STANDARDIZE_VCF {
     ext version: params.gatk_version
+
+    input:
     // errorStrategy "ignore"
     // BUG: <2025-01-03 Fri> gatk has an Invalid File pointer error
     // when trying to read the recal bam file it produced...
-
-    
-    
-
-    input:
     tuple val(meta), path(vcf), path(normal_bam), path(tumor_bam)
-    val(reference)
-    
+    val reference
 
     output:
     tuple val(meta), path(output), emit: vcf
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     suffix = meta.suffix ? meta.suffix : "Standardized"
     output = Utl.getName(meta, "Standardize", "vcf.gz")
-    check = file("${meta.out}/${output}")
     to_clear = [
         "INFO": ["DP", "MMQ", "MBQ", "AN", "AC", "AF"],
         "FORMAT": ["AD"],
     ]
-    annotations = ["ChromosomeCounts", "Coverage", "AlleleFraction",
-                   "DepthPerAlleleBySample", "MappingQuality", "BaseQuality"]
+    annotations = ["ChromosomeCounts", "Coverage", "AlleleFraction", "DepthPerAlleleBySample", "MappingQuality", "BaseQuality"]
 
-    annotation_flag = annotations.collect({" -A ${it} "}).join(" ")
-    clear_flag = to_clear.collect({ k,v -> v.collect({ "${k}/${it}" }).join(",") }).join(",")
+    annotation_flag = annotations.collect { " -A ${it} " }.join(" ")
+    clear_flag = to_clear.collect { k, v -> v.collect { "${k}/${it}" }.join(",") }.join(",")
     read_flag = !params.tumor_only ? " -I ${tumor_bam} -I ${normal_bam} " : " -I ${tumor_bam} "
     args = task.ext.args.join(" ")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/${suffix}.log .
-        """
-    } else {
-        """
-        standardize_vcf_clean.bash -c "${clear_flag}" \\
-            -r ${reference} \\
-            -i ${vcf} \\
-            -o tmp.vcf.gz
+    """
+    standardize_vcf_clean.bash -c "${clear_flag}" \\
+        -r ${reference} \\
+        -i ${vcf} \\
+        -o tmp.vcf.gz
 
-        gatk IndexFeatureFile -I tmp.vcf.gz
-        gatk VariantAnnotator ${args} \\
-            -R ${reference} -V tmp.vcf.gz \\
-            ${read_flag} \\
-            ${annotation_flag} \\
-            -O ${output} \\
-            --add-output-vcf-command-line || \\
-                standardize_vcf_clean.bash -r ${reference} -i ${vcf} -o ${output}
+    gatk IndexFeatureFile -I tmp.vcf.gz
+    gatk VariantAnnotator ${args} \\
+        -R ${reference} -V tmp.vcf.gz \\
+        ${read_flag} \\
+        ${annotation_flag} \\
+        -O ${output} \\
+        --add-output-vcf-command-line || \\
+            standardize_vcf_clean.bash -r ${reference} -i ${vcf} -o ${output}
 
-        get_nextflow_log.bash ${suffix}.log
-        """
-    }
-    //
+    get_nextflow_log.bash ${suffix}.log
+    """
 }

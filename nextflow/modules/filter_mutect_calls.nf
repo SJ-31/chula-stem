@@ -5,43 +5,31 @@ process FILTER_MUTECT_CALLS {
     //  - whether or not a read is "well-formed", see https://gatk.broadinstitute.org/hc/en-us/articles/360042911951-WellformedReadFilter
     ext version: params.gatk_version
 
-    
-    
-
     input:
     tuple val(meta), path(vcf), path(ro_model), path(contamination), path(segmentation), path(stats)
-    val(reference)
-    
-    //
+    val reference
 
     output:
+
+    //
     tuple val(meta), path(output), emit: filtered
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "Mutect2_filtered", "vcf.gz")
-    check = file("${meta.out}/${output}")
     args = task.ext.args.join(" ")
     args_flag = task.ext.args ? "-a ${args}" : ""
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/filter_mutect_calls.log .
-        """
-    } else {
-        """
-        filter_mutect_calls.bash -v ${vcf} \\
-            ${args_flag} \\
-            -r ${reference} \\
-            -t ${segmentation} \\
-            -o ${output} \\
-            -m ${ro_model} \\
-            -s ${stats} \\
-            -c ${contamination}
+    """
+    filter_mutect_calls.bash -v ${vcf} \\
+        ${args_flag} \\
+        -r ${reference} \\
+        -t ${segmentation} \\
+        -o ${output} \\
+        -m ${ro_model} \\
+        -s ${stats} \\
+        -c ${contamination}
 
-        get_nextflow_log.bash filter_mutect_calls.log
-        """
-    }
-    //
+    get_nextflow_log.bash filter_mutect_calls.log
+    """
 }

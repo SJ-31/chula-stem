@@ -71,4 +71,7 @@ workflow PURECN_COMPLETE {
 
     emit:
     purity_ploidy = PURECN_CALL.out.purity_ploidy
+    call = PURECN_CALL.out.call
+    loess = COVERAGE_TUMOR.out.loess
+    cov = COVERAGE_TUMOR.out.cov
 }

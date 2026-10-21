@@ -1,43 +1,31 @@
 process CROSS_REFERENCE {
     ext version: "1"
+
+    input:
     // Cross-reference CNV or repeat data with those found in online databases
     // Takes output from ClassifyCNV and the get_msisensor.bash script and adds the
     // metadata columns "accession", "source", "p_overlap" and "ClinGen_report"
-
-    
-    
-
-    input:
     tuple val(meta), path(cnv_or_msi)
-    val(type) // Either "CNV" or "MSI"
-    val(clingen)
-    val(reference)
-    
-    //
+    val type // Either "CNV" or "MSI"
+    val clingen
+    val reference
 
     output:
+
+    //
     tuple val(meta), path(out), emit: tsv
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
-    out = Utl.getName(meta, "CR", "tsv")
-    check = file("${meta.out}/${out}")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        ln -sr ${meta.log}/${type}_cross_reference.log .
-        """
-    } else {
-        """
-        cross_reference.r --input ${cnv_or_msi} \\
-            --type ${type} \\
-            --reference ${reference} \\
-            --clingen ${clingen} \\
-            --output ${out}
-
-        get_nextflow_log.bash ${type}_cross_reference.log
-        """
-    }
     //
+    out = Utl.getName(meta, "CR", "tsv")
+    """
+    cross_reference.r --input ${cnv_or_msi} \\
+        --type ${type} \\
+        --reference ${reference} \\
+        --clingen ${clingen} \\
+        --output ${out}
+
+    get_nextflow_log.bash ${type}_cross_reference.log
+    """
 }

@@ -1,103 +1,83 @@
 process SIGPROFILERASSIGNMENT {
     ext version: "0.1.9"
 
-    
-    
-
     input:
     tuple val(meta), path(vcfs)
-    val(is_exome)
-    val(exclude_file)
-    
-    //
+    val is_exome
+    val exclude_file
 
     output:
-    tuple val(meta), path(output), emit: data
+
+    //
+    tuple val(meta), path(output), emit: all
     tuple val(meta), path(activities_file), emit: activities
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "SigProfilerAssignment")
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args.join(" ")
-    check = file("$meta.out/$output")
     activities_file = "${output}/Activities/Assignment_Solution_Activities.txt"
-    if (check.exists()) {
-        """
-        cp -r $check .
-        ln -sr $meta.log/sigprofilerassignment.log .
-        """
-    } else {
-        """
-        export SIGPROFILERASSIGNMENT_VOLUME=${task.ext.volume}
+    """
+    export SIGPROFILERASSIGNMENT_VOLUME=${task.ext.volume}
 
-        mkdir vcfs
+    mkdir vcfs
 
-        for v in *vcf.gz; do
-            sigprofiler_assignment_cleanup.bash \$v vcfs
-        done
+    for v in *vcf.gz; do
+        sigprofiler_assignment_cleanup.bash \$v vcfs
+    done
 
-        SigProfilerAssignmentWrapper.py -i vcfs \\
-            ${args} \\
-            -o ${output} \\
-            ${exome_flag} \\
-            ${exclude_flag}
+    SigProfilerAssignmentWrapper.py -i vcfs \\
+        ${args} \\
+        -o ${output} \\
+        ${exome_flag} \\
+        ${exclude_flag}
 
-        if [[ ! -z \$(ls -A ${output}/Assignment_Solution) ]]; then
-            mv ${output}/Assignment_Solution/* ${output}
-        fi
-        
-        rmdir ${output}/Assignment_Solution
+    if [[ ! -z \$(ls -A ${output}/Assignment_Solution) ]]; then
+        mv ${output}/Assignment_Solution/* ${output}
+    fi
+    
+    rmdir ${output}/Assignment_Solution
 
-        if [[ ! -e ${output}/Activities ]]; then
-            mkdir ${output}/Activities
-        fi
+    if [[ ! -e ${output}/Activities ]]; then
+        mkdir ${output}/Activities
+    fi
 
-        if [[ ! -e '${activities_file}' ]]; then
-            echo EMPTY > ${activities_file}
-        fi
+    if [[ ! -e '${activities_file}' ]]; then
+        echo EMPTY > ${activities_file}
+    fi
 
-        get_nextflow_log.bash sigprofilerassignment.log
-        """
-    }
+    get_nextflow_log.bash sigprofilerassignment.log
+    """
 }
 
 process SIGPROFILERASSIGNMENT_COLLECT {
-    
-
     input:
     tuple val(meta), path(activities, stageAs: "?/*")
-    
-    //
 
     output:
-    path(output)
+
     //
+    path output
 
     script:
+    //
     output = Utl.getName(meta, "SigProfilerAssignment_activities", "tsv")
-    check = file("${meta.out}/${output}")
-    if (check.exists()) {
-        """
-        ln -sr ${check} .
-        """
-    } else {
-        """
-        #!/usr/bin/env Rscript
+    """
+    #!/usr/bin/env Rscript
 
-        library(tidyverse)
-        files <- list.files(pattern = "Assignment_Solution_Activities.txt",
-            recursive = TRUE)
-        combined <- lapply(files, read_tsv) |> bind_rows()
-        if (nrow(combined) > 0) {
-            combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
-            str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
-            })
-        }
-        write_tsv(combined, "${output}")
-        """
+    library(tidyverse)
+    files <- list.files(pattern = "Assignment_Solution_Activities.txt",
+        recursive = TRUE)
+    combined <- lapply(files, read_tsv) |> bind_rows()
+    if (nrow(combined) > 0) {
+        combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
+        str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
+        })
     }
+    write_tsv(combined, "${output}")
+    """
     //
 }

@@ -1,30 +1,25 @@
 process VEP {
     ext version: "113"
 
-    
-    
-
     input:
     tuple val(meta), path(vcf)
-    val(reference)
-    val(panel_of_normals)
-    
-    //
+    val reference
+    val panel_of_normals
 
     output:
+
+    //
     tuple val(meta), path(output), emit: vcf
-    path("*.html"), emit: report
+    tuple val(meta), path ("*.html"), emit: report
     tuple val(meta), path(tsv), emit: tsv
     tuple val(meta), path("*.log"), emit: log
-    //
 
     script:
+    //
     output = Utl.getName(meta, "VEP", "vcf.gz")
     tsv = Utl.getName(meta, "VEP", "tsv")
     logfile = Utl.getName(meta, "VEP", "log")
     html = Utl.getName(meta, "VEP_summary", "html")
-    check = file("$meta.out/$output")
-    check2 = file("$meta.out/$tsv")
     variant_class = meta.variant_class ? meta.variant_class : "small"
     // One of "sv" or "small"
     normal_flag = !params.tumor_only ? "-n ${meta.RGSM_normal}" : ""
@@ -33,50 +28,42 @@ process VEP {
         pon_filter_command = """
         bcftools view -T ^${panel_of_normals} ${vcf} -O z -W -o pon_filtered.vcf.gz
         """
-    } else {
+    }
+    else {
         pon_filter_command = ""
     }
     args = task.ext.args.join(" ")
-    if (check.exists() && check2.exists()) {
-        """
-        ln -sr $check .
-        ln -sr $check2 .
-        ln -sr $meta.log/${logfile} .
-        ln -sr $meta.out/${html} .
-        """
-    } else {
-        """
-        ${pon_filter_command}
-        
-        bcftools view ${input} -H | head > check.txt
+    """
+    ${pon_filter_command}
+    
+    bcftools view ${input} -H | head > check.txt
 
-        if [[ -s check.txt ]]; then
+    if [[ -s check.txt ]]; then
 
-                vep --cache \\
-                    $args \\
-                    --input_file ${input} \\
-                    --dir_cache ${task.ext.cache} \\
-                    --species ${task.ext.species} \\
-                    --fasta $reference \\
-                    --stats_file ${html} \\
-                    --hgvs \\
-                    --hgvsg \\
-                    --vcf \\
-                    --vcf_info_field ANN \\
-                    --compress_output bgzip \\
-                    --output_file $output
+            vep --cache \\
+                ${args} \\
+                --input_file ${input} \\
+                --dir_cache ${task.ext.cache} \\
+                --species ${task.ext.species} \\
+                --fasta ${reference} \\
+                --stats_file ${html} \\
+                --hgvs \\
+                --hgvsg \\
+                --vcf \\
+                --vcf_info_field ANN \\
+                --compress_output bgzip \\
+                --output_file ${output}
 
-                format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} \\
-                    -c ${variant_class} -v ANN -r ${meta.RGSM_tumor} ${normal_flag}
+            format_vep_vcf -i ${output} -o ${tsv} -t ${params.source_name} \\
+                -c ${variant_class} -v ANN -r ${meta.RGSM_tumor} ${normal_flag}
 
-                get_nextflow_log.bash ${logfile}
-        else
-            touch ${output}
-            touch ${html}
-            echo '${input} has no variants!' > ${logfile}
-            touch ${tsv}
-        fi
-        """
-    }
+            get_nextflow_log.bash ${logfile}
+    else
+        touch ${output}
+        touch ${html}
+        echo '${input} has no variants!' > ${logfile}
+        touch ${tsv}
+    fi
+    """
     // use --synonyms flag to unify the naming systems (can just use your existing renaming files)
 }

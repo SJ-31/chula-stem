@@ -12,7 +12,7 @@ process REPORT {
     //
 
     output:
-    tuple val(meta), path(output)
+    tuple val(meta), path(output), emit: report
     path("report_tmp")
     tuple val(meta), path("*.log"), emit: log
     //
