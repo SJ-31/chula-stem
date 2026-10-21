@@ -15,42 +15,66 @@ workflow PREPROCESS_FASTQ {
     main:
     input = channel.fromPath(manifest)
         .splitCsv(header: true)
-        .map { it -> [["id": it.patient,
+        .map { it ->
+            [[
+                "id": it.patient,
                 "type": it.source,
                 "filename": "${it.patient}_${it.source}", // Output filename
                 "RGLB": it.read_group_library, // Read group info used by GATK tools
                 "RGPL": it.read_group_platform,
                 "RGPU": it.read_group_platform_unit,
-                "RGSM": it.read_group_sample_name
-            ], [file(it.fastq_1), file(it.fastq_2)]] }
+                "RGSM": it.read_group_sample_name,
+            ], [file(it.fastq_1), file(it.fastq_2)]]
+        }
 
     FASTP(input)
     if (omics_type == "rnaseq") {
-        STAR(FASTP.out.passed, params.ref.star_index, params.strandedness,
-             "UniqueIdenticalNotMulti", true, params.ref.genome_gff)
+        STAR(
+            FASTP.out.passed,
+            params.ref.star_index,
+            params.strandedness,
+            "UniqueIdenticalNotMulti",
+            true,
+            params.ref.genome_gff,
+        )
         bams = STAR.out.mapped
         chimeric_junction = STAR.out.chimeric
         counts = STAR.out.counts
-    } else if (omics_type == "sc_rnaseq") {
-        STAR_SOLO(FASTP.out.passed, params.ref.star_index, params.strandedness, true,
-                  params.ref.genome_gff, params.ref.barcodes)
+    }
+    else if (omics_type == "sc_rnaseq") {
+        STAR_SOLO(
+            FASTP.out.passed,
+            params.ref.star_index,
+            params.strandedness,
+            true,
+            params.ref.genome_gff,
+            params.ref.barcodes,
+        )
         bams = STAR_SOLO.out.mapped
         chimeric_junction = STAR_SOLO.out.chimeric
         SC_RNASEQ_QC(STAR_SOLO.out.counts, params.ref.genome_gff_sqlite)
         counts = SC_RNASEQ_QC.out.counts
-    } else {
+    }
+    else {
         BWA(FASTP.out.passed, params.ref.genome)
         MARK_DUPLICATES(BWA.out.mapped, params.ref.genome)
-        BQSR(MARK_DUPLICATES.out.dedup, params.ref.genome, params.ref.known_variants,
-             false)
+        BQSR(
+            MARK_DUPLICATES.out.dedup,
+            params.ref.genome,
+            params.ref.known_variants,
+            false,
+        )
         bams = BQSR.out.bam
         chimeric_junction = channel.empty()
         counts = channel.empty()
     }
     SAMTOOLS_INDEX(bams) // indices are required by certain callers
 
-    with_index = Utl.joinFirst(bams, [SAMTOOLS_INDEX.out.index],
-                               ["id", "type"])
+    with_index = Utl.joinFirst(
+        bams,
+        [SAMTOOLS_INDEX.out.index],
+        ["id", "type"],
+    )
 
     emit:
     bam = bams

@@ -7,8 +7,8 @@ include { PURECN_CALL } from "../modules/purecn_call.nf"
 
 
 workflow PURECN_COMPLETE {
-    //
     take:
+    //
     mutect2_unfiltered
     tumor_bam
     normal_bam
@@ -20,13 +20,14 @@ workflow PURECN_COMPLETE {
     normal_bam.dump(tag: "purecn_normal")
 
     if (!params.ref.purecn_bait_intervals) {
-        PURECN_BAIT_INTERVALS([["out": "${params.outdir}/PureCN_ref",
-                                "log": "${params.outdir}/PureCN_ref"],
-                              params.ref.genome],
-                              params.ref.baits,
-                              params.ref.mappability)
+        PURECN_BAIT_INTERVALS(
+            [["out": "${params.outdir}/PureCN_ref", "log": "${params.outdir}/PureCN_ref"], params.ref.genome],
+            params.ref.baits,
+            params.ref.mappability,
+        )
         bait_intervals = PURECN_BAIT_INTERVALS.out.baits
-    } else {
+    }
+    else {
         bait_intervals = params.ref.purecn_bait_intervals
     }
 
@@ -34,38 +35,39 @@ workflow PURECN_COMPLETE {
 
     if (!params.ref.purecn_normaldb) {
         COVERAGE_NORMAL(normal_bam, bait_intervals, false)
-        normal_files = COVERAGE_NORMAL.out.loess.map({ it -> it[1] }).toList()
-        def to_normaldb = channel.of(["filename": cohort_name,
-                                      "out": "${params.outdir}/PureCN_ref",
-                                      "log": "${params.outdir}/PureCN_ref"])
+        normal_files = COVERAGE_NORMAL.out.loess.map { it -> it[1] }.toList()
+        def to_normaldb = channel.of(
+                ["filename": cohort_name, "out": "${params.outdir}/PureCN_ref", "log": "${params.outdir}/PureCN_ref"]
+            )
             .merge(normal_files) { meta, cov -> tuple(meta, tuple(cov)) }
         to_normaldb.dump(tag: "purecn_normaldb")
         PURECN_NORMALDB(to_normaldb, panel_of_normals)
         normaldb = PURECN_NORMALDB.out.db.first()
         mapping_bias = PURECN_NORMALDB.out.mapping_bias.first()
-    } else {
+    }
+    else {
         normaldb = params.ref.purecn_normaldb
         mapping_bias = params.ref.purecn_mapping_bias ?: ""
     }
-    to_call = COVERAGE_TUMOR.out.loess.map({ it -> [it[0].id,
-                                               ["type": "paired",
-                                                "id": it[0].id,
-                                                "filename": it[0].id],
-                                               it[1]]})
+    to_call = COVERAGE_TUMOR.out.loess
+        .map { it ->
+            [it[0].id, ["type": "paired", "id": it[0].id, "filename": it[0].id], it[1]]
+        }
         .join(Utl.getId(mutect2_unfiltered))
-        .map({ it -> it[1..-1] })
-        .map({ it ->
-                [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations",
-                          "log": "${params.logdir}/${it[0].id}/annotations"]] +
-                    it[1..-1] })
+        .map { it -> it[1..-1] }
+        .map { it ->
+            [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations", "log": "${params.logdir}/${it[0].id}/annotations"]] + it[1..-1]
+        }
 
-    PURECN_CALL(to_call,
-                normaldb,
-                bait_intervals,
-                mapping_bias,
-                params.ref.snp_blacklist ?: "",
-                params.defaults.purity,
-                params.defaults.ploidy)
+    PURECN_CALL(
+        to_call,
+        normaldb,
+        bait_intervals,
+        mapping_bias,
+        params.ref.snp_blacklist ?: "",
+        params.defaults.purity,
+        params.defaults.ploidy,
+    )
 
     emit:
     purity_ploidy = PURECN_CALL.out.purity_ploidy

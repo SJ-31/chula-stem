@@ -13,31 +13,31 @@ workflow MUTECT2_COMPLETE {
     panel_of_normals
 
     main:
-    MUTECT2(meta_and_bam,
-            params.ref.genome,
-            params.ref.targets,
-            params.ref.germline,
-            panel_of_normals,
-            params.interval_padding ?: 0,
-            params.tumor_only)
+    MUTECT2(
+        meta_and_bam,
+        params.ref.genome,
+        params.ref.targets,
+        params.ref.germline,
+        panel_of_normals,
+        params.interval_padding ?: 0,
+        params.tumor_only,
+    )
     LEARN_READ_ORIENTATION(MUTECT2.out.raw)
 
-    to_pileup = meta_and_bam.map({ it -> [it[0], it[2], it[3] ] })
+    to_pileup = meta_and_bam.map { it -> [it[0], it[2], it[3]] }
 
     GET_PILEUP_SUMMARIES(to_pileup, params.ref.pileup)
 
     CALCULATE_CONTAMINATION(GET_PILEUP_SUMMARIES.out.pileup)
 
-    to_filter = Utl.joinFirst(MUTECT2.out.variants,
-                              [LEARN_READ_ORIENTATION.out.ro,
-                               CALCULATE_CONTAMINATION.out.c,
-                               CALCULATE_CONTAMINATION.out.s,
-                               MUTECT2.out.stats])
+    to_filter = Utl.joinFirst(
+        MUTECT2.out.variants,
+        [LEARN_READ_ORIENTATION.out.ro, CALCULATE_CONTAMINATION.out.c, CALCULATE_CONTAMINATION.out.s, MUTECT2.out.stats],
+    )
 
     FILTER_MUTECT_CALLS(to_filter, params.ref.genome)
 
     emit:
     unfiltered = MUTECT2.out.variants
     filtered = FILTER_MUTECT_CALLS.out.filtered
-
 }
