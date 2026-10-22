@@ -10,7 +10,7 @@ process DUPRADAR {
     output:
     tuple val(meta), path(output), emit: plots
     tuple val(meta), path("${output}/${output}.tsv"), emit: tsv
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

@@ -12,7 +12,7 @@ process FACETS {
     tuple val(with_caller), path("${prefix}/${prefix}_hisens.rds"), emit: rds
     tuple val(meta), path("${prefix}/purity.txt"), path("${prefix}/ploidy.txt"), emit: purity_ploidy
     path tsv
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

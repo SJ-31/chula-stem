@@ -20,7 +20,7 @@ process CNVKIT_PREP {
     tuple path(target), path(antitarget)
     path access
     path (bins), emit: autobin, optional: true
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

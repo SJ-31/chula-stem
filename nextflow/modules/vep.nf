@@ -12,7 +12,7 @@ process VEP {
     tuple val(meta), path(output), emit: vcf
     tuple val(meta), path("*.html"), emit: report
     tuple val(meta), path(tsv), emit: tsv
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

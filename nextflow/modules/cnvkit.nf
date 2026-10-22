@@ -11,7 +11,7 @@ process CNVKIT {
     tuple val(with_caller), path("${out}/${out}.call.cns"), emit: cns
     tuple val(with_caller), path("${out}/${out}.cnr"), emit: cnr
     tuple val(with_caller), path(out), emit: all
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

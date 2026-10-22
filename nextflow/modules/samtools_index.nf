@@ -7,7 +7,7 @@ process SAMTOOLS_INDEX {
     output:
     //
     tuple val(meta), path(output), emit: index
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

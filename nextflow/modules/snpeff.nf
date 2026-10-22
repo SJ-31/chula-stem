@@ -14,7 +14,7 @@ process SNPEFF {
     output:
     tuple val(meta), path("${output}.gz"), emit: vcf
     tuple val(meta), path("*.html"), path("*.txt"), emit: report
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
     //
 
     script:

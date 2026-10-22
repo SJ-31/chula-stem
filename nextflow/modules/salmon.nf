@@ -15,7 +15,7 @@ process SALMON {
     //
     tuple val(meta), path(sf), emit: transcripts
     tuple val(meta), path(sf_genes), emit: genes
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

@@ -8,7 +8,7 @@ process COMBINE_COUNTS {
 
     //
     tuple val(meta), path(output), emit: combined
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

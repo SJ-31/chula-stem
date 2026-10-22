@@ -8,7 +8,7 @@ process CLASSIFY_CNV_FORMAT {
 
     //
     tuple val(meta), path(output), emit: bed
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

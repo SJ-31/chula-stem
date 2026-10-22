@@ -11,7 +11,7 @@ process REPORT {
     //
     tuple val(meta), path(output), emit: report
     path "report_tmp"
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

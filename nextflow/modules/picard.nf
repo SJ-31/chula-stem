@@ -16,7 +16,7 @@ process PICARD {
     tuple val(meta), path(out2), emit: specific_metrics
     tuple val(meta), path(out), emit: algn_metrics
     tuple path(out), path(out2), emit: metrics
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     out = Utl.getName(meta, "Picard_alignment_metrics", "txt")

@@ -7,7 +7,7 @@ process LEARN_READ_ORIENTATION {
     output:
     //
     tuple val(meta), path(output), emit: ro
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

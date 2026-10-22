@@ -13,7 +13,7 @@ process CREATE_PANEL_OF_NORMALS {
     tuple val(meta), path(output), emit: pon // Empty pon with no sample information
     tuple val(meta), path(output_ws), emit: pon_ws
     path "*.tbi"
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

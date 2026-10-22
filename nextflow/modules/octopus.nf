@@ -16,7 +16,7 @@ process OCTOPUS {
     //
     tuple val(meta), path(somatic), emit: variants
     tuple val(meta), path(output), emit: all
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

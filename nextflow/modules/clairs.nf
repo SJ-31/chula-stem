@@ -10,7 +10,7 @@ process CLAIRS {
 
     //
     tuple val(meta), path(output), emit: variants
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

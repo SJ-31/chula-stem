@@ -10,7 +10,7 @@ process DELLY_SV {
 
     //
     tuple val(meta), path(out), emit: variants
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

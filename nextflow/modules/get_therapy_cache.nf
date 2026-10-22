@@ -9,7 +9,7 @@ process GET_THERAPY_CACHE {
     path ("therapy_cache/${civic}"), emit: civic
     path ("therapy_cache/${pandrugs2}"), emit: pandrugs2
     path not_in
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

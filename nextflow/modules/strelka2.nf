@@ -11,7 +11,7 @@ process STRELKA2 {
     //
     tuple val(meta), path("*.vcf.gz"), emit: variants
     tuple val(meta), path(out), emit: dir
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

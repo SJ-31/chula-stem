@@ -9,7 +9,7 @@ process CALCULATE_CONTAMINATION {
     //
     tuple val(meta), path(contamination), emit: c
     tuple val(meta), path(segmentation), emit: s
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

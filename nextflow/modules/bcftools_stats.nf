@@ -8,7 +8,7 @@ process BCFTOOLS_STATS {
     output:
     tuple val(meta), path(output), emit: plots
     path ("${output}/${output}.py"), emit: py
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

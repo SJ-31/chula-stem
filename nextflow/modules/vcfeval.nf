@@ -9,7 +9,7 @@ process VCFEVAL {
     output:
 
     //
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

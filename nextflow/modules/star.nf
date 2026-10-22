@@ -17,7 +17,7 @@ process STAR {
     tuple val(meta), path(output), emit: mapped
     tuple val(meta), path(counts), emit: counts, optional: true
     tuple val(meta), path(chimeric_junction), emit: chimeric, optional: true
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

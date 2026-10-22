@@ -33,7 +33,7 @@ process CALLSET_QC_TSV {
     //
     tuple val(meta), path(output), emit: tsv
     tuple val(meta), path(minimal)
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

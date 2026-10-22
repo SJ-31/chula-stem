@@ -14,7 +14,7 @@ process MUTECT2 {
     tuple val(meta), path(out), emit: variants
     tuple val(meta), path(raw), emit: raw
     tuple val(meta), path(stats), emit: stats
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

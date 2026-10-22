@@ -11,7 +11,7 @@ process DELLY_CNV {
     //
     tuple val(with_caller), path(out)
     path segmentation
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

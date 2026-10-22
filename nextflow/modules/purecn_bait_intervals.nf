@@ -11,7 +11,7 @@ process PURECN_BAIT_INTERVALS {
     //
     path (o1), emit: baits
     path (o2), emit: baits_optimized
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

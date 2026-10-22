@@ -13,7 +13,7 @@ process PURECN_NORMALDB {
     path (mapping_bias_hq), optional: true
     path png
     path low_cov
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

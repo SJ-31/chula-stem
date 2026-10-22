@@ -9,7 +9,7 @@ process GET_PILEUP_SUMMARIES {
 
     output:
     tuple val(meta), path(output), emit: pileup
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

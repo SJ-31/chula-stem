@@ -17,7 +17,7 @@ process BQSR {
     tuple val(meta), path(recal), emit: bam
     path (report), emit: report, optional: true
     tuple val(meta), path(recal_dir), emit: recal_tables
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     recal = Utl.getName(meta, "recal", "bam")

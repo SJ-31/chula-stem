@@ -14,7 +14,7 @@ process CLASSIFY_CNV {
     // 4. CNV type (DEL or DUP)
     tuple val(meta), path(tsv), emit: tsv
     path intermediate
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

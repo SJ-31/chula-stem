@@ -11,7 +11,7 @@ process SIGPROFILERASSIGNMENT {
     //
     tuple val(meta), path(output), emit: all
     tuple val(meta), path(activities_file), emit: activities
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

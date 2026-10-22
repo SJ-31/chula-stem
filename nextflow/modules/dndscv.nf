@@ -11,7 +11,7 @@ process DNDSCV {
     // We generate this directly from the vcf (dndscv supports snps and indels)
 
     output:
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
     //
 
     script:

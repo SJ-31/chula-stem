@@ -20,7 +20,7 @@ process MULTIQC {
     //  from html summary file
     path (out), emit: html
     path (data), emit: data
-    path ("multiqc.log"), emit: log
+    path ("multiqc.log"), emit: logfile
 
     script:
     //

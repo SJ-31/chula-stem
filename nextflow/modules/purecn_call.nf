@@ -15,7 +15,7 @@ process PURECN_CALL {
     //
     tuple val(meta), path(output), emit: call
     tuple val(meta), eval("head purity.txt"), eval("head ploidy.txt"), emit: purity_ploidy
-    tuple val(meta), path("*.log"), emit: log, optional: true
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

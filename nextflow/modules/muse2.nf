@@ -11,7 +11,7 @@ process MUSE2 {
     output:
     tuple val(meta), path(output), emit: variants
     tuple val(meta), path("${prefix}.MuSE.txt"), emit: txt
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

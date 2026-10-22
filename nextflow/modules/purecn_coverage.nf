@@ -11,7 +11,7 @@ process PURECN_COVERAGE {
     //
     tuple val(meta), path(o1), emit: loess
     tuple val(meta), path(o2), emit: cov
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

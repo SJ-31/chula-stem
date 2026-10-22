@@ -11,7 +11,7 @@ process SNPSIFT {
     //
     path "${output}.gz"
     path "*.html"
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

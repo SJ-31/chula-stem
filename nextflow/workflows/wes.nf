@@ -440,33 +440,33 @@ workflow {
 
     to_publish_logs = Utl
         .joinFirst(
-            REPORT.out.log,
+            REPORT.out.logfile,
             [
                 // Small variant callers
                 MUTECT2_COMPLETE.out.call_log,
                 MUTECT2_COMPLETE.out.filter_log,
                 MUTECT2_COMPLETE.out.contamination_log,
                 MUTECT2_COMPLETE.out.read_orientation_log,
-                STRELKA2.out.log,
-                MUSE2.out.log,
-                OCTOPUS.out.log,
-                CLAIRS.out.log,
+                STRELKA2.out.logfile,
+                MUSE2.out.logfile,
+                OCTOPUS.out.logfile,
+                CLAIRS.out.logfile,
                 // Other callers
-                MANTA.out.log,
-                DELLY_SV.out.log,
-                MSISENSORPRO.out.log,
-                PURECN_COMPLETE.out.log,
-                CNVKIT.out.log,
-                SIGPROFILERASSIGNMENT.out.log,
+                MANTA.out.logfile,
+                DELLY_SV.out.logfile,
+                MSISENSORPRO.out.logfile,
+                PURECN_COMPLETE.out.logfilefile,
+                CNVKIT.out.logfile,
+                SIGPROFILERASSIGNMENT.out.logfile,
                 // Annotated calls
-                CROSS_REFERENCE_CNV.out.log,
-                CROSS_REFERENCE_MSI.out.log,
-                VEP.out.log,
-                CALLSET_QC_TSV.out.log,
+                CROSS_REFERENCE_CNV.out.logfile,
+                CROSS_REFERENCE_MSI.out.logfile,
+                VEP.out.logfile,
+                CALLSET_QC_TSV.out.logfile,
                 // Metrics
-                PICARD.out.log,
-                MOSDEPTH.out.log,
-                BCFTOOLS_STATS.out.log,
+                PICARD.out.logfile,
+                MOSDEPTH.out.logfile,
+                BCFTOOLS_STATS.out.logfile,
             ],
         )
         .map { meta, report_log, mutect2_call_log, mutect2_filter_log, mutect2_contamination_log, mutect2_read_orientation_log, strelka2_log, muse2_log, octopus_log, clairs_log, manta_log, delly_log, msisensorpro_log, purecn_log, cnvkit_log, sigprofilerassignment_log, cnv_xref_log, msi_xref_log, vep_log, callset_qc_tsv_log, picard_log, mosdepth_log, bcftools_stats_log ->

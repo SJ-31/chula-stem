@@ -10,7 +10,7 @@ process FACETS_PILEUP {
 
     //
     tuple val(meta), path(output), emit: pileup
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

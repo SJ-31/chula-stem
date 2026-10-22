@@ -10,7 +10,7 @@ process STAR_FUSION {
     //
     tuple val(meta), path(fusion)
     path abridged
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

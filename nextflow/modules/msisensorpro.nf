@@ -12,7 +12,7 @@ process MSISENSORPRO {
     tuple val(meta), path("${prefix}/${unstable}.tsv"), emit: tsv
     tuple val(meta), path("${prefix}/${prefix}_summary.tsv"), emit: summary
     tuple val(meta), path(prefix), emit: all
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

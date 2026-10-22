@@ -13,7 +13,7 @@ process MANTA {
     tuple val(meta), path(callfile), emit: somatic
     tuple val(meta), path("${meta.filename}-candidateSmallIndels_Manta.vcf.gz"), emit: indels
     tuple val(meta), path(out), emit: dir
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     // Produces 4 files

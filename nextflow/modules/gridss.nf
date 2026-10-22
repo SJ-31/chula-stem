@@ -16,7 +16,7 @@ process GRIDSS {
     //
     tuple val(meta), path(filtered), emit: variants
     path all
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

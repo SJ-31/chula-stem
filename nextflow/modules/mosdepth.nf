@@ -8,7 +8,7 @@ process MOSDEPTH {
     output:
     tuple val(meta), path("${prefix}*"), emit: all
     tuple val(meta), path(out), emit: dist
-    tuple val(meta), path("*log"), emit: log
+    tuple val(meta), path("*log"), emit: logfile
 
     script:
     //

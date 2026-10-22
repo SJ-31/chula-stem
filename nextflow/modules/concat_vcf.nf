@@ -9,7 +9,7 @@ process CONCAT_VCF {
 
     //
     tuple val(meta), path(output), emit: vcf
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

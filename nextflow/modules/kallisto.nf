@@ -12,7 +12,7 @@ process KALLISTO {
     tuple val(meta), path(tsv), emit: tsv
     tuple val(meta), path(h5), emit: h5
     path "*.json"
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

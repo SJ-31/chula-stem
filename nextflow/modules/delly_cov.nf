@@ -10,7 +10,7 @@ process DELLY_COV {
 
     //
     tuple val(meta), path(output), emit: cov
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

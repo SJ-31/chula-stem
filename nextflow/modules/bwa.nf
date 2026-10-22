@@ -13,7 +13,7 @@ process BWA {
     output:
     //
     tuple val(meta), path(out), emit: mapped
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //

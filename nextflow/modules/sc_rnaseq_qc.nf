@@ -14,7 +14,7 @@ process SC_RNASEQ_QC {
 
     //
     tuple val(meta), path(output), emit: counts
-    tuple val(meta), path("*.log"), emit: log
+    tuple val(meta), path("*.log"), emit: logfile
 
     script:
     //
