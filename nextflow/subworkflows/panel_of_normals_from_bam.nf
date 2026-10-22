@@ -25,9 +25,7 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
 
     if (with_cnkvit) {
         CNVKIT_PREP(
-            channel.of(
-                ["filename": cohort_name, "out": "${params.outdir}/cnvkit_reference", "log": "${params.outdir}/cnvkit_reference"]
-            ).merge(collected_normals) { meta, b -> tuple(meta, tuple(b)) },
+            channel.of(["filename": cohort_name]).merge(collected_normals) { meta, b -> tuple(meta, tuple(b)) },
             params.ref.genome,
             params.ref.baits_unzipped,
             params.ref.genome_blacklist,
@@ -67,9 +65,7 @@ workflow PANEL_OF_NORMALS_FROM_BAM {
     // handling the vcfs of the other callers
     vcf_channels = CONCAT_VCF.out.vcf.map { it -> it[1] }.mix(previous_vcfs).collect()
 
-    to_pon = vcf_channels.map { it ->
-        [["filename": params.cohort, "out": "${params.outdir}/panel_of_normals", "log": params.logdir], it]
-    }
+    to_pon = vcf_channels.map { it -> [["filename": params.cohort], it]}
 
     min_samples = params.minimum_samples ? params.minimum_samples : 2
     add_to_pon = params.ref.add_to_pon ? params.ref.add_to_pon : []

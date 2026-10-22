@@ -20,8 +20,7 @@ workflow PURECN_COMPLETE {
     normal_bam.dump(tag: "purecn_normal")
 
     if (!params.ref.purecn_bait_intervals) {
-        PURECN_BAIT_INTERVALS(
-            [["out": "${params.outdir}/PureCN_ref", "log": "${params.outdir}/PureCN_ref"], params.ref.genome],
+        PURECN_BAIT_INTERVALS([[], params.ref.genome],
             params.ref.baits,
             params.ref.mappability,
         )
@@ -36,9 +35,7 @@ workflow PURECN_COMPLETE {
     if (!params.ref.purecn_normaldb) {
         COVERAGE_NORMAL(normal_bam, bait_intervals, false)
         normal_files = COVERAGE_NORMAL.out.loess.map { it -> it[1] }.toList()
-        def to_normaldb = channel.of(
-                ["filename": cohort_name, "out": "${params.outdir}/PureCN_ref", "log": "${params.outdir}/PureCN_ref"]
-            )
+        def to_normaldb = channel.of(["filename": cohort_name])
             .merge(normal_files) { meta, cov -> tuple(meta, tuple(cov)) }
         to_normaldb.dump(tag: "purecn_normaldb")
         PURECN_NORMALDB(to_normaldb, panel_of_normals)
@@ -55,9 +52,6 @@ workflow PURECN_COMPLETE {
         }
         .join(Utl.getId(mutect2_unfiltered))
         .map { it -> it[1..-1] }
-        .map { it ->
-            [it[0] + ["out": "${params.outdir}/${it[0].id}/annotations", "log": "${params.logdir}/${it[0].id}/annotations"]] + it[1..-1]
-        }
 
     PURECN_CALL(
         to_call,

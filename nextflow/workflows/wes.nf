@@ -33,8 +33,12 @@ include { VEP } from "../modules/vep.nf"
 include { PANEL_OF_NORMALS_FROM_BAM } from "../subworkflows/panel_of_normals_from_bam.nf"
 
 
-def toConcat(suffix, outdir_name, val) {
-    [val[0] + ["suffix": suffix, "out": "${params.outdir}/${val[0].id}/${outdir_name}", "log": "${params.logdir}/${val[0].id}/${outdir_name}"]] + [val[1..-1]]
+def toConcat(suffix, val) {
+    [val[0] + ["suffix": suffix]] + [val[1..-1]]
+}
+
+params {
+    tumor_only = false
 }
 
 workflow {
@@ -45,9 +49,7 @@ workflow {
         tumor: it[0].type == "cancer" || it[0].type == "tumor"
         normal: it[0].type == "normal"
     }
-    def cohortTopLevel = { it ->
-        [["out": params.outdir, "log": params.logdir, "filename": cohort_name], it]
-    }
+    def cohortTopLevel = { it -> [["filename": cohort_name], it]}
     /*
      * Preprocessing
      */
@@ -129,7 +131,7 @@ workflow {
             MUTECT2_COMPLETE.out.filtered,
             [STRELKA2.out.variants.map { it -> [it[0]] + it[1] }, MUSE2.out.variants],
         )
-        .map { it -> toConcat("Concat_to_oct", "paired", it) }
+        .map { it -> toConcat("Concat_to_oct", it) }
     CONCAT_SMALL_1(small_variants_to_geno)
 
     // Octopus and Clairs uses previous variants to aid calling
@@ -152,7 +154,7 @@ workflow {
                 // GRIDSS.out.variants
             ],
         )
-        .map { it -> toConcat("SV_all", "annotations", it) }
+        .map { it -> toConcat("SV_all", it) }
     CONCAT_SV(structural_variants)
     to_std_small = Utl.joinFirst(
         CONCAT_SMALL_2.out.vcf,
