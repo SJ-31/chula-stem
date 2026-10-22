@@ -3,3 +3,13 @@ run = '''
 ssh -L 8023:localhost:8023 shannc@161.200.107.77 \
     ssh -L 8023:localhost:8023 cuaim-fat-01.cuaim.hpc
     '''
+
+[tasks.sync_nextflow]
+run = '''
+unison ./nextflow ssh://$stem_ip/chula-stem/nextflow \
+       -ignore 'Path nf_metrics' \
+       -ignore 'Path bin' \
+       -ignore 'Path .nextflow.*' \
+       -ignore 'Path .nf-test' \
+       -ignore 'Path .nextflow'
+'''
