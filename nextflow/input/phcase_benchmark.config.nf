@@ -3,7 +3,7 @@ workDir = "/data/project/stemcell/shannc/output/nf-work/PHCase_BM"
 outputDir = "/data/project/stemcell/shannc/output/Phcase_benchmark"
 
 includeConfig "$launchDir/input/wes_tools.config.nf"
-params.input = "$launchDir/input/manifests/pdac_phcase1.csv"
+params.input = "$launchDir/input/manifests/wes_test.csv"
 params.cohort = "PHcase_BM"
 params.source_name = "SOURCE"
 
