@@ -455,7 +455,7 @@ workflow {
                 MANTA.out.logfile,
                 DELLY_SV.out.logfile,
                 MSISENSORPRO.out.logfile,
-                PURECN_COMPLETE.out.logfilefile,
+                PURECN_COMPLETE.out.logfile,
                 CNVKIT.out.logfile,
                 SIGPROFILERASSIGNMENT.out.logfile,
                 // Annotated calls
@@ -509,6 +509,9 @@ workflow {
 
 
 output {
+    multiqc {
+    }
+    
     merged_results {
         path { s ->
             // Reports

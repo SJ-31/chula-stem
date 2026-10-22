@@ -68,5 +68,5 @@ workflow PURECN_COMPLETE {
     call = PURECN_CALL.out.call
     loess = COVERAGE_TUMOR.out.loess
     cov = COVERAGE_TUMOR.out.cov
-    logfile = PURECN_CALL.out.log
+    logfile = PURECN_CALL.out.logfile
 }

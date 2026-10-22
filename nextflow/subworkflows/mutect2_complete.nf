@@ -45,9 +45,9 @@ workflow MUTECT2_COMPLETE {
     read_orientation = LEARN_READ_ORIENTATION.out.ro
     pileup = GET_PILEUP_SUMMARIES.out.pileup
     segmentation = CALCULATE_CONTAMINATION.out.s
-    call_log = MUTECT2.out.log
-    filter_log = FILTER_MUTECT_CALLS.out.log
-    contamination_log = CALCULATE_CONTAMINATION.out.log
-    read_orientation_log = LEARN_READ_ORIENTATION.out.log
-    pileup_log = GET_PILEUP_SUMMARIES.out.log
+    call_log = MUTECT2.out.logfile
+    filter_log = FILTER_MUTECT_CALLS.out.logfile
+    contamination_log = CALCULATE_CONTAMINATION.out.logfile
+    read_orientation_log = LEARN_READ_ORIENTATION.out.logfile
+    pileup_log = GET_PILEUP_SUMMARIES.out.logfile
 }
