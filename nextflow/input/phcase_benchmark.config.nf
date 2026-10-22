@@ -1,12 +1,10 @@
 // * Required params
-workDir = "/data/project/stemcell/shannc/output/nf-work/PHCase"
-includeConfig "$projectDir/input/wes_tools.config.nf"
-params.outdir = "/data/project/stemcell/shannc/output/Phcase_benchmark"
-params.input = "$projectDir/input/manifests/pdac_phcase1.csv"
-params.logdir = "${params.outdir}/log"
-params.routine = "wes"
-params.cohort = "PHcase"
-params.tumor_only = false
+workDir = "/data/project/stemcell/shannc/output/nf-work/PHCase_BM"
+outputDir = "/data/project/stemcell/shannc/output/Phcase_benchmark"
+
+includeConfig "$launchDir/input/wes_tools.config.nf"
+params.input = "$launchDir/input/manifests/pdac_phcase1.csv"
+params.cohort = "PHcase_BM"
 params.source_name = "SOURCE"
 
 report {
@@ -75,32 +73,3 @@ process {
         ext.extra_paths = ["therapy_data_cache": "/data/home/shannc/.cache/2025-01-13_therapy_data.parquet"]
     }
 }
-
-// * Misc
-// Add gnomad subsets to known_variants
-// gnomad_subsets = [
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr10.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr11.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr12.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr13.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr14.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr15.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr16.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr17.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr18.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr19.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr1.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr20.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr21.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr22.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr2.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr3.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr4.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr5.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr6.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr7.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr8.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chr9.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chrX.vcf.bgz",
-//     "$refdir/variants/gnomADv4.1.0_Exomes/random/chrY.vcf.bgz",
-// ]
