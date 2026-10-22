@@ -13,9 +13,9 @@ process FASTP {
 
     //
     tuple val(meta), path("*fastp.fastq.gz"), emit: passed
-    path ("*fail.fastq.gz"), optional: true, emit: failed_reads
+    tuple val(meta), path ("*fail.fastq.gz"), optional: true, emit: failed_reads
     path "*.html"
-    path ("*.json"), emit: json
+    tuple val(meta), path ("*.json"), emit: json
     tuple val(meta), path("*.log"), emit: logfile
 
     script:

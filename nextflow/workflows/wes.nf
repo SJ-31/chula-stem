@@ -57,6 +57,8 @@ workflow {
     PREPROCESS_FASTQ(params.input, "wes")
     // After preprocessing, branch data into tumor and normal then pair up by id and join with  index
 
+    PREPROCESS_FASTQ.out.bam.view(tag: "bams")
+    
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
     normals = Utl.getId(
         branched.normal.map { it ->
@@ -504,11 +506,15 @@ workflow {
     publish:
     merged_results = to_publish
     logs = to_publish_logs
+    purecn_baits = PURECN_COMPLETE.out.bait_intervals
     multiqc = MULTIQC.out.html.mix(MULTIQC.out.data)
 }
 
 
 output {
+    purecn_baits {
+        path { "purecn_ref/" }
+    }
     multiqc {
     }
     
