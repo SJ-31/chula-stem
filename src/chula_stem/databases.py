@@ -6,11 +6,11 @@ from time import sleep
 from typing import override
 
 import click
+import duckdb
 import polars as pl
 import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-from polars.exceptions import InvalidOperationError
 from requests import Session
 
 # * Utilities
@@ -46,31 +46,27 @@ from requests import Session
     help="File to write genes that weren't found",
 )
 @click.option(
-    "-v",
-    "--civic-cache",
-    default="",
-    show_default=True,
-    help="Path to write Civic cache. If not supplied, do not lookup with Civic",
-)
-@click.option(
-    "-p",
-    "--pandrugs2-cache",
-    default="",
-    show_default=True,
-    help="Path to write Pandrugs2 cache. If not supplied, do not lookup with Pandrugs2",
-)
-@click.option(
     "-i",
     "--ignore_failed_file",
     required=True,
     help="If supplied, will ignore all genes in this file",
 )
+@click.option(
+    "-e", "--cache", required=True, help="DB file to cache data", default=None
+)
+@click.option(
+    "-d",
+    "--databases",
+    required=True,
+    help="Comma-delimited string specifying which databases to include in the lookup",
+    default=None,
+    type=str,
+)
 def therapy_cache_from_files(
     input_files: str,
-    civic_cache: str,
-    pandrugs2_cache: str,
     not_in_db: str,
     filter_confident: bool,
+    cache: str,
     gene_col: str = "Genes",
 ):
     genes: set = set()
@@ -89,24 +85,23 @@ def therapy_cache_from_files(
                 genes |= set(f.read().splitlines())
     _ = get_therapy_df(
         genes,
-        civic_cache=civic_cache,
-        pandrugs2_cache=pandrugs2_cache,
+        cache=Path(cache),
         not_in_db_file=not_in_db,
         filter_confident=filter_confident,
     )
 
 
 def get_therapy_df(
-    gene_list: list,
-    civic_cache: str = "",
-    pandrugs2_cache: str = "",
+    genes: set,
+    cache: Path,
+    dbs: list[str] = ["civic"],
     not_in_db_file: str = "",
     filter_confident=False,
     attempt_failed=True,
 ) -> pl.DataFrame:
     """Get therapeutic information
 
-    :param gene_list: list of genes to look up
+    :param genes: set of genes to look up
 
     :returns: the input dataframe with additional information about therapeutic
     options for each gene.
@@ -116,28 +111,25 @@ def get_therapy_df(
     - "disease": disease(s) the gene is implicated in
     - "therapies": validated therapies for the gene
     """
-    therapy_dbs: list[TherapyDB] = [
-        Civic(civic_cache),
-        PanDrugs2(pandrugs2_cache),
-    ]
+    therapy_dbs: list[TherapyDB] = [Civic(cache)]
     temp: list[pl.DataFrame] = []
-    gene_list_copy: list = copy.copy(gene_list)
+    genes_copy: set = copy.copy(genes)
     if not attempt_failed and not_in_db_file and os.path.exists(not_in_db_file):
         # Do not look up genes that weren't found in the databases on previous tries
         with open(not_in_db_file, "r") as f:
             failed_previously: list = f.read().splitlines()
-            gene_list = list(set(gene_list) - set(failed_previously))
+            genes = set(genes) - set(failed_previously)
     for db in therapy_dbs:
-        find_info: pl.DataFrame = db.get_genes(gene_list, filter_confident)
+        find_info: pl.DataFrame = db.get_genes(genes, filter_confident)
         if not find_info.is_empty():
             found = find_info["gene"]
-            gene_list = list(filter(lambda x: x not in found, gene_list))
+            genes = set(filter(lambda x: x not in found, genes))
             temp.append(find_info.select(TherapyDB.shared_cols))
-        if not gene_list:
+        if not genes:
             break
     if temp:
         all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
-        not_in_db: list = list(set(gene_list_copy) - set(all_drug_info["gene"]))
+        not_in_db: list = list(set(genes_copy) - set(all_drug_info["gene"]))
         write_not_found = not_in_db_file if not_in_db_file else "genes_not_found.txt"
         with open(write_not_found, "a") as f:
             f.write("\n".join(not_in_db))
@@ -169,6 +161,7 @@ class TherapyDB(ABC):
     api_wait: float
     name: str
     cache: Path
+    schema: dict[str, str]
     shared_cols: tuple = (
         "gene",
         "source",
@@ -177,17 +170,11 @@ class TherapyDB(ABC):
         "db",
         "db_link",
     )
-    all_cached: pl.DataFrame
+    db: duckdb.DuckDBPyConnection
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
         pass
-
-    @staticmethod
-    def _cache_default(name: str, cache: str) -> Path:
-        return (
-            Path(cache) if cache else Path.home().joinpath(f".cache/{name}_cache.json")
-        )
 
     @staticmethod
     @abstractmethod
@@ -198,11 +185,16 @@ class TherapyDB(ABC):
         """
         pass
 
-    def get_genes(self, gene_list: list, confident: bool = True) -> pl.DataFrame:
+    def get_genes(self, genes: set, confident: bool = True) -> pl.DataFrame:
+        schema_concat = ",\n    ".join(
+            f"{name} {dtype}" for name, dtype in self.schema.items()
+        )
+        self.db.execute(f"CREATE TABLE {self.name} (\n    {schema_concat}\n)")
         results: list = []
-        previous, gene_list = self.read_cache(gene_list)  # Get cached results
-        # and filter gene list for those that weren't cached
-        for g in gene_list:
+        previous: pl.DataFrame = self.db.query(f"SELECT * FROM {self.name}").pl()
+        if not previous.is_empty():
+            genes = genes - set(previous["gene"])
+        for g in genes:
             try:
                 current: pl.DataFrame = self.get_gene(g, confident)
                 if not current.is_empty():
@@ -211,16 +203,11 @@ class TherapyDB(ABC):
             except TimeoutError:
                 print(f"WARNING: received timeout error for gene {g}, skipping...")
         if results:
-            try:
-                df = pl.concat(results, how="vertical_relaxed")
-            except InvalidOperationError:
-                print(results)
-                raise InvalidOperationError(
-                    "cannot cast List type (inner: 'String', to: 'String')"
-                )
+            df = pl.concat(results, how="vertical_relaxed")
+            df = df.select(self.schema.keys())
             if not previous.is_empty():
                 df = pl.concat([previous, df], how="vertical_relaxed")
-            self.write_cache(df)
+            self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
             return df
         if not previous.is_empty():
             return previous
@@ -240,30 +227,14 @@ class TherapyDB(ABC):
         """
         pass
 
-    def read_cache(self, gene_list: list) -> tuple[pl.DataFrame, list[str]]:
-        """Retrieve entries from `gene_list` found in the cache, and filter
-        `gene_list` so that only unknown entries remain
-        """
-        self.all_cached = pl.DataFrame()
-        if self.cache.exists():
-            previous = pl.read_json(self.cache, infer_schema_length=None)
-            self.all_cached = previous
-            if not previous.is_empty():
-                previous = previous.filter(pl.col("gene").is_in(gene_list))
-                not_found: list[str] = list(
-                    filter(lambda x: x not in previous["gene"], gene_list)
-                )
-            else:
-                not_found = gene_list
-            return previous, not_found
-        else:
-            return pl.DataFrame(), gene_list
-
     def write_cache(self, df: pl.DataFrame) -> None:
         if not self.all_cached.is_empty():
             df = pl.concat([self.all_cached, df], how="vertical_relaxed")
             df = df.filter(~df.is_duplicated())
         df.write_json(self.cache)
+
+
+# * Open targets
 
 
 # * Civic database
@@ -272,14 +243,26 @@ CIVIC_URL: str = "https://civicdb.org"
 
 
 class Civic(TherapyDB):
-    def __init__(self, cache: str = "") -> None:
+    def __init__(self, cache: str | Path = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
         self.name: str = "Civic"
         self.api_wait: float = 0.5
-        self.cache: Path = self._cache_default("civic", cache)
         self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
+        self.db: duckdb.DuckDBPyConnection = duckdb.connect(cache)
+        self.schema: dict[str, str] = {
+            "loc": "VARCHAR",
+            "molecularProfile": "VARCHAR",
+            "therapies": "VARCHAR[]",
+            "evidenceRating": "BIGINT",
+            "civicLink": "VARCHAR",
+            "origin": "VARCHAR",
+            "disease": "VARCHAR[]",
+            "source": "VARCHAR",
+            "variantAliases": "VARCHAR[]",
+            "clinvarIds": "VARCHAR[]",
+        }
 
         self.gene_query: str = gql(
             """
@@ -342,9 +325,9 @@ class Civic(TherapyDB):
         return f"[{title}]({url})"
 
     @staticmethod
-    def get_loc(coordinates: dict) -> str | None:
+    def get_loc(coordinates: dict) -> str:
         if not all(coordinates.values()):
-            return None
+            return "NA"
         return (
             f"{coordinates['chromosome']}:{coordinates['start']}-{coordinates['stop']}"
         )
@@ -495,7 +478,7 @@ class Civic(TherapyDB):
             return df
 
 
-## * Pandrugs 2
+# [2026-10-23 Fri] Unused since it's not being updated
 
 
 class PanDrugs2(TherapyDB):

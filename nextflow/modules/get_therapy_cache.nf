@@ -9,18 +9,14 @@ process GET_THERAPY_CACHE {
     output:
     //
     path cache_path, emit: cache
-    path not_in, emit: failed
+    path "not_in_databases.txt", emit: failed
     path("*.log"), emit: logfile
 
     script:
-    //
-    not_in = "not_in_databases.txt"
     """
-    
-    
     get_therapy_cache -i . \\
          --filter-confident \\
-         --not-in-db therapy_cache/${not_in} \\
+         --not-in-db not_in_databases.txt \\
          --cache ${cache_path} \\
          --gene-col SYMBOL
 
