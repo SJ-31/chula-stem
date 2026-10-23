@@ -128,7 +128,7 @@ class VariantCallingReport(ResultsReport):
         cnvkit_cnr: str = "",
         msisensor_pro: str = "",
         sigprofiler: str = "",
-        cosmic_reference: str = "",
+        cosmic_signatures: str = "",
         existing_variants_file: str = "",
         tmpdir: str = "temp",
         font=FONT,
@@ -248,7 +248,7 @@ class VariantCallingReport(ResultsReport):
             self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[
                 0
             ]
-        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_reference)
+        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_signatures)
         self.stats["counts"]["Mutational Signatures"] = sum(
             [d.shape[0] for d in self.data["sigprofiler"]]
         )

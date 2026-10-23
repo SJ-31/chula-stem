@@ -546,7 +546,7 @@ def make_signature_table(slice: pl.DataFrame, ref: pl.DataFrame) -> pl.DataFrame
 
 def sigprofiler_fmt(
     soln_activities_path: str,
-    cosmic_reference: str,
+    cosmic_signatures: str,
     abs_threshold: int = 100,
     rel_threshold: float = 0.25,
     excluded_signatures: str = "",
@@ -554,7 +554,7 @@ def sigprofiler_fmt(
     """Format SigProfilerAssignment results for reportlab
 
     :param soln_activities_path: Path to SigProfiler "Assignment_Solution_Activities.txt" file
-    :param cosmic_reference: Path to csv file with COSMIC signature metadata
+    :param cosmic_signatures: Path to csv file with COSMIC signature metadata
 
         This function performs some basic filtering on signatures
     :param abs_threshold: Minimum absolute number of mutations required to be considered
@@ -611,6 +611,6 @@ def sigprofiler_fmt(
         .group_by("Samples")
         .agg(pl.col(["Signatures", "Frequency", "Count"]), pl.col("m").first())
     )
-    cosmic_data: pl.DataFrame = pl.read_csv(cosmic_reference)
+    cosmic_data: pl.DataFrame = pl.read_csv(cosmic_signatures)
     formatted = [make_signature_table(s, cosmic_data) for s in filtered.iter_slices(1)]
     return formatted
