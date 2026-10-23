@@ -187,7 +187,6 @@ class VariantCallingReport(ResultsReport):
                 pandrugs2_cache=pandrugs2_cache,
                 filter_confident=filter_confident_therapies,
             )
-            therapy_df.write_parquet(therapy_data_cache)
         else:
             therapy_df = pl.DataFrame()
 

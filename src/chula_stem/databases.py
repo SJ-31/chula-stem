@@ -1,17 +1,18 @@
 import copy
+import importlib.resources as res
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+from subprocess import run
+from tempfile import TemporaryDirectory
 from time import sleep
 from typing import override
 
 import click
 import duckdb
 import polars as pl
-import requests
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-from requests import Session
 
 # * Utilities
 
@@ -105,41 +106,42 @@ def get_therapy_df(
 
     :returns: the input dataframe with additional information about therapeutic
     options for each gene.
-    The result is a dataframe with columns
+    The result is a dataframe with the following columns
     - "gene"
-    - "source" database or paper source
+    - "source" database or literature source
     - "disease": disease(s) the gene is implicated in
     - "therapies": validated therapies for the gene
+    - "db": Database name
+    - "db_link": link to page of association in database
     """
-    therapy_dbs: list[TherapyDB] = [Civic(cache)]
+    db_mapping = {"civic": Civic}
+    therapy_dbs: list[TherapyDB] = [db_mapping[db](cache) for db in dbs]
     temp: list[pl.DataFrame] = []
     genes_copy: set = copy.copy(genes)
     if not attempt_failed and not_in_db_file and os.path.exists(not_in_db_file):
-        # Do not look up genes that weren't found in the databases on previous tries
         with open(not_in_db_file, "r") as f:
             failed_previously: list = f.read().splitlines()
-            genes = set(genes) - set(failed_previously)
+            genes = genes - set(failed_previously)
     for db in therapy_dbs:
         find_info: pl.DataFrame = db.get_genes(genes, filter_confident)
         if not find_info.is_empty():
-            found = find_info["gene"]
-            genes = set(filter(lambda x: x not in found, genes))
+            genes -= set(find_info["gene"])
             temp.append(find_info.select(TherapyDB.shared_cols))
         if not genes:
             break
     if temp:
-        all_drug_info: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
-        not_in_db: list = list(set(genes_copy) - set(all_drug_info["gene"]))
-        write_not_found = not_in_db_file if not_in_db_file else "genes_not_found.txt"
-        with open(write_not_found, "a") as f:
-            f.write("\n".join(not_in_db))
-        return all_drug_info
+        all_found: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
+        not_in_db: list = list(genes_copy - set(all_found["gene"]))
+        if not_in_db_file:
+            with open(not_in_db_file, "a") as f:
+                f.write("\n".join(not_in_db))
+        return all_found
     return pl.DataFrame(
         schema={
             "gene": pl.String,
             "source": pl.String,
-            "disease": pl.String,
-            "therapies": pl.String,
+            "disease": pl.List(pl.String),
+            "therapies": pl.List(pl.String),
         }
     )
 
@@ -160,7 +162,6 @@ def no_gene_df(gene: str) -> pl.DataFrame:
 class TherapyDB(ABC):
     api_wait: float
     name: str
-    cache: Path
     schema: dict[str, str]
     shared_cols: tuple = (
         "gene",
@@ -175,6 +176,16 @@ class TherapyDB(ABC):
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
         pass
+
+    @staticmethod
+    def symbol2ensembl(genes: set[str]) -> pl.DataFrame:
+        mapping: pl.DataFrame = pl.read_csv(
+            res.files("data") / "ensembl_gene_data_116.csv"
+        )
+        return mapping.filter(
+            (pl.col("HGNC symbol").is_in(genes))
+            & (pl.col("Gene Stable ID").is_not_null())
+        ).rename({"HGNC symbol": "gene", "Gene Stable ID": "ensembl"})
 
     @staticmethod
     @abstractmethod
@@ -226,12 +237,6 @@ class TherapyDB(ABC):
             - therapies: list[str]
         """
         pass
-
-    def write_cache(self, df: pl.DataFrame) -> None:
-        if not self.all_cached.is_empty():
-            df = pl.concat([self.all_cached, df], how="vertical_relaxed")
-            df = df.filter(~df.is_duplicated())
-        df.write_json(self.cache)
 
 
 # * Open targets
@@ -478,105 +483,105 @@ class Civic(TherapyDB):
             return df
 
 
-# [2026-10-23 Fri] Unused since it's not being updated
-
-
-class PanDrugs2(TherapyDB):
-    def __init__(self, cache: str = "") -> None:
-        self.url: str = "https://www.pandrugs.org/pandrugs-backend/api/genedrug/"
-        self.api_wait: float = 1
-        self.name: str = "PanDrugs2"
-        self.session: Session = Session()
-        self.cache: Path = self._cache_default("pandrugs2", cache)
-
-    @staticmethod
-    @override
-    def parse_gene_response(data: list) -> pl.DataFrame:
-        cols: dict = {
-            "status": [],
-            "therapies": [],
-            "therapyType": [],
-            "disease": [],
-            "gScore": [],
-            "dScore": [],
-        }
-        schema: dict = {
-            "status": pl.String,
-            "therapies": pl.String,
-            "therapyType": pl.String,
-            "disease": pl.List(pl.String),
-            "gScore": pl.Float64,
-            "dScore": pl.Float64,
-        }
-        for entry in data:
-            cols["disease"].append(entry["cancer"])
-            # All diseases from pandrugs are cancers
-            cols["dScore"].append(entry["dScore"])
-            cols["status"].append(entry["status"])
-            therapy = entry["showDrugName"]
-            if entry.get("pubchemId"):
-                pc = entry["pubchemId"][0]  # These are synonyms, so just take the first
-                cols["therapies"].append(f"{therapy}:{pc}")
-            else:
-                cols["therapies"].append(f"{therapy}:NA")
-            cols["gScore"].append(entry["gScore"])
-            cols["therapyType"].append(entry["therapy"])
-        return pl.DataFrame(cols, schema=schema).with_columns(
-            db_link=pl.lit("https://pandrugs.org/#!/"),
-            source=pl.lit("NA"),
+class OpenTargets(TherapyDB):
+    def __init__(self, cache, data_dir: Path | str | None = None) -> None:
+        """
+        Parameters
+        data_dir : Path | str | None
+            Optional path to directory containing pre-downloaded
+            Open Targets data.
+            Must have two directories with parquet files:
+            `clinical_target` and `clinical_report`
+        """
+        self.db: duckdb.DuckDBPyConnection = duckdb.connect(cache)
+        self.data_dir: Path | None = (
+            Path(data_dir) if isinstance(data_dir, str) else data_dir
         )
 
-    @override
-    @staticmethod
-    def get_confident(df: pl.DataFrame) -> pl.DataFrame:
+    def get_data(self) -> tuple[duckdb.DuckDBPyRelation, duckdb.DuckDBPyRelation]:
         """
-        Criteria are...
-            - Has the highest dScore, and dScore > 0.7
-            - Has gScore > 0.6
-            - Drug's status is either "APPROVED" or "CLINICAL_TRIALS"
+        Return PyRelation objects of Open Targets' clinical report and
+        clinical targets datasets, downloading them to a temporary
+        directory if necessary
+
+        https://platform.opentargets.org/downloads
         """
-        df = df.filter(
-            (pl.col("gScore") >= 0.6)
-            & (pl.col("gScore") >= 0.7)
-            & (
-                (pl.col("status") == "APPROVED")
-                | (pl.col("status") == "CLINIAL_TRIALS")
+        if self.data_dir is None:
+            tmpdir = TemporaryDirectory()
+            data_dir = Path(tmpdir.name)
+            cmd_args = [
+                "wget",
+                "--recursive",
+                "--no-parent",
+                "--no-host-directories",
+                "--cut-dirs",
+                "6",
+            ]
+            _ = run(
+                cmd_args
+                + [
+                    "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_report",
+                    "-P",
+                    tmpdir.name,
+                ],
+                shell=True,
+                check=True,
             )
-        )
-        df = df.filter(pl.col("dScore") == pl.col("dScore").max())
-        return df
+            _ = run(
+                cmd_args
+                + [
+                    "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_target",
+                    "-P",
+                    tmpdir.name,
+                ],
+                shell=True,
+                check=True,
+            )
+        else:
+            data_dir = self.data_dir
+        report = duckdb.read_parquet(f"{data_dir}/clinical_report/*.parquet")
+        target = duckdb.read_parquet(f"{data_dir}/clinical_target/*.parquet")
+        return report, target
 
     @override
-    def get_gene(self, gene: str, confident: bool = True) -> pl.DataFrame:
-        response: requests.Response = self.session.get(
-            url=self.url,
-            params={
-                "gene": gene,
-                # The following are all required
-                "directTarget": True,
-                "biomarker": True,
-                "pathwayMember": False,  # DO NOT permit indirect gene-drug interactions
-                "geneDependency": False,
-            },
-        )
-        if not response.ok or not (data := response.json().get("geneDrugGroup")):
-            return pl.DataFrame()
-        parsed: pl.DataFrame = PanDrugs2.parse_gene_response(data)
-        df: pl.DataFrame = parsed.with_columns(
-            pl.lit(gene).alias("gene"),
-        )
-        if confident:
-            df = self.get_confident(df)
-        df = (
-            df.group_by("gene")
-            .agg(pl.all().first())
-            .with_columns(
-                pl.col("therapies").map_elements(
-                    lambda x: [x], return_dtype=pl.List(pl.String)
+    def get_genes(self, genes: set, confident: bool = True) -> pl.DataFrame:
+        report, target = self.get_data()
+        keep = self.symbol2ensembl(genes)
+        target_filtered: pl.DataFrame = target.filter(
+            "targetId IN (SELECT ensembl FROM keep)"
+        ).pl()
+        target_filtered = (
+            target_filtered.filter(
+                pl.col("diseases")
+                .list.filter(
+                    pl.element()
+                    .struct.field("diseaseFromSource")
+                    .str.contains("tumor|neoplasm|cancer")
                 )
+                .list.len()
+                > 0
+            )
+            .join(keep, left_on="targetId", right_on="ensembl")
+            .with_columns(
+                db_link="https://platform.opentargets.org/target/" + pl.col("targetId"),
+                db="Open Targets",
             )
         )
-        return df.select(sorted(df.columns))
+        if target_filtered.is_empty():
+            return pl.DataFrame()
+        target_filtered = target_filtered.with_columns("" + pl.col(""))
+        unique_reports = target_filtered["clinicalReportIds"].explode().value_counts()
+        report = report.filter("id IN (SELECT clinicalReportIds FROM unique_reports)")
+        if confident:
+            report = report.filter(
+                "clinicalStage IN ['APPROVAL', 'PHASE_4', 'PREAPPROVAL', 'PHASE_3']"
+            )
+        report_filtered: pl.DataFrame = report.pl().rename({"id": "report_id"})
+        if report_filtered.is_empty():
+            return target_filtered.with_columns(pl.lit(None).alias("source"))
+        target_filtered = target_filtered.explode("clinicalReportIds")
+        # TODO: format source
+        return
 
 
 def add_therapy_info(
