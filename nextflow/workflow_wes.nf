@@ -28,6 +28,7 @@ include { STANDARDIZE_VCF } from "./modules/standardize_vcf.nf"
 include { MUSE2 } from "./modules/muse2.nf"
 include { GRIDSS } from "./modules/gridss.nf"
 include { SIGPROFILERASSIGNMENT } from "./modules/sigprofilerassignment.nf"
+include { GET_THERAPY_CACHE } from "./modules/get_therapy_cache.nf"
 include { SIGPROFILERASSIGNMENT_COLLECT } from "./modules/sigprofilerassignment.nf"
 include { VEP } from "./modules/vep.nf"
 include { PANEL_OF_NORMALS_FROM_BAM } from "./subworkflows/panel_of_normals_from_bam.nf"
@@ -49,7 +50,7 @@ workflow {
         tumor: it[0].type == "cancer" || it[0].type == "tumor"
         normal: it[0].type == "normal"
     }
-    def cohortTopLevel = { it -> [["filename": cohort_name], it]}
+    def cohortTopLevel = { it -> [["filename": cohort_name], it] }
     /*
      * Preprocessing
      */
@@ -106,7 +107,7 @@ workflow {
 
     MANTA(paired_no_id, params.ref.genome, params.ref.targets)
     DELLY_SV(paired_no_id, params.ref.genome, params.ref.delly_exclude)
-    
+
     MSISENSORPRO(
         paired_no_id,
         params.ref.homopolymers_microsatellites,
@@ -330,10 +331,22 @@ workflow {
             [CNVKIT.out.cns, CNVKIT.out.cnr, CROSS_REFERENCE_CNV.out.tsv, CROSS_REFERENCE_MSI.out.tsv],
         )
         .map { it ->
-            [it[0], [sigprofiler: it[1], cnvkit_cns: it[2], cnvkit_cnr: it[3], classify_cnv: it[4], msisensor_pro: it[5], civic_cache: params.ref.civic_cache ?: "civic_cache.json", pandrugs2_cache: params.ref.pandrugs2_cache ?: "pandrugs2_cache.json", cosmic_reference: params.ref.cosmic_reference]]
+            [it[0], [sigprofiler: it[1], cnvkit_cns: it[2], cnvkit_cnr: it[3], classify_cnv: it[4], msisensor_pro: it[5], cosmic_reference: params.ref.cosmic_signatures]]
         }
 
     to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report)).map { it -> [it[0], it[1] + it[2]] }
+
+    if (params.cache_lookup) {
+        GET_THERAPY_CACHE(
+            vep_to_report.map { val -> val[1].vep_small }.collect(),
+            vep_to_report.map { val -> val[1].vep_sv }.collect(),
+            params.ref.therapy_data_cache,
+        )
+        therapy_data_cache = GET_THERAPY_CACHE.out.cache
+    }
+    else {
+        therapy_data_cache = channel.of(params.ref.therapy_data_cache)
+    }
 
     REPORT(to_report, "variant_calling")
 
@@ -517,7 +530,7 @@ output {
     purecn_baits {
         path { "purecn_ref/" }
     }
-    
+
     merged_results {
         path { s ->
             // Reports

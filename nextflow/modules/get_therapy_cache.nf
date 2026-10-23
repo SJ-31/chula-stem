@@ -2,40 +2,28 @@ process GET_THERAPY_CACHE {
     ext version: "1"
 
     input:
-    tuple val(meta), path(files)
+    path small_variants
+    path structural_variants
+    path cache_path
 
     output:
     //
-    path ("therapy_cache/${civic}"), emit: civic
-    path ("therapy_cache/${pandrugs2}"), emit: pandrugs2
-    path not_in
-    tuple val(meta), path("*.log"), emit: logfile
+    path cache_path, emit: cache
+    path not_in, emit: failed
+    path("*.log"), emit: logfile
 
     script:
     //
-    civic = "civic_cache.json"
-    pandrugs2 = "pandrugs2_cache.json"
     not_in = "not_in_databases.txt"
-    check = file("${meta.out}/therapy_cache")
-    if (check) {
-        """
-        cp -r ${check} .
-        ln -sr ${meta.log}/therapy_cache.log .
-        """
-    }
-    else {
-        """
-        mkdir therapy_cache
+    """
+    
+    
+    get_therapy_cache -i . \\
+         --filter-confident \\
+         --not-in-db therapy_cache/${not_in} \\
+         --cache ${cache_path} \\
+         --gene-col SYMBOL
 
-        get_therapy_cache -i . \\
-            --filter-confident \\
-            --not-in-db therapy_cache/${not_in} \\
-            --civic-cache therapy_cache/${civic} \\
-            --pandrugs2-cache therapy_cache/${pandrugs2} \\
-            --gene-col SYMBOL
-
-        get_nextflow_log.bash therapy_cache.log
-        """
-    }
-    //
+    get_nextflow_log.bash therapy_cache.log
+    """
 }

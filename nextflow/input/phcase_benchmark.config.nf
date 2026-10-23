@@ -6,6 +6,7 @@ includeConfig "$launchDir/input/wes_tools.config.nf"
 params.input = "$launchDir/input/manifests/wes_test.csv"
 params.cohort = "PHcase_BM"
 params.source_name = "SOURCE"
+params.cache_lookup = true
 
 report {
     enabled = true
@@ -46,9 +47,8 @@ params.ref = ["genome": "/data/project/stemcell/shannc/reference/genomes/GRCh38.
               "cnv_reference": "/data/project/stemcell/shannc/reference/variants/structural/aggregated_cnv.tsv",
               "msi_reference": "/data/project/stemcell/shannc/reference/variants/structural/aggregated_msi.tsv",
               "clingen_dosage": "/data/project/stemcell/shannc/reference/therapeutics/Clingen-Dosage-Sensitivity-2024-12-16.csv",
-              "civic_cache": "/data/home/shannc/chula-stem/resources/civic_cache.json",
-              "pandrugs2_cache": "/data/home/shannc/chula-stem/resources/2025-01-13_pandrugs2_cache_pdac.json",
-              "cosmic_reference": "/data/home/shannc/chula-stem/resources/config/cosmic_signatures_v3.4-2024-12-26.csv",
+              "cosmic_signatures": "/data/home/shannc/chula-stem/resources/cosmic_signatures_v3.4-2024-12-26.csv",
+              "therapy_data_cache": "/data/home/shannc/.cache/2026-therapy_data.db",              
               "clingen_gene": "/data/project/stemcell/shannc/reference/therapeutics/Clingen-Gene-Disease-Summary-2024-12-19.csv"]
 
 // * Variant calling parameters
@@ -70,6 +70,6 @@ params.qc = ["accepted_filters": ["PASS"],
 process {
     withName: "REPORT" {
         ext.misc = ["plot": false, "show_therapies": true]
-        ext.extra_paths = ["therapy_data_cache": "/data/home/shannc/.cache/2025-01-13_therapy_data.parquet"]
+        ext.extra_paths = []
     }
 }
