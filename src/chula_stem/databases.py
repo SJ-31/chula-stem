@@ -19,6 +19,18 @@ from gql.transport.aiohttp import AIOHTTPTransport
 
 import chula_stem
 
+"""
+Utilities for looking up validated therapies for specific gene mutations
+
+Implemented databases [2026-10-24 Sat]
+- OpenTargets
+- CiVIC
+
+NOTE: The OpenTargets and CiVIC databases are organized differently —
+the former uses gene-therapy associations, while the latter uses
+gene-literature source (nested within variant aliases)
+"""
+
 # * Utilities
 
 
@@ -106,6 +118,7 @@ def get_therapy_df(
     filter_confident=False,
     attempt_failed=True,
     lookup: bool = False,
+    db_kws: dict | None = None,
 ) -> pl.DataFrame:
     """Get therapeutic information
 
@@ -121,8 +134,11 @@ def get_therapy_df(
     - "db": Database name
     - "db_link": link to page of association in database
     """
+    db_kws = db_kws or {}
     db_mapping = {"civic": Civic, "open_targets": OpenTargets}
-    therapy_dbs: list[TherapyDB] = [db_mapping[db](cache) for db in dbs]
+    therapy_dbs: list[TherapyDB] = [
+        db_mapping[db](cache=cache, **db_kws.get(db, {})) for db in dbs
+    ]
     temp: list[pl.DataFrame] = []
     genes_copy: set = copy.copy(genes)
     if not attempt_failed and not_in_db_file and os.path.exists(not_in_db_file):
@@ -199,10 +215,14 @@ class TherapyDB(ABC):
         mapping: pl.DataFrame = pl.read_csv(
             res.files(chula_stem) / "data/ensembl_gene_data_116.csv"
         )
-        return mapping.filter(
-            (pl.col("HGNC symbol").is_in(genes))
-            & (pl.col("Gene stable ID").is_not_null())
-        ).rename({"HGNC symbol": "gene", "Gene stable ID": "ensembl"})
+        return (
+            mapping.filter(
+                (pl.col("HGNC symbol").is_in(genes))
+                & (pl.col("Gene stable ID").is_not_null())
+            )
+            .rename({"HGNC symbol": "gene", "Gene stable ID": "ensembl"})
+            .select(["gene", "ensembl"])
+        )
 
     @staticmethod
     def get_confident(df: pl.DataFrame) -> pl.DataFrame:
@@ -518,10 +538,12 @@ class Civic(TherapyDB):
 
 class OpenTargets(TherapyDB):
     batched = True
+    name = "OpenTargets"
     schema: dict[str, str] = {
         "therapies": "VARCHAR[]",
         "disease": "VARCHAR[]",
         "db_link": "VARCHAR",
+        "source": "VARCHAR",
         "gene": "VARCHAR",
         "db": "VARCHAR",
     }
@@ -538,6 +560,27 @@ class OpenTargets(TherapyDB):
         self.db: duckdb.DuckDBPyConnection = duckdb.connect(cache)
         self.data_dir: Path | None = (
             Path(data_dir) if isinstance(data_dir, str) else data_dir
+        )
+
+    @staticmethod
+    def filter_format_diseases(df: pl.DataFrame) -> pl.DataFrame:
+        return (
+            df.filter(
+                pl.col("diseases")
+                .list.filter(
+                    pl.element()
+                    .struct.field("diseaseFromSource")
+                    .str.contains("tumor|neoplasm|cancer")
+                )
+                .list.len()
+                > 0
+            )
+            .rename({"diseases": "disease"})
+            .with_columns(
+                disease=pl.col("disease").list.eval(
+                    pl.element().struct.field("diseaseFromSource")
+                ),
+            )
         )
 
     def get_data(self) -> tuple[duckdb.DuckDBPyRelation, duckdb.DuckDBPyRelation]:
@@ -592,46 +635,58 @@ class OpenTargets(TherapyDB):
             "targetId IN (SELECT ensembl FROM keep)"
         ).pl()
         target_filtered = (
-            target_filtered.filter(
-                pl.col("diseases")
-                .list.filter(
-                    pl.element()
-                    .struct.field("diseaseFromSource")
-                    .str.contains("tumor|neoplasm|cancer")
-                )
-                .list.len()
-                > 0
+            target_filtered.join(keep, left_on="targetId", right_on="ensembl")
+            .rename(
+                {
+                    "drugId": "therapies",  # TODO: remove this when you can map chembl IDs to names
+                }
             )
-            .join(keep, left_on="targetId", right_on="ensembl")
             .with_columns(
                 db_link="https://platform.opentargets.org/target/" + pl.col("targetId"),
-                db="Open Targets",
+                db=pl.lit("Open Targets"),
             )
+            .pipe(self.filter_format_diseases)
         )
+        print(target_filtered)
         if target_filtered.is_empty():
             return pl.DataFrame()
-        target_filtered = target_filtered.with_columns("" + pl.col(""))
         unique_reports = target_filtered["clinicalReportIds"].explode().value_counts()
         report = report.filter("id IN (SELECT clinicalReportIds FROM unique_reports)")
         if confident:
             report = report.filter(
                 "clinicalStage IN ['APPROVAL', 'PHASE_4', 'PREAPPROVAL', 'PHASE_3']"
             )
-        report_filtered: pl.DataFrame = report.pl().rename({"id": "report_id"})
+        report_filtered: pl.DataFrame = (
+            report.pl().rename({"id": "report_id"}).pipe(self.filter_format_diseases)
+        )
+        # TODO: group by the association id
+        # and choose the best trial from the selection
+        # so you don't have to explode on many sources
+        agg_expr = [
+            pl.col("therapies"),
+            pl.col("db").first(),
+            pl.col("db_link").first(),
+        ]
         if report_filtered.is_empty():
             return (
-                target_filtered.with_columns(pl.lit(None).alias("source"))
-                .group_by("gene")
-                .agg(pl.all())
+                target_filtered.group_by("gene")
+                .agg(pl.col("disease").list.explode(), *agg_expr)
+                .with_columns(
+                    pl.lit(None).alias("source"), pl.col("disease").list.unique()
+                )
             )
+        target_filtered = target_filtered.drop("disease")
+        print(target_filtered)
         target_filtered = (
             target_filtered.explode("clinicalReportIds")
             .join(report_filtered, left_on="clinicalReportIds", right_on="report_id")
-            .select()
+            .with_columns(
+                source="[" + pl.col("title") + "]" + "(" + pl.col("url") + ")"
+            )
         )
-        # TODO: make sure that the schema is the same as civic
-        # and write at the top of therapy db!!!
-        return
+        return target_filtered.group_by("gene", "source").agg(
+            pl.col("disease").first(), *agg_expr
+        )
 
 
 def add_therapy_info(
