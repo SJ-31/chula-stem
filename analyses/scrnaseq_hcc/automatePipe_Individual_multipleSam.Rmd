@@ -1,0 +1,1594 @@
+```{r}
+Sys.time()
+start_time <- Sys.time()
+``` 
+```{r}
+features1 = c("FCN1", "VCAN", "C1QC", "IL1B", "MNDA", "CPVL", "MS4A7", "MSR1", "CD163", "CYBB", "CSF2RA", "CLEC10A",
+             "LILRA4", "LRRC26", "PTCRA", "CLEC4C","KLRF1", "KLRC1", "PRF1", "FGFBP2",
+             "MKI67", "TOP2A", "UBE2C", "RRM2","TRAC", "CD2","CD79A", "MS4A1",
+             "FCRL5", "JSRP1","TPSAB1", "CPA3",
+             "CLEC14A", "EGFL7", "HSPG2", "FCN3", "CLEC4G", "PLVAP", "VWF", "EMCN", "OIT3", "CLEC4M",
+             "TAGLN", "ACTA2", "TIMP1", "COL3A1", "COL1A2", "RGS5", "PDGFRB", "LUM", "PDGFRA", "CCL19",
+             "ALB", "KNG1", "TTR", "ORM1", "TF", "APOC2", "F2", "PRAP1", "HSD17B6", "ITIH1", "CYP4A11", "AGXT",
+             "KRT19", "CXCL6", "CXCL1", "SOX9")
+
+features2 = c(
+"CYP3A7","CYP2A7","CYP2A6","SCD",
+"HMGCS1","ACSS2","TM7SF2","SEC16B",
+"SLBP","RND3","PCK1","BCHE",
+"G6PC","GHR","ALDH6A1","RPP25L",
+"HSD11B1","HAMP","HPR","GSTA2","AKR1C1","MASP2" ,
+#Hep
+
+"MGP","SPARCL1","TM4SF1","CLEC14A" ,
+#LSEC zone1
+"CCL14","CLEC1B","FCN2","S100A13",
+#LSEC zone2,3
+"RAMP3","INMT","DNASE1L3","LIFR",
+#Portal endothelial
+"KRT7","KRT19","SOX9","EPCAM" ,
+#Cholangiocytes
+"ACTA2","COL1A1","RBP1" ,
+#Stellate cells
+"S100A8","LYZ","S100A9","HLA-DPB1",
+#Inflammatory Macs
+"CD5L","MARCO","VSIG4",
+#Non-inflammatory Mac
+"CD2","CD3D","TRAC","GZMK",
+#CD3+ αβ T-cells
+"GNLY","PTGDS","GZMB","TRDC",
+#γδ T-cells 1
+"STMN1","HMGB2","TYMS",
+#γδ T-cells 2
+"MS4A1","LTB","CD37","CD79B",
+#Mature B-cells
+"IGLC2","IGHG1","IGKC",
+#Plasma cells
+"CD7","KLRB1","NKG7",
+#NK-like cells
+"HBB","CA1","ALAS2")
+#Erthyroid cells
+```
+
+
+```{r}
+library("Seurat")
+library("dplyr")
+library("tidyverse")
+library("data.table")
+library("plotly")
+library("GGally")
+library("velocyto.R")
+library("Matrix.utils")
+```
+
+#input HCC5
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCC5.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCC5.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+#input HCC8
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCC8.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCC8.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input HCCN1
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCCN1.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCCN1.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input HCCN13
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCCN13.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCCN13.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input HCCN14
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCCN14.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCCN14.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input HCCN17
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCCN17.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCCN17.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input HCCN22
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_HCCN22.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_HCCN22.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCA11
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCA11.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCA11.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCA13
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCA13.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCA13.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+
+#input CCA16
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCA16.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCA16.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCA9
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCA9.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCA9.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCAN12
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCAN12.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCAN12.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCAN15
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCAN15.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCAN15.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+#input CCAN18
+```{r}
+load("/data2/thanakornj/LiverOrganoid_out/output_logfile/organoid_CCAN18.RData")
+pwdSave = "/data2/thanakornj/LiverOrganoid_out/output_logfile/sub_CCAN18.RData"
+
+organoid.int = subset(organoid.int, subset = orig.ident == "organoid")
+```
+
+```{r}
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "orig.ident")
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.int, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+```{r}
+organoid.sub = SCTransform(organoid.int,vars.to.regress = c("S.Score", "G2M.Score","percent.mt"))
+organoid.sub <- RunPCA(organoid.sub, npcs = 30, verbose = FALSE,assay = "SCT")
+organoid.sub <- RunTSNE(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT")
+organoid.sub <- RunUMAP(organoid.sub, reduction = "pca", dims = 1:30,assay = "SCT",n.components=3)
+organoid.sub <- FindNeighbors(organoid.sub, reduction = "pca", dims = 1:30)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.5)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.3)
+organoid.sub <- FindClusters(organoid.sub, resolution = 0.1)
+```
+
+```{r}
+save(organoid.sub,file = pwdSave)
+```
+
+```{r}
+DimPlot(object = organoid.sub, reduction = 'tsne',group.by = "integrated_snn_res.0.5",label = T)
+#DimPlot(object = organoid, reduction = 'tsne',group.by = "cellType",label = T)
+
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "integrated_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.5",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.3",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "SCT_snn_res.0.1",label = T)
+DimPlot(object = organoid.sub, reduction = 'umap',group.by = "cellTypeTransfer",label = T)
+
+```
+
+
+```{r}
+
+organoid.sub.df = cbind(organoid.sub@reductions$umap@cell.embeddings, 
+               organoid.sub@reductions$tsne@cell.embeddings,
+               organoid.sub@meta.data)
+
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~percent.mt,marker = list(size = 2),colors="YlOrRd")
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~Phase,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~integrated_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.5,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.3,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~SCT_snn_res.0.1,marker = list(size = 2))
+plot_ly(organoid.sub.df, x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, color = ~cellTypeTransfer,marker = list(size = 2))
+        
+```
+
+
+
+
+```{r}
+table(organoid.sub$SCT_snn_res.0.5, organoid.sub$integrated_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.5)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.3)
+table(organoid.sub$cellTypeTransfer, organoid.sub$SCT_snn_res.0.1)
+```
+
+
+
+
+```{r}
+Idents(organoid.sub) = "cellTypeTransfer"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.5"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.3"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+
+Idents(organoid.sub) = "SCT_snn_res.0.1"
+DotPlot(organoid.sub,assay="SCT", features = features1 ,cluster.idents=T) + RotatedAxis() 
+DotPlot(organoid.sub,assay="SCT", features = features2 ,cluster.idents=T) + RotatedAxis() 
+```
+
+```{r}
+end_time <- Sys.time()
+end_time - start_time
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+```
+

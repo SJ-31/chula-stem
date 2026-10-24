@@ -184,3 +184,13 @@ docs
 /.projectile-cache.eld
 /tests/purecn_from_aj/
 /tests/datastore/scrna_seq2/
+/analyses/pdac/p23_cosmic_interesting.csv
+/analyses/pdac/p23_interesting.csv
+/analyses/pdac/phcase_23_confirmed_cosmic.csv
+/analyses/pdac/snakemake/p23_interesting.vcf
+/analyses/pdac_subtyping/cohort.h5ad
+/analyses/pdac_subtyping/cohort_old.h5ad
+/src/chula_stem/data/pbmc3k_raw.h5ad
+/analyses/pdac_subtyping/de_cluster/
+/analyses/pdac_subtyping/de_random/
+/analyses/pdac_subtyping/de_status/
