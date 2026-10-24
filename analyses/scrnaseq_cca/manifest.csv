@@ -1,0 +1,16 @@
+sample_name,fastq_path,type,flowcell,treatment
+CCA11,/data/project/stemcell/shannc/CCA/scRNASeq/CCA11/HGC3FCCX2,tumor,HGC3FCCX2,control
+CCA13,/data/project/stemcell/shannc/CCA/scRNASeq/CCA13/HGC3FCCX2,tumor,HGC3FCCX2,control
+CCA16,/data/project/stemcell/shannc/CCA/scRNASeq/CCA16/HGC3FCCX2,tumor,HGC3FCCX2,control
+CCA9,/data/project/stemcell/shannc/CCA/scRNASeq/CCA9/HG7VCCCX2,tumor,HG7VCCCX2,control
+CCAN11,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN11_control/HHF5TCCX2,tumor,HHF5TCCX2,control
+CCAN11,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN11_IACS/HHF5TCCX2,tumor,HHF5TCCX2,iacs
+CCAN11,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN11_Oligo/HHF5TCCX2,tumor,HHF5TCCX2,oligomycin
+CCAN11,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN11_PP/HHF5TCCX2,tumor,HHF5TCCX2,pp
+CCAN12,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN12/HGL5KCCX2,tumor,HGL5KCCX2,control
+CCAN15,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN15/HGL5KCCX2,tumor,HGL5KCCX2,control
+CCAN18,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN18/HGL5KCCX2,tumor,HGL5KCCX2,control
+CCAN9,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN9_control/HHF5TCCX2,tumor,HHF5TCCX2,control
+CCAN9,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN9_IACS/HHF5TCCX2,tumor,HHF5TCCX2,iacs
+CCAN9,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN9_Oligo/HHF5TCCX2,tumor,HHF5TCCX2,oligomycin
+CCAN9,/data/project/stemcell/shannc/CCA/scRNASeq/CCAN9_PP/HHF5TCCX2,tumor,HHF5TCCX2,pp

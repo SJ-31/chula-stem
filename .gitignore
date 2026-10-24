@@ -28,6 +28,9 @@ nextflow/workflows/lib
 *_Session.py
 output
 tests/*_pytest*
+*.h5ad
+slurm_logs
+logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -194,3 +197,14 @@ docs
 /analyses/pdac_subtyping/de_cluster/
 /analyses/pdac_subtyping/de_random/
 /analyses/pdac_subtyping/de_status/
+/analyses/pdac_de/IC50/
+/analyses/pdac_de/IC80/
+/analyses/pdac_de/IC80_old/
+/data/
+/analyses/pdac_de/de_genes_regress.csv
+/analyses/pdac_de/enrichment_regress.csv
+/analyses/pdac_de/pdac_counts.csv
+/analyses/scrnaseq_hcc/test_markers/
+/analyses/pdac_subtyping/phcase_pca_greatest_vars.csv
+/analyses/data_all
+/analyses/data/

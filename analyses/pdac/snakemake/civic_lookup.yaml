@@ -1,0 +1,25 @@
+__use_yte__: true
+__variables__:
+  root: "../../data_all/output/PHCase"
+
+input:
+  - ?f"{root}/PHcase_1/annotations/7-PHcase_1-VEP_small.tsv"
+  - ?f"{root}/PHcase_4/annotations/7-PHcase_4-VEP_small.tsv"
+  - ?f"{root}/PHcase_21/annotations/7-PHcase_21-VEP_small.tsv"
+  - ?f"{root}/PHcase_15/annotations/7-PHcase_15-VEP_small.tsv"
+  - ?f"{root}/PHcase_3/annotations/7-PHcase_3-VEP_small.tsv"
+  - ?f"{root}/PHcase_10/annotations/7-PHcase_10-VEP_small.tsv"
+  - ?f"{root}/PHcase_13/annotations/7-PHcase_13-VEP_small.tsv"
+  - ?f"{root}/PHcase_17/annotations/7-PHcase_17-VEP_small.tsv"
+  - ?f"{root}/PHcase_14/annotations/7-PHcase_14-VEP_small.tsv"
+  - ?f"{root}/PHcase_9/annotations/7-PHcase_9-VEP_small.tsv"
+  - ?f"{root}/PHcase_12/annotations/7-PHcase_12-VEP_small.tsv"
+  - ?f"{root}/PHcase_16/annotations/7-PHcase_16-VEP_small.tsv"
+  - ?f"{root}/PHcase_6/annotations/7-PHcase_6-VEP_small.tsv"
+  - ?f"{root}/PHcase_18/annotations/7-PHcase_18-VEP_small.tsv"
+  - ?f"{root}/PHcase_2/annotations/7-PHcase_2-VEP_small.tsv"
+  - ?f"{root}/PHcase_5/annotations/7-PHcase_5-VEP_small.tsv"
+
+output: "../../../resources/civic_hgvscs.tsv"
+workdir: ".civic_lookups"
+mode: "update"

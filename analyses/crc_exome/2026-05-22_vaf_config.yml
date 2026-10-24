@@ -1,0 +1,135 @@
+outdir: "../../analyses/output/crc_exome"
+conda: "stem-base" # conda environment for reticulate
+sample_spec:
+  - manifest: "../../nextflow/input/manifests/crc_exome_paired.csv"
+    root: "../../analyses/data_all/output/CRC/EXOME-PAIRED"
+    cohort: "CEN2"
+date: "2026-05-22"
+src:
+  py: "../../src/chula_stem"
+  r: "../../src/R"
+
+extra:
+  cases: ["CEN2_N18", "CEN2_N27", "D-CEN2-N20", "D-CEN2-N22"]
+  multiqc_vep:
+    [
+      "../../analyses/data_all/output/CRC/EXOME-TUMOR_ONLY/8-CEN2-MultiQC_data/vep.txt",
+    ]
+
+alignment_plot:
+  reference_genome: "../../analyses/data_all/reference/genomes/GRCh38.p14_filtered.fasta"
+  window: 50 # Width of alignment for plotting
+  # Plot file dimensions
+  width: 12
+  height: 12
+  with_prob: False
+  protein_only: True # Only allow variants that affect proteins
+  target_symbols:
+    - "KRAS"
+    - "TP53"
+
+variant_calling:
+  paired: "detect"
+  min_alt_depth: 5 # Minimum depth that variants are counted in the plot
+  protein_only: False
+  somatic_only: False
+  order_by_config: True # If True, order the genes in the plot
+  # by the way they are specified in the configuration. Otherwise, sort
+  # by frequency
+
+plot:
+  dpi: 500
+  width: 15
+  height: 20
+
+variant_table:
+  wanted_genes: ["KRAS", "TP53"]
+
+individual_gene_plots: {}
+
+only_curated: False # Only allow named variants, regardless of type
+
+accepted_significance:
+  - likely_pathogenic
+  - pathogenic
+  - uncertain_significance
+  - risk_factor
+
+accepted_consequence: # Only these variant types are plotted, if !`only_curated`
+  # follows naming convention for variant consequences used by VEP
+  # See https://grch37.ensembl.org/info/genome/variation/prediction/predicted_data.html
+  - "missense_variant"
+  - "frameshift_variant"
+  # - "downstream_gene_variant"
+  # - "upstream_gene_variant"
+  # - "intron_variant"
+  - "3_prime_UTR_variant"
+  - "stop_gained"
+  - "splice_region_variant"
+  - "inframe_deletion"
+  - "splice_donor_5th_base_variant"
+  - "NMD_transcript_variant"
+
+wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
+  TP53: "17:7661779-7687546"
+  APC: "5:112707518-112846239"
+  KRAS: "12:25205246-25250936"
+  SMAD4: 18:51028528-51085045
+  TCF7L2: 10:112950247-113167678
+  BRAF: 7:140719327-140924929
+  CDKN2A: 9:21967752-21974857
+  ZFP36L2: 2:43222402-43226606
+  PIK3CA: 3:179148357-179240093
+  PRKN: 6:161347417-162727766
+  FHIT: 3:59747277-61251452
+  BCL9L: 11:118896136-118925926
+  RNF43: 17:58353676-58417534
+  FAT4: 4:125314955-125492932
+  GNAS: 20:58891421-58911192
+  STS: X:7147712-7354641
+  MACROD2: 20:13995516-16053197
+  CCND2: 12:4273762-4305353
+  PTEN: 10:87863625-87971930
+  ALK: 2:29192774-29921586
+  UBR5: 8:102252273-102412700
+  MAP3K21: 1:233327724-233385148
+  RAD50: 5:132556977-132646349
+  KMT2D: 12:49018978-49060794
+  MET: 7:116672196-116798377
+  RET: 10:43077069-43130351
+  CHD4: 12:6570082-6607379
+  TSC2: 16:2047985-2089491
+  FLT3: 13:28003274-28100576
+  CHEK2: 22:28677738-28752422
+  ATP2B3: X:153517642-153582929
+  KDR: 4:55078481-55125595
+  MTOR: 1:11106535-11262551
+  CDH10: 5:24487100-24644978
+  CCSER1: 4:90127394-91605295
+  POLE: 12:132623762-132687342
+  IMMP2L: 7:110662644-111562492
+  SLCO1B1: 12:21131194-21239796
+  RB1: 13:48303751-48481890
+  CTNNA1: 5:138753425-138935034
+  SEMG2: 20:45221373-45224458
+  KMT2C: 7:152134925-152436003
+  FBXW7: 4:152320544-152536092
+  ERBB4: 2:211375717-212538802
+  MAP2K7: 19:7903877-7914478
+  RAD21: 8:116845934-116874776
+  NOTCH2: 1:119911553-120069662
+  NF1: 17:31094977-31377675
+  PREX2: 8:67952046-68237032
+  FOXA1: 14:37589552-37595249
+  AXL: 19:41219223-41261766
+  H3.3B: 17:75776434-75779779
+  TENM1: X:124375903-125204312
+  LATS2: 13:20973036-21061586
+  TG: 8:132866958-133134899
+  FLT4: 5:180601506-180649600
+  MAP3K13: 3:185363136-185489094
+
+allowed_variants: # Mapping of gene symbols to a list of specific variants
+  # variant identifiers can be in either HGVSp or HGVSg format
+  KRAS:
+    - "ENSP00000256078.5:p.Gly12Asp"
