@@ -10,7 +10,7 @@ def test_database_lookup(tmp_path):
     df = get_therapy_df(set(genes), cache=db, not_in_db_file=not_found, lookup=True)
     df_prev = get_therapy_df(set(genes), cache=db, lookup=False)
     assert df.height == df_prev.height
-    assert df["gene"] == df_prev["gene"]
+    assert set(df["gene"]) == set(df_prev["gene"])
     print(df)
     print(df.schema)
 

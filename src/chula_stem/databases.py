@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import importlib.resources as res
 import os
@@ -135,12 +137,14 @@ def get_therapy_df(
             break
     if temp:
         all_found: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
-        not_in_db: list = list(genes_copy - set(all_found["gene"]))
-        if not_in_db_file:
-            with open(not_in_db_file, "a") as f:
-                f.write("\n".join(not_in_db))
+        not_in_db: set = genes_copy - set(all_found["gene"])
         return all_found
-    return pl.DataFrame(schema=TherapyDB.schema_shared)
+    else:
+        not_in_db = genes_copy
+    if not_in_db_file:
+        with open(not_in_db_file, "a") as f:
+            f.write("\n".join(not_in_db))
+    return pl.DataFrame(schema=TherapyDB.schema_shared())
 
 
 def no_gene_df(gene: str) -> pl.DataFrame:
@@ -181,9 +185,9 @@ class TherapyDB(ABC):
     batched: bool
     db: duckdb.DuckDBPyConnection
 
-    @property
-    def schema_shared(self) -> dict:
-        return {k: v.dtype.type for k, v in self.schema_pa.columns.items()}
+    @staticmethod
+    def schema_shared() -> dict:
+        return {k: v.dtype.type for k, v in TherapyDB.schema_shared_pa.columns.items()}
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
@@ -214,7 +218,9 @@ class TherapyDB(ABC):
         schema_concat = ",\n    ".join(
             f"{name} {dtype}" for name, dtype in self.schema.items()
         )
-        self.db.execute(f"CREATE TABLE {self.name} (\n    {schema_concat}\n)")
+        self.db.execute(
+            f"CREATE TABLE IF NOT EXISTS {self.name} (\n    {schema_concat}\n)"
+        )
         previous: pl.DataFrame = self.db.query(f"SELECT * FROM {self.name}").pl()
         if not lookup:
             return previous.filter(pl.col("gene").is_in(genes))
@@ -233,11 +239,12 @@ class TherapyDB(ABC):
             if results:
                 df = pl.concat(results, how="vertical_relaxed")
             else:
-                df = pl.DataFrame(schema=self.schema_shared)
+                df = pl.DataFrame(schema=self.schema_shared())
         else:
             df = self.get_genes_batched(genes, confident=confident)
-        df = df.select(self.schema.keys())
-        self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
+        if not df.is_empty():
+            df = df.select(self.schema.keys())
+            self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
         if not previous.is_empty():
             df = pl.concat([previous, df], how="vertical_relaxed")
         df = df.select(self.schema_shared_pa.columns.keys())
@@ -512,6 +519,13 @@ class Civic(TherapyDB):
 
 class OpenTargets(TherapyDB):
     batched = True
+    schema: dict[str, str] = {
+        "therapies": "VARCHAR[]",
+        "disease": "VARCHAR[]",
+        "db_link": "VARCHAR",
+        "gene": "VARCHAR",
+        "db": "VARCHAR",
+    }
 
     def __init__(self, cache, data_dir: Path | str | None = None) -> None:
         """
