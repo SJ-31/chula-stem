@@ -119,7 +119,7 @@ def get_therapy_df(
     - "db": Database name
     - "db_link": link to page of association in database
     """
-    db_mapping = {"civic": Civic}
+    db_mapping = {"civic": Civic, "open_targets": OpenTargets}
     therapy_dbs: list[TherapyDB] = [db_mapping[db](cache) for db in dbs]
     temp: list[pl.DataFrame] = []
     genes_copy: set = copy.copy(genes)
@@ -189,9 +189,8 @@ class TherapyDB(ABC):
     def schema_shared() -> dict:
         return {k: v.dtype.type for k, v in TherapyDB.schema_shared_pa.columns.items()}
 
-    @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
-        pass
+        raise NotImplementedError()
 
     @staticmethod
     def symbol2ensembl(genes: set[str]) -> pl.DataFrame:
@@ -204,13 +203,12 @@ class TherapyDB(ABC):
         ).rename({"HGNC symbol": "gene", "Gene Stable ID": "ensembl"})
 
     @staticmethod
-    @abstractmethod
     def get_confident(df: pl.DataFrame) -> pl.DataFrame:
         """Retrieve the most confident and useful Evidence Item from the `get_gene` operation
         Criteria are database-specific
         :return: a df of one row
         """
-        pass
+        raise NotImplementedError()
 
     def get_genes(
         self, genes: set, confident: bool = True, lookup: bool = False
@@ -254,7 +252,6 @@ class TherapyDB(ABC):
         raise NotImplementedError()
 
     @staticmethod
-    @abstractmethod
     def parse_gene_response(data: list) -> pl.DataFrame:
         """
         :param: data a list of evidence entries associated with a gene, such as the result
@@ -265,7 +262,7 @@ class TherapyDB(ABC):
             - disease: list[str]
             - therapies: list[str]
         """
-        pass
+        raise NotImplementedError()
 
 
 # * Open targets
