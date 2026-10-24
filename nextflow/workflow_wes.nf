@@ -59,12 +59,14 @@ workflow {
     // After preprocessing, branch data into tumor and normal then pair up by id and join with  index
 
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
+    
     normals = Utl.getId(
-        branched.normal.map { it ->
-            [it[0].id, ["type": "paired", "id": it[0].id, "RGSM_normal": it[0].RGSM, "filename": it[0].id], it[1]]
+        branched.normal.map { val ->
+            [["type": "paired", "id": val[0].id, "RGSM_normal": val[0].RGSM, "filename": val[0].id], val[1]]
         }
     )
-    tumors = branched.tumor.map { it -> [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
+    tumors = branched.tumor.map { val -> [["RGSM_tumor": val[0].RGSM], val[1]] }
+    
     indices = Utl.getId(PREPROCESS_FASTQ.out.bam_index).groupTuple()
     paired = normals
         .join(tumors)
@@ -326,7 +328,6 @@ workflow {
 
     others = Utl
         .joinFirst(
-
             SIGPROFILERASSIGNMENT.out.activities,
             [CNVKIT.out.cns, CNVKIT.out.cnr, CROSS_REFERENCE_CNV.out.tsv, CROSS_REFERENCE_MSI.out.tsv],
         )
