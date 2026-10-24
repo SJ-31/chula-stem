@@ -24,7 +24,7 @@ if __name__ == "__main__":
     msi_files = Path(args["input_dir"]).rglob(f"*{args["suffix"]}")
     dfs = []
     for file in msi_files:
-        sample = re.findall(f"[0-9]+-(.*)-{args['suffix']}", file.name)[0]
+        sample = re.findall(f"(.*)-{args['suffix']}", file.name)[0]
         df = pd.read_csv(file, sep="\t").assign(sample=sample)
         if df.shape[0] == 0:
             df = pd.DataFrame({k: np.nan for k in df.columns}, index=[0])

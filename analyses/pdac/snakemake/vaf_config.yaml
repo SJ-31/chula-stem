@@ -14,16 +14,17 @@ __definitions__:
 outdir: ?f"{proj_root}/analyses/output/pdac" # Root path for output
 conda: ?conda_env # conda environment for reticulate
 
-custom_sample_file: ?f"{proj_root}/analyses/pdac/snakemake/custom_samples.tsv"
+custom_sample_file:
+# custom_sample_file: ?f"{proj_root}/analyses/pdac/snakemake/custom_samples.tsv"
 # A TSV file containing samples to manually add to the VAF plot e.g.
 # if no VCF data are available
 # Columns must follow VEP's column naming format, with four required columns:
 # Consequence, SYMBOL, HGVSc, and HGVSp
 
 sample_spec:
-  # - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
-  #   root: ?f"{data_root}/output/PDAC" # Root path of wes results
-  #   cohort: "cohort"
+  - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac.csv" # Nextflow manifest file used for WES pipeline
+    root: ?f"{data_root}/output/PDAC" # Root path of wes results
+    cohort: "cohort"
   # - manifest: ?f"{proj_root}/nextflow/input/manifests/pdac_prev.csv"
   #   root: ?f"{data_root}/output/PDAC" # Root path of wes results
   #   cohort: "prev_cohort"
@@ -31,18 +32,22 @@ sample_spec:
     cohort: "PHcase"
     root: ?f"{data_root}/output/PHCase"
     ignore:
-      []
-      # - PHcase_12
-      # - PHcase_15
-      # - PHcase_2
+      - PHcase_12
+      - PHcase_15
+      - PHcase_2
+      - PHcase_22
+      # Samples without rna-seq or exome data
+      # [2026-08-13 Thu] for plot
+      - PHcase_23
+      - PHcase_24
       # The below aren't pdac
-      # - PHcase_1 # no tissue confirmed
-      # - PHcase_4 # no tissue confirmed
-      # - PHcase_8 # Breast
-      # - PHcase_11 # Breast
-      # - PHcase_18 # Sarcoma
-      # - PHcase_19 # Kidney
-      # - PHcase_21 # Colorectal
+      - PHcase_1 # no tissue confirmed
+      - PHcase_4 # no tissue confirmed
+      - PHcase_8 # Breast
+      - PHcase_11 # Breast
+      - PHcase_18 # Sarcoma
+      - PHcase_19 # Kidney
+      - PHcase_21 # Colorectal
 
 manifest:
 src: # source directories
@@ -56,7 +61,7 @@ variant_calling:
   min_alt_depth: 5 # Minimum depth that variants are counted in the plot
   protein_only: false
 plot:
-  dpi: 500
+  dpi: 800
   width: 20
   height: 10
   with_sbs: False
@@ -79,7 +84,7 @@ sample_labels:
       other: "ENSP00000256078.5:.*"
   "Moffitt is basal-like":
     palette: "Manu::Hihi"
-    file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal.tsv"
+    file: ?f"{proj_root}/analyses/pdac_subtyping/moffitt_is_basal_manual.tsv"
 
 no_data_label: "no data"
 add_label_samples: false # Add any samples that are found in the label files, but not
@@ -93,7 +98,7 @@ accepted_significance:
     - risk_factor
   symbols: # symbol-specific filters. Leave null for no filtering
     SMAD4:
-    UGT1A1:
+    # UGT1A1:
     DPYD:
 
 accepted_consequence: # Only these variant types are plotted, if !`only_curated`
@@ -104,7 +109,7 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
     - "frameshift_variant"
     - "downstream_gene_variant"
     - "upstream_gene_variant"
-    - "intron_variant"
+    # - "intron_variant"
     - "3_prime_UTR_variant"
     - "stop_gained"
     - "splice_region_variant"
@@ -113,7 +118,7 @@ accepted_consequence: # Only these variant types are plotted, if !`only_curated`
     - "NMD_transcript_variant"
   symbols:
     DPYD:
-    UGT1A1:
+    # UGT1A1:
     SMAD4:
       - "missense_variant"
       - "frameshift_variant"
@@ -161,7 +166,7 @@ wanted_genes: # Entries are mappings in the form gene_symbol: "chr:start-end"
   EGFR: "7:55018820-55211628"
 
   # [2026-07-23 Thu] New targets
-  DPYD: "1:97077743-97995000"
+  # DPYD: "1:97077743-97995000"
   # Specifically DPYD variants Cys29Arg
   UGT1A1: "2:233760270-233773300"
   EXO1: "1:241847967-241889939"

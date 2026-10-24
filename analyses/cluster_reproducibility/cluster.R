@@ -31,8 +31,9 @@ cluster_call_de <- function(file) {
   library(ConsensusClusterPlus)
 
   adata <- ad$read_h5ad(file)
+  print(adata$shape)
   sc$pp$filter_cells(adata, min_genes = 50)
-  sc$pp$filter_cells(adata, min_counts = 100)
+  print(adata$shape)
   sc$pp$filter_genes(adata, min_cells = 20)
 
   if (adata$shape[[1]] == 0) {
@@ -57,6 +58,7 @@ cluster_call_de <- function(file) {
   result <- ConsensusClusterPlus(d = expr, maxK = 7)
   ic_vals <- calcICL(result)
   best <- as_tibble(ic_vals$clusterConsensus) |>
+    filter(k >= (env$min_clusters %||% 3)) |>
     group_by(k) |>
     summarise(avg = mean(clusterConsensus, na.rm = TRUE)) |>
     slice_max(avg) |>

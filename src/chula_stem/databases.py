@@ -10,6 +10,7 @@ from typing import override
 
 import click
 import duckdb
+import pandera.polars as pa
 import polars as pl
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
@@ -89,6 +90,7 @@ def therapy_cache_from_files(
         cache=Path(cache),
         not_in_db_file=not_in_db,
         filter_confident=filter_confident,
+        lookup=True,
     )
 
 
@@ -99,6 +101,7 @@ def get_therapy_df(
     not_in_db_file: str = "",
     filter_confident=False,
     attempt_failed=True,
+    lookup: bool = False,
 ) -> pl.DataFrame:
     """Get therapeutic information
 
@@ -123,7 +126,7 @@ def get_therapy_df(
             failed_previously: list = f.read().splitlines()
             genes = genes - set(failed_previously)
     for db in therapy_dbs:
-        find_info: pl.DataFrame = db.get_genes(genes, filter_confident)
+        find_info: pl.DataFrame = db.get_genes(genes, filter_confident, lookup=lookup)
         if not find_info.is_empty():
             genes -= set(find_info["gene"])
             temp.append(find_info.select(TherapyDB.shared_cols))
@@ -171,6 +174,17 @@ class TherapyDB(ABC):
         "db",
         "db_link",
     )
+    schema = pa.DataFrameSchema(
+        {
+            "gene": pa.Column(str),
+            "source": pa.Column(str),
+            "disease": pa.Column(""),
+            "therapies": pa.Column(str),
+            "db": pa.Column(),
+            "db_link": pa.Column(str),
+        }
+    )
+    batched: bool
     db: duckdb.DuckDBPyConnection
 
     @abstractmethod
@@ -196,33 +210,42 @@ class TherapyDB(ABC):
         """
         pass
 
-    def get_genes(self, genes: set, confident: bool = True) -> pl.DataFrame:
+    def get_genes(
+        self, genes: set, confident: bool = True, lookup: bool = False
+    ) -> pl.DataFrame:
         schema_concat = ",\n    ".join(
             f"{name} {dtype}" for name, dtype in self.schema.items()
         )
         self.db.execute(f"CREATE TABLE {self.name} (\n    {schema_concat}\n)")
-        results: list = []
         previous: pl.DataFrame = self.db.query(f"SELECT * FROM {self.name}").pl()
+        if not lookup:
+            return previous.filter(pl.col("gene").is_in(genes))
         if not previous.is_empty():
             genes = genes - set(previous["gene"])
-        for g in genes:
-            try:
-                current: pl.DataFrame = self.get_gene(g, confident)
-                if not current.is_empty():
-                    results.append(current.with_columns(db=pl.lit(self.name)))
-                sleep(self.api_wait)  # API permits 2 requests per second
-            except TimeoutError:
-                print(f"WARNING: received timeout error for gene {g}, skipping...")
-        if results:
-            df = pl.concat(results, how="vertical_relaxed")
-            df = df.select(self.schema.keys())
-            if not previous.is_empty():
-                df = pl.concat([previous, df], how="vertical_relaxed")
-            self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
-            return df
+        if not self.batched:
+            results: list = []
+            for g in genes:
+                try:
+                    current: pl.DataFrame = self.get_gene(g, confident)
+                    if not current.is_empty():
+                        results.append(current.with_columns(db=pl.lit(self.name)))
+                    sleep(self.api_wait)  # API permits 2 requests per second
+                except TimeoutError:
+                    print(f"WARNING: received timeout error for gene {g}, skipping...")
+            if results:
+                df = pl.concat(results, how="vertical_relaxed")
+                df = df.select(self.schema.keys())
+            else:
+                df = pl.DataFrame()
+        else:
+            df = self.get_genes_batched(genes, confident=confident)
+        self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
         if not previous.is_empty():
-            return previous
-        return pl.DataFrame()
+            df = pl.concat([previous, df], how="vertical_relaxed")
+        return df
+
+    def get_genes_batched(self, genes: set, confident: bool = True) -> pl.DataFrame:
+        raise NotImplementedError()
 
     @staticmethod
     @abstractmethod
@@ -248,10 +271,12 @@ CIVIC_URL: str = "https://civicdb.org"
 
 
 class Civic(TherapyDB):
+    batched = False
+    name: str = "Civic"
+    api_wait = 0.5
+
     def __init__(self, cache: str | Path = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
-        self.name: str = "Civic"
-        self.api_wait: float = 0.5
         self.client: Client = Client(
             transport=transport, fetch_schema_from_transport=True
         )
@@ -484,6 +509,8 @@ class Civic(TherapyDB):
 
 
 class OpenTargets(TherapyDB):
+    batched = True
+
     def __init__(self, cache, data_dir: Path | str | None = None) -> None:
         """
         Parameters
@@ -543,8 +570,7 @@ class OpenTargets(TherapyDB):
         target = duckdb.read_parquet(f"{data_dir}/clinical_target/*.parquet")
         return report, target
 
-    @override
-    def get_genes(self, genes: set, confident: bool = True) -> pl.DataFrame:
+    def get_genes_batched(self, genes: set, confident: bool = True) -> pl.DataFrame:
         report, target = self.get_data()
         keep = self.symbol2ensembl(genes)
         target_filtered: pl.DataFrame = target.filter(
@@ -578,9 +604,18 @@ class OpenTargets(TherapyDB):
             )
         report_filtered: pl.DataFrame = report.pl().rename({"id": "report_id"})
         if report_filtered.is_empty():
-            return target_filtered.with_columns(pl.lit(None).alias("source"))
-        target_filtered = target_filtered.explode("clinicalReportIds")
-        # TODO: format source
+            return (
+                target_filtered.with_columns(pl.lit(None).alias("source"))
+                .group_by("gene")
+                .agg(pl.all())
+            )
+        target_filtered = (
+            target_filtered.explode("clinicalReportIds")
+            .join(report_filtered, left_on="clinicalReportIds", right_on="report_id")
+            .select()
+        )
+        # TODO: make sure that the schema is the same as civic
+        # and write at the top of therapy db!!!
         return
 
 

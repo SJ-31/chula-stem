@@ -6,9 +6,11 @@ library(patchwork)
 
 workdir <- here("analyses", "marmoset")
 # MANE select transcript for human is NM_000377.3
+# at position 57 +- 30
 
 prot <- here(workdir, "wasp_prot_aligned.fasta")
 nuc <- here(workdir, "wasp_nuc_aligned.fasta")
+nuc2 <- here(workdir, "wasp_aligned2.fasta")
 
 prot_set <- readAAMultipleAlignment(prot)
 
@@ -41,7 +43,7 @@ plot_msa_multiple <- function(file, width, seqtype = "prot", ...) {
 }
 
 prot_plot <- plot_msa_multiple(prot, 100, seq_name = TRUE)
-nuc_plot <- plot_msa_multiple(nuc, 200, seq_name = TRUE, seqtype = "nuc")
+## nuc_plot <- plot_msa_multiple(nuc, 200, seq_name = TRUE, seqtype = "nuc")
 
 ggsave(
   here(workdir, "protein_aligned.png"),
@@ -56,4 +58,21 @@ ggsave(
   width = 30,
   height = 10,
   dpi = 500
+)
+
+plot_range <- ggmsa(
+  nuc2,
+  30,
+  80,
+  seq_name = TRUE,
+  color = "Shapely_NT"
+) +
+  scale_x_continuous(breaks = \(x) {
+    seq(30, 80)
+  })
+ggsave(
+  here(workdir, "nuc_aligned_30-80.png"),
+  plot_range,
+  width = 15,
+  height = 5
 )

@@ -289,8 +289,8 @@ use rule base as cellassign with:
     resources:
         **gpu_res40,
     output:
-        predictions=other_outs["cellassign_predictions"],
-        run_metrics=other_outs["cellassign_run_metrics"],
+        predictions=other_outs.get("cellassign_predictions", []),
+        run_metrics=other_outs.get("cellassign_run_metrics", []),
 
 
 use rule base as enrich_clusters with:
