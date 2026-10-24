@@ -127,9 +127,10 @@ def get_therapy_df(
             genes = genes - set(failed_previously)
     for db in therapy_dbs:
         find_info: pl.DataFrame = db.get_genes(genes, filter_confident, lookup=lookup)
+        TherapyDB.schema_shared_pa.validate(find_info)
         if not find_info.is_empty():
             genes -= set(find_info["gene"])
-            temp.append(find_info.select(TherapyDB.shared_cols))
+            temp.append(find_info)
         if not genes:
             break
     if temp:
@@ -139,14 +140,7 @@ def get_therapy_df(
             with open(not_in_db_file, "a") as f:
                 f.write("\n".join(not_in_db))
         return all_found
-    return pl.DataFrame(
-        schema={
-            "gene": pl.String,
-            "source": pl.String,
-            "disease": pl.List(pl.String),
-            "therapies": pl.List(pl.String),
-        }
-    )
+    return pl.DataFrame(schema=TherapyDB.schema_shared)
 
 
 def no_gene_df(gene: str) -> pl.DataFrame:
@@ -174,18 +168,22 @@ class TherapyDB(ABC):
         "db",
         "db_link",
     )
-    schema = pa.DataFrameSchema(
+    schema_shared_pa: pa.DataFrameSchema = pa.DataFrameSchema(
         {
             "gene": pa.Column(str),
             "source": pa.Column(str),
-            "disease": pa.Column(""),
-            "therapies": pa.Column(str),
-            "db": pa.Column(),
+            "disease": pa.Column(pl.List(pl.String)),
+            "therapies": pa.Column(pl.List(pl.String)),
+            "db": pa.Column(str),
             "db_link": pa.Column(str),
         }
     )
     batched: bool
     db: duckdb.DuckDBPyConnection
+
+    @property
+    def schema_shared(self) -> dict:
+        return {k: v.dtype.type for k, v in self.schema_pa.columns.items()}
 
     @abstractmethod
     def get_gene(self, gene: str, confident: bool) -> pl.DataFrame:
@@ -234,14 +232,15 @@ class TherapyDB(ABC):
                     print(f"WARNING: received timeout error for gene {g}, skipping...")
             if results:
                 df = pl.concat(results, how="vertical_relaxed")
-                df = df.select(self.schema.keys())
             else:
-                df = pl.DataFrame()
+                df = pl.DataFrame(schema=self.schema_shared)
         else:
             df = self.get_genes_batched(genes, confident=confident)
+        df = df.select(self.schema.keys())
         self.db.execute(f"INSERT INTO {self.name} SELECT * FROM df")
         if not previous.is_empty():
             df = pl.concat([previous, df], how="vertical_relaxed")
+        df = df.select(self.schema_shared_pa.columns.keys())
         return df
 
     def get_genes_batched(self, genes: set, confident: bool = True) -> pl.DataFrame:
@@ -274,6 +273,22 @@ class Civic(TherapyDB):
     batched = False
     name: str = "Civic"
     api_wait = 0.5
+    schema: dict[str, str] = {
+        "loc": "VARCHAR",
+        "molecularProfile": "VARCHAR",
+        "therapies": "VARCHAR[]",
+        "evidenceLevel": "BIGINT",
+        "evidenceRating": "BIGINT",
+        "civicLink": "VARCHAR",
+        "origin": "VARCHAR",
+        "disease": "VARCHAR[]",
+        "source": "VARCHAR",
+        "variantAliases": "VARCHAR[]",
+        "clinvarIds": "VARCHAR[]",
+        "db_link": "VARCHAR",
+        "gene": "VARCHAR",
+        "db": "VARCHAR",
+    }
 
     def __init__(self, cache: str | Path = "") -> None:
         transport = AIOHTTPTransport(url="https://civicdb.org/api/graphql")
@@ -281,18 +296,6 @@ class Civic(TherapyDB):
             transport=transport, fetch_schema_from_transport=True
         )
         self.db: duckdb.DuckDBPyConnection = duckdb.connect(cache)
-        self.schema: dict[str, str] = {
-            "loc": "VARCHAR",
-            "molecularProfile": "VARCHAR",
-            "therapies": "VARCHAR[]",
-            "evidenceRating": "BIGINT",
-            "civicLink": "VARCHAR",
-            "origin": "VARCHAR",
-            "disease": "VARCHAR[]",
-            "source": "VARCHAR",
-            "variantAliases": "VARCHAR[]",
-            "clinvarIds": "VARCHAR[]",
-        }
 
         self.gene_query: str = gql(
             """
@@ -504,8 +507,7 @@ class Civic(TherapyDB):
         )
         if confident:
             return Civic.get_confident(df)
-        else:
-            return df
+        return df
 
 
 class OpenTargets(TherapyDB):
