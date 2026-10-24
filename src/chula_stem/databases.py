@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.resources as res
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 from subprocess import run
 from tempfile import TemporaryDirectory
@@ -16,6 +16,8 @@ import pandera.polars as pa
 import polars as pl
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
+
+import chula_stem
 
 # * Utilities
 
@@ -195,12 +197,12 @@ class TherapyDB(ABC):
     @staticmethod
     def symbol2ensembl(genes: set[str]) -> pl.DataFrame:
         mapping: pl.DataFrame = pl.read_csv(
-            res.files("data") / "ensembl_gene_data_116.csv"
+            res.files(chula_stem) / "data/ensembl_gene_data_116.csv"
         )
         return mapping.filter(
             (pl.col("HGNC symbol").is_in(genes))
-            & (pl.col("Gene Stable ID").is_not_null())
-        ).rename({"HGNC symbol": "gene", "Gene Stable ID": "ensembl"})
+            & (pl.col("Gene stable ID").is_not_null())
+        ).rename({"HGNC symbol": "gene", "Gene stable ID": "ensembl"})
 
     @staticmethod
     def get_confident(df: pl.DataFrame) -> pl.DataFrame:
