@@ -23,7 +23,7 @@ process BQSR {
     recal = Utl.getName(meta, "recal", "bam")
     report = Utl.getName(meta, "AnalyzeCovariates", "pdf")
     recal_dir = "recalibration_tables"
-    def sites_command = known_sites.collect { "--known-sites ${it}" }.join(' ')
+    def sites_command = known_sites.collect { val -> "--known-sites ${val}" }.join(' ')
     """
     gatk BaseRecalibrator \\
         -R ${reference} \\

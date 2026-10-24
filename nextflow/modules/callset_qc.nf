@@ -26,15 +26,15 @@ process CALLSET_QC {
     tdepth = qc.min_tumor_depth ? "FORMAT/AD[@tumor.txt:1-] >= ${qc.min_tumor_depth}" : ""
     vaf = qc.min_VAF ? "FORMAT/AF[@tumor.txt] > ${qc.min_VAF}" : ""
     // Note: VAF is calculated with GATK, which calls it FORMAT/AF
-    filter = qc.accepted_filters.collect { "FILTER~\"${it}\"" }.join(" && ")
+    filter = qc.accepted_filters.collect { val -> "FILTER~\"${val}\"" }.join(" && ")
 
     filter_list = [tdepth, filter, vaf]
     if (!params.tumor_only) {
         filter_list << ndepth
     }
     all = filter_list
-        .findAll { it != "" && it != null }
-        .collect { "bcftools filter -i '${it}'" }
+        .findAll { val -> val != "" && val != null }
+        .collect { val -> "bcftools filter -i '${val}'" }
         .join(" | ")
     all = all != "" && all != null ? "${all} -O z > ${output}" : "bcftools view -O z > ${output}"
 

@@ -69,7 +69,7 @@ workflow PREPROCESS_FASTQ {
         counts = channel.empty()
     }
     SAMTOOLS_INDEX(bams) // indices are required by certain callers
-
+    //
     with_index = Utl.joinFirst(
         bams,
         [SAMTOOLS_INDEX.out.index],

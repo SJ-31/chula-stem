@@ -35,8 +35,8 @@ process STANDARDIZE_VCF {
     ]
     annotations = ["ChromosomeCounts", "Coverage", "AlleleFraction", "DepthPerAlleleBySample", "MappingQuality", "BaseQuality"]
 
-    annotation_flag = annotations.collect { " -A ${it} " }.join(" ")
-    clear_flag = to_clear.collect { k, v -> v.collect { "${k}/${it}" }.join(",") }.join(",")
+    annotation_flag = annotations.collect { val -> " -A ${val} " }.join(" ")
+    clear_flag = to_clear.collect { k, v -> v.collect { field -> "${k}/${field}" }.join(",") }.join(",")
     read_flag = !params.tumor_only ? " -I ${tumor_bam} -I ${normal_bam} " : " -I ${tumor_bam} "
     args = task.ext.args.join(" ")
     """

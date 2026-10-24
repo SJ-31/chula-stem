@@ -59,18 +59,18 @@ workflow {
     // After preprocessing, branch data into tumor and normal then pair up by id and join with  index
 
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
-    
+
     normals = Utl.getId(
         branched.normal.map { val ->
             [["type": "paired", "id": val[0].id, "RGSM_normal": val[0].RGSM, "filename": val[0].id], val[1]]
         }
     )
     tumors = branched.tumor.map { val -> [["RGSM_tumor": val[0].RGSM], val[1]] }
-    
+
     indices = Utl.getId(PREPROCESS_FASTQ.out.bam_index).groupTuple()
     paired = normals
         .join(tumors)
-        .map { it -> [it[0]] + [it[1] + it[3]] + [it[2]] + [it[4]] } // Merge the maps
+        .map { val -> [val[0]] + [val[1] + val[3]] + [val[2]] + [val[4]] } // Merge the maps
         .join(indices)
     // Order is important for the first two
     paired_no_id = Utl.delId(paired)
@@ -81,8 +81,8 @@ workflow {
      * (Optional) Panel of normals
      */
     if (params.create_pon) {
-        to_pon_bam = branched.normal.map { it ->
-            [it[0] + ["out": "${params.outdir}/for_panel_of_normals"]] + it[1..-1]
+        to_pon_bam = branched.normal.map { val ->
+            [val[0] + ["out": "${params.outdir}/for_panel_of_normals"]] + val[1..-1]
         }
         to_pon_bam_indices = PREPROCESS_FASTQ.out.bam_index.filter { v -> v[0].type == "normal" }
 
@@ -95,7 +95,7 @@ workflow {
             channel.empty(),
             false,
         )
-        panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon_ws.map { it -> it[1] }
+        panel_of_normals = PANEL_OF_NORMALS_FROM_BAM.out.pon_ws.map { val -> val[1] }
     }
     else {
         panel_of_normals = params.ref.panel_of_normals ?: ""
@@ -122,8 +122,8 @@ workflow {
     // GRIDSS(paired_no_id, params.ref.genome, params.ref.genome_blacklist, 5)
 
     // Small variants
-    to_mutect = paired_no_id.map { it ->
-        [it[0] + ["out": "${it[0].out}/5-Mutect2"]] + it[1..-1]
+    to_mutect = paired_no_id.map { val ->
+        [val[0] + ["out": "${val[0].out}/5-Mutect2"]] + val[1..-1]
     }
     MUTECT2_COMPLETE(to_mutect, panel_of_normals)
     to_strelka = Utl.delId(Utl.joinFirst(paired, [MANTA.out.indels]))
@@ -134,9 +134,9 @@ workflow {
     small_variants_to_geno = Utl
         .joinFirst(
             MUTECT2_COMPLETE.out.filtered,
-            [STRELKA2.out.variants.map { it -> [it[0]] + it[1] }, MUSE2.out.variants],
+            [STRELKA2.out.variants.map { val -> [val[0]] + val[1] }, MUSE2.out.variants],
         )
-        .map { it -> toConcat("Concat_to_oct", it) }
+        .map { val -> toConcat("Concat_to_oct", val) }
     CONCAT_SMALL_1(small_variants_to_geno)
 
     // Octopus and Clairs uses previous variants to aid calling
@@ -149,7 +149,7 @@ workflow {
             CONCAT_SMALL_1.out.vcf,
             [OCTOPUS.out.variants, CLAIRS.out.variants],
         )
-        .map { it -> [it[0]] + [it[1..-1]] }
+        .map { val -> [val[0]] + [val[1..-1]] }
     CONCAT_SMALL_2(to_concat_small_2)
     structural_variants = Utl
         .joinFirst(
@@ -159,7 +159,7 @@ workflow {
                 // GRIDSS.out.variants
             ],
         )
-        .map { it -> toConcat("SV_all", it) }
+        .map { val -> toConcat("SV_all", val) }
     CONCAT_SV(structural_variants)
     to_std_small = Utl.joinFirst(
         CONCAT_SMALL_2.out.vcf,
@@ -187,8 +187,8 @@ workflow {
 
     if (!params.ref.cnvkit_reference) {
         collected_normals = normals
-            .map { it -> it[2] }
-            .mix(PREPROCESS_FASTQ.out.bam_index.map { it -> it[1] })
+            .map { val -> val[2] }
+            .mix(PREPROCESS_FASTQ.out.bam_index.map { val -> val[1] })
             .toList()
         CNVKIT_PREP(
             channel.of(
@@ -222,7 +222,7 @@ workflow {
 
     to_cnvkit = Utl.delId(
 
-        paired.map { it -> it[0..1] + [it[3]] }.join(Utl.getId(MUTECT2_COMPLETE.out.filtered)).join(Utl.getId(PURECN_COMPLETE.out.purity_ploidy))
+        paired.map { val -> val[0..1] + [val[3]] }.join(Utl.getId(MUTECT2_COMPLETE.out.filtered)).join(Utl.getId(PURECN_COMPLETE.out.purity_ploidy))
     )
 
     CNVKIT(to_cnvkit, cnvkit_reference, "hybrid")
@@ -233,9 +233,9 @@ workflow {
             keepHeader: true,
             skip: 1,
         ) { meta, file -> ["5-${meta.id}-ClassifyCNV_all.bed", file] }
-        .map { it ->
-            def id = (it.baseName =~ /[0-9]+-(.*)-ClassifyCNV.*/)[0][1]
-            [["filename": id, "id": id], it]
+        .map { val ->
+            def id = (val.baseName =~ /[0-9]+-(.*)-ClassifyCNV.*/)[0][1]
+            [["filename": id, "id": id], val]
         }
 
     /*
@@ -265,7 +265,7 @@ workflow {
         "${params.configdir}/excluded_signatures.txt",
     )
     SIGPROFILERASSIGNMENT_COLLECT(
-        SIGPROFILERASSIGNMENT.out.activities.map { it -> it[1] }.collect().map(cohortTopLevel)
+        SIGPROFILERASSIGNMENT.out.activities.map { val -> val[1] }.collect().map(cohortTopLevel)
     )
     CLASSIFY_CNV(cnv_bed)
 
@@ -323,19 +323,19 @@ workflow {
     // Combine channels for report
     vep_grouped = Utl
         .getId(CALLSET_QC_TSV.out.tsv)
-        .groupTuple(sort: { it -> (it.baseName =~ /VEP_small/) ? 1 : -1 })
-    vep_to_report = vep_grouped.map { it -> [it[0]] + [vep_small: it[1][1], vep_sv: it[1][0]] }
+        .groupTuple(sort: { val -> (val.baseName =~ /VEP_small/) ? 1 : -1 })
+    vep_to_report = vep_grouped.map { val -> [val[0]] + [vep_small: val[1][1], vep_sv: val[1][0]] }
 
     others = Utl
         .joinFirst(
             SIGPROFILERASSIGNMENT.out.activities,
             [CNVKIT.out.cns, CNVKIT.out.cnr, CROSS_REFERENCE_CNV.out.tsv, CROSS_REFERENCE_MSI.out.tsv],
         )
-        .map { it ->
-            [it[0], [sigprofiler: it[1], cnvkit_cns: it[2], cnvkit_cnr: it[3], classify_cnv: it[4], msisensor_pro: it[5], cosmic_reference: params.ref.cosmic_signatures]]
+        .map { val ->
+            [val[0], [sigprofiler: val[1], cnvkit_cns: val[2], cnvkit_cnr: val[3], classify_cnv: val[4], msisensor_pro: val[5], cosmic_reference: params.ref.cosmic_signatures]]
         }
 
-    to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report)).map { it -> [it[0], it[1] + it[2]] }
+    to_report = Utl.delId(Utl.getId(others, true).join(vep_to_report)).map { val -> [val[0], val[1] + val[2]] }
 
     if (params.cache_lookup) {
         GET_THERAPY_CACHE(
