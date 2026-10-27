@@ -539,6 +539,26 @@ class Civic(TherapyDB):
 class OpenTargets(TherapyDB):
     batched = True
     name = "OpenTargets"
+    phase_mapping: dict[str, int] = {
+        k: i
+        for i, k in enumerate(
+            (
+                "WITHDRAWAL",
+                "UNKNOWN",
+                "PRECLINICAL",
+                "IND",
+                "EARLY_PHASE_1",
+                "PHASE_1",
+                "PHASE_1_2",
+                "PHASE_2",
+                "PHASE_2_3",
+                "PHASE_3",
+                "PREAPPROVAL",
+                "PHASE_4",
+                "APPROVAL",
+            )
+        )
+    }
     schema: dict[str, str] = {
         "therapies": "VARCHAR[]",
         "disease": "VARCHAR[]",
@@ -657,7 +677,14 @@ class OpenTargets(TherapyDB):
                 "clinicalStage IN ['APPROVAL', 'PHASE_4', 'PREAPPROVAL', 'PHASE_3']"
             )
         report_filtered: pl.DataFrame = (
-            report.pl().rename({"id": "report_id"}).pipe(self.filter_format_diseases)
+            report.pl()
+            .rename({"id": "report_id"})
+            .pipe(self.filter_format_diseases)
+            .with_columns(
+                pl.col("clinicalStage")
+                .replace_strict(self.phase_mapping, default=0)
+                .alias("stageScore")
+            )
         )
         # TODO: group by the association id
         # and choose the best trial from the selection
@@ -675,10 +702,17 @@ class OpenTargets(TherapyDB):
                     pl.lit(None).alias("source"), pl.col("disease").list.unique()
                 )
             )
-        target_filtered = target_filtered.drop("disease")
-        print(target_filtered)
         target_filtered = (
-            target_filtered.explode("clinicalReportIds")
+            target_filtered.drop("disease")
+            .with_columns(
+                pl.col("clinicalReportIds").list.get(
+                    pl.col("clinicalReportIds")
+                    .list.eval(
+                        pl.element().replace_strict(self.phase_mapping, default=0)
+                    )
+                    .list.arg_max()
+                )
+            )
             .join(report_filtered, left_on="clinicalReportIds", right_on="report_id")
             .with_columns(
                 source="[" + pl.col("title") + "]" + "(" + pl.col("url") + ")"
