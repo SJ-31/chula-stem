@@ -34,6 +34,10 @@ process {
         conda = "${params.miniforge3}/envs/cnvkit"
     }
 
+    withName: "MUTECT2|LEARN_READ_ORIENTATION|GET_PILEUP_SUMMARIES|CALCULATE_CONTAMINATION|FILTER_MUTECT_CALLS|MARK_DUPLICATES|BQSR|PICARD" {
+        container = "/data/home/shannc/tools/gatk.sif"
+    }
+
     withName: "MUSE2" {
         container = "/data/home/shannc/tools/MuSE.sif"
         ext.cores = 8

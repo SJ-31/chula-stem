@@ -3,14 +3,15 @@ import groovy.json.JsonOutput
 class Utl {
     public static String getName(Map meta, String suffix = null, String ext = null) {
         def suf = meta.suffix ? meta.suffix : suffix
+        def prefix = meta.filename ?: meta.id
         if (!ext && suffix) {
-            return "${meta.filename}-${suf}"
+            return "${prefix}-${suf}"
         } else if (ext && suf) {
-            return "${meta.filename}-${suf}.${ext}"
+            return "${prefix}-${suf}.${ext}"
         } else if (!suf && !ext) {
-            return "${meta.filename}"
+            return "${prefix}"
         } else {
-            return "${meta.filename}.${ext}"
+            return "${prefix}.${ext}"
         }
     }
 
