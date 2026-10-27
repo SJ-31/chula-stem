@@ -667,7 +667,6 @@ class OpenTargets(TherapyDB):
             )
             .pipe(self.filter_format_diseases)
         )
-        print(target_filtered)
         if target_filtered.is_empty():
             return pl.DataFrame()
         unique_reports = target_filtered["clinicalReportIds"].explode().value_counts()
@@ -686,9 +685,6 @@ class OpenTargets(TherapyDB):
                 .alias("stageScore")
             )
         )
-        # TODO: group by the association id
-        # and choose the best trial from the selection
-        # so you don't have to explode on many sources
         agg_expr = [
             pl.col("therapies"),
             pl.col("db").first(),

@@ -29,8 +29,7 @@ def test_open_targets(download_path, tmp_path):
         lookup=True,
         db_kws={"open_targets": {"data_dir": download_path}},
     )
-    print(df)
-    df_prev = get_therapy_df(set(genes), cache=db, lookup=False)
+    df_prev = get_therapy_df(set(genes), dbs=["open_targets"], cache=db, lookup=False)
     assert df.height == df_prev.height
     assert set(df["gene"]) == set(df_prev["gene"])
 
