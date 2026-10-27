@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 import datetime
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
@@ -111,19 +112,37 @@ CRITERIA_TABLE: Table = Table(
 )
 
 
+@dataclass
+class InPaths:
+    classify_cnv: Path
+    therapy_data_cache: Path
+    sigprofiler: Path
+    msisensor_pro: Path
+    cosmic_signatures: Path
+    vep_small: Path
+    vep_sv: Path
+    purecn_dir: Path
+
+    @classmethod
+    def new(cls, spec: dict):
+        validated = {}
+        for req in dir(InPaths):
+            if not (p := spec.get(req)):
+                raise ValueError(f"Missing required input: {req}")
+            if not (path := Path(p)).exists():
+                raise ValueError(f"Path {path} does not exist")
+            validated[req] = path
+        return cls(**validated)
+
+
 class VariantCallingReport(ResultsReport):
     def __init__(
         self,
         filename: str,
         metadata: dict,
-        therapy_data_cache: str,
+        paths: dict,
         other_text: dict = {},
-        vep_small: str = "",
-        vep_sv: str = "",
-        classify_cnv: str = "",
-        msisensor_pro: str = "",
-        sigprofiler: str = "",
-        cosmic_signatures: str = "",
+        purecn_prefix: str = "",
         existing_variants_file: str = "",
         tmpdir: str = "temp",
         therapy_databases=["open_targets", "civic"],
@@ -141,6 +160,7 @@ class VariantCallingReport(ResultsReport):
             bold_font=bold_font,
             other_text=other_text,
         )
+        self.paths: InPaths = InPaths.new(paths)
         self.spec: dict = {
             "right_margin": 2 * cm,
             "left_margin": 2 * cm,
@@ -161,23 +181,23 @@ class VariantCallingReport(ResultsReport):
         }
 
         gene_spec = [
-            {"file": vep_small, "column": "SYMBOL"},
-            {"file": vep_sv, "column": "SYMBOL"},
+            {"file": self.paths.vep_small, "column": "SYMBOL"},
+            {"file": self.paths.vep_sv, "column": "SYMBOL"},
             {
-                "file": classify_cnv,
+                "file": self.paths.classify_cnv,
                 "is_list": True,
                 "is_list_separator": ",",
                 "column": "All protein coding genes",
             },
-            {"file": msisensor_pro, "column": "gene_name"},
+            {"file": self.paths.msisensor_pro, "column": "gene_name"},
         ]
-        if os.path.exists(therapy_data_cache) and self.show_therapies:
-            therapy_df = pl.read_parquet(therapy_data_cache)
+        if os.path.exists(self.paths.therapy_data_cache) and self.show_therapies:
+            therapy_df = pl.read_parquet(self.paths.therapy_data_cache)
         elif self.show_therapies:
             gene_list = fr.get_genes(gene_spec)
             therapy_df: pl.DataFrame = get_therapy_df(
                 genes=set(gene_list),
-                cache=Path(therapy_data_cache),
+                cache=self.paths.therapy_data_cache,
                 dbs=therapy_databases,
                 lookup=download_therapy_data,
                 filter_confident=filter_confident_therapies,
@@ -192,10 +212,10 @@ class VariantCallingReport(ResultsReport):
                 existing_variants = f.read().splitlines()
 
         calls = [
-            lambda: fr.vep_fmt(vep_small, "small", existing_variants),
-            lambda: fr.vep_fmt(vep_sv, "sv", existing_variants),
-            lambda: fr.classify_cnv_fmt(classify_cnv),
-            lambda: fr.msisensor_pro_fmt(msisensor_pro),
+            lambda: fr.vep_fmt(self.paths.vep_small, "small", existing_variants),
+            lambda: fr.vep_fmt(self.paths.vep_sv, "sv", existing_variants),
+            lambda: fr.classify_cnv_fmt(self.paths.classify_cnv),
+            lambda: fr.msisensor_pro_fmt(self.paths.msisensor_pro),
         ]
         self.variant_names: dict[str, str] = dict(
             zip(
@@ -242,7 +262,9 @@ class VariantCallingReport(ResultsReport):
             self.stats["counts"]["Available Therapies"] = self.data["therapies"].shape[
                 0
             ]
-        self.data["sigprofiler"] = fr.sigprofiler_fmt(sigprofiler, cosmic_signatures)
+        self.data["sigprofiler"] = fr.sigprofiler_fmt(
+            self.paths.sigprofiler, self.paths.cosmic_signatures
+        )
         self.stats["counts"]["Mutational Signatures"] = sum(
             [d.shape[0] for d in self.data["sigprofiler"]]
         )

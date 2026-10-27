@@ -8,6 +8,7 @@
 #       these fns will add relevant links
 import re
 from collections.abc import Iterable
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -111,7 +112,7 @@ def get_clingen_link(clingen_str) -> str:
     return add_link(symbol, clingen_str, underline="yes")
 
 
-def msisensor_pro_fmt(msisensor_path: str) -> tuple:
+def msisensor_pro_fmt(msisensor_path: Path) -> tuple:
     wanted_cols = ["Locus"] + list(Rename.repeat.values())
     df = pl.read_csv(
         msisensor_path, separator="\t", null_values="NA", infer_schema_length=None
@@ -153,8 +154,7 @@ def classify_cnv_fmt(
     cnvkit_path: str = "",
 ) -> tuple:
     """
-    Format cnv data from ClassifyCNV for the report. Includes merging with cnvkit
-    and facets to determine show estimated copy number
+    Format cnv data from ClassifyCNV for the report
     """
     cnv = (
         pl.read_csv(
@@ -225,7 +225,7 @@ def format_var_type(var: str) -> str:
 
 
 def vep_fmt(
-    vep_path: str, variant_class: str, existing_variants: list[str] | None = None
+    vep_path: Path, variant_class: str, existing_variants: list[str] | None = None
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table

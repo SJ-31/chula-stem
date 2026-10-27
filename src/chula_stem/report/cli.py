@@ -35,10 +35,8 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
         assert isinstance(paths, dict)
     except (KeyError, AssertionError):
         raise ValueError("`paths` map must be specified!")
-    out = output if output else paths.get("output")
-    shared_keys = {"filename", "metadata", "tmpdir"}
-    kwargs: dict = {k: v for k, v in paths.items() if k not in shared_keys}
-    kwargs.update(spec.get("misc", {}))
+    out = output or paths["output"]
+    kws = spec.get("misc", {})
     report = None
     if report_type == "variant_calling":
         report = VariantCallingReport(
@@ -46,7 +44,8 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
             metadata=spec.get("meta", {}),
             other_text=spec.get("other_text", {}),
             tmpdir=tmpdir,
-            **kwargs,
+            paths=spec["paths"],
+            **kws,
         )
     if report:
         report.build()
