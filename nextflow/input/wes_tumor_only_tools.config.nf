@@ -57,15 +57,6 @@ process {
         container = "/data/home/shannc/tools/multiqc.sif"
     }
 
-    withName: "FACETS_PILEUP|FACETS" {
-        container = "/data/home/shannc/tools/facets.sif"
-    }
-
-    withName: "FACETS" {
-        ext.args = ["--purity-cval 1000", "--cval 500", "--everything"]
-        ext.genome = "hg38"
-    }
-
     withName: "CLASSIFY_CNV" {
         ext.genome = "hg38"
     }
