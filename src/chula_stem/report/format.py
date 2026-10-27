@@ -73,23 +73,16 @@ def dbvar_link(x):
 
 
 def get_copy_number(
-    df: pl.DataFrame, facets_path: str = "", cnvkit_path: str = "", cn_col_name="cn"
+    df: pl.DataFrame, cnvkit_path: str = "", cn_col_name="cn"
 ) -> pl.DataFrame:
     """
     Add a copy number column `cn_col_name` to df
     by merging with the raw CNV data. df must have the
     column "Locus", containing the location of the cnv in the form of
         chromosome:start-end
-    :param format: one of CNVKit|Facets
+    :param format: one of CNVKit
     """
     wanted_cols = df.columns + [cn_col_name]
-    if facets_path:
-        # TODO: need to fix this
-        facets: pl.DataFrame = read_facets_rds(facets_path).rename(
-            {"tcn.em": cn_col_name}
-        )
-        facets = add_loc(facets, "chrom")
-        df = df.join(facets, how="left", on="Locus")
     if cnvkit_path:
         cnvkit: pl.DataFrame = pl.read_csv(
             cnvkit_path, separator="\t", null_values="NA", infer_schema_length=None
@@ -98,7 +91,7 @@ def get_copy_number(
             cnvkit = cnvkit.with_columns(pl.col("chromosome").str.replace("^", "chr"))
         cnvkit = add_loc(cnvkit)
         df = df.join(cnvkit, how="left", on="Locus")
-    if facets_path and cnvkit_path:
+    if cnvkit_path:
         df = df.with_columns(
             pl.coalesce([cn_col_name, f"{cn_col_name}_right"]).alias(cn_col_name)
         )
@@ -157,7 +150,6 @@ def msisensor_pro_fmt(msisensor_path: str) -> tuple:
 
 def classify_cnv_fmt(
     classifycnv_path,
-    facets_path: str = "",
     cnvkit_path: str = "",
 ) -> tuple:
     """
@@ -210,7 +202,7 @@ def classify_cnv_fmt(
     cn_col = "CN"
     wanted_cols.insert(1, cn_col)
     with_cn = (
-        get_copy_number(cnv, facets_path, cnvkit_path, cn_col_name=cn_col)
+        get_copy_number(cnv, cnvkit_path, cn_col_name=cn_col)
         .select(wanted_cols)
         .cast(pl.String)
         .with_columns(cs.by_dtype(pl.String).str.replace("^$", "-"))
