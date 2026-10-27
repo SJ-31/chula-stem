@@ -116,26 +116,22 @@ class VariantCallingReport(ResultsReport):
         self,
         filename: str,
         metadata: dict,
+        therapy_data_cache: str,
         other_text: dict = {},
-        pandrugs2_cache: str = "pandrugs2_cache.json",
-        civic_cache: str = "civic_cache.json",
-        therapy_data_cache: str = "therapy_data.parquet",
         vep_small: str = "",
         vep_sv: str = "",
         classify_cnv: str = "",
-        facets: str = "",
-        cnvkit_cns: str = "",
-        cnvkit_cnr: str = "",
         msisensor_pro: str = "",
         sigprofiler: str = "",
         cosmic_signatures: str = "",
         existing_variants_file: str = "",
         tmpdir: str = "temp",
+        therapy_databases=["open_targets", "civic"],
         font=FONT,
         bold_font=BOLD_FONT,
-        plot=True,
         filter_confident_therapies=True,
         show_therapies=True,
+        download_therapy_data=False,
     ) -> None:
         super().__init__(
             filename=filename,
@@ -155,8 +151,6 @@ class VariantCallingReport(ResultsReport):
             "header_style": STYLE["table_title_style"],
         }
         self.show_therapies = show_therapies
-        self.civic_cache: str = civic_cache
-        self.pandrugs2_cache: str = pandrugs2_cache
         self.data: dict = {"relevant": {}, "nonrelevant": {}, "all": {}}
         self.files: dict = {"signatures": []}
         self.table_styles: dict = {
@@ -182,9 +176,10 @@ class VariantCallingReport(ResultsReport):
         elif self.show_therapies:
             gene_list = fr.get_genes(gene_spec)
             therapy_df: pl.DataFrame = get_therapy_df(
-                gene_list,
-                civic_cache=civic_cache,
-                pandrugs2_cache=pandrugs2_cache,
+                genes=set(gene_list),
+                cache=Path(therapy_data_cache),
+                dbs=therapy_databases,
+                lookup=download_therapy_data,
                 filter_confident=filter_confident_therapies,
             )
         else:
@@ -199,7 +194,7 @@ class VariantCallingReport(ResultsReport):
         calls = [
             lambda: fr.vep_fmt(vep_small, "small", existing_variants),
             lambda: fr.vep_fmt(vep_sv, "sv", existing_variants),
-            lambda: fr.classify_cnv_fmt(classify_cnv, facets, cnvkit_cns),
+            lambda: fr.classify_cnv_fmt(classify_cnv),
             lambda: fr.msisensor_pro_fmt(msisensor_pro),
         ]
         self.variant_names: dict[str, str] = dict(

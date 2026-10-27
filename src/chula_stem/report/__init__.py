@@ -101,7 +101,7 @@ def draw_paragraph(
 
 def add_pstyles(
     data: pl.DataFrame | list,
-    style: ParagraphStyle | dict[int, ParagraphStyle],
+    style: ParagraphStyle | dict[int | None, ParagraphStyle],
     nested=False,
 ) -> list:
     """Helper for adding paragraph styles to lists or data in dfs

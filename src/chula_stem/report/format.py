@@ -6,8 +6,8 @@
 #    the latter two being used directly for report tables
 #    In addition to cleaning up the output with string operations and renaming cols,
 #       these fns will add relevant links
-
 import re
+from collections.abc import Iterable
 
 import numpy as np
 import polars as pl
@@ -371,7 +371,7 @@ def format_therapy_sources(sources: str, source_lookup: dict) -> list[str]:
     return [helper(s) for s in sources if s and s != "NA"]
 
 
-def empty_table(columns: list) -> pl.DataFrame:
+def empty_table(columns: Iterable) -> pl.DataFrame:
     schema = {c: pl.String for c in columns}
     return pl.DataFrame(schema=schema)
 
