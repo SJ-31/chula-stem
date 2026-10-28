@@ -21,11 +21,10 @@ features = ["pyo3/extension-module"]
 module-name = "chula_stem._rust"
 
 [project.scripts]
-get_therapy_cache = "sarek_plus.databases:therapy_cache_from_files"
-format_vep_vcf = "chula_stem.utils:format_vep_vcf"
+get_therapy_cache = "sarek_plus:therapy_cache_from_files"
+format_vep_vcf = "sarek_plus.format_vep_vcf:main"
 classify_cnv_format = "chula_stem.utils:classify_cnv_format"
-callset_qc = "chula_stem.callset_qc:qc_main"
+callset_qc = "sarek_plus.callset_qc:qc_main"
 pipeline_report = "chula_stem.report.cli:entry_point"
 read_10x_mtx = "chula_stem.sc_rnaseq:read_10x_mtx"
 combine_counts = "chula_stem.utils:combine_counts"
-ds_actions = "chula_stem.datastore_actions:main"

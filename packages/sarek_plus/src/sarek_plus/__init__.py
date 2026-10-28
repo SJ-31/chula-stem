@@ -129,3 +129,42 @@ def therapy_cache_from_files(
         filter_confident=filter_confident,
         lookup=True,
     )
+
+
+@click.command()
+@click.option("-i", "--input", required=True, help="Input file")
+@click.option("-o", "--output", required=True, help="Output")
+@click.option("-c", "--caller", required=True, help="Tool producing CNV calls")
+@click.option(
+    "-t", "--tumor_sample", required=False, help="Name of tumor sample", default=""
+)
+def classify_cnv_format(caller: str, input: str, output: str, tumor_sample: str):
+    import polars as pl
+
+    def dup_or_del(x):
+        return "DEL" if x < 2 else "DUP"
+
+    if caller.lower() == "cnvkit":
+        df = pl.read_csv(input, separator="\t", infer_schema_length=None).select(
+            ["chromosome", "start", "end", "cn"]
+        )
+    elif caller.lower() == "dellycnv":
+        from subprocess import run
+
+        if not tumor_sample:
+            raise ValueError("Tumor sample name must be provided")
+        qstring = f"bcftools query -f '%CHROM\t%POS0\t%END\t[%CN]\n' -s {tumor_sample} {input} > tmp.bed"
+        run(
+            qstring,
+            shell=True,
+        )
+        df = pl.read_csv(
+            "tmp.bed", separator="\t", new_columns=["chromosome", "start", "end", "cn"]
+        )
+        run("rm tmp.bed", shell=True)
+    else:
+        raise ValueError("Unknown caller provided")
+
+    df.filter(pl.col("cn") != 2).with_columns(
+        type=pl.col("cn").map_elements(dup_or_del, return_dtype=pl.String)
+    ).drop("cn").write_csv(output, separator="\t", include_header=False)

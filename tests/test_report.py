@@ -82,19 +82,13 @@ def test_full(front_page_only=False):
     R = VariantCallingReport(
         "/home/shannc/Bio_SDD/chula-stem/tests/report_full.pdf",
         metadata=meta,
-        civic_cache="/home/shannc/Bio_SDD/chula-stem/tests/civic.json",
-        pandrugs2_cache="/home/shannc/Bio_SDD/chula-stem/tests/pandrugs2.json",
         vep_small=small_path,
         vep_sv=sv_pat,
         classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
-        facets="/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds",
-        cnvkit_cns="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns",
-        cnvkit_cnr="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr",
         msisensor_pro="/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv",
         sigprofiler="/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/Assignment_Solution_Activities.txt",
-        cosmic_reference="/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmic_signatures_v3.4-2024-12-26.csv",
+        cosmic_signatures="/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmic_signatures_v3.4-2024-12-26.csv",
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
-        plot=False,
     )
     if front_page_only:
         R.build_front_page()

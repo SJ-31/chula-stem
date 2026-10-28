@@ -1,7 +1,7 @@
 #!/usr/bin/env ipython
 
 import pytest
-from chula_stem.databases import get_therapy_df
+from sarek_plus.databases import get_therapy_df
 
 
 def test_civic_lookup(tmp_path):

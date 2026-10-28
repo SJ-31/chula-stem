@@ -198,6 +198,9 @@ docs
 /analyses/pdac_subtyping/de_random/
 /analyses/pdac_subtyping/de_status/
 /analyses/pdac_de/IC50/
+/nextflow/workflows/*/lib
+/nextflow/workflows/*/modules
+/nextflow/workflows/*/subworkflows
 /analyses/pdac_de/IC80/
 /analyses/pdac_de/IC80_old/
 /data/
