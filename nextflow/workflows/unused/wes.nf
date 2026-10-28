@@ -62,10 +62,10 @@ workflow {
     branched = PREPROCESS_FASTQ.out.bam.branch(branchSources)
     normals = Utl.getId(
         branched.normal.map { it ->
-            [it[0].id, ["type": "paired", "id": it[0].id, "RGSM_normal": it[0].RGSM, "filename": it[0].id], it[1]]
+            [["type": "paired", "id": it[0].id, "RGSM_normal": it[0].RGSM, "filename": it[0].id], it[1]]
         }
     )
-    tumors = branched.tumor.map { it -> [it[0].id, ["RGSM_tumor": it[0].RGSM], it[1]] }
+    tumors = branched.tumor.map { it -> [["RGSM_tumor": it[0].RGSM], it[1]] }
     indices = Utl.getId(PREPROCESS_FASTQ.out.bam_index).groupTuple()
     paired = normals
         .join(tumors)
