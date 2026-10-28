@@ -112,6 +112,32 @@ def get_clingen_link(clingen_str) -> str:
     return add_link(symbol, clingen_str, underline="yes")
 
 
+# TODO: [2026-10-27 Tue] finish this. Subclass for each
+# output, extract the gene column and copy number, then combine
+# with the
+
+
+class CopyNumberResult:
+    def __init__():
+        return
+
+    def read(self) -> pl.DataFrame:
+        return
+
+    @staticmethod
+    def combine() -> pl.DataFrame:
+        """
+        Merge copy number results from various callers
+        """
+
+
+def cnv_fmt(classify_cnv, cnvkit_cns, purecn_genes) -> tuple:
+    cnvkit_df = pl.read_csv(classify_cnv, separator="\t")
+    classify_cnv_df = pl.read_csv(cnvkit_cns, separator="\t")
+    purecn_df = pl.read_csv(purecn_genes, separator="\t")
+    raise NotImplementedError()
+
+
 def msisensor_pro_fmt(msisensor_path: Path) -> tuple:
     wanted_cols = ["Locus"] + list(Rename.repeat.values())
     df = pl.read_csv(
