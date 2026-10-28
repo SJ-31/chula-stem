@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import cm, mm
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import BaseDocTemplate
 
-from sarek_plus.utils import alternating_bg, style_cells
+from sarek_plus.report.utils import alternating_bg, style_cells
 
 FONT = "Helvetica"
 BOLD_FONT = "Helvetica-Bold"

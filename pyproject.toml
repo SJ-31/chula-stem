@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.12"
-dependencies = ["sarek_plus"]
+dependencies = ["sarek_plus", "stem_analysis", "pytest"]
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -15,16 +15,8 @@ dynamic = ["version"]
 
 [tool.uv.sources]
 sarek_plus = { path = "packages/sarek_plus" }
+stem_analysis = { path = "packages/stem_analysis" }
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "chula_stem._rust"
-
-[project.scripts]
-get_therapy_cache = "sarek_plus:therapy_cache_from_files"
-format_vep_vcf = "sarek_plus.format_vep_vcf:main"
-classify_cnv_format = "chula_stem.utils:classify_cnv_format"
-callset_qc = "sarek_plus.callset_qc:qc_main"
-pipeline_report = "chula_stem.report.cli:entry_point"
-read_10x_mtx = "chula_stem.sc_rnaseq:read_10x_mtx"
-combine_counts = "chula_stem.utils:combine_counts"

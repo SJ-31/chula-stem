@@ -11,7 +11,6 @@ from time import sleep
 from typing import override
 
 import chula_stem
-import click
 import duckdb
 import pandera.polars as pa
 import polars as pl

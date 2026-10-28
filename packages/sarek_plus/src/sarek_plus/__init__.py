@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 
 from sarek_plus.databases import get_therapy_df
-from sarek_plus.variant_calling_report import VariantCallingReport
+from sarek_plus.report.main import VariantCallingReport
 
 
 @click.command()

@@ -19,16 +19,16 @@ from reportlab.platypus import (
     Table,
 )
 
-import sarek_plus.format as fr
-from sarek_plus import (
+import sarek_plus.report.format as fr
+from sarek_plus.databases import get_therapy_df
+from sarek_plus.report import (
     PATIENT_DATA,
     SAMPLE_DATA,
     ResultsReport,
     add_pstyles,
     draw_paragraph,
 )
-from sarek_plus.databases import get_therapy_df
-from sarek_plus.spec import (
+from sarek_plus.report.spec import (
     AVAILABLE_WIDTH,
     BOLD_FONT,
     FONT,
@@ -42,7 +42,7 @@ from sarek_plus.spec import (
     sv_style,
     therapy_style,
 )
-from sarek_plus.utils import style_cells
+from sarek_plus.report.utils import style_cells
 
 HGVS_LINK: str = "https://hgvs-nomenclature.org/stable"
 

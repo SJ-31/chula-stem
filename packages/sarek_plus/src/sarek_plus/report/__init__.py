@@ -17,7 +17,7 @@ from reportlab.platypus import (
     SimpleDocTemplate,
 )
 
-from sarek_plus.spec import BOLD_FONT
+from sarek_plus.report.spec import BOLD_FONT
 
 STYLES = getSampleStyleSheet()
 
