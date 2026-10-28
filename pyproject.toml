@@ -5,19 +5,7 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.12"
-dependencies = [
-  "click",
-  "sarek_plus",
-  "scirpy",
-  "polars",
-  "scanpy",
-  "scipy",
-  "beartype",
-  "anndata>=0.11.3",
-  "numpy==2.2.0",
-  "pyhere>=1.0.3",
-  "dnachisel",
-]
+dependencies = ["sarek_plus"]
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -33,11 +21,11 @@ features = ["pyo3/extension-module"]
 module-name = "chula_stem._rust"
 
 [project.scripts]
+get_therapy_cache = "sarek_plus.databases:therapy_cache_from_files"
 format_vep_vcf = "chula_stem.utils:format_vep_vcf"
 classify_cnv_format = "chula_stem.utils:classify_cnv_format"
 callset_qc = "chula_stem.callset_qc:qc_main"
 pipeline_report = "chula_stem.report.cli:entry_point"
-get_therapy_cache = "chula_stem.databases:therapy_cache_from_files"
 read_10x_mtx = "chula_stem.sc_rnaseq:read_10x_mtx"
 combine_counts = "chula_stem.utils:combine_counts"
 ds_actions = "chula_stem.datastore_actions:main"

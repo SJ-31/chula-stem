@@ -10,14 +10,13 @@ from tempfile import TemporaryDirectory
 from time import sleep
 from typing import override
 
+import chula_stem
 import click
 import duckdb
 import pandera.polars as pa
 import polars as pl
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
-
-import chula_stem
 
 """
 Utilities for looking up validated therapies for specific gene mutations
@@ -34,82 +33,6 @@ gene-literature source (nested within variant aliases)
 """
 
 # * Utilities
-
-
-@click.command()
-@click.option(
-    "-i",
-    "--input-files",
-    required=True,
-    help="Path to directory containing input files",
-)
-@click.option(
-    "-c",
-    "--gene-col",
-    default="Gene",
-    show_default=True,
-    help="For dataframe input, the column containing gene names",
-)
-@click.option(
-    "-f",
-    "--filter-confident",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Whether or not to filter confident therapy entries",
-)
-@click.option(
-    "-n",
-    "--not-in-db",
-    default="not_in_databases.txt",
-    show_default=True,
-    help="File to write genes that weren't found",
-)
-@click.option(
-    "-i",
-    "--ignore_failed_file",
-    required=True,
-    help="If supplied, will ignore all genes in this file",
-)
-@click.option(
-    "-e", "--cache", required=True, help="DB file to cache data", default=None
-)
-@click.option(
-    "-d",
-    "--databases",
-    required=True,
-    help="Comma-delimited string specifying which databases to include in the lookup",
-    default=None,
-    type=str,
-)
-def therapy_cache_from_files(
-    input_files: str,
-    not_in_db: str,
-    filter_confident: bool,
-    cache: str,
-    gene_col: str = "Genes",
-):
-    genes: set = set()
-    for path in Path(input_files).rglob("*"):
-        path: Path
-        if path.is_dir():
-            continue
-        if path.suffix == ".tsv":
-            df = pl.read_csv(path, separator="\t", infer_schema_length=None)
-            genes |= set(df[gene_col])
-        elif path.suffix == ".csv":
-            df = pl.read_csv(path, infer_schema_length=None)
-            genes |= set(df[gene_col])
-        else:
-            with open(path, "r") as f:
-                genes |= set(f.read().splitlines())
-    _ = get_therapy_df(
-        genes,
-        cache=Path(cache),
-        not_in_db_file=not_in_db,
-        filter_confident=filter_confident,
-        lookup=True,
-    )
 
 
 def get_therapy_df(
@@ -748,10 +671,7 @@ def add_therapy_info(
     ).with_columns(
         pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
     )
-    therapy_dbs: list[TherapyDB] = [
-        Civic(civic_cache),
-        PanDrugs2(pandrugs2_cache),
-    ]
+    therapy_dbs: list[TherapyDB] = [Civic(civic_cache)]
     gene_list = list(df["SYMBOL"].unique())
 
     temp: list[pl.DataFrame] = []
