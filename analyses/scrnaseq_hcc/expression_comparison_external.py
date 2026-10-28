@@ -29,7 +29,7 @@ data = here("analyses", "data_all")
 outdir = here(data, "output", "HCC", "SCRNASEQ", "cohort", "compare_external")
 (outdir / "qc").mkdir(exist_ok=True)
 geo_dir = here(data, "public_data", "GEO")
-gene_reference: Path = here("analyses/data/ensembl_gene_data.csv")
+gene_reference: Path = here("data/ensembl_gene_data.csv")
 
 # /home/shannc/Bio_SDD/stem_synology/chula_mount/shannc/output/HCC/SCRNASEQ/cohort/compare_external
 

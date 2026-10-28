@@ -199,8 +199,8 @@ obs_markers_annotate:
 markers:
 
 gene_sets:
-gene_set_files: ?[f"{proj_root}/analyses/data/hcc_reference/gene_sets.yaml"]
-marker_files: ?[f"{proj_root}/analyses/data/hcc_reference/cell_markers.yaml"]
+gene_set_files: ?[f"{proj_root}/data/hcc_reference/gene_sets.yaml"]
+marker_files: ?[f"{proj_root}/data/hcc_reference/cell_markers.yaml"]
 
 # * Cell type annotation
 
@@ -341,10 +341,10 @@ visualize_de_genes:
 
 # * Resources
 
-gene_reference: ?f"{proj_root}/analyses/data/ensembl_gene_data.csv"
-go_term2id: ?f"{proj_root}/analyses/data/go_term2id.csv"
-go_graph: ?f"{proj_root}/analyses/data/go.gml"
-reactome_pathways: ?f"{proj_root}/analyses/data/ReactomePathways.txt"
-reactome_relations: ?f"{proj_root}/analyses/data/ReactomePathwaysRelation.txt"
-tflink_mitab: ?f"{proj_root}/analyses/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
-reactome_fi: ?f"{proj_root}/analyses/data/FIsInGene_04142025_with_annotations.txt"
+gene_reference: ?f"{proj_root}/data/ensembl_gene_data.csv"
+go_term2id: ?f"{proj_root}/data/go_term2id.csv"
+go_graph: ?f"{proj_root}/data/go.gml"
+reactome_pathways: ?f"{proj_root}/data/ReactomePathways.txt"
+reactome_relations: ?f"{proj_root}/data/ReactomePathwaysRelation.txt"
+tflink_mitab: ?f"{proj_root}/data/TFLink_Homo_sapiens_interactions_SS_mitab_v1.0.tsv"
+reactome_fi: ?f"{proj_root}/data/FIsInGene_04142025_with_annotations.txt"

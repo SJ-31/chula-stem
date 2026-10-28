@@ -19,7 +19,7 @@ data_dir <- here(
   "compare_external"
 )
 geo <- here(data, "public_data", "GEO")
-gene_reference <- here("analyses/data/ensembl_gene_data.csv")
+gene_reference <- here("data/ensembl_gene_data.csv")
 combined_file <- here(data_dir, "combined.h5ad")
 
 ## * Collect misc. data

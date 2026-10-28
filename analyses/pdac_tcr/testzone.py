@@ -196,7 +196,7 @@ mixtest = pd.read_csv(
 )
 
 val = format_tcrdb(
-    "foo", Path("/home/shannc/Bio_SDD/chula-stem/analyses/data/tcrdb/immunoSEQ72")
+    "foo", Path("/home/shannc/Bio_SDD/chula-stem/data/tcrdb/immunoSEQ72")
 )
 
 # * Stitchr output
@@ -242,7 +242,7 @@ vjdb.obs_names = vjdb.obs_names + "_vjdb"
 iedb = ir.datasets.iedb(cached=True, cache_path=here("analyses", "data", "iedb.h5ad"))
 vjdb.obs = vjdb.obs.rename(columns=lambda x: f"vjdb_{x}")
 mcpas_df = pl.read_csv(
-    "/home/shannc/Bio_SDD/chula-stem/analyses/data/McPAS-TCR.csv",
+    "/home/shannc/Bio_SDD/chula-stem/data/McPAS-TCR.csv",
     infer_schema_length=None,
 )
 
@@ -332,7 +332,7 @@ def format_cedar(path) -> ad.AnnData:
     return cedar
 
 
-# mcpas = format_mcpas("/home/shannc/Bio_SDD/chula-stem/analyses/data/McPAS-TCR.csv")
+# mcpas = format_mcpas("/home/shannc/Bio_SDD/chula-stem/data/McPAS-TCR.csv")
 
 # pl.from_pandas(ir.get.airr(vjdb, "junction_aa")).with_columns(
 #     pl.all().map_elements(lambda x: len(x) if x else 0, return_dtype=pl.Int64)
