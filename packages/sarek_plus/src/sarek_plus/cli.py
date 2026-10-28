@@ -5,7 +5,7 @@ import json
 
 import click
 
-from chula_stem.report.variant_calling_report import VariantCallingReport
+from sarek_plus.variant_calling_report import VariantCallingReport
 
 
 @click.command()

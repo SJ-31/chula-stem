@@ -14,10 +14,10 @@ import numpy as np
 import polars as pl
 import polars.selectors as cs
 
-from chula_stem.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
-from chula_stem.databases import TherapyDB
-from chula_stem.report.spec import URL, Rename
-from chula_stem.utils import (
+from sarek_plus.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
+from sarek_plus.databases import TherapyDB
+from sarek_plus.report.spec import URL, Rename
+from sarek_plus.utils import (
     add_loc,
     empty_string2null,
     str_split_unique,

@@ -8,7 +8,7 @@ from reportlab.lib.units import cm, mm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import BaseDocTemplate
 
-from chula_stem.report.utils import alternating_bg, style_cells
+from sarek_plus.utils import alternating_bg, style_cells
 
 FONT = "Helvetica"
 BOLD_FONT = "Helvetica-Bold"

@@ -19,16 +19,16 @@ from reportlab.platypus import (
     Table,
 )
 
-import chula_stem.report.format as fr
-from chula_stem.databases import get_therapy_df
-from chula_stem.report import (
+import sarek_plus.format as fr
+from sarek_plus import (
     PATIENT_DATA,
     SAMPLE_DATA,
     ResultsReport,
     add_pstyles,
     draw_paragraph,
 )
-from chula_stem.report.spec import (
+from sarek_plus.databases import get_therapy_df
+from sarek_plus.spec import (
     AVAILABLE_WIDTH,
     BOLD_FONT,
     FONT,
@@ -42,7 +42,7 @@ from chula_stem.report.spec import (
     sv_style,
     therapy_style,
 )
-from chula_stem.report.utils import style_cells
+from sarek_plus.utils import style_cells
 
 HGVS_LINK: str = "https://hgvs-nomenclature.org/stable"
 
