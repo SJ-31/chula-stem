@@ -34,8 +34,6 @@ class MaveDB:
 
     @score_sets.default
     def _make_score_sets(self) -> pl.DataFrame:
-        # TODO: flatten the main dictionary into a df of metadata for
-        # score sets, to facilitate easy lookups
         tmp = {
             "urn": [],
             "targetGenes": [],
@@ -88,37 +86,116 @@ class MaveDB:
         name = urn.replace(":", "-")
         if which == "mapped":
             suffix = ".mapped-variants.json"
-        elif which == "mapped":
+        elif which == "va":
             suffix = ".va.ndjson"
         else:
             suffix = ".scores.csv"
-        lookup = self / which / name / suffix
-        if lookup.exists():
-            return lookup
-        raise FileNotFoundError(f"{which} file for URN {urn} is missing")
-
-    # TODO: read the VRS documentation
+        return self / which / f"{name}{suffix}"
 
     @staticmethod
-    def parse_mapping(map_file: Path) -> pl.DataFrame:
-        tmp = {}
+    def get_va(va_file: Path) -> pl.DataFrame:
+        """ """
+        tmp = {
+            "variant_urn": [],
+            "va_spec": [],
+            "variant_ga4gh": [],
+            "evidence_direction": [],
+            "classification": [],
+        }
+        for json_line in va_file.read_text().splitlines():
+            data = json.loads(json_line)
+            anno = data["annotation"]
+            if not anno:
+                continue
+            match anno:
+                case {"proposition": prop}:
+                    match prop:
+                        case {"subjectVariant": subject} | {"subject": subject}:
+                            tmp["variant_ga4gh"].append(subject["id"])
+                    tmp["va_spec"].append(anno["proposition"]["type"])
+                    tmp["evidence_direction"].append(anno["direction"])
+                    tmp["classification"].append(
+                        anno["classification"]["primaryCoding"]["code"]
+                    )
+                case {"focusVariant": focus} | {"focus": focus}:
+                    if "id" not in focus:
+                        continue
+                    tmp["variant_ga4gh"].append(focus["id"])
+                    tmp["va_spec"].append(anno["type"])
+                    tmp["classification"].append(None)
+                    tmp["evidence_direction"].append(None)
+            tmp["variant_urn"].append(data["variant_urn"])
+        return pl.DataFrame(tmp)
+
+    @staticmethod
+    def get_mapping(map_file: Path) -> pl.DataFrame:
+        """
+        Retrieve successfully mapped variants from `map_file`
+        """
+        rows = {"variant_urn": [], "current": []}
         with open(map_file, "rb") as f:
-            txt = json.load(f)
+            data: dict = json.load(f)
+
+        tmp_exprs = defaultdict(list)
+
+        for rec in data:
+            post = rec.get("postMapped")
+            pre = rec.get("preMapped")
+            if rec["errorMessage"] or (not post and not pre):
+                continue
+            exprs = post.get("expressions") or []
+            vu = rec.get("variantUrn")
+            if not vu:
+                continue
+            rows["variant_urn"].append(vu)
+            rows["current"].append(rec.get("current"))
+            for expr in exprs:
+                tmp_exprs["variant_urn"].append(vu)
+                tmp_exprs[expr["syntax"]].append(expr["value"])
+
+        expr_df = pl.DataFrame(tmp_exprs)
+        df = pl.DataFrame(rows).join(expr_df, on="variant_urn")
+        return df
 
     def gene_score_set(self, gene: str, col: str = "targetGenes.HGNC") -> pl.DataFrame:
         urns = self.score_sets.filter(pl.col(col) == gene)["urn"]
+        dfs = []
         for urn in urns:
             scores = pl.read_csv(self.urn2file(urn, "csv"))
-            try:
-                va_text = self.urn2file(urn, "")
-                with open(self.urn2file(urn, "va")) as va_file:
-                    va_tmp = json.load(va_file)
-            except FileNotFoundError:
-                pass
+            if (mapped_file := self.urn2file(urn, "mapped")).exists():
+                mapped = self.get_mapping(mapped_file)
+                scores = scores.join(
+                    mapped, left_on="accession", right_on="variant_urn"
+                )
+            if (va_file := self.urn2file(urn, "va")).exists():
+                va = self.get_va(va_file)
+                scores = scores.join(va, left_on="accession", right_on="variant_urn")
+            dfs.append(scores)
+        final = pl.concat(dfs, how="diagonal_relaxed")
+        return final
 
-        pass
 
+M = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
 
-M = MaveDB(
-    "/home/shannc/Bio_SDD/stem_synology/chula_mount/shannc/reference/variants/mavedb-dump.2026062418131"
+samp = json.load(
+    open(
+        "/home/shannc/Downloads/mavedb-dump.2026062418131/mapped/urn-mavedb-00000001-a-1.mapped-variants.json"
+    )
 )
+
+# parsed = M.get_mapping(
+#     "/home/shannc/Downloads/mavedb-dump.2026062418131/mapped/urn-mavedb-00000001-a-1.mapped-variants.json"
+# )
+
+# TODO: when formatting the report, create a link to the variant on the
+# mavedb website from the ga4gh digest
+
+va_file = "/home/shannc/Downloads/mavedb-dump.2026062418131/va/urn-mavedb-00000094-a-2.va.ndjson"
+
+scores = pl.read_csv(
+    "/home/shannc/Downloads/mavedb-dump.2026062418131/csv/urn-mavedb-00000001-a-1.scores.csv"
+)
+
+va = M.get_va(Path(va_file))
+
+result = M.gene_score_set("UBE2I")
