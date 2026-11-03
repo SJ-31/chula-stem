@@ -16,7 +16,7 @@ def test_civic_lookup(tmp_path):
     assert set(df["gene"]) == set(df_prev["gene"])
 
 
-@pytest.mark.parametrize("download_path,", [None, "./data/ot"])
+@pytest.mark.parametrize("download_path,", [(None,), ("./data/ot",)])
 def test_open_targets(download_path, tmp_path):
     db = tmp_path / "data.db"
     not_found = tmp_path / "not_found.txt"

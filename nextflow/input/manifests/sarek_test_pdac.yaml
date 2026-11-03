@@ -4,7 +4,10 @@ wes: true
 trim_fastq: true
 save_mapped: true
 save_trimmed: true
-tools: "cnvkit,controlfreec,deepsomatic,deepvariant,freebayes,haplotypecaller,lofreq,manta,merge,mpileup,msisensor2,msisensorpro,muse,mutect2,sentieon_tnscope,snpeff,snpsift,strelka,tiddit,vep"
+snv_consensus_calling: true
+consensus_min_count: 2
+tools: "cnvkit,controlfreec,deepsomatic,deepvariant,freebayes,haplotypecaller,lofreq,manta,merge,mpileup,muse,mutect2,snpeff,strelka,tiddit,vep"
+# BUG: [2026-11-03 Tue] something's wrong with msisensorpro not using the correct reference genome
 # tool options: [
 #     ascat,
 #     bbsplit,
@@ -39,7 +42,7 @@ tools: "cnvkit,controlfreec,deepsomatic,deepvariant,freebayes,haplotypecaller,lo
 #     vep,
 #     varlociraptor,
 #   ]
-intervals: "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/S07604514_Padded.bed"
+intervals: "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/S07604514_Padded_no_headers.bed"
 genome: "GATK.GRCh38"
 ascat_genome: hg38
 only_paired_variant_calling: false

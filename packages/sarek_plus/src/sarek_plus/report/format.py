@@ -21,6 +21,7 @@ from chula_stem.utils import (
 
 from sarek_plus.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
 from sarek_plus.databases import TherapyDB
+from sarek_plus.mavedb import MaveDB
 from sarek_plus.report.spec import URL, Rename
 
 TUMOR_KEYWORDS = ["cancer", "leukemia", "carcinoma", "lymphoma"]
@@ -251,7 +252,10 @@ def format_var_type(var: str) -> str:
 
 
 def vep_fmt(
-    vep_path: Path, variant_class: str, existing_variants: list[str] | None = None
+    vep_path: Path,
+    variant_class: str,
+    existing_variants: list[str] | None = None,
+    mavedb: MaveDB | None = None,
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table
@@ -347,8 +351,65 @@ def vep_fmt(
                 lambda x: all(list(map(lambda vaf: float(vaf) >= 0.6, x))),
                 separator=",",
             )
+            if mavedb:
+                nonrelevant = fmt_mavedb(nonrelevant, mavedb)
         return df, relevant.select(wanted_cols), nonrelevant.select(wanted_cols)
     return tuple([empty_table(rename.values())] * 3)
+
+
+def fmt_mavedb(
+    df: pl.DataFrame,
+    mavedb: MaveDB,
+    join_spec: dict[str, str],
+    gene_col: str = "Gene",
+    mave_gene_col: str = "targetGenes.HGNC",
+) -> pl.DataFrame:
+    """
+    Annotate `df` with columns from MaveDB lookups, ready to
+    display in a reportlab table
+
+    Parameters
+    ----------
+    hgvs_spec : dict
+        Dictionary mapping columns in `df` to those in `mavedb` for joining.
+        E.g. {"HGVS": "hgvs.g", "HGVS": "hgvs.c"}
+
+    TODO: [2026-11-03 Tue] Finalize all the external variation sources
+    before doing this. Also consider producing an HTML report
+    for the uncertain variants or something similar.
+    Would be way easier to manage
+
+    Returns
+    -------
+    "[MaveDB ('SCORE_SET_TITLE')](SCORE_SET_URN): [FUNCTIONAL_SCORE](VARIANT_URN), "
+    DataFrame with a
+        - "Score"
+        - "MaveDB Score Set"
+        - "MaveDB classification"
+    """
+    tmp = []
+    for gene in df[gene_col].unique():
+        cur = df.filter(pl.col(gene_col) == gene)
+        from_mavedb = mavedb.gene_score_set(gene, col=mave_gene_col)
+        if from_mavedb.is_empty():
+            tmp.append(cur)
+            continue
+        for left, right in join_spec.items():
+            if right not in from_mavedb.columns:
+                continue
+            cleaned = (
+                from_mavedb.filter(pl.col(right).is_not_null())
+                .unique(right)
+                .with_columns(pl.col(right).str.replace(".*:", ""))
+            )
+            cur = cur.join(
+                cleaned,
+                left_on=left,
+                right_on=right,
+                how="left",
+            )
+        tmp.append(cur)
+    return pl.concat(tmp, how="diagonal_relaxed")
 
 
 def str_split_contains(colname: str, query: list[str], separator: str = ";") -> pl.Expr:

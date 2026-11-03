@@ -21,6 +21,7 @@ from reportlab.platypus import (
 
 import sarek_plus.report.format as fr
 from sarek_plus.databases import get_therapy_df
+from sarek_plus.mavedb import MaveDB
 from sarek_plus.report import (
     PATIENT_DATA,
     SAMPLE_DATA,
@@ -151,6 +152,7 @@ class VariantCallingReport(ResultsReport):
         existing_variants_file: str = "",
         tmpdir: str = "temp",
         therapy_databases=["open_targets", "civic"],
+        mavedb_dump: Path | None = None,
         font=FONT,
         bold_font=BOLD_FONT,
         filter_confident_therapies=True,
@@ -196,9 +198,7 @@ class VariantCallingReport(ResultsReport):
             },
             {"file": self.paths.msisensor_pro, "column": "gene_name"},
         ]
-        if os.path.exists(self.paths.therapy_data_cache) and self.show_therapies:
-            therapy_df = pl.read_parquet(self.paths.therapy_data_cache)
-        elif self.show_therapies:
+        if self.show_therapies:
             gene_list = fr.get_genes(gene_spec)
             therapy_df: pl.DataFrame = get_therapy_df(
                 genes=set(gene_list),
@@ -209,6 +209,7 @@ class VariantCallingReport(ResultsReport):
             )
         else:
             therapy_df = pl.DataFrame()
+        self.mavedb: MaveDB | None = MaveDB(mavedb_dump) if mavedb_dump else None
 
         if not existing_variants_file:
             existing_variants = None
@@ -217,7 +218,9 @@ class VariantCallingReport(ResultsReport):
                 existing_variants = f.read().splitlines()
 
         calls = [
-            lambda: fr.vep_fmt(self.paths.vep_small, "small", existing_variants),
+            lambda: fr.vep_fmt(
+                self.paths.vep_small, "small", existing_variants, mavedb=self.mavedb
+            ),
             lambda: fr.vep_fmt(self.paths.vep_sv, "sv", existing_variants),
             lambda: fr.classify_cnv_fmt(self.paths.classify_cnv),
             lambda: fr.msisensor_pro_fmt(self.paths.msisensor_pro),

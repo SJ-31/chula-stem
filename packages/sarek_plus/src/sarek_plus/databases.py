@@ -211,11 +211,6 @@ class TherapyDB(ABC):
         raise NotImplementedError()
 
 
-# * Open targets
-
-
-# * Civic database
-
 CIVIC_URL: str = "https://civicdb.org"
 
 
@@ -545,31 +540,40 @@ class OpenTargets(TherapyDB):
                 "--no-host-directories",
                 "--cut-dirs",
                 "6",
+                "-P",
+                tmpdir.name,
             ]
             _ = run(
-                cmd_args
-                + [
-                    "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_report",
-                    "-P",
-                    tmpdir.name,
-                ],
+                " ".join(
+                    cmd_args
+                    + [
+                        "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_report"
+                    ]
+                ),
                 shell=True,
                 check=True,
             )
             _ = run(
-                cmd_args
-                + [
-                    "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_target",
-                    "-P",
-                    tmpdir.name,
-                ],
+                " ".join(
+                    cmd_args
+                    + [
+                        "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_target"
+                    ]
+                ),
                 shell=True,
                 check=True,
             )
         else:
             data_dir = self.data_dir
+            tmpdir = None
+        print("DATA exists", data_dir.exists())
+        print(list((data_dir / "clinical_target").iterdir()))
         report = duckdb.read_parquet(f"{data_dir}/clinical_report/*.parquet")
+        print("DATA exists", data_dir.exists())
+        print(list((data_dir / "clinical_target").iterdir()))
         target = duckdb.read_parquet(f"{data_dir}/clinical_target/*.parquet")
+        if tmpdir is not None:
+            tmpdir.cleanup()
         return report, target
 
     def get_genes_batched(self, genes: set, confident: bool = True) -> pl.DataFrame:
@@ -654,6 +658,8 @@ def add_therapy_info(
 ) -> pl.DataFrame:
     """Add therapeutic information
 
+    TODO: [2026-11-03 Tue] might not need this anymore, can just use
+    `get_therapy_df`
     :param vep_out: the filtered tsv from VEP reporting the effects of small and
     structural variants
 

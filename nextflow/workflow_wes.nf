@@ -185,15 +185,15 @@ workflow {
      * Copy number aberration
      */
 
+    normals.dump(tag: "debug")
+    
     if (!params.ref.cnvkit_reference) {
         collected_normals = normals
             .map { val -> val[2] }
             .mix(PREPROCESS_FASTQ.out.bam_index.map { val -> val[1] })
             .toList()
         CNVKIT_PREP(
-            channel.of(
-                ["filename": cohort_name, "out": "${params.outdir}/cnvkit_reference", "log": "${params.outdir}/cnvkit_reference"]
-            ).merge(collected_normals) { meta, bams -> tuple(meta, tuple(bams)) },
+            channel.of(["filename": cohort_name]).merge(collected_normals) { meta, bams -> tuple(meta, tuple(bams)) },
             params.ref.genome,
             params.ref.baits_unzipped,
             params.ref.genome_blacklist,
@@ -204,8 +204,8 @@ workflow {
         cnvkit_autobin = CNVKIT_PREP.out.autobin.first()
     }
     else {
-        cnvkit_reference = params.ref.cnvkit_reference
-        cnvkit_autobin = params.ref.cnvkit_autobin
+        cnvkit_reference = channel.of(params.ref.cnvkit_reference)
+        cnvkit_autobin = channel.of(params.ref.cnvkit_autobin)
     }
 
     branched_with_index = PREPROCESS_FASTQ.out.bam_with_index.branch(branchSources)
@@ -519,6 +519,7 @@ workflow {
 
     publish:
     merged_results = to_publish
+    cnvkit_prep = cnvkit_reference.mix(cnvkit_autobin)
     logs = to_publish_logs
     multiqc = MULTIQC.out.html.mix(MULTIQC.out.data)
     purecn_baits = PURECN_COMPLETE.out.bait_intervals
@@ -527,6 +528,9 @@ workflow {
 
 output {
     multiqc {
+    }
+    cnvkit_prep {
+        path { "cnvkit_ref/" }
     }
     purecn_baits {
         path { "purecn_ref/" }
