@@ -5,15 +5,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Literal
 
-import duckdb
 import polars as pl
-from attrs import Factory, define, field, validators
+from attrs import Factory, define, field
 
 # [2026-10-30 Fri]
 # Plan for using maveDB data (and any other MAVE data)
 # Just add the data to all possible variants in the report, showing
 # the relevant experiments and the MAVE score
 # If the variant is of uncertain significance, make a note of it
+
+# https://www.mavedb.org/docs/mavedb/finding-data/downloading.html#archive-contents
 
 
 @define
@@ -36,6 +37,7 @@ class MaveDB:
     def _make_score_sets(self) -> pl.DataFrame:
         tmp = {
             "urn": [],
+            "title": [],
             "targetGenes": [],
             "targetGenes.HGNC": [],
             "targetGenes.UniprotID": [],
@@ -46,6 +48,7 @@ class MaveDB:
                 for score_set in exp["scoreSets"]:
                     for tg in score_set["targetGenes"]:
                         name = tg["name"]
+                        tmp["title"].append(score_set["title"])
                         tmp["targetGenes"].append(name)
                         tmp["targetGenes.UniprotID"].append(
                             tg["uniprotIdFromMappedMetadata"]
@@ -158,9 +161,9 @@ class MaveDB:
         return df
 
     def gene_score_set(self, gene: str, col: str = "targetGenes.HGNC") -> pl.DataFrame:
-        urns = self.score_sets.filter(pl.col(col) == gene)["urn"]
+        rel = self.score_sets.filter(pl.col(col) == gene)
         dfs = []
-        for urn in urns:
+        for urn in rel["urn"]:
             scores = pl.read_csv(self.urn2file(urn, "csv"))
             if (mapped_file := self.urn2file(urn, "mapped")).exists():
                 mapped = self.get_mapping(mapped_file)
@@ -170,32 +173,13 @@ class MaveDB:
             if (va_file := self.urn2file(urn, "va")).exists():
                 va = self.get_va(va_file)
                 scores = scores.join(va, left_on="accession", right_on="variant_urn")
+            scores = scores.with_columns(pl.lit(urn).alias("urn"))
             dfs.append(scores)
-        final = pl.concat(dfs, how="diagonal_relaxed")
+        final = pl.concat(dfs, how="diagonal_relaxed").join(rel, on="urn")
         return final
 
 
-M = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
-
-samp = json.load(
-    open(
-        "/home/shannc/Downloads/mavedb-dump.2026062418131/mapped/urn-mavedb-00000001-a-1.mapped-variants.json"
-    )
-)
-
-# parsed = M.get_mapping(
-#     "/home/shannc/Downloads/mavedb-dump.2026062418131/mapped/urn-mavedb-00000001-a-1.mapped-variants.json"
-# )
-
 # TODO: when formatting the report, create a link to the variant on the
 # mavedb website from the ga4gh digest
-
-va_file = "/home/shannc/Downloads/mavedb-dump.2026062418131/va/urn-mavedb-00000094-a-2.va.ndjson"
-
-scores = pl.read_csv(
-    "/home/shannc/Downloads/mavedb-dump.2026062418131/csv/urn-mavedb-00000001-a-1.scores.csv"
-)
-
-va = M.get_va(Path(va_file))
-
-result = M.gene_score_set("UBE2I")
+# And the source of the variant can also be the main score set URN
+# e.g. https://mavedb.org/score-sets/urn:mavedb:00000001-a-1
