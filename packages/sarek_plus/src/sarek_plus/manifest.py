@@ -149,6 +149,10 @@ def make_sarek_manifest(
         .agg(pl.col("sample_status"))
     )
     variant_called = pl.read_csv(outdir / "csv" / "variantcalled.csv")
+    recal: dict[tuple(str, str), dict] = pl.read_csv(
+        outdir / "csv" / "recalibrated.csv"
+    ).rows_by_key(["patient", "sample"], unique=True, named=True)
+
     renamed_callers = [
         rename_caller(vc, file)
         for vc, file in zip(variant_called["variantcaller"], variant_called["vcf"])
@@ -169,13 +173,25 @@ def make_sarek_manifest(
         patient = row["patient"]
         for normal, tumor in group_samples(row["status_sample"]):
             obj = PatientOutputs(name=patient, normal=normal, tumor=tumor, config=cfg)
+            tumor_recal, normal_recal = (
+                recal.get((patient, obj.tumor), {}),
+                recal.get((patient, obj.normal), {}),
+            )
             if obj.ot == "paired":
                 to_update = paired
                 to_update["mutect2_unfiltered"].append(obj.mutect2_unfiltered)
+                to_update["recal_tumor"].append(tumor_recal.get("cram"))
+                to_update["recal_tumor_index"].append(tumor_recal.get("crai"))
+                to_update["recal_normal"].append(normal_recal.get("cram"))
+                to_update["recal_normal_index"].append(normal_recal.get("crai"))
             elif obj.ot == "tumor_only":
                 to_update = t_only
+                to_update["recal"].append(tumor_recal.get("cram"))
+                to_update["recal_index"].append(tumor_recal.get("crai"))
             else:
                 to_update = germline
+                to_update["recal"].append(normal_recal.get("cram"))
+                to_update["recal_index"].append(normal_recal.get("crai"))
             to_update["patient"].append(patient)
             vcfs: dict = caller_map[(patient, obj.sample)]
             for caller, file in ((c, v) for c, v in vcfs.items() if v):
