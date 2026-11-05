@@ -13,7 +13,7 @@ def in_vcf_header(vcf: str, string: str) -> bool:
     return run(f"bcftools head {vcf} | grep '{string}'", shell=True).returncode == 0
 
 
-def format_vep_vcf_internal(
+def _format_vep_vcf(
     input: str,
     tumor_sample: str,
     normal_sample: str = "",
@@ -154,7 +154,7 @@ def main(
     ad_tag: str = "AD",
     variant_class: str = "small",
 ):
-    df = format_vep_vcf_internal(
+    df = _format_vep_vcf(
         input=input,
         tumor_sample=tumor_sample,
         normal_sample=normal_sample,
@@ -165,3 +165,48 @@ def main(
         variant_class=variant_class,
     )
     df.write_csv(output, separator="\t", null_value="NA")
+
+
+def _extract_format(vcf: str) -> pl.DataFrame:
+    samples: list[str] = (
+        run(f"bcftools query -l '{vcf}'", shell=True, capture_output=True)
+        .stdout.decode()
+        .splitlines()
+    )
+    pos_df: pl.DataFrame = pl.read_csv(
+        run(
+            f"bcftools query -f '%CHROM\t%POS\t%ALT\t%REF' '{vcf}'",
+            shell=True,
+            capture_output=True,
+        ).stdout,
+        has_header=False,
+        new_columns=["CHROM", "POS", "ALT", "REF"],
+        separator="\t",
+    )
+    dfs = []
+    for sample in samples:
+        tmp = []
+        for fline in (
+            run(
+                f"bcftools query -f '%FORMAT' '{vcf}' -s {sample}",
+                shell=True,
+                capture_output=True,
+            )
+            .stdout.decode()
+            .splitlines()
+        ):
+            fields, vals = fline.split("\t")
+            tmp.append({f: v for f, v in zip(fields.split(":"), vals.split(":"))})
+        val_df = pl.from_dicts(tmp, strict=False, infer_schema_length=None)
+        val_df = pl.concat([pos_df, val_df], how="horizontal").with_columns(
+            pl.lit(sample).alias("sample")
+        )
+        dfs.append(val_df)
+    return pl.concat(dfs, how="diagonal_relaxed")
+
+
+@click.command()
+@click.option("-i", "--input", required=True, help="Input VCF file", default=None)
+@click.option("-o", "--output", required=True, help="Output TSV file", default=None)
+def extract_vcf_format(vcf: str) -> None:
+    df = _extract_format(vcf)
