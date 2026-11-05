@@ -23,5 +23,6 @@ unison . ssh://$stem_ip/chula-stem \
        -ignore 'Path packages/*/build' \
        -ignore 'Path packages/*/src/*.egg-info' \
        -ignore 'Path packages/*/.pytest_cache' \
-       -ignore 'Path packages/*/src/*/__pycache__'
+       -ignore 'Name __pycache__' \
+       -ignore 'Name _rust*'
 '''
