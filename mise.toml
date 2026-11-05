@@ -13,3 +13,10 @@ unison ./nextflow ssh://$stem_ip/chula-stem/nextflow \
        -ignore 'Path .nf-test' \
        -ignore 'Path .nextflow'
 '''
+
+[tasks.sync_pkgs]
+run = '''
+unison . ssh://$stem_ip/chula-stem \
+       -path packages \
+       -path src
+'''

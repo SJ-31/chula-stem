@@ -110,7 +110,7 @@ def group_samples(samples: list[dict], config: dict) -> list[tuple[str, str]]:
 
 
 def make_sarek_manifest(
-    config: Path, caller: str = "consensus"
+    config: Path,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """
     Construct sarek output manifest from the yaml configuration used
@@ -137,7 +137,6 @@ def make_sarek_manifest(
     assert "tools" in cfg, "`tools` must be in configuration"
     assert "vep" in tools, "Pipeline must be run with vep"
     assert "mutect2" in tools, "Pipeline must be run with mutect2"
-    assert caller in tools, "`caller` chosen for annotations must be in tool list"
     assert annotations.exists(), "`annotations` directory must exist"
 
     cfg["tools"] = tools
@@ -202,3 +201,13 @@ def make_sarek_manifest(
                 to_update[f"vep_{caller}"].append(annotated)
 
     return pl.DataFrame(germline), pl.DataFrame(t_only), pl.DataFrame(paired)
+
+
+def test_manifest():
+    from pyhere import here
+
+    test_config = here("nextflow", "input", "manifests", "sarek_test_pdac.yaml")
+    germline, t_only, paired = make_sarek_manifest(test_config)
+    germline.write_csv(here("tests", "sarek_plus_out") / "germline_manifest.csv")
+    # t_only.write_csv(here("tests", "sarek_plus_out") / "t_only_manifest.csv")
+    paired.write_csv(here("tests", "sarek_plus_out") / "paired_manifest.csv")
