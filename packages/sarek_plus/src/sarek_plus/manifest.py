@@ -242,6 +242,9 @@ def _make_sarek_manifest(
 )
 def make_sarek_manifest(config, germline, tumor_only, paired) -> None:
     g, t, p = _make_sarek_manifest(config=config)
+    g = pl.DataFrame({"id": []}) if g.is_empty() else g
+    t = pl.DataFrame({"id": []}) if t.is_empty() else t
+    p = pl.DataFrame({"id": []}) if p.is_empty() else p
     g.write_csv(germline)
     t.write_csv(tumor_only)
     p.write_csv(paired)
