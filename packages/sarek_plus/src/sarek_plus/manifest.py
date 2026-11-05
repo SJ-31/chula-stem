@@ -21,16 +21,17 @@ class PatientOutputs:
     config: str
     ot: OUTPUT_TYPE = field(
         init=False,
-        factory=Factory(
+        default=Factory(
             lambda x: "paired"
             if x.tumor and x.normal
             else "germline"
             if x.normal
-            else "tumor_only"
+            else "tumor_only",
+            takes_self=True,
         ),
     )
     outdir: Path = field(
-        init=False, factory=Factory(lambda x: Path(x.config["outdir"]), takes_self=True)
+        init=False, default=Factory(lambda x: Path(x.config["outdir"]), takes_self=True)
     )
 
     @property
@@ -50,13 +51,14 @@ class PatientOutputs:
         )
 
     def vep(self, variant_vcf: str) -> str | None:
-        vcf_path = Path(variant_vcf)
-        name = vcf_path.stem.removesuffix(".vcf")
-        caller = vcf_path.parent.parent.stem
-        dir = self.outdir / "annotation" / caller / self.sample
-        file = dir / f"{name}_{self.vep_suffix}"
-        if file.exists():
-            return str(file)
+        if variant_vcf:
+            vcf_path = Path(variant_vcf)
+            name = vcf_path.stem.removesuffix(".vcf")
+            caller = vcf_path.parent.parent.stem
+            dir = self.outdir / "annotation" / caller / self.sample
+            file = dir / f"{name}{self.vep_suffix}"
+            if file.exists():
+                return str(file)
 
     @property
     def mutect2_unfiltered(self) -> str | None:
@@ -71,6 +73,11 @@ class PatientOutputs:
 
     def all(self) -> dict:
         return {"mutect2_unfiltered": self.mutect2_unfiltered}
+
+
+def drop_null_cols(df: pl.DataFrame) -> pl.DataFrame:
+    nulls = [col for col, series in zip(df.columns, df) if series.is_null().all()]
+    return df.drop(nulls)
 
 
 def rename_caller(caller: str, vcf: str) -> str:
@@ -125,10 +132,10 @@ def _make_sarek_manifest(
     """
 
     with open(config, "r") as f:
-        cfg: dict = yaml.load(f)
+        cfg: dict = yaml.full_load(f)
     tools: list[str] = cfg["tools"].split(",")
     outdir: Path = Path(cfg["outdir"])
-    annotations = outdir / "annotations"
+    annotation = outdir / "annotation"
 
     assert "input" in cfg, "Sample manifest must be in configuration"
     assert (
@@ -138,15 +145,15 @@ def _make_sarek_manifest(
     assert "tools" in cfg, "`tools` must be in configuration"
     assert "vep" in tools, "Pipeline must be run with vep"
     assert "mutect2" in tools, "Pipeline must be run with mutect2"
-    assert annotations.exists(), "`annotations` directory must exist"
+    assert annotation.exists(), "`annotations` directory must exist"
 
     cfg["tools"] = tools
 
     sample_sheet: pl.DataFrame = (
-        pl.read_csv(cfg["input"], schema_overrides={"status", str})
+        pl.read_csv(cfg["input"], schema_overrides={"status": str})
         .with_columns(pl.struct(["status", "sample"]).alias("status_sample"))
         .group_by("patient")
-        .agg(pl.col("sample_status"))
+        .agg(pl.col("status_sample"))
     )
     variant_called = pl.read_csv(outdir / "csv" / "variantcalled.csv")
     recal: dict[tuple(str, str), dict] = pl.read_csv(
@@ -157,21 +164,21 @@ def _make_sarek_manifest(
         rename_caller(vc, file)
         for vc, file in zip(variant_called["variantcaller"], variant_called["vcf"])
     ]
-    joint_germline: str | None = renamed_callers.pop(
-        ("all_samples", "joint_variant_calling"), {}
-    ).get("haplotypecaller")
 
     caller_map: dict[tuple[str, str], dict] = (
         variant_called.with_columns(pl.Series(renamed_callers).alias("variantcaller"))
         .pivot(on="variantcaller", values="vcf")
         .rows_by_key(["patient", "sample"], named=True, unique=True)
     )
+    joint_germline: str | None = caller_map.pop(
+        ("all_samples", "joint_variant_calling"), {}
+    ).get("haplotypecaller")
 
     # BAM files default to tumor bam
     germline, t_only, paired = defaultdict(list), defaultdict(list), defaultdict(list)
     for row in sample_sheet.iter_rows(named=True):
         patient = row["patient"]
-        for normal, tumor in group_samples(row["status_sample"]):
+        for normal, tumor in group_samples(row["status_sample"], cfg):
             obj = PatientOutputs(name=patient, normal=normal, tumor=tumor, config=cfg)
             tumor_recal, normal_recal = (
                 recal.get((patient, obj.tumor), {}),
@@ -194,14 +201,18 @@ def _make_sarek_manifest(
                 to_update["recal_index"].append(normal_recal.get("crai"))
             to_update["id"].append(patient)
             vcfs: dict = caller_map[(patient, obj.sample)]
-            for caller, file in ((c, v) for c, v in vcfs.items() if v):
+            for caller, file in vcfs.items():
                 if caller == "haplotypecaller" and joint_germline:
                     file = joint_germline
                 annotated: str | None = obj.vep(file)
                 to_update[caller].append(file)
                 to_update[f"vep_{caller}"].append(annotated)
 
-    return pl.DataFrame(germline), pl.DataFrame(t_only), pl.DataFrame(paired)
+    return (
+        pl.DataFrame(germline).pipe(drop_null_cols),
+        pl.DataFrame(t_only).pipe(drop_null_cols),
+        pl.DataFrame(paired).pipe(drop_null_cols),
+    )
 
 
 @click.command()
@@ -239,7 +250,7 @@ def make_sarek_manifest(config, germline, tumor_only, paired) -> None:
 def test_manifest():
     from pyhere import here
 
-    test_config = here("nextflow", "input", "manifests", "sarek_test_pdac.yaml")
+    test_config = here("nextflow", "input", "manifests", "sarek_test_pdac_1.yaml")
     germline, t_only, paired = _make_sarek_manifest(test_config)
     germline.write_csv(here("tests", "sarek_plus_out") / "germline_manifest.csv")
     # t_only.write_csv(here("tests", "sarek_plus_out") / "t_only_manifest.csv")
