@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "chula_stem"
 requires-python = ">=3.12"
-dependencies = ["sarek_plus", "stem_analysis", "pytest"]
+dependencies = ["sarek_plus", "pytest"]
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: Implementation :: CPython",

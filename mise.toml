@@ -18,5 +18,10 @@ unison ./nextflow ssh://$stem_ip/chula-stem/nextflow \
 run = '''
 unison . ssh://$stem_ip/chula-stem \
        -path packages \
-       -path src
+       -path src \
+       -path pyproject.toml \
+       -ignore 'Path packages/*/build' \
+       -ignore 'Path packages/*/src/*.egg-info' \
+       -ignore 'Path packages/*/.pytest_cache' \
+       -ignore 'Path packages/*/src/*/__pycache__'
 '''

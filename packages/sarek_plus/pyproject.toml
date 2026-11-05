@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 get_therapy_cache = "sarek_plus:therapy_cache_from_files"
 format_vep_vcf = "sarek_plus.format_vep_vcf:main"
+make_sarek_manifest = "sarek_plus.manifest:make_sarek_manifest"
 classify_cnv_format = "sarek_plus:classify_cnv_format"
 callset_qc = "sarek_plus.callset_qc:qc_main"
 pipeline_report = "sarek_plus:entry_point"

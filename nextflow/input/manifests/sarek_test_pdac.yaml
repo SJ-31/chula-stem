@@ -10,6 +10,7 @@ trim_fastq: true
 save_mapped: true
 save_trimmed: true
 snv_consensus_calling: true
+concatenate_vcfs: true
 consensus_min_count: 2
 intervals: "/data/project/stemcell/shannc/reference/exome_kits/SureSelectHumanAllExonV6Hg38/S07604514_Padded_no_headers.bed"
 genome: "GATK.GRCh38"

@@ -5,6 +5,7 @@ from itertools import product
 from pathlib import Path
 from typing import Literal, TypeAlias
 
+import click
 import polars as pl
 import yaml
 from attrs import Factory, define, field
@@ -109,7 +110,7 @@ def group_samples(samples: list[dict], config: dict) -> list[tuple[str, str]]:
     return paired + [(n, "") for n in normals]
 
 
-def make_sarek_manifest(
+def _make_sarek_manifest(
     config: Path,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     """
@@ -191,7 +192,7 @@ def make_sarek_manifest(
                 to_update = germline
                 to_update["recal"].append(normal_recal.get("cram"))
                 to_update["recal_index"].append(normal_recal.get("crai"))
-            to_update["patient"].append(patient)
+            to_update["id"].append(patient)
             vcfs: dict = caller_map[(patient, obj.sample)]
             for caller, file in ((c, v) for c, v in vcfs.items() if v):
                 if caller == "haplotypecaller" and joint_germline:
@@ -203,11 +204,43 @@ def make_sarek_manifest(
     return pl.DataFrame(germline), pl.DataFrame(t_only), pl.DataFrame(paired)
 
 
+@click.command()
+@click.option(
+    "-c",
+    "--config",
+    required=True,
+    help="YAML file used in original sarek run",
+    default=None,
+)
+@click.option(
+    "-g",
+    "--germline",
+    required=True,
+    help="CSV file for germline output",
+    default=None,
+)
+@click.option(
+    "-t",
+    "--tumor_only",
+    required=True,
+    help="CSV file for tumor-only output",
+    default=None,
+)
+@click.option(
+    "-p", "--paired", required=True, help="CSV file for paired output", default=None
+)
+def make_sarek_manifest(config, germline, tumor_only, paired) -> None:
+    g, t, p = _make_sarek_manifest(config=config)
+    g.write_csv(germline)
+    t.write_csv(tumor_only)
+    p.write_csv(paired)
+
+
 def test_manifest():
     from pyhere import here
 
     test_config = here("nextflow", "input", "manifests", "sarek_test_pdac.yaml")
-    germline, t_only, paired = make_sarek_manifest(test_config)
+    germline, t_only, paired = _make_sarek_manifest(test_config)
     germline.write_csv(here("tests", "sarek_plus_out") / "germline_manifest.csv")
     # t_only.write_csv(here("tests", "sarek_plus_out") / "t_only_manifest.csv")
     paired.write_csv(here("tests", "sarek_plus_out") / "paired_manifest.csv")
