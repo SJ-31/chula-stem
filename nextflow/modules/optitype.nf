@@ -15,6 +15,9 @@ process OPTITYPE {
            optitype_pdf: file(out_pdf)
     )
 
+    topic:
+    record(id: id, process: "optitype", file: file("optitype.log")) >> "logs"
+    
     script:
     prefix = "${id}-optitype"
     out_csv = "${prefix}.csv"
@@ -28,5 +31,7 @@ process OPTITYPE {
         -o . \
         --prefix "${prefix}" \
         ${args}
+    
+    get_nextflow_log.bash optitype.log
     """
 }
