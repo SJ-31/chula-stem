@@ -75,11 +75,6 @@ class PatientOutputs:
         return {"mutect2_unfiltered": self.mutect2_unfiltered}
 
 
-def drop_null_cols(df: pl.DataFrame) -> pl.DataFrame:
-    nulls = [col for col, series in zip(df.columns, df) if series.is_null().all()]
-    return df.drop(nulls)
-
-
 def rename_caller(caller: str, vcf: str) -> str:
     if caller not in {"manta", "strelka"}:
         return caller
@@ -91,6 +86,26 @@ def rename_caller(caller: str, vcf: str) -> str:
         return "strelka_indels"
     if caller == "strelka":
         return "strelka"
+
+
+def get_fq(
+    sample, patient, outdir: Path, config: dict, fastq_map: dict
+) -> tuple[str, str | None]:
+    """
+    If fastq files were split, the first element is the directory containing
+    the fastp files and the second is None.
+    Otherwise, return a tuple of fastq1, fastq2
+    """
+    if "save_trimmed" in config:
+        dir: Path = outdir / "preprocessing" / "fastp" / sample
+        if len(list(dir.iterdir())) > 2:
+            return str(dir), None
+        return str(next(dir.glob("*R1.fastp.fastq.gz"))), str(
+            next(dir.glob("*R2.fastp.fastq.gz"))
+        )
+    fq1 = fastq_map.get((patient, sample))["fastq_1"]
+    fq2 = fastq_map.get((patient, sample))["fastq_2"]
+    return fq1, fq2
 
 
 def group_samples(samples: list[dict], config: dict) -> list[tuple[str, str]]:
@@ -117,9 +132,7 @@ def group_samples(samples: list[dict], config: dict) -> list[tuple[str, str]]:
     return paired + [(n, "") for n in normals]
 
 
-def _make_sarek_manifest(
-    config: Path,
-) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     """
     Construct sarek output manifest from the yaml configuration used
     to run sarek.
@@ -128,7 +141,7 @@ def _make_sarek_manifest(
 
     Returns
     -------
-    Tuple of dataframes: (germline, tumor_only, paired)
+    Tuple of dataframes: (tool_outs, preprocessed)
     """
 
     with open(config, "r") as f:
@@ -145,16 +158,25 @@ def _make_sarek_manifest(
     assert "tools" in cfg, "`tools` must be in configuration"
     assert "vep" in tools, "Pipeline must be run with vep"
     assert "mutect2" in tools, "Pipeline must be run with mutect2"
+    assert not cfg.get("trim_fastq", False) or (
+        cfg["trim_fastq"] and cfg.get("save_trimmed", False)
+    ), "If trimming is enabled, must save trimmed output"
     assert annotation.exists(), "`annotations` directory must exist"
 
     cfg["tools"] = tools
 
-    sample_sheet: pl.DataFrame = (
-        pl.read_csv(cfg["input"], schema_overrides={"status": str})
-        .with_columns(pl.struct(["status", "sample"]).alias("status_sample"))
+    sample_sheet = pl.read_csv(cfg["input"], schema_overrides={"status": str})
+    samples_grouped: pl.DataFrame = (
+        sample_sheet.with_columns(
+            pl.struct(["status", "sample"]).alias("status_sample")
+        )
         .group_by("patient")
         .agg(pl.col("status_sample"))
     )
+    fq_map: dict = sample_sheet.select(
+        ["patient", "sample", "fastq_1", "fastq_2"]
+    ).rows_by_key(["patient", "sample"], named=True, unique=True)
+
     variant_called = pl.read_csv(outdir / "csv" / "variantcalled.csv")
     recal: dict[tuple(str, str), dict] = pl.read_csv(
         outdir / "csv" / "recalibrated.csv"
@@ -175,44 +197,55 @@ def _make_sarek_manifest(
     ).get("haplotypecaller")
 
     # BAM files default to tumor bam
-    germline, t_only, paired = defaultdict(list), defaultdict(list), defaultdict(list)
-    for row in sample_sheet.iter_rows(named=True):
+    tool_outs, preprocessed = defaultdict(list), defaultdict(list)
+    for row in samples_grouped.iter_rows(named=True):
         patient = row["patient"]
+        added_preprocessed: bool = False
         for normal, tumor in group_samples(row["status_sample"], cfg):
             obj = PatientOutputs(name=patient, normal=normal, tumor=tumor, config=cfg)
-            tumor_recal, normal_recal = (
-                recal.get((patient, obj.tumor), {}),
-                recal.get((patient, obj.normal), {}),
-            )
-            if obj.ot == "paired":
-                to_update = paired
-                to_update["mutect2_unfiltered"].append(obj.mutect2_unfiltered)
-                to_update["recal_tumor"].append(tumor_recal.get("cram"))
-                to_update["recal_tumor_index"].append(tumor_recal.get("crai"))
-                to_update["recal_normal"].append(normal_recal.get("cram"))
-                to_update["recal_normal_index"].append(normal_recal.get("crai"))
-            elif obj.ot == "tumor_only":
-                to_update = t_only
-                to_update["recal"].append(tumor_recal.get("cram"))
-                to_update["recal_index"].append(tumor_recal.get("crai"))
-            else:
-                to_update = germline
-                to_update["recal"].append(normal_recal.get("cram"))
-                to_update["recal_index"].append(normal_recal.get("crai"))
-            to_update["id"].append(patient)
+
+            tool_outs["output_type"].append(obj.ot)
+            tool_outs["normal_sample"].append(obj.normal)
+            tool_outs["tumor_sample"].append(obj.tumor)
+            tool_outs["id"].append(patient)
+            tool_outs["mutect2_unfiltered"].append(obj.mutect2_unfiltered)
             vcfs: dict = caller_map[(patient, obj.sample)]
             for caller, file in vcfs.items():
-                if caller == "haplotypecaller" and joint_germline:
+                if (
+                    caller == "haplotypecaller"
+                    and joint_germline
+                    and obj.ot == "germline"
+                ):
                     file = joint_germline
                 annotated: str | None = obj.vep(file)
-                to_update[caller].append(file)
-                to_update[f"vep_{caller}"].append(annotated)
+                tool_outs[caller].append(file)
+                tool_outs[f"vep_{caller}"].append(annotated)
 
-    return (
-        pl.DataFrame(germline).pipe(drop_null_cols),
-        pl.DataFrame(t_only).pipe(drop_null_cols),
-        pl.DataFrame(paired).pipe(drop_null_cols),
-    )
+            if not added_preprocessed:
+                tumor_recal, normal_recal = (
+                    recal.get((patient, obj.tumor), {}),
+                    recal.get((patient, obj.normal), {}),
+                )
+                preprocessed["id"].extend([patient, patient])
+                preprocessed["status"].extend(["1", "0"])
+                preprocessed["recal"].extend(
+                    [tumor_recal.get("cram"), normal_recal.get("cram")]
+                )
+                preprocessed["recal_index"].extend(
+                    [tumor_recal.get("crai"), normal_recal.get("crai")]
+                )
+                n_fastq_1, n_fastq_2 = get_fq(obj.normal, patient, outdir, cfg, fq_map)
+                t_fastq_1, t_fastq_2 = get_fq(obj.tumor, patient, outdir, cfg, fq_map)
+                preprocessed["fastq_1"].extend([t_fastq_1, n_fastq_1])
+                if not n_fastq_2:
+                    preprocessed["fastq_2"].extend([None, None])
+                    preprocessed["split_fastq"].extend([True, True])
+                else:
+                    preprocessed["fastq_2"].extend([t_fastq_2, n_fastq_2])
+                    preprocessed["split_fastq"].extend([False, False])
+                added_preprocessed = True
+
+    return pl.DataFrame(tool_outs), pl.DataFrame(preprocessed)
 
 
 @click.command()
@@ -224,15 +257,15 @@ def _make_sarek_manifest(
     default=None,
 )
 @click.option(
-    "-g",
-    "--germline",
+    "-p",
+    "--preprocessed",
     required=True,
-    help="CSV file for germline output",
+    help="CSV file for preprocessed data",
     default=None,
 )
 @click.option(
     "-t",
-    "--tumor_only",
+    "--tool_outs",
     required=True,
     help="CSV file for tumor-only output",
     default=None,
@@ -240,21 +273,18 @@ def _make_sarek_manifest(
 @click.option(
     "-p", "--paired", required=True, help="CSV file for paired output", default=None
 )
-def make_sarek_manifest(config, germline, tumor_only, paired) -> None:
-    g, t, p = _make_sarek_manifest(config=config)
-    g = pl.DataFrame({"id": []}) if g.is_empty() else g
+def make_sarek_manifest(config, preprocessed, tool_outs) -> None:
+    t, p = _make_sarek_manifest(config=config)
     t = pl.DataFrame({"id": []}) if t.is_empty() else t
     p = pl.DataFrame({"id": []}) if p.is_empty() else p
-    g.write_csv(germline)
-    t.write_csv(tumor_only)
-    p.write_csv(paired)
+    t.write_csv(tool_outs)
+    p.write_csv(preprocessed)
 
 
 def test_manifest():
     from pyhere import here
 
     test_config = here("nextflow", "input", "manifests", "sarek_test_pdac_1.yaml")
-    germline, t_only, paired = _make_sarek_manifest(test_config)
-    germline.write_csv(here("tests", "sarek_plus_out") / "germline_manifest.csv")
-    # t_only.write_csv(here("tests", "sarek_plus_out") / "t_only_manifest.csv")
-    paired.write_csv(here("tests", "sarek_plus_out") / "paired_manifest.csv")
+    tool_outs, pp = _make_sarek_manifest(test_config)
+    tool_outs.write_csv(here("tests", "sarek_plus_out") / "tool_outs_manifest.csv")
+    pp.write_csv(here("tests", "sarek_plus_out") / "preprocessed_manifest.csv")
