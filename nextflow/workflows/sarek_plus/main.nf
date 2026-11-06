@@ -19,7 +19,7 @@ workflow {
         row -> record(id: row.id, status: row.status, recal: row.recal, recal_index: row.recal_index, fastq_1: row.fastq_1, fastq_2: row.fastq_2, split_fastq: row.split_fastq)
     }
     merged = MERGE_FASTQ(preprocessed.filter {v -> v.split_fastq}.map { v -> record(id: v.id, fastq_dir: v.fastq_1, status: v.status) })
-    fastq = preprocessed.filter {v -> !v.split_fastq}.map { v -> record(id: v.id, fastq_1: v.fastq_1, fastq_2: v.fastq_2, status: v.status) }.mix(merged)
+    fastq = preprocessed.filter {v -> !v.split_fastq}.map { v -> record(id: v.id, fastq_1: file(v.fastq_1), fastq_2: file(v.fastq_2), status: v.status) }.mix(merged)
 
     optitype = OPTITYPE(fastq.filter { v -> v.status == "0" }, "dna")
 
@@ -46,4 +46,18 @@ workflow {
     // passes them to vep. Just use concat_vcf
     
     // PURECN_COMPLETE(mutect2_unfiltered)
+
+    publish:
+    optitype = optitype 
+    
+}
+
+output {
+    optitype { 
+        path {
+            v ->
+            v.optitype_csv >> "optitype/${v.id}"
+            v.optitype_pdf >> "optitype/${v.id}"
+        }
+    }
 }

@@ -11,16 +11,17 @@ process OPTITYPE {
 
     output:
     record(id: id,
-           optitype_csv: out_csv,
-           optitype_pdf: out_pdf
+           optitype_csv: file(out_csv),
+           optitype_pdf: file(out_pdf)
     )
 
     script:
     prefix = "${id}-optitype"
-    out_csv = "${prefix}/"
-    out_pdf = "${prefix}/"
+    out_csv = "${prefix}.csv"
+    out_pdf = "${prefix}.pdf"
     data_type_flag = "dna" == data_type ? "--dna" : "--rna"
-    args = task.ext.args.join(" ")
+    args = task.ext.args ?: ""
+    
     """
     optitype run -i "${fastq_1}" -i "${fastq_2}" \
         "${data_type_flag}" \
