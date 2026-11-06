@@ -270,9 +270,6 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     help="CSV file for tumor-only output",
     default=None,
 )
-@click.option(
-    "-p", "--paired", required=True, help="CSV file for paired output", default=None
-)
 def make_sarek_manifest(config, preprocessed, tool_outs) -> None:
     t, p = _make_sarek_manifest(config=config)
     t = pl.DataFrame({"id": []}) if t.is_empty() else t

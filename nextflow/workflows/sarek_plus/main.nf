@@ -1,20 +1,36 @@
 include { OPTITYPE } from "./modules/optitype.nf"
-include { PURECN_COMPLETE } from "./subworkflows/purecn_complete.nf"
+include { MERGE_FASTQ } from "./modules/merge_fastq.nf"
+// include { PURECN_COMPLETE } from "./subworkflows/purecn_complete.nf"
 include { SAREK_MANIFEST } from "./modules/sarek_manifest.nf"
+
+nextflow.enable.types = true
+params {
+    sarek_config: Path
+}
 
 workflow {
 
     main:
-    input = SAREK_MANIFEST(params.sarek_config)
+    sarek_out = SAREK_MANIFEST(params.sarek_config)
 
-    germline = input.germline.splitCsv(header: true)
-    tumor_only = input.tumor_only.splitCsv(header: true)
-    paired = input.paired.splitCsv(header: true)
+    preprocessed = sarek_out.preprocessed.flatMap {
+        csv -> csv.splitCsv(header: true) 
+    }.map {
+        row -> record(id: row.id, status: row.status, recal: row.recal, recal_index: row.recal_index, fastq_1: row.fastq_1, fastq_2: row.fastq_2, split_fastq: row.split_fastq)
+    }
+    merged = MERGE_FASTQ(preprocessed.filter {v -> v.split_fastq}.map { v -> record(id: v.id, fastq_dir: v.fastq_1, status: v.status) })
+    fastq = preprocessed.filter {v -> !v.split_fastq}.map { v -> record(id: v.id, fastq_1: v.fastq_1, fastq_2: v.fastq_2, status: v.status) }.mix(merged)
 
-    tumor_only.view()
+    optitype = OPTITYPE(fastq.filter { v -> v.status == "0" }, "dna")
+
+    // TODO: extract VEP annotations from the VCF
+    //      sarek uses "CSQ" as the VEP field instead of "ANN"
+    //      
+
+    // TODO: need a routine "extract depth" that retrieves allele depths
+    // and other statistics for every caller
+    // [2026-11-05 Thu] Written this already, just need to add it now
     
-    // TODO: use optitype to get the hla classification given fastp
-
     // TODO: [2026-11-05 Thu] after parsing the output directory
     // and manifest, will produce three channels: germline, paired, and
     // tumor-only channels
