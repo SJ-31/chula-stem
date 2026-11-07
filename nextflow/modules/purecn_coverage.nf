@@ -1,26 +1,26 @@
 nextflow.enable.types = true
 
 process PURECN_COVERAGE {
-    ext version: ""
-
     input:
-    record(id: String,
-           bam_or_cov: Path,
-           index: Path
+    record(
+        id: String,
+        bam_or_cov: Path,
+        index: Path
     )
     bait_intervals: Path
     normalize_only: Boolean
-    // PureCN supports using third-party tools for coverage calculation. If `normalize_only` is true, then the precomputed coverage files are GC-normalized
 
     output:
-    record(id: id,
-           loess: file(o1),
-           coverage: file(o2)
+    // PureCN supports using third-party tools for coverage calculation. If `normalize_only` is true, then the precomputed coverage files are GC-normalized
+    record(
+        id: id,
+        loess: file(o1),
+        coverage: file(o2),
     )
 
     topic:
     record(id: id, process: "purecn_coverage", file: "purecn_coverage.log") >> "logs"
-    
+
     script:
     o1 = "${id}-coverage_loess.txt.gz"
     o2 = "${id}-coverage.txt.gz"

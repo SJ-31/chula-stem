@@ -1,16 +1,15 @@
 nextflow.enable.types = true
 
 process PURECN_BAIT_INTERVALS {
-    ext version: "2.16.1"
-
     input:
     genome: Path
     baits: Path
     mappability: Path
 
     output:
-    record(baits: file(o1),
-           baits_optimized: file(o2)
+    record(
+        baits: file(o1),
+        baits_optimized: file(o2),
     )
 
     topic:

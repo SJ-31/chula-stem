@@ -1,11 +1,10 @@
 process SAREK_MANIFEST {
-
     input:
-    val(sarek_config)
+    val sarek_config
 
     output:
-    path("tool_outs.csv"), emit: tool_outs
-    path("preprocessed.csv"), emit: preprocessed
+    path ("tool_outs.csv"), emit: tool_outs
+    path ("preprocessed.csv"), emit: preprocessed
 
     script:
     """

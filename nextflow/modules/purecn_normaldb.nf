@@ -9,16 +9,17 @@ process PURECN_NORMALDB {
     genome_build: String
 
     output:
-    record(db: file(output),
-           mapping_bias: file(mapping_bias),
-           mapping_bias_hq: file(mapping_bias_hq),
-           png: file(png),
-           low_cov: low_cov
+    record(
+        db: file(output),
+        mapping_bias: file(mapping_bias),
+        mapping_bias_hq: file(mapping_bias_hq),
+        png: file(png),
+        low_cov: low_cov,
     )
-    
+
     topic:
     record(process: "purecn_normaldb", file: file("purecn_normaldb.log")) >> "logs"
-    
+
     script:
     output = "normalDB_${genome_build}.rds"
     png = "interval_weights_${genome_build}.png"
