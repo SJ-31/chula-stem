@@ -19,27 +19,37 @@ workflow PURECN_COMPLETE {
     take:
     samples: Channel<Sample>
     panel_of_normals: String
+    genome: Path
+    baits: Path
+    mappability: Path
+    purecn_bait_intervals: Path
+    purecn_mapping_bias: Path
+    purecn_normaldb: Path
+    snp_blacklist: Path
+    default_ploidy: String
+    default_purity: String
 
     main:
-    if (!params.ref.purecn_bait_intervals) {
-        bait_intervals = PURECN_BAIT_INTERVALS(
-            params.ref.genome,
-            params.ref.baits,
-            params.ref.mappability,
-        ).toList().map { v -> v.first() }
+    if (!purecn_bait_intervals) {
+        baits_proc = PURECN_BAIT_INTERVALS(
+            genome,
+            baits,
+            mappability,
+        )
+        bait_intervals = baits_proc.map { v -> v.baits }
         // NOTE: [2026-11-07 Sat] as of Nextflow version 26.10.5
         // there doesn't seem to be a better idiom for generating a value
         // channel. The type checker will complain about the above, but
         // it runs fine
     }
     else {
-        bait_intervals = channel.value(params.ref.purecn_bait_intervals)
+        bait_intervals = channel.value(purecn_bait_intervals)
     }
     tumor_bam = samples.map { v -> record(id: v.id, bam_or_cov: v.tumor_bam, index: v.tumor_bam_index) }
     normal_bam = samples.map { v -> record(id: v.id, bam_or_cov: v.normal_bam, index: v.normal_bam_index) }
 
 
-    if (!params.ref.purecn_normaldb && !params.ref.purecn_mapping_bias) {
+    if (!purecn_normaldb && !purecn_mapping_bias) {
         to_normaldb = COVERAGE_NORMAL(normal_bam, bait_intervals, false).map { val -> val.loess }.collect()
 
         db_ch = PURECN_NORMALDB(to_normaldb, panel_of_normals, params.genome_build).toList().map { b -> b.first() }
@@ -47,8 +57,8 @@ workflow PURECN_COMPLETE {
         mapping_bias = db_ch.map { v -> v.mapping_bias }
     }
     else {
-        normaldb = params.ref.purecn_normaldb
-        mapping_bias = params.ref.purecn_mapping_bias
+        normaldb = channel.value(purecn_normaldb)
+        mapping_bias = channel.value(purecn_mapping_bias)
     }
     coverage_tumor = COVERAGE_TUMOR(tumor_bam, bait_intervals, false)
 
@@ -59,9 +69,9 @@ workflow PURECN_COMPLETE {
         normaldb,
         bait_intervals,
         mapping_bias,
-        params.ref.snp_blacklist,
-        params.defaults.purity,
-        params.defaults.ploidy,
+        snp_blacklist,
+        default_purity,
+        default_ploidy,
     )
 
     emit:

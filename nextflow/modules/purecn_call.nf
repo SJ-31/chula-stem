@@ -8,7 +8,7 @@ process PURECN_CALL {
         mutect2_vcf: Path
     )
     normaldb: Path
-    bait_intervals: String
+    bait_intervals: Path
     mapping_bias: Path
     snp_blacklist: Path
     default_purity: String

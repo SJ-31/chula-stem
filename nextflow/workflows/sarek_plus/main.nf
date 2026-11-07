@@ -1,11 +1,14 @@
 include { OPTITYPE } from "./modules/optitype.nf"
 include { MERGE_FASTQ } from "./modules/merge_fastq.nf"
-// include { PURECN_COMPLETE } from "./subworkflows/purecn_complete.nf"
+include { PURECN_COMPLETE } from "./subworkflows/purecn_complete.nf"
 include { SAREK_MANIFEST } from "./modules/sarek_manifest.nf"
+include { SIGPROFILERASSIGNMENT ; SIGPROFILERASSIGNMENT_COLLECT } from "./modules/sigprofilerassignment.nf"
 
 nextflow.enable.types = true
 params {
     sarek_config: Path
+    ref: Map
+    defaults: Map
 }
 
 workflow {
@@ -22,11 +25,20 @@ workflow {
         }
     merged = MERGE_FASTQ(preprocessed.filter { v -> v.split_fastq }.map { v -> record(id: v.id, fastq_dir: v.fastq_1, status: v.status) })
 
-    merged.view()
-
     fastq = preprocessed.filter { v -> !v.split_fastq }.map { v -> record(id: v.id, fastq_1: file(v.fastq_1), fastq_2: file(v.fastq_2), status: v.status) }.mix(merged)
 
     optitype = OPTITYPE(fastq.filter { v -> v.status == 0 }, "dna")
+
+    to_purecn = sarek_out.tool_outs
+        .flatMap { csv ->
+            csv.splitCsv(header: true)
+        }
+        .map { row ->
+            record(id: row.id, mutect2_vcf: row.mutect2_unfiltered)
+        }
+        .join(preprocessed.filter { v -> v.status == 0 }.map { v -> record(id: v.id, normal_bam: v.recal, normal_bam_index: v.recal_index) }, by: "id")
+        .join(preprocessed.filter { v -> v.status == 1 }.map { v -> record(id: v.id, tumor_bam: v.recal, tumor_bam_index: v.recal_index) }, by: "id")
+    to_purecn.view()
 
     publish:
 
