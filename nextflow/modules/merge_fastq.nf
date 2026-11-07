@@ -5,7 +5,7 @@ process MERGE_FASTQ {
     record(
         id: String,
         fastq_dir: String,
-        status: String
+        status: Integer
     )
 
     output:
@@ -20,10 +20,10 @@ process MERGE_FASTQ {
     fq1 = "${id}_R1.fastq.gz"
     fq2 = "${id}_R2.fastq.gz"
     """
-    seqkit seq ${fastq_dir}/*_R1.*fastq.gz > t1.fq.gz
+    seqkit seq ${fastq_dir}/*_R1.*fastq.gz -o t1.fq.gz
     mv t1.fq.gz ${fq1}
     
-    seqkit seq ${fastq_dir}/*_R2.*fastq.gz > t2.fq.gz
+    seqkit seq ${fastq_dir}/*_R2.*fastq.gz -o t2.fq.gz
     mv t2.fq.gz ${fq2}
     """
 }
