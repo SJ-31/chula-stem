@@ -1,73 +1,71 @@
-include { MUTECT2 } from "../modules/mutect2.nf"
 include { PURECN_BAIT_INTERVALS } from "../modules/purecn_bait_intervals.nf"
 include { PURECN_COVERAGE as COVERAGE_NORMAL } from "../modules/purecn_coverage.nf"
 include { PURECN_COVERAGE as COVERAGE_TUMOR } from "../modules/purecn_coverage.nf"
 include { PURECN_NORMALDB } from "../modules/purecn_normaldb.nf"
 include { PURECN_CALL } from "../modules/purecn_call.nf"
 
+nextflow.enable.types = true
+
+record Sample {
+    id: String
+    mutect2_vcf: Path
+    tumor_bam: Path
+    normal_bam: Path
+    tumor_bam_index: Path
+    normal_bam_index: Path
+}
 
 workflow PURECN_COMPLETE {
     take:
-    //
-    mutect2_unfiltered
-    tumor_bam
-    normal_bam
-    panel_of_normals
-    cohort_name
+    samples: Channel<Sample>
+    panel_of_normals: String
 
     main:
-    tumor_bam.dump(tag: "purecn_tumor")
-    normal_bam.dump(tag: "purecn_normal")
-
     if (!params.ref.purecn_bait_intervals) {
-        PURECN_BAIT_INTERVALS([[], params.ref.genome],
+        bait_intervals = PURECN_BAIT_INTERVALS(
+            params.ref.genome,
             params.ref.baits,
             params.ref.mappability,
-        )
-        bait_intervals = PURECN_BAIT_INTERVALS.out.baits
+        ).toList().map { v -> v.first() }
+        // NOTE: [2026-11-07 Sat] as of Nextflow version 26.10.5
+        // there doesn't seem to be a better idiom for generating a value
+        // channel. The type checker will complain about the above, but
+        // it runs fine
     }
     else {
-        bait_intervals = params.ref.purecn_bait_intervals
+        bait_intervals = channel.value(params.ref.purecn_bait_intervals)
     }
+    tumor_bam = samples.map { v -> record(id: v.id, bam_or_cov: v.tumor_bam, index: v.tumor_bam_index) }
+    normal_bam = samples.map { v -> record(id: v.id, bam_or_cov: v.normal_bam, index: v.normal_bam_index) }
 
-    COVERAGE_TUMOR(tumor_bam, bait_intervals, false)
 
-    if (!params.ref.purecn_normaldb) {
-        COVERAGE_NORMAL(normal_bam, bait_intervals, false)
-        normal_files = COVERAGE_NORMAL.out.loess.map { it -> it[1] }.toList()
-        def to_normaldb = channel.of(["filename": cohort_name])
-            .merge(normal_files) { meta, cov -> tuple(meta, tuple(cov)) }
-        to_normaldb.dump(tag: "purecn_normaldb")
-        PURECN_NORMALDB(to_normaldb, panel_of_normals)
-        normaldb = PURECN_NORMALDB.out.db.first()
-        mapping_bias = PURECN_NORMALDB.out.mapping_bias.first()
+    if (!params.ref.purecn_normaldb && !params.ref.purecn_mapping_bias) {
+        to_normaldb = COVERAGE_NORMAL(normal_bam, bait_intervals, false).map { val -> val.loess }.collect()
+
+        db_ch = PURECN_NORMALDB(to_normaldb, panel_of_normals, params.genome_build).toList().map { b -> b.first() }
+        normaldb = db_ch.map { v -> v.db }
+        mapping_bias = db_ch.map { v -> v.mapping_bias }
     }
     else {
         normaldb = params.ref.purecn_normaldb
-        mapping_bias = params.ref.purecn_mapping_bias ?: ""
+        mapping_bias = params.ref.purecn_mapping_bias
     }
-    to_call = COVERAGE_TUMOR.out.loess
-        .map { it ->
-            [it[0].id, ["type": "paired", "id": it[0].id, "filename": it[0].id], it[1]]
-        }
-        .join(Utl.getId(mutect2_unfiltered))
-        .map { it -> it[1..-1] }
+    coverage_tumor = COVERAGE_TUMOR(tumor_bam, bait_intervals, false)
 
-    PURECN_CALL(
+    to_call = coverage_tumor.map { v -> record(id: v.id, coverage: v.coverage) }.join(samples.map { v -> record(id: v.id, mutect2_vcf: v.mutect2_vcf) }, by: "id")
+
+    purecn_call = PURECN_CALL(
         to_call,
         normaldb,
         bait_intervals,
         mapping_bias,
-        params.ref.snp_blacklist ?: "",
+        params.ref.snp_blacklist,
         params.defaults.purity,
         params.defaults.ploidy,
     )
 
     emit:
     bait_intervals = bait_intervals
-    purity_ploidy = PURECN_CALL.out.purity_ploidy
-    call = PURECN_CALL.out.call
-    loess = COVERAGE_TUMOR.out.loess
-    cov = COVERAGE_TUMOR.out.cov
-    logfile = PURECN_CALL.out.logfile
+    call = purecn_call
+    coverage = coverage_tumor
 }
