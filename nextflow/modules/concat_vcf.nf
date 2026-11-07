@@ -1,19 +1,26 @@
-process CONCAT_VCF {
-    ext version: "1.21"
+nextflow.enable.types = true
 
+process CONCAT_VCF {
     input:
     // Concatenate groups vcf files of the same samples
-    tuple val(meta), path(vcfs, arity: "2..*")
+    record(
+        id: String,
+        vcfs: Bag<Path>
+    )
+    prefix: String
 
     output:
+    record(
+        id: id,
+        concat: output,
+    )
 
-    //
-    tuple val(meta), path(output), emit: vcf
-    tuple val(meta), path("*.log"), emit: logfile
+    topic:
+    record(id: id, process: "concat_vcf", file: file("concat_vcf.log")) >> "logs"
 
     script:
     //
-    output = Utl.getName(meta, "All", "vcf.gz")
+    output = "${id}-${prefix}concat.vcf.gz"
     """
     i=0
     for v in *.vcf.gz; do
