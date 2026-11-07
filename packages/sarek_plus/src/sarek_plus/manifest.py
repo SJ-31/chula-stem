@@ -154,6 +154,9 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     assert (
         "save_mapped" in cfg and cfg["save_mapped"]
     ), "Pipeline must produce mapping files"
+    assert (
+        "save_output_as_bam" in cfg and cfg["save_output_as_bam"]
+    ), "Pipeline must save mapping files as BAM"
     assert "outdir" in cfg, "`outdir` must be in configuration"
     assert "tools" in cfg, "`tools` must be in configuration"
     assert "vep" in tools, "Pipeline must be run with vep"
@@ -229,10 +232,10 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
                 preprocessed["id"].extend([patient, patient])
                 preprocessed["status"].extend(["1", "0"])
                 preprocessed["recal"].extend(
-                    [tumor_recal.get("cram"), normal_recal.get("cram")]
+                    [tumor_recal.get("bam"), normal_recal.get("bam")]
                 )
                 preprocessed["recal_index"].extend(
-                    [tumor_recal.get("crai"), normal_recal.get("crai")]
+                    [tumor_recal.get("bai"), normal_recal.get("bai")]
                 )
                 n_fastq_1, n_fastq_2 = get_fq(obj.normal, patient, outdir, cfg, fq_map)
                 t_fastq_1, t_fastq_2 = get_fq(obj.tumor, patient, outdir, cfg, fq_map)

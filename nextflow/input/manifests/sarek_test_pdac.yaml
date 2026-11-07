@@ -9,6 +9,7 @@ wes: true
 trim_fastq: true
 save_mapped: true
 save_trimmed: true
+save_output_as_bam: true
 snv_consensus_calling: true
 concatenate_vcfs: true
 consensus_min_count: 2
