@@ -1,24 +1,28 @@
-process SIGPROFILERASSIGNMENT {
-    ext version: "0.1.9"
+nextflow.enable.types = true
 
+process SIGPROFILERASSIGNMENT {
+    
     input:
-    tuple val(meta), path(vcfs)
-    val is_exome
-    val exclude_file
+    record(id: String,
+           vcfs: Bag<Path>)
+    is_exome: Boolean
+    exclude_file: Path
 
     output:
+    record(id: id,
+           dir: file(all),
+           activities: activities_file
+    )
 
-    //
-    tuple val(meta), path(output), emit: all
-    tuple val(meta), path(activities_file), emit: activities
-    tuple val(meta), path("*.log"), emit: logfile
+    topic:
+    record(id: id, process: "sigprofilerassignment_collect", file: file("sigprofilerassignment.log")) >> "logs"
 
     script:
     //
-    output = Utl.getName(meta, "SigProfilerAssignment")
+    output = "${id}-SigProfilerAssignment"
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
-    args = task.ext.args.join(" ")
+    args = task.ext.args ?: ""
     activities_file = "${output}/Activities/Assignment_Solution_Activities.txt"
     """
     export SIGPROFILERASSIGNMENT_VOLUME=${task.ext.volume}
