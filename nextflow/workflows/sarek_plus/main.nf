@@ -2,7 +2,9 @@ include { OPTITYPE } from "./modules/optitype.nf"
 include { MERGE_FASTQ } from "./modules/merge_fastq.nf"
 include { PURECN_COMPLETE } from "./subworkflows/purecn_complete.nf"
 include { SAREK_MANIFEST } from "./modules/sarek_manifest.nf"
+include { CONCAT_VCF } from "./modules/concat_vcf.nf"
 include { SIGPROFILERASSIGNMENT ; SIGPROFILERASSIGNMENT_COLLECT } from "./modules/sigprofilerassignment.nf"
+include { EXTRACT_FORMAT_FIELDS } from "./modules/extract_format_fields.nf"
 
 nextflow.enable.types = true
 params {
@@ -40,6 +42,20 @@ workflow {
         .join(preprocessed.filter { v -> v.status == 1 }.map { v -> record(id: v.id, tumor_bam: v.recal, tumor_bam_index: v.recal_index) }, by: "id")
     to_purecn.view()
 
+
+    to_extract_format = sarek_out.tool_outs.map {
+        { v ->
+            def res = [:]
+            ["deepvariant", "freebayes", "strelka", "tiddit", "deepsomatic", "manta_somatic", "muse", "mutect2", "strelka_indels", "haplotypecaller", "deepvariant"].each { el ->
+                if (v[el]) {
+                    res[el] = v[el]
+                }
+            }
+            record(id: v.id, caller2vcfs: res, suffix: "_${v.output_type}", normal_sample: v.normal_sample, tumor_sample: v.tumor_sample)
+        }
+    }
+    to_extract_format.view()
+    EXTRACT_FORMAT_FIELDS(to_extract_format)
     publish:
 
     // TODO: use 'topics' to extract versions as well as logs
