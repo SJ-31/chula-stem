@@ -25,10 +25,9 @@ process OPTITYPE {
     out_pdf = "${prefix}.pdf"
     data_type_flag = "dna" == data_type ? "--dna" : "--rna"
     args = task.ext.args ?: ""
-
     """
     optitype run -i "${fastq_1}" -i "${fastq_2}" \
-        "${data_type_flag}" \
+        ${data_type_flag} \
         -o . \
         --prefix "${prefix}" \
         ${args}

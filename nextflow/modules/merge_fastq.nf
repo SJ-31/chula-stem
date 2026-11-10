@@ -17,8 +17,8 @@ process MERGE_FASTQ {
     )
 
     script:
-    fq1 = "${id}_R1.fastq.gz"
-    fq2 = "${id}_R2.fastq.gz"
+    fq1 = "${status}-${id}_R1.fastq.gz"
+    fq2 = "${status}-${id}_R2.fastq.gz"
     """
     seqkit seq ${fastq_dir}/*_R1.*fastq.gz -o t1.fq.gz
     mv t1.fq.gz ${fq1}
