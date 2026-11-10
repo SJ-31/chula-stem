@@ -65,7 +65,7 @@ workflow {
     format_fields = EXTRACT_FORMAT_FIELDS(to_extract_format)
 
     to_vep_tsv = sarek_out.tool_outs.filter { v -> v.vep_consensus }.map { v -> record(id: v.id, vcf: v.vep_consensus) }.mix(sv_tumor_concat.map { v -> record(id: v.id, vcf: v.concat) })
-    vep_tsvs = FORMAT_VEP_VCF(to_vep_tsv)
+    vep_tsvs = FORMAT_VEP_VCF(to_vep_tsv, ["CALLERS", "NCALLERS", "SVTYPE"], "CSQ")
 
     publish:
 
