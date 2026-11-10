@@ -55,7 +55,8 @@ workflow {
         }
     }
     to_extract_format.view()
-    EXTRACT_FORMAT_FIELDS(to_extract_format)
+    format_fields = EXTRACT_FORMAT_FIELDS(to_extract_format)
+
     publish:
 
     // TODO: use 'topics' to extract versions as well as logs
@@ -65,26 +66,11 @@ workflow {
     //      sarek uses "CSQ" as the VEP field instead of "ANN"
     //
 
-    // TODO: need a routine "extract depth" that retrieves allele depths
-    // and other statistics for every caller
-    // [2026-11-05 Thu] Written this already, just need to add it now
+    // TODO: need to merge the output of the CNV callers
 
-    // TODO: [2026-11-05 Thu] after parsing the output directory
-    // and manifest, will produce three channels: germline, paired, and
-    // tumor-only channels
-    // The latter go to PURECN and structural variant calling
-    // The rest go straight to the report
-    // `paired` has columns for tumor and normal recal files
-
-    // OPTITYPE(germline.map { val -> [val, [val.fastp_1, val.fastp2]] }, "dna")
-
-    // mutect2_unfiltered = input.map { val -> [val, val.mutect2_unfiltered] }
-
-    // // TODO: add a step that combines structural variant callers and
-    // passes them to vep. Just use concat_vcf
-
-    // PURECN_COMPLETE(mutect2_unfiltered)
     optitype = optitype
+    format_fields = format_fields 
+    
 }
 
 output {
@@ -93,5 +79,8 @@ output {
             v.optitype_csv >> "optitype/${v.id}"
             v.optitype_pdf >> "optitype/${v.id}"
         }
+    }
+    format_fields {
+        path { v -> v.tsv >> "format_fields/${v.id}" }
     }
 }

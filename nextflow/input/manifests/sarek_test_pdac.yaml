@@ -1,6 +1,5 @@
 input: "/data/home/shannc/chula-stem/nextflow/input/manifests/sarek_test.csv"
 outdir: "/data/home/shannc/chula-stem/output/sarek_pdac_test"
-vep_cache: "/data/home/shannc/remote/.cache/sarek/vep"
 snpeff_cache: "/data/home/shannc/remote/.cache/sarek/snpeff"
 save_reference: true
 pon: "/data/home/shannc/remote/.cache/sarek/pon/1000g_pon.hg38.vcf.gz"
@@ -19,6 +18,14 @@ ascat_genome: hg38
 only_paired_variant_calling: false
 normalize_vcfs: true
 joint_germline: true
+vep_cache: "/data/home/shannc/remote/.cache/sarek/vep"
+vep_dbnsfp: true
+# WARNING: dbNFSP needs a license for commercial use, you need to ask Aj first. Make it optional in the report at least
+dbnsfp: "/data/project/stemcell/shannc/reference/variants/dbNSFP.4a/dbNSFP.4a_grch38.gz"
+dbnsfp_tbi: "/data/project/stemcell/shannc/reference/variants/dbNSFP.4a/dbNSFP.4a_grch38.gz.tbi"
+# dbnsfp_consequence:
+dbnsfp_fields: AlphaMissense_score,AlphaMissense_pred,VARITY_R_score,ESM1b_score,popEVE_score,popEVE_pred,MetaRNN_score,MetaRNN_pred,clinvar_review,clinvar_OMIM_id
+
 tools: "cnvkit,controlfreec,deepsomatic,deepvariant,freebayes,haplotypecaller,lofreq,manta,merge,mpileup,muse,mutect2,snpeff,strelka,tiddit,vep"
 # BUG: [2026-11-03 Tue] something's wrong with msisensorpro not using the correct reference genome
 # tool options: [

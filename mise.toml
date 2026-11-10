@@ -4,6 +4,11 @@ ssh -L 8023:localhost:8023 shannc@161.200.107.77 \
     ssh -L 8023:localhost:8023 cuaim-fat-01.cuaim.hpc
     '''
 
+[tasks.sync_tests]
+run = '''
+unison ./tests ssh://$stem_ip/chula-stem/tests
+'''
+
 [tasks.sync_nextflow]
 run = '''
 unison ./nextflow ssh://$stem_ip/chula-stem/nextflow \
