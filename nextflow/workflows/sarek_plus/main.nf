@@ -27,6 +27,8 @@ workflow {
             record(id: row.id, status: row.status as Integer, recal: row.recal, recal_index: row.recal_index, fastq_1: row.fastq_1, fastq_2: row.fastq_2, split_fastq: row.split_fastq)
         }
 
+    tool_outs = sarek_out.tool_outs.flatMap { csv -> csv.splitCsv(header: true) }
+
     merged = MERGE_FASTQ(preprocessed.filter { v -> v.split_fastq }.map { v -> record(id: v.id, fastq_dir: v.fastq_1, status: v.status) })
 
     fastq = preprocessed.filter { v -> !v.split_fastq }.map { v -> record(id: v.id, fastq_1: file(v.fastq_1), fastq_2: file(v.fastq_2), status: v.status) }.mix(merged)
@@ -35,36 +37,30 @@ workflow {
 
     optitype = OPTITYPE(fastq.filter { v -> v.status == 0 }, "dna")
 
-    to_purecn = sarek_out.tool_outs
-        .flatMap { csv ->
-            csv.splitCsv(header: true)
-        }
+    to_purecn = tool_outs
         .map { row ->
             record(id: row.id, mutect2_vcf: row.mutect2_unfiltered)
         }
         .join(preprocessed.filter { v -> v.status == 0 }.map { v -> record(id: v.id, normal_bam: v.recal, normal_bam_index: v.recal_index) }, by: "id")
         .join(preprocessed.filter { v -> v.status == 1 }.map { v -> record(id: v.id, tumor_bam: v.recal, tumor_bam_index: v.recal_index) }, by: "id")
-    to_purecn.view()
 
     sv_tumor_to_concat = sarek_out.tool_outs.filter { v -> v.output_type == "paired" || v.output_type == "tumor_only" }.map { v -> record(id: v.id, vcfs: [v?.vep_manta_somatic, v?.vep_tiddit]) }
 
     sv_tumor_concat = CONCAT_VCF(sv_tumor_to_concat, "sv_")
 
-    to_extract_format = sarek_out.tool_outs.map {
-        { v ->
-            def res = [:]
-            ["deepvariant", "freebayes", "strelka", "tiddit", "deepsomatic", "manta_somatic", "muse", "mutect2", "strelka_indels", "haplotypecaller", "deepvariant"].each { el ->
-                if (v[el]) {
-                    res[el] = v[el]
-                }
+    to_extract_format = tool_outs.map { v ->
+        def res = [:]
+        ["deepvariant", "freebayes", "strelka", "tiddit", "deepsomatic", "manta_somatic", "muse", "mutect2", "strelka_indels", "haplotypecaller", "deepvariant"].each { el ->
+            if (v[el]) {
+                res[el] = file(v[el])
             }
-            record(id: v.id, caller2vcfs: res, suffix: "_${v.output_type}", normal_sample: v.normal_sample, tumor_sample: v.tumor_sample)
         }
+        record(id: v.id, caller2vcfs: res, suffix: "_${v.output_type}", normal_sample: v.normal_sample, tumor_sample: v.tumor_sample)
     }
     to_extract_format.view()
     format_fields = EXTRACT_FORMAT_FIELDS(to_extract_format)
 
-    to_vep_tsv = sarek_out.tool_outs.filter { v -> v.vep_consensus }.map { v -> record(id: v.id, vcf: v.vep_consensus) }.mix(sv_tumor_concat.map { v -> record(id: v.id, vcf: v.concat) })
+    to_vep_tsv = tool_outs.filter { v -> v.vep_consensus }.map { v -> record(id: v.id, vcf: file(v.vep_consensus)) }.mix(sv_tumor_concat.map { v -> record(id: v.id, vcf: v.concat) })
     vep_tsvs = FORMAT_VEP_VCF(to_vep_tsv, ["CALLERS", "NCALLERS", "SVTYPE"], "CSQ")
 
     publish:
