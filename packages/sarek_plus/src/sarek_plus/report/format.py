@@ -11,9 +11,12 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import numpy as np
+import pandera.polars as pa
 import polars as pl
 import polars.selectors as cs
+from attrs import define, field
 from chula_stem.utils import (
+    Ensembl116,
     add_loc,
     empty_string2null,
     str_split_unique,
@@ -118,18 +121,78 @@ def get_clingen_link(clingen_str) -> str:
 # with the
 
 
+@define
 class CopyNumberResult:
-    def __init__():
-        return
+    cfg: dict = field(factory=dict)
+    segment_schema: pa.DataFrameSchema = pa.DataFrameSchema(
+        {
+            "chr": pa.Column(str),
+            "start": pa.Column(int),
+            "end": pa.Column(int),
+            "cn": pa.Column(int),
+            "genes": pa.Column(list[str]),
+            "caller": pa.Column(str),
+        }
+    )
 
-    def read(self) -> pl.DataFrame:
-        return
+    def _read_segmental(self, file: Path) -> pl.DataFrame:
+        raise NotImplementedError()
+
+    def read_segmental(self, file: Path) -> pl.DataFrame:
+        df: pl.DataFrame = self._read_segmental(file)
+        df = (
+            self.segment_schema.validate(df)
+            .with_columns(pl.col("genes").list.unique())
+            .filter(pl.col("cn") != 2)
+        )
+        df = df.with_columns(
+            pl.col("genes").list.len().alias("n_genes"),
+            pl.when(pl.col("cn") > 2)
+            .then(pl.lit("gain"))
+            .otherwise(pl.lit("loss"))
+            .alias("cn_category"),
+        ).with_columns(pl.col("genes").list.join(", "))
+        return df
 
     @staticmethod
     def combine() -> pl.DataFrame:
         """
         Merge copy number results from various callers
         """
+
+
+@define
+class CNVKitResult(CopyNumberResult):
+    def _read_segmental(self, file: Path) -> pl.DataFrame:
+        "Read and filter `call.cns` file"
+        mappings: dict = Ensembl116.name_mapping(
+            "ensembl_transcript", "gene_name", versioned=False
+        )
+        mappings.update(Ensembl116.name_mapping("mane_select", "gene_name"))
+        df: pl.DataFrame = (
+            pl.scan_csv(file, separator="\t")
+            .filter(pl.col("p_ttest") <= self.cfg.get("p_threshold", 0.05))
+            .select(["chromosome", "start", "end", "gene", "cn"])
+            .with_columns(pl.col("gene").str.split(","))
+            .explode("gene")
+            .filter(
+                ~((pl.col("gene").str.starts_with("ccds|")) | (pl.col("gene") == "-"))
+            )
+            .with_columns(
+                pl.when(pl.col("gene").str.starts_with("miRNA|"))
+                .then(pl.col("gene").str.replace("miRNA|", ""))
+                .otherwise(pl.col("gene").str.replace("^.*\\|", "").replace(mappings))
+            )
+            .group_by(["chromosome", "start", "end", "cn"])
+            .agg(pl.col("gene"))
+            .with_columns(
+                pl.col("gene").list.filter(~pl.element().str.contains("\\|")),
+                pl.lit("cnvkit").alias("caller"),
+            )
+            .rename({"chromosome": "chr", "gene": "genes"})
+            .collect()
+        )
+        return df
 
 
 def cnv_fmt(classify_cnv, cnvkit_cns, purecn_genes) -> tuple:
