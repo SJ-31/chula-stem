@@ -1,14 +1,17 @@
 #!/usr/bin/env ipython
 
+from __future__ import annotations
+
 import ast
 import importlib.resources as res
 from collections.abc import Sequence
 from functools import reduce
 from pathlib import Path
-from typing import Callable
+from typing import Callable, ClassVar, Literal
 
 import click
 import polars as pl
+from attrs import define
 
 
 def str_split_unique(
@@ -180,8 +183,96 @@ def read_existing(
 # * Ensembl annotations
 
 
-def get_valid_biomart_attributes() -> set:
-    return set((res.files("data") / "biomart_attributes.txt").read_text().splitlines())
+@define
+class Ensembl116:
+    path: ClassVar[Path] = Path(res.files("chula_stem")) / "data" / "ensembl116"
+    rename: ClassVar[dict] = {
+        "Transcript stable ID": "ensembl_transcript",
+        "Transcript stable ID version": "ensembl_transcript",
+        "RefSeq match transcript (MANE Select)": "mane_select",
+        "RefSeq match transcript (MANE Plus Clinical)": "mane_select_clinical",
+        "Gene stable ID": "ensembl",
+        "Gene stable ID version": "ensembl",
+        "Gene name": "gene_name",
+        "Gene start (bp)": "start",
+        "Gene end (bp)": "end",
+        "Transcript start (bp)": "start",
+        "Transcript end (bp)": "end",
+        "NCBI gene (formerly Entrezgene) ID": "ncbi",
+        "HGNC symbol": "hgnc_symbol",
+    }
+
+    @staticmethod
+    def coords(
+        what: Literal["transcript", "gene"] = "gene", versioned: bool = False
+    ) -> pl.DataFrame:
+        if what == "transcript":
+            path = Ensembl116.path / "transcript_coords.parquet"
+            col = "Transcript stable ID version"
+        else:
+            path = Ensembl116.path / "gene_coords.parquet"
+            col = "Gene stable ID version"
+        df = pl.read_parquet(path)
+        if not versioned:
+            df = df.with_columns(pl.col(col).str.replace("\\..*$", ""))
+        to_rename = {k: v for k, v in Ensembl116.rename.items() if k in df.columns}
+        return df.rename(to_rename)
+
+    @staticmethod
+    def name_mapping(
+        old: Literal[
+            "ensembl",
+            "ensembl_transcript",
+            "mane_select",
+            "mane_select_clinical",
+            "hgnc_symbol",
+            "ncbi",
+        ],
+        new: Literal[
+            "ensembl",
+            "ensembl_transcript",
+            "mane_select",
+            "mane_select_clinical",
+            "hgnc_symbol",
+            "ncbi",
+        ] = "ensembl_transcript",
+        versioned: bool = False,
+    ) -> dict:
+        assert old != new
+        remap = {
+            "ensembl": "Gene stable ID",
+            "ensembl_transcript": "Transcript stable ID",
+            "mane_select": "RefSeq match transcript (MANE Select)",
+            "mane_select_clinical": "RefSeq match transcript (MANE Plus Clinical)",
+            "hgnc_symbol": "HGNC symbol",
+            "ncbi": "NCBI gene (formerly Entrezgene) ID",
+            "gene_name": "Gene name",
+        }
+        oc, nc = remap[old], remap[new]
+        df = (
+            pl.scan_parquet(Ensembl116.path / "ids.parquet")
+            .select([oc, nc])
+            .with_columns(
+                pl.when(versioned)
+                .then(pl.col(oc).str.replace("\\..*$", ""))
+                .otherwise(pl.col(oc)),
+                pl.when(versioned)
+                .then(pl.col(nc).str.replace("\\..*$", ""))
+                .otherwise(pl.col(nc)),
+            )
+            .unique()
+            .filter((pl.col(oc).is_not_null()) & (pl.col(nc).is_not_null()))
+            .collect()
+        )
+        if df[oc].is_duplicated().any():
+            print(f"WARNING: multiple ids in `{new}` map to the same id in `{old}`")
+        return dict(zip(df[oc], df[nc]))
+
+    @staticmethod
+    def biomart_attrs() -> set:
+        return set(
+            (Ensembl116.path / "biomart_attributes.txt").read_text().splitlines()
+        )
 
 
 def construct_biomart_query(
@@ -191,7 +282,7 @@ def construct_biomart_query(
     Constructs a query for retrieving attributes from ensembl biomart
 
     """
-    valid_all: set = get_valid_biomart_attributes()
+    valid_all: set = Ensembl116.biomart_attrs()
     valid_attrs: list = []
     for attr in attributes:
         if attr not in valid_all:
