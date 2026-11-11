@@ -44,7 +44,7 @@ workflow {
         .join(preprocessed.filter { v -> v.status == 0 }.map { v -> record(id: v.id, normal_bam: v.recal, normal_bam_index: v.recal_index) }, by: "id")
         .join(preprocessed.filter { v -> v.status == 1 }.map { v -> record(id: v.id, tumor_bam: v.recal, tumor_bam_index: v.recal_index) }, by: "id")
 
-    sv_tumor_to_concat = sarek_out.tool_outs.filter { v -> v.output_type == "paired" || v.output_type == "tumor_only" }.map { v -> record(id: v.id, vcfs: [v?.vep_manta_somatic, v?.vep_tiddit]) }
+    sv_tumor_to_concat = tool_outs.filter { v -> v.output_type == "paired" || v.output_type == "tumor_only" }.filter { v -> v.vep_manta_somatic || v.vep_tiddit }.map { v -> record(id: v.id, vcfs: [v?.vep_manta_somatic, v?.vep_tiddit].findAll { el -> el }) }
 
     sv_tumor_concat = CONCAT_VCF(sv_tumor_to_concat, "sv_")
 
