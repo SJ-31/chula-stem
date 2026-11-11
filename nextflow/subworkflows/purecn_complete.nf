@@ -28,6 +28,7 @@ workflow PURECN_COMPLETE {
     snp_blacklist: Path
     default_ploidy: String
     default_purity: String
+    genome_build: String
 
     main:
     if (!purecn_bait_intervals) {
@@ -52,7 +53,7 @@ workflow PURECN_COMPLETE {
     if (!purecn_normaldb && !purecn_mapping_bias) {
         to_normaldb = COVERAGE_NORMAL(normal_bam, bait_intervals, false).map { val -> val.loess }.collect()
 
-        db_ch = PURECN_NORMALDB(to_normaldb, panel_of_normals, params.genome_build).toList().map { b -> b.first() }
+        db_ch = PURECN_NORMALDB(to_normaldb, panel_of_normals, genome_build)
         normaldb = db_ch.map { v -> v.db }
         mapping_bias = db_ch.map { v -> v.mapping_bias }
     }
