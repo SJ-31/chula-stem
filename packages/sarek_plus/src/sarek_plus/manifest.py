@@ -76,7 +76,11 @@ class PatientOutputs:
 
 
 def rename_caller(caller: str, vcf: str) -> str:
-    if caller not in {"manta", "strelka"}:
+    if caller not in {"manta", "strelka", "tiddit"}:
+        return caller
+    if caller == "tiddit" and "germline.vcf.gz" in vcf:
+        return "tiddit_germline"
+    if caller == "tiddit":
         return caller
     if caller == "manta" and "manta.diploid" in vcf:
         return "manta_diploid"
@@ -181,6 +185,28 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     ).rows_by_key(["patient", "sample"], named=True, unique=True)
 
     variant_called = pl.read_csv(outdir / "csv" / "variantcalled.csv")
+    if cfg.get("normalize_vcfs"):
+        # NOTE: [2026-11-11 Wed] For some reason the "variantcalled" file
+        # includes the normalized versions of the vcf file and the
+        # unnormalized ones, but inconsistently for each caller
+        variant_called = (
+            variant_called.group_by("patient", "sample", "variantcaller")
+            .agg("vcf")
+            .with_columns(
+                pl.when(
+                    pl.col("vcf")
+                    .list.eval(pl.element().str.ends_with(".norm.sorted.vcf.gz"))
+                    .list.any()
+                )
+                .then(
+                    pl.col("vcf").list.filter(
+                        pl.element().str.ends_with(".norm.sorted.vcf.gz")
+                    )
+                )
+                .otherwise(pl.col("vcf"))
+            )
+            .explode("vcf")
+        )
     recal: dict[tuple(str, str), dict] = pl.read_csv(
         outdir / "csv" / "recalibrated.csv"
     ).rows_by_key(["patient", "sample"], unique=True, named=True)
