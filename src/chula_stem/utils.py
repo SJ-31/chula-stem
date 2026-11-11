@@ -189,6 +189,7 @@ class Ensembl116:
     rename: ClassVar[dict] = {
         "Transcript stable ID": "ensembl_transcript",
         "Transcript stable ID version": "ensembl_transcript",
+        "Chromosome/scaffold name": "chr",
         "RefSeq match transcript (MANE Select)": "mane_select",
         "RefSeq match transcript (MANE Plus Clinical)": "mane_select_clinical",
         "Gene stable ID": "ensembl",
