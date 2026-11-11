@@ -151,6 +151,9 @@ class CopyNumberResult:
             .then(pl.lit("gain"))
             .otherwise(pl.lit("loss"))
             .alias("cn_category"),
+            pl.when(pl.col("chr").str.starts_with("chr"))
+            .then(pl.col("chr"))
+            .otherwise("chr" + pl.col("chr")),
         ).with_columns(pl.col("genes").list.join(", "))
         return df
 
@@ -159,6 +162,39 @@ class CopyNumberResult:
         """
         Merge copy number results from various callers
         """
+
+
+@define
+class FreecResult(CopyNumberResult):
+    def _read_segmental(self, file: Path) -> pl.DataFrame:
+        thresh: float = self.cfg.get("p_threshold", 0.05)
+        name_mapping: dict = Ensembl116.name_mapping("ensembl", "gene_name", False)
+        gene_coords: pl.DataFrame = (
+            Ensembl116.coords("gene", False)
+            .with_columns(pl.col("ensembl").replace(name_mapping))
+            .lazy()
+        )
+        df = (
+            pl.scan_csv(file, separator="\t")
+            .filter(
+                (pl.col("WilcoxonRankSumTestPvalue") <= thresh)
+                & (pl.col("KolmogorovSmirnovPvalue") <= thresh)
+            )
+            .select(["chr", "start", "end", "copy number"])
+            .join_where(
+                gene_coords,
+                pl.col("chr") == pl.col("chr_right"),
+                pl.col("start") <= pl.col("start_right"),
+                pl.col("end") >= pl.col("end_right"),
+            )
+            .drop(cs.ends_with("_right"))
+            .rename({"copy number": "cn", "ensembl": "genes"})
+            .group_by(["chr", "start", "end", "cn"])
+            .agg(pl.col("genes"))
+            .with_columns(pl.lit("control_freec").alias("caller"))
+            .collect()
+        )
+        return df
 
 
 @define

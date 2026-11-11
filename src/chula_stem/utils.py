@@ -215,7 +215,9 @@ class Ensembl116:
             col = "Gene stable ID version"
         df = pl.read_parquet(path)
         if not versioned:
-            df = df.with_columns(pl.col(col).str.replace("\\..*$", ""))
+            df = df.drop(col).unique()
+        else:
+            df = df.drop(col.removesuffix(" version"))
         to_rename = {k: v for k, v in Ensembl116.rename.items() if k in df.columns}
         return df.rename(to_rename)
 
