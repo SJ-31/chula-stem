@@ -26,12 +26,11 @@ from skbio.alignment import pair_align
 from skbio.metadata import IntervalMetadata
 from skbio.sequence import DNA
 
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {None: None}, "log": [0]})
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
 
-RCONFIG: dict = smk.config[smk.rule]
+
+RCONFIG: dict = snakemake.config[snakemake.rule]
 
 CHAINS: tuple = ("VJ_1", "VDJ_1")
 AIRR_WANTED_COLS = [
@@ -707,8 +706,8 @@ def validate_construct(sequences: list[DNA]):
 
 
 def assemble_constructs():
-    airr = md.read_h5mu(smk.input[0])["airr"]
-    outdir: Path = smk.params["outdir"]
+    airr = md.read_h5mu(snakemake.input[0])["airr"]
+    outdir: Path = snakemake.params["outdir"]
     outdir.mkdir(exist_ok=True)
     df = filter_wanted_clones(
         airr, RCONFIG, extras=["fwr1", "fwr2", "fwr3", "fwr4", "cdr2", "cdr1"]
@@ -756,16 +755,16 @@ def primers_main(airr: ad.AnnData, out_tabular: Path, out_json: Path, cfg: dict)
 
 
 def create_primers():
-    airr = md.read_h5mu(smk.input[0])["airr"]
+    airr = md.read_h5mu(snakemake.input[0])["airr"]
     primers_main(
         airr=airr,
         cfg=RCONFIG,
-        out_tabular=smk.output["primers_tabular"],
-        out_json=smk.output["primers_json"],
+        out_tabular=snakemake.output["primers_tabular"],
+        out_json=snakemake.output["primers_json"],
     )
 
 
 # * Entry point & tests
 
-if fn := globals().get(smk.rule):
+if fn := globals().get(snakemake.rule):
     fn()

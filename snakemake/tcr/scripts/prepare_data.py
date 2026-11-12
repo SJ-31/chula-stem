@@ -7,13 +7,12 @@ import pandas as pd
 import polars as pl
 import scirpy as ir
 
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {}})
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
+
 md.set_options(pull_on_update=False)
 
-SCOL: str = smk.config.get("sample_col", "Sample_Name")
+SCOL: str = snakemake.config.get("sample_col", "Sample_Name")
 
 
 def check_consistent_ids(mdata: md.MuData, verbose: bool = False):
@@ -218,11 +217,11 @@ def load_rhapsody_run(path: Path, run_name: str, tag_mapping: dict) -> md.MuData
 def load_runs():
     tag_mapping: dict = {
         f"SampleTag{i if len(str(i)) > 1 else f'0{i}'}_hs": v
-        for i, v in smk.config["sample_tags"].items()
+        for i, v in snakemake.config["sample_tags"].items()
     }
 
     mdatas = []
-    for run_name, dir in smk.params["runs"].items():
+    for run_name, dir in snakemake.params["runs"].items():
         run: Path = Path(dir)
         mdata = load_rhapsody_run(run, run_name, tag_mapping=tag_mapping)
         mdata["airr"].obs_names = [f"{x}_{run_name}" for x in mdata["airr"].obs_names]
@@ -240,7 +239,7 @@ def load_runs():
 
     # ** Call clonotypes
     # TODO: verify that you can do this with multiple samples
-    calling_config = smk.config["clonotype_calling"]
+    calling_config = snakemake.config["clonotype_calling"]
     ir.tl.define_clonotypes(combined)
     shared_kws = {
         k: v
@@ -258,24 +257,26 @@ def load_runs():
         combined, key_added="cc_id", **calling_config["define_clonotype_clusters"]
     )
     assign_ranks(combined, within=SCOL, target_col="cc_id")
-    ir.tl.clonal_expansion(combined, expanded_in=SCOL, **smk.config["clonal_expansion"])
+    ir.tl.clonal_expansion(
+        combined, expanded_in=SCOL, **snakemake.config["clonal_expansion"]
+    )
     mark_public_clones(
-        combined["airr"], ignore_samples=smk.config.get("ignore_samples", ())
+        combined["airr"], ignore_samples=snakemake.config.get("ignore_samples", ())
     )
 
     # ** Diversity
-    for alpha in smk.config["alpha_metrics"]:
+    for alpha in snakemake.config["alpha_metrics"]:
         if alpha == "richness":
             alpha_richness(combined["airr"], groupby=SCOL, target_col="clone_id")
         else:
             ir.tl.alpha_diversity(combined, groupby=SCOL, metric=alpha)
 
-    combined.write_h5mu(smk.output[0])
+    combined.write_h5mu(snakemake.output[0])
 
 
 # * Prepare reference files
 def prepare_references():
-    for k, v in smk.params["refs_to_get"].items():
+    for k, v in snakemake.params["refs_to_get"].items():
         path = Path(v)
         as_adata = path.with_suffix(".h5ad")
         if k == "mcpas":
@@ -303,8 +304,8 @@ def annotate_cells():
     import pandas as pd
     from scvi.external import CellAssign
 
-    config = smk.config[smk.rule]["cellassign"]
-    mdata: md.MuData = md.read_h5mu(smk.input[0])
+    config = snakemake.config[snakemake.rule]["cellassign"]
+    mdata: md.MuData = md.read_h5mu(snakemake.input[0])
 
     markers: pd.DataFrame = pd.read_csv(config["marker_file"]).set_index(
         config["symbol_col"]
@@ -322,19 +323,19 @@ def annotate_cells():
     elbo_plot = model.history["elbo_validation"].plot()
 
     predictions.index = mdata.obs.index
-    predictions.reset_index().to_csv(smk.output["predictions_raw"], index=False)
-    elbo_plot.figure.savefig(smk.output["elbo_plot"])  # TODO:
+    predictions.reset_index().to_csv(snakemake.output["predictions_raw"], index=False)
+    elbo_plot.figure.savefig(snakemake.output["elbo_plot"])  # TODO:
     result = pl.DataFrame(
         {"index": filtered.obs.index, "prediction": predictions.idxmax(axis=1).values}
     )
-    result.write_csv(smk.output["predictions"])
+    result.write_csv(snakemake.output["predictions"])
 
 
 # * Entry point
 
-if smk.rule == "load_runs":
+if snakemake.rule == "load_runs":
     load_runs()
-elif smk.rule == "annotate_cells":
+elif snakemake.rule == "annotate_cells":
     annotate_cells()
-elif smk.rule == "prepare_references":
+elif snakemake.rule == "prepare_references":
     prepare_references()

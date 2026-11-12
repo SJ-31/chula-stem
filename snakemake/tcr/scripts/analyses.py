@@ -17,10 +17,9 @@ import scirpy as ir
 
 md.set_options(pull_on_update=False)
 
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {}})
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
+
 
 CHAIN_NAMING = {
     "VJ": {"TRG+TRD": "gamma", "TRA+TRB": "alpha"},
@@ -28,13 +27,13 @@ CHAIN_NAMING = {
 }
 # TODO: you can include the other receptor subtypes  (BCRs mainly) if needed
 
-SCOL: str = smk.config.get("sample_col", "Sample_Name")
+SCOL: str = snakemake.config.get("sample_col", "Sample_Name")
 
 
 def get_airr(input_key: str | int = 0, filter_samples: bool = False) -> ad.AnnData:
-    airr: ad.AnnData = md.read_h5mu(smk.input[input_key])["airr"]
+    airr: ad.AnnData = md.read_h5mu(snakemake.input[input_key])["airr"]
     if filter_samples:
-        airr = airr[~airr.obs[SCOL].isin(smk.config["ignore_samples"]), :]
+        airr = airr[~airr.obs[SCOL].isin(snakemake.config["ignore_samples"]), :]
     return airr
 
 
@@ -176,9 +175,9 @@ def query_routine(
 
 
 def scirpy_query(airr: ad.AnnData, query_cols: list):
-    for db_name, path in smk.params["references"].items():
+    for db_name, path in snakemake.params["references"].items():
         reference = ad.read_h5ad(path)
-        outfile = Path(smk.params["outdir"]) / f"scirpy_{db_name}"
+        outfile = Path(snakemake.params["outdir"]) / f"scirpy_{db_name}"
         if "tcrdb" in db_name:
             continue  # query_routine doesn't work with orphan VDJ
         try:
@@ -422,28 +421,30 @@ def tcrmatch(airr: ad.AnnData, cfg):
             threads=cfg.get("threads", 1),
             threshold=cfg.get("threshold", 0.97),
         )
-        result.to_csv(f"{smk.params['outdir']}/tcrmatch_{name}.csv", index=False)
+        result.to_csv(f"{snakemake.params['outdir']}/tcrmatch_{name}.csv", index=False)
         if i == 0:
-            invalid.to_csv(f"{smk.params['outdir']}/tcrmatch_invalid.csv", index=False)
+            invalid.to_csv(
+                f"{snakemake.params['outdir']}/tcrmatch_invalid.csv", index=False
+            )
 
 
 # * Querying
-if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
+if snakemake.rule in {"scirpy_query", "tcrmatch", "compairr"}:
     airr = get_airr(0, filter_samples=True)
-    config: dict = smk.config["query_reference"]
+    config: dict = snakemake.config["query_reference"]
     query_cols = [SCOL, "clone_id", "clone_id_size"]
     did_filter, airr = maybe_filter_by_rank(airr, config)
     if did_filter:
         query_cols.append(config["rank_key"])
     # ** Scirpy
-    if smk.rule == "scirpy_query":
+    if snakemake.rule == "scirpy_query":
         scirpy_query(airr, query_cols)
     # ** tcrmatch
-    elif smk.rule == "tcrmatch":
+    elif snakemake.rule == "tcrmatch":
         tcrmatch_config: dict = config["tcrmatch"]
         tcrmatch(airr=airr, cfg=tcrmatch_config)
     # ** compairr
-    elif smk.rule == "compairr":
+    elif snakemake.rule == "compairr":
         compairr_config: dict = config["compairr"]
         seqid_col = "sequence_id_query"
         query_obs: pl.DataFrame = (
@@ -461,7 +462,7 @@ if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
             .filter(pl.col(seqid_col).is_not_null())
             .drop(["variable", SCOL])
         )
-        for i, (name, db_path) in enumerate(smk.params["references"].items()):
+        for i, (name, db_path) in enumerate(snakemake.params["references"].items()):
             db = ad.read_h5ad(db_path)
             result_lst, invalid_lst = [], []
             for sample in airr.obs[SCOL].unique():
@@ -479,15 +480,17 @@ if smk.rule in {"scirpy_query", "tcrmatch", "compairr"}:
                 if not cur_invalid.is_empty():
                     invalid_lst.append(cur_invalid)
             result = pl.concat(result_lst) if result_lst else pl.DataFrame()
-            result.write_csv(f"{smk.params['outdir']}/compairr_{name}.csv")
+            result.write_csv(f"{snakemake.params['outdir']}/compairr_{name}.csv")
             if i == 0:
                 invalid = pl.concat(invalid_lst) if invalid_lst else pl.DataFrame()
-                invalid.write_csv(f"{smk.params['outdir']}/compairr_invalid.csv")
+                invalid.write_csv(f"{snakemake.params['outdir']}/compairr_invalid.csv")
 # * Sequences
-elif smk.rule == "extract_sequences":
-    airr: ad.AnnData = md.read_h5mu(smk.input[0])["airr"]
-    samples = set(airr.obs[SCOL].unique()) - set(smk.config.get("ignore_samples", []))
-    config = smk.config.get("get_sequences", {})
+elif snakemake.rule == "extract_sequences":
+    airr: ad.AnnData = md.read_h5mu(snakemake.input[0])["airr"]
+    samples = set(airr.obs[SCOL].unique()) - set(
+        snakemake.config.get("ignore_samples", [])
+    )
+    config = snakemake.config.get("get_sequences", {})
     top = config.get("top", 3)
     rank_col = config.get("rank_key", "clone_id_Sample_Name_rank")
     airr.obs = airr.obs.rename(
@@ -505,8 +508,8 @@ elif smk.rule == "extract_sequences":
                 cols_add=("rank", "sample", "clone_size"),
                 return_aa=return_aa,
             )
-            outfile = Path(smk.params["outdir"]) / f"{sample}{suffix}.fasta"
+            outfile = Path(snakemake.params["outdir"]) / f"{sample}{suffix}.fasta"
             outfile.write_text(fasta)
             if i == 0:
                 all_ignored.append(ignored)
-    pd.concat(all_ignored).to_csv(smk.output["ignored"], index=False)
+    pd.concat(all_ignored).to_csv(snakemake.output["ignored"], index=False)

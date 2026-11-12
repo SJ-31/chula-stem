@@ -22,13 +22,11 @@ from analyses import SCOL, get_airr, maybe_filter_by_rank
 
 md.set_options(pull_on_update=False)
 
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
 
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {}})
 
-SCOL: str = smk.config.get("sample_col", "Sample_Name")
+SCOL: str = snakemake.config.get("sample_col", "Sample_Name")
 
 
 def categorical_to_str(
@@ -248,10 +246,10 @@ def top_clone_calls(
 
 
 def plot_sequence():
-    outdir = Path(smk.params["outdir"])
-    plotdir = Path(smk.params["plotdir"])
+    outdir = Path(snakemake.params["outdir"])
+    plotdir = Path(snakemake.params["plotdir"])
     airr = get_airr(filter_samples=True)
-    viz_config = smk.config["vdj_plot"]
+    viz_config = snakemake.config["vdj_plot"]
     for_title = [c[1] for c in viz_config["title_spec"]]
     if "clone_id" not in for_title:
         for_title.append("clone_id")
@@ -381,11 +379,11 @@ def align_to_plot(chain_seqs, chain, align_out: Path, plot_out: Path, id_col, cf
 
 
 # * Generate plots
-if smk.rule == "make_reports":
-    mdata: md.MuData = md.read_h5mu(smk.input[0])
-    if to_ignore := smk.config.get("ignore_samples"):
+if snakemake.rule == "make_reports":
+    mdata: md.MuData = md.read_h5mu(snakemake.input[0])
+    if to_ignore := snakemake.config.get("ignore_samples"):
         mdata = mdata[~mdata.obs[SCOL].isin(to_ignore), :]
-    ct_col = smk.config["cell_type_col"]
+    ct_col = snakemake.config["cell_type_col"]
     airrs = {
         s: mdata[mdata.obs[SCOL] == s, :]
         for s in mdata.obs[SCOL].unique()
@@ -396,7 +394,7 @@ if smk.rule == "make_reports":
     # umap_fig = plot_obs(adata, "UMAP", hues=to_plot)
     clone_calls, cluster_calls = [], []
     for p in ["expansion", "ct_abundance"]:
-        if not (check_path := Path(smk.output[p])).exists():
+        if not (check_path := Path(snakemake.output[p])).exists():
             check_path.mkdir(parents=True)
 
     for sample, cur in airrs.items():
@@ -409,7 +407,7 @@ if smk.rule == "make_reports":
             + gg.ggtitle(sample)
         )
         clone_expansion_plot.save(
-            f"{smk.output['expansion']}/{sample}.png",
+            f"{snakemake.output['expansion']}/{sample}.png",
             width=10,
             height=10,
             verbose=False,
@@ -423,7 +421,7 @@ if smk.rule == "make_reports":
             + gg.ggtitle(sample)
         )
         ct_plot.save(
-            f"{smk.output['ct_abundance']}/{sample}.png",
+            f"{snakemake.output['ct_abundance']}/{sample}.png",
             width=13,
             height=10,
             verbose=False,
@@ -433,19 +431,19 @@ if smk.rule == "make_reports":
             lst.append(tmp.iloc[:, [-1] + list(range(len(tmp.columns) - 2))])
 
     c_rank_plot = plot_clone_ranking(mdata, k=4, expanded_in=SCOL)
-    c_rank_plot.save(smk.output["clone_ranks"], width=10, height=8, verbose=False)
+    c_rank_plot.save(snakemake.output["clone_ranks"], width=10, height=8, verbose=False)
 
     cc_rank_plot = plot_clone_ranking(
         mdata, k=4, expanded_in=SCOL, target_col="cc_id"
     ) + gg.labs(fill="Clone Cluster Rank")
     cc_rank_plot.save(
-        smk.output["clone_cluster_ranks"], width=10, height=8, verbose=False
+        snakemake.output["clone_cluster_ranks"], width=10, height=8, verbose=False
     )
 
     dplot = plot_alpha_diversity(
-        mdata["airr"], smk.config["alpha_metrics"], groupby=SCOL
+        mdata["airr"], snakemake.config["alpha_metrics"], groupby=SCOL
     ) + gg.xlab("Sample")
-    dplot.save(smk.output["alpha_diversity"], verbose=False)
+    dplot.save(snakemake.output["alpha_diversity"], verbose=False)
     public_private_plot = plot_group_abundance(
         mdata["airr"], x="clone_id", fill=SCOL, max_cols=30
     ) + gg.xlab("Clone ID")
@@ -454,12 +452,12 @@ if smk.rule == "make_reports":
     ) + gg.xlab("Cluster ID")
 
     public_private_plot.save(
-        smk.output["public_private"], width=15, height=8, verbose=False
+        snakemake.output["public_private"], width=15, height=8, verbose=False
     )
     public_private_cc_plot.save(
-        smk.output["public_private_clusters"], width=15, height=8, verbose=False
+        snakemake.output["public_private_clusters"], width=15, height=8, verbose=False
     )
-    pd.concat(clone_calls).to_csv(smk.output["top_clones"], index=False)
-    pd.concat(cluster_calls).to_csv(smk.output["top_clusters"], index=False)
-if smk.rule == "plot_sequence":
+    pd.concat(clone_calls).to_csv(snakemake.output["top_clones"], index=False)
+    pd.concat(cluster_calls).to_csv(snakemake.output["top_clusters"], index=False)
+if snakemake.rule == "plot_sequence":
     plot_sequence()

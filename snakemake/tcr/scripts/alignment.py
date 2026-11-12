@@ -14,10 +14,8 @@ from Bio.SeqRecord import SeqRecord
 from matplotlib.figure import Figure
 from pymsaviz import MsaViz
 
-try:
-    from snakemake.script import snakemake as smk
-except ImportError:
-    smk = type("snakemake", (), {"rule": None, "config": {}})
+if TYPE_CHECKING:
+    from snakemake.iocontainers import snakemake
 
 
 SEQ_COLS = ["sequence", "cdr1", "cdr2", "cdr3", "fwr1", "fwr2", "fwr3", "fwr4"]
