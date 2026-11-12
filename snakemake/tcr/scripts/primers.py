@@ -6,7 +6,7 @@ import subprocess as sp
 from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import Callable, Literal
+from typing import TYPE_CHECKING, Callable, Literal
 
 import anndata as ad
 import mudata as md

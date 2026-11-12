@@ -1,5 +1,6 @@
 #!/usr/bin/env ipython
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import anndata as ad
 import mudata as md

@@ -1,0 +1,13 @@
+anndata
+snakemake
+rpy2
+ipython
+loguru
+pymsaviz
+plotnine
+mudata
+scirpy
+pydna
+dnachisel
+polars
+scikit-bio

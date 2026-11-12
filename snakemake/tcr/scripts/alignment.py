@@ -5,7 +5,7 @@ from itertools import chain
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import rpy2.robjects as ro

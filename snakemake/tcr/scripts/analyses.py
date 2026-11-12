@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from subprocess import Popen, run
 from tempfile import NamedTemporaryFile
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import anndata as ad
 import joblib

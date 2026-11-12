@@ -1,8 +1,7 @@
 #!/usr/bin/env ipython
-
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import anndata as ad
 import matplotlib.pyplot as plt
