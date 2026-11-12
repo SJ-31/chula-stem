@@ -15,7 +15,7 @@ import polars as pl
 import polars.selectors as cs
 import scirpy as ir
 
-md.set_options(pull_on_update=False)
+md.settings.pull_on_update = False
 
 if TYPE_CHECKING:
     from snakemake.iocontainers import snakemake

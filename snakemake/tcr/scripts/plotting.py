@@ -19,7 +19,7 @@ from plotnine.ggplot import ggplot
 from alignment import align_vdj, get_stitchr_seqs, plot_vdj
 from analyses import SCOL, get_airr, maybe_filter_by_rank
 
-md.set_options(pull_on_update=False)
+md.settings.pull_on_update = False
 
 if TYPE_CHECKING:
     from snakemake.iocontainers import snakemake

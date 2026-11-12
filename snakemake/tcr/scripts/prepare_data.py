@@ -11,7 +11,7 @@ import scirpy as ir
 if TYPE_CHECKING:
     from snakemake.iocontainers import snakemake
 
-md.set_options(pull_on_update=False)
+md.settings.pull_on_update = False
 
 SCOL: str = snakemake.config.get("sample_col", "Sample_Name")
 
