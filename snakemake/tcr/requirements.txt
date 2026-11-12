@@ -1,6 +1,9 @@
 anndata
 snakemake
 rpy2
+pyarrow
+great_tables
+css-inline
 ipython
 loguru
 pymsaviz
