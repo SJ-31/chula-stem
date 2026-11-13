@@ -1,17 +1,20 @@
 nextflow.enable.types = true
 
 process SIGPROFILERASSIGNMENT {
-    
     input:
-    record(id: String,
-           vcfs: Bag<Path>)
+    record(
+        id: String,
+        vcfs: Bag<Path>
+    )
     is_exome: Boolean
     exclude_file: Path
+    volume: String
 
     output:
-    record(id: id,
-           dir: file(all),
-           activities: activities_file
+    record(
+        id: id,
+        dir: file(output),
+        activities: file(activities_file),
     )
 
     topic:
@@ -21,11 +24,11 @@ process SIGPROFILERASSIGNMENT {
     //
     output = "${id}-SigProfilerAssignment"
     exome_flag = is_exome ? " --exome " : ""
-    exclude_flag = exclude_file != "" ? " --exclude_file ${exclude_file} " : ""
+    exclude_flag = exclude_file ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args ?: ""
     activities_file = "${output}/Activities/Assignment_Solution_Activities.txt"
     """
-    export SIGPROFILERASSIGNMENT_VOLUME=${task.ext.volume}
+    export SIGPROFILERASSIGNMENT_VOLUME=${volume}
 
     mkdir vcfs
 
@@ -59,16 +62,15 @@ process SIGPROFILERASSIGNMENT {
 
 process SIGPROFILERASSIGNMENT_COLLECT {
     input:
-    tuple val(meta), path(activities, stageAs: "?/*")
+    activities: Bag<Path>
+    sample_pattern: String
 
     output:
-
-    //
-    path output
+    file(out)
 
     script:
     //
-    output = Utl.getName(meta, "SigProfilerAssignment_activities", "tsv")
+    out = "SigProfilerAssignment_activities.tsv"
     """
     #!/usr/bin/env Rscript
 
@@ -78,10 +80,11 @@ process SIGPROFILERASSIGNMENT_COLLECT {
     combined <- lapply(files, read_tsv) |> bind_rows()
     if (nrow(combined) > 0) {
         combined[['Samples']] <- map_chr(combined[['Samples']], function(x) {
-        str_extract(x, '[0-9]+-(.*)-Small_high_conf', group = 1)
+    str_extract(x, "${sample_pattern}", group = 1)
         })
     }
-    write_tsv(combined, "${output}")
+    write_tsv(combined, "${out}")
     """
-    //
+    // TODO: you need to modify the sample pattern depending on the
+    // filename
 }

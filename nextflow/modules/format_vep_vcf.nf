@@ -12,7 +12,7 @@ process FORMAT_VEP_VCF {
     output:
     record(
         id: id,
-        tsv: output,
+        tsv: file(output),
     )
 
     script:

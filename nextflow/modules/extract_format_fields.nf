@@ -13,7 +13,7 @@ process EXTRACT_FORMAT_FIELDS {
     output:
     record(
         id: id,
-        tsv: output,
+        tsv: file(output),
     )
 
     topic:
