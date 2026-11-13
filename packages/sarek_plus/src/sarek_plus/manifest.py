@@ -100,6 +100,19 @@ class PatientOutputs:
         return {"mutect2_unfiltered": self.mutect2_unfiltered}
 
 
+def fix_normalized_path(path: str) -> str:
+    p = Path(path)
+    if not path.endswith(".norm.sorted.vcf.gz") or p.exists():
+        return path
+    sample_dir = p.parent.stem
+    fixed = p.parent.parent.parent / "normalized" / sample_dir / p.name
+    if fixed.exists():
+        return str(fixed)
+    raise ValueError(
+        f"Could not find the normalized file for `{path}`\nTried `{fixed}`"
+    )
+
+
 def rename_caller(caller: str, vcf: str) -> str:
     if caller not in {"manta", "strelka", "tiddit"}:
         return caller
@@ -214,6 +227,7 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
         # NOTE: [2026-11-11 Wed] For some reason the "variantcalled" file
         # includes the normalized versions of the vcf file and the
         # unnormalized ones, but inconsistently for each caller
+        # BUG: the paths to the normalize vcfs file is also wrong
         variant_called = (
             variant_called.group_by("patient", "sample", "variantcaller")
             .agg("vcf")
@@ -231,6 +245,9 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
                 .otherwise(pl.col("vcf"))
             )
             .explode("vcf")
+            .with_columns(
+                pl.col("vcf").map_elements(fix_normalized_path, return_dtype=pl.String)
+            )
         )
     recal: dict[tuple(str, str), dict] = pl.read_csv(
         outdir / "csv" / "recalibrated.csv"
