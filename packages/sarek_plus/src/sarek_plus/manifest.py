@@ -1,6 +1,8 @@
 #!/usr/bin/env ipython
 
 from collections import defaultdict
+from collections.abc import Callable
+from functools import reduce
 from itertools import product
 from pathlib import Path
 from typing import Literal, TypeAlias
@@ -49,6 +51,28 @@ class PatientOutputs:
             if "snpeff" not in self.config["tools"]
             else "_snpEff_VEP.ann.vcf.gz"
         )
+
+    def _get_file_with_suffix(self, paths: list[str], suffix: str) -> str | None:
+        dir = reduce(lambda x, y: x / y, [self.outdir] + paths)
+        file = dir / self.sample / f"{self.sample}{suffix}"
+        if file.exists():
+            return str(file)
+
+    def ascat_file(self, suffix: str) -> str | None:
+        return self._get_file_with_suffix(["variant_calling", "ascat"], suffix)
+
+    def controlfreec_file(self, suffix: str) -> str | None:
+        return self._get_file_with_suffix(["variant_calling", "controlfreec"], suffix)
+
+    def cnvkit_file(self, suffix: str) -> str | None:
+        cnvkit_dir = self.outdir / "variant_calling" / "cnvkit" / self.sample
+        if self.ot == "paired":
+            file = cnvkit_dir / f"{self.tumor}{suffix}"
+        else:
+            file = cnvkit_dir / f"{self.normal}{suffix}"
+        if file.exists():
+            return str(file)
+        return ""
 
     def vep(self, variant_vcf: str) -> str | None:
         if variant_vcf:
@@ -225,7 +249,13 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
         ("all_samples", "joint_variant_calling"), {}
     ).get("haplotypecaller")
 
-    # BAM files default to tumor bam
+    cnv_callers: dict[str, Callable[PatientOutputs]] = {
+        "cnvkit_cns": lambda x: x.cnvkit_file(".call.cns"),
+        "ascat_purity_ploidy": lambda x: x.ascat_file(".purityploidy.txt"),
+        "ascat_cns": lambda x: x.ascat_file(".cnvs.txt"),
+        "controlfreec_cns": lambda x: x.controlfreec_file(".p.value.txt"),
+    }
+
     tool_outs, preprocessed = defaultdict(list), defaultdict(list)
     for row in samples_grouped.iter_rows(named=True):
         patient = row["patient"]
@@ -238,6 +268,10 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
             tool_outs["tumor_sample"].append(obj.tumor)
             tool_outs["id"].append(patient)
             tool_outs["mutect2_unfiltered"].append(obj.mutect2_unfiltered)
+            for caller, fn in cnv_callers.items():
+                cnv_file = fn(obj)
+                tool_outs[caller].append(cnv_file)
+
             vcfs: dict = caller_map[(patient, obj.sample)]
             for caller, file in vcfs.items():
                 if (
@@ -273,7 +307,6 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
                     preprocessed["fastq_2"].extend([t_fastq_2, n_fastq_2])
                     preprocessed["split_fastq"].extend([False, False])
                 added_preprocessed = True
-
     return pl.DataFrame(tool_outs), pl.DataFrame(preprocessed)
 
 
@@ -310,7 +343,7 @@ def make_sarek_manifest(config, preprocessed, tool_outs) -> None:
 def test_manifest():
     from pyhere import here
 
-    test_config = here("nextflow", "input", "manifests", "sarek_test_pdac_1.yaml")
+    test_config = here("nextflow", "input", "manifests", "sarek_test_pdac.yaml")
     tool_outs, pp = _make_sarek_manifest(test_config)
     tool_outs.write_csv(here("tests", "sarek_plus_out") / "tool_outs_manifest.csv")
     pp.write_csv(here("tests", "sarek_plus_out") / "preprocessed_manifest.csv")
