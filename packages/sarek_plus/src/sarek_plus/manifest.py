@@ -74,12 +74,13 @@ class PatientOutputs:
             return str(file)
         return ""
 
-    def vep(self, variant_vcf: str) -> str | None:
+    def vep(self, variant_vcf: str, sample_dir: str | None = None) -> str | None:
         if variant_vcf:
             vcf_path = Path(variant_vcf)
             name = vcf_path.stem.removesuffix(".vcf")
             caller = vcf_path.parent.parent.stem
-            dir = self.outdir / "annotation" / caller / self.sample
+            sample_dir = sample_dir or self.sample
+            dir = self.outdir / "annotation" / caller / sample_dir
             file = dir / f"{name}{self.vep_suffix}"
             if file.exists():
                 return str(file)
@@ -274,13 +275,15 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
 
             vcfs: dict = caller_map[(patient, obj.sample)]
             for caller, file in vcfs.items():
+                sample_dir = None
                 if (
                     caller == "haplotypecaller"
                     and joint_germline
                     and obj.ot == "germline"
                 ):
                     file = joint_germline
-                annotated: str | None = obj.vep(file)
+                    sample_dir = "joint_variant_calling"
+                annotated: str | None = obj.vep(file, sample_dir)
                 tool_outs[caller].append(file)
                 tool_outs[f"vep_{caller}"].append(annotated)
 
