@@ -2,8 +2,17 @@
 import io
 import re
 from functools import reduce
+from io import StringIO
+from pathlib import Path
 from subprocess import CompletedProcess, run
+from typing import Literal
 
+try:
+    from icecream import ic
+
+    ic.configureOutput("dbg: ", includeContext=True)
+except ImportError:  # Graceful fallback if IceCream isn't installed.
+    ic = lambda *a: None if not a else (a[0] if len(a) == 1 else a)  # noqa
 import click
 import polars as pl
 import polars.selectors as cs
@@ -109,7 +118,32 @@ def main(
     df.write_csv(output, separator="\t", null_value="NA")
 
 
+def get_vcf_types(
+    vcf: str, field: Literal["FORMAT", "INFO", "FILTER"] = "FORMAT"
+) -> dict:
+    pl_type_mapping = {
+        "Integer": pl.Int64,
+        "Number": pl.Float64,
+        "Float": pl.Float64,
+        "Flag": pl.Boolean,
+        "Character": pl.String,
+        "String": pl.String,
+    }
+    type_mapping = {
+        k: pl_type_mapping[v] if n == "1" else pl.String
+        for k, n, v in (
+            re.findall("ID=(.*?),Number=(.*?),Type=(.*?),", line)[0]
+            for line in run(f"bcftools head '{vcf}'", capture_output=True, shell=True)
+            .stdout.decode()
+            .splitlines()
+            if line.startswith(f"##{field}")
+        )
+    }
+    return type_mapping
+
+
 def _extract_format(vcf: str, samples: list[str] | None) -> pl.DataFrame:
+    assert Path(vcf).exists(), f"File `{vcf}` doesn't exist"
     all_samples = (
         run(f"bcftools query -l '{vcf}'", shell=True, capture_output=True)
         .stdout.decode()
@@ -118,7 +152,7 @@ def _extract_format(vcf: str, samples: list[str] | None) -> pl.DataFrame:
     samples = list(set(samples) & set(all_samples)) if samples else all_samples
     if not samples:
         raise ValueError(
-            f"None of the specified samples are in the VCF. Samples present: {all_samples}"
+            f"None of the specified samples are in the VCF `{vcf}`. Samples present: {all_samples}"
         )
     pos_df: pl.DataFrame = pl.read_csv(
         run(
@@ -129,7 +163,9 @@ def _extract_format(vcf: str, samples: list[str] | None) -> pl.DataFrame:
         has_header=False,
         new_columns=["CHROM", "POS", "ALT", "REF"],
         separator="\t",
+        null_values=["."],
     )
+    format_types = get_vcf_types(vcf, "FORMAT")
     dfs = []
     for sample in samples:
         tmp = []
@@ -145,6 +181,9 @@ def _extract_format(vcf: str, samples: list[str] | None) -> pl.DataFrame:
             fields, vals = fline.split("\t")
             tmp.append({f: v for f, v in zip(fields.split(":"), vals.split(":"))})
         val_df = pl.from_dicts(tmp, strict=False, infer_schema_length=None)
+        val_df = val_df.with_columns(cs.by_dtype(pl.String).replace(".", None)).cast(
+            {k: v for k, v in format_types.items() if k in val_df.columns}
+        )
         val_df = pl.concat([pos_df, val_df], how="horizontal").with_columns(
             pl.lit(sample).alias("sample")
         )
@@ -368,4 +407,4 @@ def extract_vcf_format(
                 callers.append(cur_caller)
             tmp.append(extracted)
         df = merge_extracted(tmp, callers or None)
-    df.write_csv(output, separator="\t")
+    df.write_csv(output, separator="\t", null_value="NA")
