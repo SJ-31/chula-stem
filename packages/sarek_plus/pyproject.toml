@@ -11,9 +11,12 @@ dependencies = [
   "pyarrow",
   "polars",
   "pandera[polars]",
+  "intervaltree",
   "gql[aiohttp]",
   "requests",
 ]
+[dependency-groups]
+dev = ["pytest", "icecream", "ipython"]
 
 [project.scripts]
 get_therapy_cache = "sarek_plus:therapy_cache_from_files"

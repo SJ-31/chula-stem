@@ -1,38 +1,25 @@
-import os
-from collections import Counter
-from pathlib import Path
-from typing import Callable
-
-import click
-import polars as pl
-import polars.selectors as cs
 import pytest
-from chula_stem.callset_qc import IMPACT_MAP
-from chula_stem.report.cli import entry_point
-from chula_stem.report.format import msisensor_pro_fmt
-
-small_path = "/home/shannc/Bio_SDD/chula-stem/tests/vep/7-patient_10-VEP_small_1.tsv"
-sv_pat = "/home/shannc/Bio_SDD/chula-stem/tests/vep/sv2.tsv"
+from pyhere import here
 
 # Documents https://docs.reportlab.com/reportlab/userguide/ch5_platypus/#documents-and-templates
 # Create a list of flowables and pass it to Doc.build()
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import cm, inch
-from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import (
-    BaseDocTemplate,
-    LongTable,
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import BaseDocTemplate
+from sarek_plus import entry_point
+from sarek_plus.report.format import (
+    AscatResult,
+    CNVKitResult,
+    CopyNumberResult,
+    FreecResult,
 )
 
 STYLES = getSampleStyleSheet()
 PWIDTH = A4[0]
 PHEIGHT = A4[1]
+
+TEST_DIR = here("tests")
+
 
 # (0, 0) is the bottom left of the page by default
 
@@ -56,17 +43,8 @@ def default_shapes(canvas, doc: BaseDocTemplate):
 
 
 @pytest.mark.skip(reason="Done")
-def test_cnvkit_pdf():
-    from chula_stem.report import VariantCallingReport
-
-    cnr = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.cnr"
-    cns = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
-    VariantCallingReport.plot_cnvkit(cnr, cns)
-
-
-@pytest.mark.skip(reason="Done")
 def test_full(front_page_only=False):
-    from chula_stem.report.variant_calling_report import VariantCallingReport
+    from sarek_plus.report.variant_calling_report import VariantCallingReport
 
     meta = {
         "patient_name": "John Doe",
@@ -102,30 +80,6 @@ def test_front_page():
     test_full(True)
 
 
-@pytest.mark.skip(reason="Done")
-def test_format_classify():
-    from chula_stem.report.format import classify_cnv_fmt
-
-    classify_cnv = (
-        "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv"
-    )
-    facets = "/home/shannc/Bio_SDD/chula-stem/tests/5-sample2-Facets/5-patient_10-Facets_hisens.rds"
-    cnvkit = "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-patient_10_cancer-recal.call.cns"
-    classify_cnv_fmt(classify_cnv, facets, cnvkit)
-
-
-@pytest.mark.skip(reason="Done")
-def test_format_vep_sv():
-    from chula_stem.report.format import vep_fmt
-
-    try:
-        os.mkdir("/home/shannc/Bio_SDD/chula-stem/tests/vep_format_sv")
-    except:
-        pass
-    vep_fmt(sv_pat, variant_class="sv")
-    vep_fmt(small_path, variant_class="small")
-
-
 spec: list = [
     {
         "file": "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
@@ -153,6 +107,87 @@ def test_read_json():
         tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
         output="/home/shannc/Bio_SDD/chula-stem/report_full.pdf",
     )
+
+
+def test_cn_intervals():
+    from intervaltree import IntervalTree
+    from sarek_plus.report.format import IntervalAnnotation
+
+    list_A = [
+        (1487442, 1646733, IntervalAnnotation({"A": 3})),
+        (2315891, 2390603, IntervalAnnotation({"A": 0})),
+        (3335548, 3729032, IntervalAnnotation({"A": 2})),
+        (4450839, 4693528, IntervalAnnotation({"A": 3})),
+        (4842924, 4964773, IntervalAnnotation({"A": 2})),
+        (5426223, 5813473, IntervalAnnotation({"A": 3})),
+        (5921762, 6250450, IntervalAnnotation({"A": 1})),
+        (6728865, 7058741, IntervalAnnotation({"A": 1})),
+        (7125036, 7529787, IntervalAnnotation({"A": 1})),
+        (8128563, 8575971, IntervalAnnotation({"A": 2})),
+        (9172157, 9489875, IntervalAnnotation({"A": 1})),
+    ]
+
+    list_B = [
+        (1224145, 1615131, IntervalAnnotation({"B": 3})),
+        (2843649, 2914206, IntervalAnnotation({"B": 2})),
+        (2966237, 3274514, IntervalAnnotation({"B": 1})),
+        (4270616, 4375535, IntervalAnnotation({"B": 0})),
+        (5201341, 5380524, IntervalAnnotation({"B": 3})),
+        (6810584, 7122450, IntervalAnnotation({"B": 1})),
+        (7326273, 7671241, IntervalAnnotation({"B": 3})),
+        (7872368, 7941357, IntervalAnnotation({"B": 3})),
+        (8553566, 8762971, IntervalAnnotation({"B": 1})),
+        (9011874, 9156036, IntervalAnnotation({"B": 1})),
+    ]
+
+    list_C = [
+        (1723601, 1873570, IntervalAnnotation({"C": 4})),
+        (1877102, 2006003, IntervalAnnotation({"C": 2})),
+        (2182413, 2233950, IntervalAnnotation({"C": 2})),
+        (2581059, 2641908, IntervalAnnotation({"C": 0})),
+        (2824929, 3198538, IntervalAnnotation({"C": 1})),
+        (3799468, 3884655, IntervalAnnotation({"C": 4})),
+        (4489631, 4827470, IntervalAnnotation({"C": 4})),
+        (4903221, 5351476, IntervalAnnotation({"C": 2})),
+        (5871323, 6094079, IntervalAnnotation({"C": 2})),
+        (6374150, 6461606, IntervalAnnotation({"C": 2})),
+        (7321509, 7424066, IntervalAnnotation({"C": 4})),
+        (7780356, 7913951, IntervalAnnotation({"C": 3})),
+        (8018115, 8178308, IntervalAnnotation({"C": 1})),
+        (8210497, 8328830, IntervalAnnotation({"C": 2})),
+        (8717225, 8965330, IntervalAnnotation({"C": 3})),
+    ]
+
+    tree_a = IntervalTree.from_tuples(list_A)
+    tree_b = IntervalTree.from_tuples(list_B)
+    tree_c = IntervalTree.from_tuples(list_C)
+
+    merged: IntervalTree = tree_a | tree_b | tree_c
+    merged.merge_overlaps(data_reducer=lambda x, y: x + y)
+    agg, dis = CopyNumberResult.intervals_to_df(merged)
+
+
+def test_combine_cnv():
+    data_dir = TEST_DIR / "data"
+    ascat = (
+        data_dir
+        / "ascat/PHcase_1-tumor_vs_PHcase_1-normal/PHcase_1-tumor_vs_PHcase_1-normal.cnvs.txt"
+    )
+    cnvkit = (
+        data_dir / "cnvkit/PHcase_1-tumor_vs_PHcase_1-normal/PHcase_1-tumor.call.cns"
+    )
+    freec = (
+        data_dir
+        / "freec/PHcase_1-tumor_vs_PHcase_1-normal/PHcase_1-tumor_vs_PHcase_1-normal.p.value.txt"
+    )
+    dfs = [
+        AscatResult().read_segmental(ascat),
+        FreecResult().read_segmental(freec),
+        CNVKitResult().read_segmental(cnvkit),
+    ]
+    c, d = CopyNumberResult.combine(dfs, add_genes=True)
+    print(c)
+    print(d)
 
 
 def test_no_therapy():

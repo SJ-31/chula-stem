@@ -2,6 +2,7 @@
 
 import pytest
 from sarek_plus.databases import get_therapy_df
+from sarek_plus.mavedb import MaveDB
 
 
 def test_civic_lookup(tmp_path):
@@ -14,6 +15,9 @@ def test_civic_lookup(tmp_path):
     df_prev = get_therapy_df(set(genes), cache=db, lookup=False)
     assert df.height == df_prev.height
     assert set(df["gene"]) == set(df_prev["gene"])
+
+
+# def test_mavedb():
 
 
 @pytest.mark.parametrize("download_path,", [(None,), ("./data/ot",)])
@@ -42,3 +46,25 @@ def test_database_empty(tmp_path):
     with open(not_found, "r") as f:
         dummies = f.read().splitlines()
         assert set(dummies) == genes
+
+
+mdb = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
+
+val = (
+    mdb.gene_score_set("CCR5")
+    .head(500)
+    .select(
+        [
+            "scores.score",
+            "accession",
+            "title",
+            "targetGenes.HGNC",
+            "classification",
+            "hgvs.p",
+        ]
+    )
+)
+
+from great_tables import GT, html, md
+
+# tab = GT(val).

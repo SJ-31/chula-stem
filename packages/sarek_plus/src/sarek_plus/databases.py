@@ -24,8 +24,6 @@ Implemented databases [2026-10-24 Sat]
 - OpenTargets
 - CiVIC
 
-TODO: MetaKB also seems promising https://search.cancervariants.org/#*
-
 NOTE: The OpenTargets and CiVIC databases are organized differently —
 the former uses gene-therapy associations, while the latter uses
 gene-literature source (nested within variant aliases)

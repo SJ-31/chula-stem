@@ -175,6 +175,8 @@ class MaveDB:
                 scores = scores.join(va, left_on="accession", right_on="variant_urn")
             scores = scores.with_columns(pl.lit(urn).alias("urn"))
             dfs.append(scores)
+        if not dfs:
+            return pl.DataFrame()
         final = pl.concat(dfs, how="diagonal_relaxed").join(rel, on="urn")
         return final
 
