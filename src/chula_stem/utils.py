@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import ast
 import importlib.resources as res
 from collections.abc import Sequence
 from functools import reduce
 from pathlib import Path
-from typing import Callable, ClassVar, Literal
+from typing import Callable, ClassVar, Literal, TypeAlias
 
 import click
 import polars as pl
@@ -182,6 +181,20 @@ def read_existing(
 
 # * Ensembl annotations
 
+ID_FIELDS: TypeAlias = Literal[
+    "ensembl",
+    "ensembl_transcript",
+    "mane_select",
+    "mane_select_clinical",
+    "gene_name",
+    "hgnc_symbol",
+    "ncbi",
+    "ensembl_protein",
+    "refseq_protein",
+    "refseq_mrna",
+    "refseq_ncrna",
+]
+
 
 @define
 class Ensembl116:
@@ -223,32 +236,8 @@ class Ensembl116:
 
     @staticmethod
     def name_mapping(
-        old: Literal[
-            "ensembl",
-            "ensembl_transcript",
-            "mane_select",
-            "mane_select_clinical",
-            "gene_name",
-            "hgnc_symbol",
-            "ncbi",
-            "ensembl_protein",
-            "refseq_protein",
-            "refseq_mrna",
-            "refseq_ncrna",
-        ],
-        new: Literal[
-            "ensembl",
-            "refseq_protein",
-            "refseq_mrna",
-            "refseq_ncrna",
-            "ensembl_protein",
-            "ensembl_transcript",
-            "mane_select",
-            "mane_select_clinical",
-            "gene_name",
-            "hgnc_symbol",
-            "ncbi",
-        ] = "ensembl_transcript",
+        old: ID_FIELDS,
+        new: ID_FIELDS = "ensembl_transcript",
         versioned: bool = False,
     ) -> dict:
         assert old != new
@@ -312,6 +301,43 @@ class Ensembl116:
         if df[oc].is_duplicated().any():
             print(f"WARNING: multiple ids in `{new}` map to the same id in `{old}`")
         return dict(zip(df[oc], df[nc]))
+
+    @staticmethod
+    def remap_hgvs(
+        df: pl.DataFrame,
+        col: str,
+        old: ID_FIELDS,
+        new: ID_FIELDS,
+        versioned: bool = False,
+        keep_failed: bool = True,
+    ) -> pl.DataFrame:
+        mapping = Ensembl116.name_mapping(old, new, versioned=versioned)
+        tmp = (
+            df.with_row_index()
+            .select([col, "index"])
+            .with_columns(pl.col(col).str.split(":").list.to_struct(["id", "change"]))
+            .unnest(col)
+            .with_columns(
+                pl.when(versioned)
+                .then(pl.col("id"))
+                .otherwise(pl.col("id").str.replace("\\..*$", ""))
+            )
+            .with_columns(
+                pl.when(keep_failed)
+                .then(pl.col("id").replace(mapping))
+                .otherwise(pl.col("id").replace_strict(mapping, default=""))
+                .alias("id")
+            )
+            .with_columns((pl.col("id") + ":" + pl.col("change")).alias(col))
+            .drop(["id", "change"])
+        )
+        df = df.with_row_index().drop(col).join(tmp, on="index")
+        if not keep_failed:
+            before = df.height
+            df = df.filter(~pl.col(col).str.starts_with(":"))
+            after = df.height
+            print(f"Remapping failed for {before-after} rows")
+        return df
 
     @staticmethod
     def biomart_attrs() -> set:
