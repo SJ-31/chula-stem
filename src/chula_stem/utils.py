@@ -231,9 +231,17 @@ class Ensembl116:
             "gene_name",
             "hgnc_symbol",
             "ncbi",
+            "ensembl_protein",
+            "refseq_protein",
+            "refseq_mrna",
+            "refseq_ncrna",
         ],
         new: Literal[
             "ensembl",
+            "refseq_protein",
+            "refseq_mrna",
+            "refseq_ncrna",
+            "ensembl_protein",
             "ensembl_transcript",
             "mane_select",
             "mane_select_clinical",
@@ -245,8 +253,12 @@ class Ensembl116:
     ) -> dict:
         assert old != new
         remap = {
-            "ensembl": "Gene stable ID",
-            "ensembl_transcript": "Transcript stable ID",
+            "ensembl": "Gene stable ID version",
+            "refseq_protein": "RefSeq peptide ID",
+            "refseq_mrna": "RefSeq mRNA ID",
+            "refseq_ncrna": "RefSeq ncRNA ID",
+            "ensembl_protein": "Protein stable ID version",
+            "ensembl_transcript": "Transcript stable ID version",
             "mane_select": "RefSeq match transcript (MANE Select)",
             "mane_select_clinical": "RefSeq match transcript (MANE Plus Clinical)",
             "hgnc_symbol": "HGNC symbol",
@@ -254,14 +266,42 @@ class Ensembl116:
             "gene_name": "Gene name",
         }
         oc, nc = remap[old], remap[new]
+        refseq_id_file = Ensembl116.path / "ids_refseq.parquet"
+        id_file = Ensembl116.path / "ids.parquet"
+        join_refseq = "Transcript stable ID version"
+        o_from_refseq: bool = old.startswith("refseq")
+        n_from_refseq: bool = new.startswith("refseq")
+
+        if (
+            (o_from_refseq and n_from_refseq)
+            or (n_from_refseq and oc == join_refseq)
+            or (o_from_refseq and nc == join_refseq)
+        ):
+            lf = pl.scan_parquet(refseq_id_file)
+
+        elif o_from_refseq or n_from_refseq:
+            from_refseq = oc if o_from_refseq else nc
+            from_main = nc if o_from_refseq else oc
+            lf = (
+                pl.scan_parquet(id_file)
+                .select([from_main, join_refseq])
+                .unique()
+                .join(
+                    pl.scan_parquet(refseq_id_file)
+                    .select([from_refseq, join_refseq])
+                    .unique(),
+                    on=join_refseq,
+                )
+            )
+        else:
+            lf = pl.scan_parquet(id_file)
         df = (
-            pl.scan_parquet(Ensembl116.path / "ids.parquet")
-            .select([oc, nc])
+            lf.select([oc, nc])
             .with_columns(
-                pl.when(versioned)
+                pl.when(not versioned and oc.endswith("version"))
                 .then(pl.col(oc).str.replace("\\..*$", ""))
                 .otherwise(pl.col(oc)),
-                pl.when(versioned)
+                pl.when(not versioned and nc.endswith("version"))
                 .then(pl.col(nc).str.replace("\\..*$", ""))
                 .otherwise(pl.col(nc)),
             )
