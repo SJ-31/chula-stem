@@ -83,14 +83,14 @@ workflow {
 output {
     optitype {
         path { v ->
-            v.optitype_csv >> "optitype/${v.id}"
-            v.optitype_pdf >> "optitype/${v.id}"
+            v.optitype_csv >> "optitype/${v.id}/${v.optitype_csv.name}"
+            v.optitype_pdf >> "optitype/${v.id}/${v.optitype_pdf.name}"
         }
     }
     vep_tsvs {
-        path { v -> v.tsv >> "annotation/${v.id}" }
+        path { v -> v.tsv >> "annotation/${v.id}/${v.tsv.name}" }
     }
     format_fields {
-        path { v -> v.tsv >> "format_fields/${v.id}" }
+        path { v -> v.tsv >> "format_fields/${v.id}/${v.tsv.name}" }
     }
 }
