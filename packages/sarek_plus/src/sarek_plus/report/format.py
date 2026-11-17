@@ -1,5 +1,7 @@
 #!/usr/bin/env ipython
 
+from __future__ import annotations
+
 # Formatting functions for the report
 # Functions ending in the suffix "_fmt" produce formatted dataframes for the
 #    report builder. They must return a tuple of "all", "relevant", "nonrelevant"
@@ -9,6 +11,7 @@
 import re
 from collections.abc import Iterable
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import pandera.polars as pa
@@ -21,6 +24,7 @@ from chula_stem.utils import (
     empty_string2null,
     str_split_unique,
 )
+from intervaltree import IntervalTree
 
 from sarek_plus.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
 from sarek_plus.databases import TherapyDB
@@ -124,13 +128,12 @@ def get_clingen_link(clingen_str) -> str:
 @define
 class CopyNumberResult:
     cfg: dict = field(factory=dict)
-    segment_schema: pa.DataFrameSchema = pa.DataFrameSchema(
+    segment_schema: ClassVar[pa.DataFrameSchema] = pa.DataFrameSchema(
         {
             "chr": pa.Column(str),
             "start": pa.Column(int),
             "end": pa.Column(int),
             "cn": pa.Column(int),
-            "genes": pa.Column(list[str]),
             "caller": pa.Column(str),
         }
     )
@@ -138,16 +141,16 @@ class CopyNumberResult:
     def _read_segmental(self, file: Path) -> pl.DataFrame:
         raise NotImplementedError()
 
-    def read_segmental(self, file: Path) -> pl.DataFrame:
+    def read_segmental(self, file: Path, add_genes: bool = True) -> pl.DataFrame:
         df: pl.DataFrame = self._read_segmental(file)
-        df = (
-            self.segment_schema.validate(df)
-            .with_columns(pl.col("genes").list.unique())
-            .filter(pl.col("cn") != 2)
+        df = self.segment_schema.validate(df).with_columns(
+            pl.col("genes").list.unique()
         )
         df = df.with_columns(
             pl.col("genes").list.len().alias("n_genes"),
-            pl.when(pl.col("cn") > 2)
+            pl.when(pl.col("cn") == 2)
+            .then(pl.lit("neutral"))
+            .when(pl.col("cn") > 2)
             .then(pl.lit("gain"))
             .otherwise(pl.lit("loss"))
             .alias("cn_category"),
@@ -155,6 +158,27 @@ class CopyNumberResult:
             .then(pl.col("chr"))
             .otherwise("chr" + pl.col("chr")),
         ).with_columns(pl.col("genes").list.join(", "))
+        if add_genes:
+            df = CopyNumberResult.add_gene_data(df, "chr", "start", "end")
+        return df
+
+    @staticmethod
+    def add_gene_data(
+        df: pl.LazyFrame, chr_col: str, start_col: str, end_col: str
+    ) -> pl.LazyFrame:
+        name_mapping: dict = Ensembl116.name_mapping("ensembl", "gene_name", False)
+        gene_coords: pl.LazyFrame = (
+            Ensembl116.coords("gene", False)
+            .with_columns(pl.col("ensembl").replace(name_mapping))
+            .rename({"chr": chr_col, "start": start_col, "end": end_col})
+            .lazy()
+        )
+        df = df.join_where(
+            gene_coords,
+            pl.col(chr_col) == pl.col(f"{chr_col}_right"),
+            pl.col(start_col) <= pl.col(f"{start_col}_right"),
+            pl.col(end_col) >= pl.col(f"{end_col}_right"),
+        ).drop(cs.ends_with("_right"))
         return df
 
     @staticmethod
