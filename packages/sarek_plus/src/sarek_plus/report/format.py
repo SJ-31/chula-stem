@@ -24,7 +24,7 @@ from chula_stem.utils import (
     empty_string2null,
     str_split_unique,
 )
-from intervaltree import IntervalTree
+from intervaltree import Interval, IntervalTree
 
 from sarek_plus.callset_qc import CLINSIG_MAP, IMPACT_MAP, filter_multiallelic
 from sarek_plus.databases import TherapyDB
@@ -126,6 +126,21 @@ def get_clingen_link(clingen_str) -> str:
 
 
 @define
+class IntervalAnnotation:
+    callers: dict[str, int]
+
+    def __add__(self, anno: IntervalAnnotation) -> IntervalAnnotation:
+        return IntervalAnnotation(self.callers | anno.callers)
+
+    def cn(self) -> int | None:
+        if self.concordant() and self.callers:
+            return next(iter(self.callers.values()))
+
+    def concordant(self) -> bool:
+        return len(set(self.callers.values())) == 1
+
+
+@define
 class CopyNumberResult:
     cfg: dict = field(factory=dict)
     segment_schema: ClassVar[pa.DataFrameSchema] = pa.DataFrameSchema(
@@ -135,32 +150,39 @@ class CopyNumberResult:
             "end": pa.Column(int),
             "cn": pa.Column(int),
             "caller": pa.Column(str),
-        }
+        },
     )
 
-    def _read_segmental(self, file: Path) -> pl.DataFrame:
+    def _read_segmental(self, file: Path) -> pl.LazyFrame:
         raise NotImplementedError()
 
     def read_segmental(self, file: Path, add_genes: bool = True) -> pl.DataFrame:
-        df: pl.DataFrame = self._read_segmental(file)
-        df = self.segment_schema.validate(df).with_columns(
-            pl.col("genes").list.unique()
-        )
-        df = df.with_columns(
-            pl.col("genes").list.len().alias("n_genes"),
-            pl.when(pl.col("cn") == 2)
-            .then(pl.lit("neutral"))
-            .when(pl.col("cn") > 2)
-            .then(pl.lit("gain"))
-            .otherwise(pl.lit("loss"))
-            .alias("cn_category"),
-            pl.when(pl.col("chr").str.starts_with("chr"))
-            .then(pl.col("chr"))
-            .otherwise("chr" + pl.col("chr")),
-        ).with_columns(pl.col("genes").list.join(", "))
+        lf: pl.LazyFrame = self._read_segmental(file)
+        to_select = list(self.segment_schema.columns.keys())
         if add_genes:
-            df = CopyNumberResult.add_gene_data(df, "chr", "start", "end")
-        return df
+            if "genes" not in lf.columns:
+                lf = CopyNumberResult.add_gene_data(lf, "chr", "start", "end")
+            lf = lf.with_columns(
+                pl.col("genes").list.len().alias("n_genes"),
+                pl.col("genes").list.join(", "),
+            )
+            to_select.extend(["genes", "n_genes"])
+        lf = (
+            self.segment_schema.validate(lf)
+            .with_columns(
+                pl.when(pl.col("cn") == 2)
+                .then(pl.lit("neutral"))
+                .when(pl.col("cn") > 2)
+                .then(pl.lit("gain"))
+                .otherwise(pl.lit("loss"))
+                .alias("cn_category"),
+                pl.when(pl.col("chr").str.starts_with("chr"))
+                .then(pl.col("chr"))
+                .otherwise("chr" + pl.col("chr")),
+            )
+            .collect()
+        )
+        return lf.select(to_select)
 
     @staticmethod
     def add_gene_data(
@@ -179,13 +201,78 @@ class CopyNumberResult:
             pl.col(start_col) <= pl.col(f"{start_col}_right"),
             pl.col(end_col) >= pl.col(f"{end_col}_right"),
         ).drop(cs.ends_with("_right"))
+        group_cols = [c for c in df.columns if c != "ensembl"]
+        df = (
+            df.group_by(group_cols)
+            .agg(pl.col("ensembl"))
+            .with_columns(pl.col("ensembl").list.unique())
+            .rename({"ensembl": "genes"})
+        )
         return df
 
     @staticmethod
-    def combine() -> pl.DataFrame:
+    def intervals_to_df(tree: IntervalTree) -> pl.DataFrame:
+        tmp_concordant = {"cn": [], "start": [], "end": [], "callers": []}
+        tmp_discordant = {"start": [], "end": [], "caller_disagreement": []}
+        for el in tree:
+            el: Interval
+            anno: IntervalAnnotation = el.data
+            if anno.concordant():
+                tmp_concordant["start"].append(el.begin)
+                tmp_concordant["end"].append(el.end)
+                tmp_concordant["cn"].append(anno.cn())
+                tmp_concordant["callers"].append(",".join(anno.callers))
+            else:
+                tmp_discordant["start"].append(el.begin)
+                tmp_discordant["end"].append(el.end)
+                tmp_discordant["caller_disagreement"].append(
+                    ",".join([f"{k}={v}" for k, v in anno.callers.items()])
+                )
+
+        return pl.DataFrame(tmp_concordant), pl.DataFrame(tmp_discordant)
+
+    @staticmethod
+    def combine(
+        dfs: list[pl.DataFrame], add_genes: bool = True
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
-        Merge copy number results from various callers
+        Merge copy number results from various callers, returning
+        a tuple of concordant, discordant cn regions
         """
+        concordant_tmp, discordant_tmp = [], []
+        combined: pl.DataFrame = pl.concat(
+            [CopyNumberResult.segment_schema.validate(d) for d in dfs],
+            how="diagonal_relaxed",
+        )
+        for chr in combined["chr"].unique():
+            cur = combined.filter(pl.col("chr") == chr)
+            tree: IntervalTree = IntervalTree.from_tuples(
+                [
+                    (
+                        row["start"],
+                        row["end"],
+                        IntervalAnnotation({row["caller"]: row["cn"]}),
+                    )
+                    for row in cur.iter_rows(named=True)
+                ]
+            )
+            tree.merge_overlaps(data_reducer=lambda x, y: x + y)
+            conc, disc = CopyNumberResult.intervals_to_df(tree)
+            concordant_tmp.append(conc.with_columns(pl.lit(chr).alias("chr")))
+            discordant_tmp.append(disc.with_columns(pl.lit(chr).alias("chr")))
+        concordant: pl.DataFrame = pl.concat(concordant_tmp, how="diagonal_relaxed")
+        discordant: pl.DataFrame = pl.concat(discordant_tmp, how="diagonal_relaxed")
+        print(concordant)
+        print(discordant)
+        if add_genes:
+            concordant = CopyNumberResult.add_gene_data(
+                concordant.lazy(), "chr", "start", "end"
+            ).collect()
+            discordant = CopyNumberResult.add_gene_data(
+                discordant.lazy(), "chr", "start", "end"
+            ).collect()
+        return concordant, discordant
+
 
 @define
 class AscatResult(CopyNumberResult):
@@ -200,17 +287,14 @@ class AscatResult(CopyNumberResult):
         coerce=True,
     )
 
-    def _read_segmental(self, file: Path) -> pl.DataFrame:
+    def _read_segmental(self, file: Path) -> pl.LazyFrame:
         "Reads the 'cnvs.txt' file"
         df = (
             pl.scan_csv(file, separator="\t")
-            .rename({"startpos": "start", "endpos": "end", "ensembl": "genes"})
             .pipe(self.schema.validate)
+            .rename({"startpos": "start", "endpos": "end"})
             .with_columns(cn=pl.col("nMajor") + pl.col("nMinor"))
-            .group_by(["chr", "start", "end", "cn"])
-            .agg(pl.col("genes"))
             .with_columns(pl.lit("ascat").alias("caller"))
-            .collect()
         )
         return df
 
@@ -228,7 +312,7 @@ class FreecResult(CopyNumberResult):
         }
     )
 
-    def _read_segmental(self, file: Path) -> pl.DataFrame:
+    def _read_segmental(self, file: Path) -> pl.LazyFrame:
         "Reads .p.value.txt"
         thresh: float = self.cfg.get("p_threshold", 0.05)
         df = (
@@ -239,11 +323,8 @@ class FreecResult(CopyNumberResult):
                 & (pl.col("KolmogorovSmirnovPvalue") <= thresh)
             )
             .select(["chr", "start", "end", "copy number"])
-            .rename({"copy number": "cn", "ensembl": "genes"})
-            .group_by(["chr", "start", "end", "cn"])
-            .agg(pl.col("genes"))
+            .rename({"copy number": "cn"})
             .with_columns(pl.lit("control_freec").alias("caller"))
-            .collect()
         )
         return df
 
@@ -261,13 +342,13 @@ class CNVKitResult(CopyNumberResult):
         coerce=True,
     )
 
-    def _read_segmental(self, file: Path) -> pl.DataFrame:
+    def _read_segmental(self, file: Path) -> pl.LazyFrame:
         "Read and filter `call.cns` file"
         mappings: dict = Ensembl116.name_mapping(
             "ensembl_transcript", "gene_name", versioned=False
         )
         mappings.update(Ensembl116.name_mapping("mane_select", "gene_name"))
-        df: pl.DataFrame = (
+        lf: pl.LazyFrame = (
             pl.scan_csv(file, separator="\t")
             .pipe(self.schema.validate)
             .filter(pl.col("p_ttest") <= self.cfg.get("p_threshold", 0.05))
@@ -289,9 +370,10 @@ class CNVKitResult(CopyNumberResult):
                 pl.lit("cnvkit").alias("caller"),
             )
             .rename({"chromosome": "chr", "gene": "genes"})
-            .collect()
         )
-        return df
+        if (lf.collect()["genes"].list.len() == 0).all():
+            lf = lf.drop("genes")
+        return lf
 
 
 def msisensor_pro_fmt(msisensor_path: Path) -> tuple:
