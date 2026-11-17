@@ -187,31 +187,58 @@ class CopyNumberResult:
         Merge copy number results from various callers
         """
 
+@define
+class AscatResult(CopyNumberResult):
+    schema: pa.DataFrameSchema = pa.DataFrameSchema(
+        {
+            "chr": pa.Column(pl.String),
+            "startpos": pa.Column(pl.Int64),
+            "endpos": pa.Column(pl.Int64),
+            "nMajor": pa.Column(pl.Int64),
+            "nMinor": pa.Column(pl.Int64),
+        },
+        coerce=True,
+    )
+
+    def _read_segmental(self, file: Path) -> pl.DataFrame:
+        "Reads the 'cnvs.txt' file"
+        df = (
+            pl.scan_csv(file, separator="\t")
+            .rename({"startpos": "start", "endpos": "end", "ensembl": "genes"})
+            .pipe(self.schema.validate)
+            .with_columns(cn=pl.col("nMajor") + pl.col("nMinor"))
+            .group_by(["chr", "start", "end", "cn"])
+            .agg(pl.col("genes"))
+            .with_columns(pl.lit("ascat").alias("caller"))
+            .collect()
+        )
+        return df
+
 
 @define
 class FreecResult(CopyNumberResult):
+    schema: pa.DataFrameSchema = pa.DataFrameSchema(
+        {
+            "chr": pa.Column(pl.String),
+            "start": pa.Column(pl.Int64),
+            "end": pa.Column(pl.Int64),
+            "copy number": pa.Column(pl.Int64),
+            "WilcoxonRankSumTestPvalue": pa.Column(pl.Float64),
+            "KolmogorovSmirnovPvalue": pa.Column(pl.Float64),
+        }
+    )
+
     def _read_segmental(self, file: Path) -> pl.DataFrame:
+        "Reads .p.value.txt"
         thresh: float = self.cfg.get("p_threshold", 0.05)
-        name_mapping: dict = Ensembl116.name_mapping("ensembl", "gene_name", False)
-        gene_coords: pl.DataFrame = (
-            Ensembl116.coords("gene", False)
-            .with_columns(pl.col("ensembl").replace(name_mapping))
-            .lazy()
-        )
         df = (
             pl.scan_csv(file, separator="\t")
+            .pipe(self.schema.validate)
             .filter(
                 (pl.col("WilcoxonRankSumTestPvalue") <= thresh)
                 & (pl.col("KolmogorovSmirnovPvalue") <= thresh)
             )
             .select(["chr", "start", "end", "copy number"])
-            .join_where(
-                gene_coords,
-                pl.col("chr") == pl.col("chr_right"),
-                pl.col("start") <= pl.col("start_right"),
-                pl.col("end") >= pl.col("end_right"),
-            )
-            .drop(cs.ends_with("_right"))
             .rename({"copy number": "cn", "ensembl": "genes"})
             .group_by(["chr", "start", "end", "cn"])
             .agg(pl.col("genes"))
@@ -223,6 +250,17 @@ class FreecResult(CopyNumberResult):
 
 @define
 class CNVKitResult(CopyNumberResult):
+    schema: pa.DataFrameSchema = pa.DataFrameSchema(
+        {
+            "chromosome": pa.Column(pl.String),
+            "start": pa.Column(pl.Int64),
+            "end": pa.Column(pl.Int64),
+            "cn": pa.Column(pl.Int64),
+            "p_ttest": pa.Column(pl.Float64),
+        },
+        coerce=True,
+    )
+
     def _read_segmental(self, file: Path) -> pl.DataFrame:
         "Read and filter `call.cns` file"
         mappings: dict = Ensembl116.name_mapping(
@@ -231,6 +269,7 @@ class CNVKitResult(CopyNumberResult):
         mappings.update(Ensembl116.name_mapping("mane_select", "gene_name"))
         df: pl.DataFrame = (
             pl.scan_csv(file, separator="\t")
+            .pipe(self.schema.validate)
             .filter(pl.col("p_ttest") <= self.cfg.get("p_threshold", 0.05))
             .select(["chromosome", "start", "end", "gene", "cn"])
             .with_columns(pl.col("gene").str.split(","))
@@ -253,13 +292,6 @@ class CNVKitResult(CopyNumberResult):
             .collect()
         )
         return df
-
-
-def cnv_fmt(classify_cnv, cnvkit_cns, purecn_genes) -> tuple:
-    cnvkit_df = pl.read_csv(classify_cnv, separator="\t")
-    classify_cnv_df = pl.read_csv(cnvkit_cns, separator="\t")
-    purecn_df = pl.read_csv(purecn_genes, separator="\t")
-    raise NotImplementedError()
 
 
 def msisensor_pro_fmt(msisensor_path: Path) -> tuple:
