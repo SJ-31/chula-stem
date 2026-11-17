@@ -162,10 +162,6 @@ class CopyNumberResult:
         if add_genes:
             if "genes" not in lf.columns:
                 lf = CopyNumberResult.add_gene_data(lf, "chr", "start", "end")
-            lf = lf.with_columns(
-                pl.col("genes").list.len().alias("n_genes"),
-                pl.col("genes").list.join(", "),
-            )
             to_select.extend(["genes", "n_genes"])
         lf = (
             self.segment_schema.validate(lf)
@@ -175,10 +171,7 @@ class CopyNumberResult:
                 .when(pl.col("cn") > 2)
                 .then(pl.lit("gain"))
                 .otherwise(pl.lit("loss"))
-                .alias("cn_category"),
-                pl.when(pl.col("chr").str.starts_with("chr"))
-                .then(pl.col("chr"))
-                .otherwise("chr" + pl.col("chr")),
+                .alias("cn_category")
             )
             .collect()
         )
@@ -195,18 +188,27 @@ class CopyNumberResult:
             .rename({"chr": chr_col, "start": start_col, "end": end_col})
             .lazy()
         )
-        df = df.join_where(
-            gene_coords,
-            pl.col(chr_col) == pl.col(f"{chr_col}_right"),
-            pl.col(start_col) <= pl.col(f"{start_col}_right"),
-            pl.col(end_col) >= pl.col(f"{end_col}_right"),
-        ).drop(cs.ends_with("_right"))
+        df = (
+            df.with_columns(
+                pl.when(pl.col("chr").str.starts_with("chr"))
+                .then(pl.col("chr").str.strip_prefix("chr"))
+                .otherwise(pl.col("chr"))
+            )
+            .join_where(
+                gene_coords,
+                pl.col(chr_col) == pl.col(f"{chr_col}_right"),
+                pl.col(start_col) <= pl.col(f"{start_col}_right"),
+                pl.col(end_col) >= pl.col(f"{end_col}_right"),
+            )
+            .drop(cs.ends_with("_right"))
+        )
         group_cols = [c for c in df.columns if c != "ensembl"]
         df = (
             df.group_by(group_cols)
             .agg(pl.col("ensembl"))
             .with_columns(pl.col("ensembl").list.unique())
             .rename({"ensembl": "genes"})
+            .with_columns(pl.col("genes").list.len().alias("n_genes"))
         )
         return df
 
@@ -262,15 +264,13 @@ class CopyNumberResult:
             discordant_tmp.append(disc.with_columns(pl.lit(chr).alias("chr")))
         concordant: pl.DataFrame = pl.concat(concordant_tmp, how="diagonal_relaxed")
         discordant: pl.DataFrame = pl.concat(discordant_tmp, how="diagonal_relaxed")
-        print(concordant)
-        print(discordant)
         if add_genes:
-            concordant = CopyNumberResult.add_gene_data(
-                concordant.lazy(), "chr", "start", "end"
-            ).collect()
-            discordant = CopyNumberResult.add_gene_data(
-                discordant.lazy(), "chr", "start", "end"
-            ).collect()
+            concordant, discordant = [
+                CopyNumberResult.add_gene_data(lf.lazy(), "chr", "start", "end")
+                .collect()
+                .with_columns(pl.col("genes").list.join(", "))
+                for lf in (concordant, discordant)
+            ]
         return concordant, discordant
 
 
@@ -366,13 +366,17 @@ class CNVKitResult(CopyNumberResult):
             .group_by(["chromosome", "start", "end", "cn"])
             .agg(pl.col("gene"))
             .with_columns(
-                pl.col("gene").list.filter(~pl.element().str.contains("\\|")),
+                pl.col("gene")
+                .list.filter(~pl.element().str.contains("\\|"))
+                .list.unique(),
                 pl.lit("cnvkit").alias("caller"),
             )
             .rename({"chromosome": "chr", "gene": "genes"})
         )
         if (lf.collect()["genes"].list.len() == 0).all():
             lf = lf.drop("genes")
+        else:
+            lf = lf.with_columns(pl.col("genes").list.len().alias("n_genes"))
         return lf
 
 
