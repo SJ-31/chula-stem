@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import click
@@ -129,6 +130,66 @@ def therapy_cache_from_files(
         filter_confident=filter_confident,
         lookup=True,
     )
+
+
+@click.command()
+@click.option(
+    "-i",
+    "--cnv-input",
+    required=True,
+    help="""CNV file input, in the format <caller>:<file_path>.
+    Can be specified multiple times to merge CNV calls from multiple
+    callers
+    """,
+    default=None,
+    multiple=True,
+)
+@click.option(
+    "-c",
+    "--concordant-out",
+    required=True,
+    help="Output file name for concordant calls",
+    default=None,
+)
+@click.option(
+    "-d",
+    "--discordant-out",
+    required=True,
+    help="Output file name for discordant calls",
+    default=None,
+)
+def merge_cnv_calls(
+    cnv_input: list[str], concordant_out: str, discordant_out: str
+) -> None:
+    import polars as pl
+
+    from sarek_plus.report.format import (
+        AscatResult,
+        CNVKitResult,
+        CopyNumberResult,
+        FreecResult,
+    )
+
+    caller_mapping: dict[str, Callable[[], CopyNumberResult]] = {
+        "ascat": AscatResult,
+        "cnvkit": CNVKitResult,
+        "freec": FreecResult,
+    }
+    dfs: list[pl.DataFrame] = []
+    for spec in cnv_input:
+        caller, file = spec.split(":")
+        if caller not in caller_mapping:
+            raise ValueError(f"caller {caller} not recognized")
+        cls = caller_mapping[caller]
+        df = cls().read_segmental(file)
+        dfs.append(df)
+    if len(dfs) == 1:
+        dfs[0].write_csv(concordant_out)
+        dfs[0].filter(False).write_csv(discordant_out)
+    else:
+        concordant, discordant = CopyNumberResult.combine(dfs, add_genes=True)
+        concordant.write_csv(concordant_out)
+        discordant.write_csv(discordant_out)
 
 
 @click.command()

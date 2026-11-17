@@ -5,6 +5,7 @@ include { SAREK_MANIFEST } from "./modules/sarek_manifest.nf"
 include { CONCAT_VCF } from "./modules/concat_vcf.nf"
 include { SIGPROFILERASSIGNMENT ; SIGPROFILERASSIGNMENT_COLLECT } from "./modules/sigprofilerassignment.nf"
 include { EXTRACT_FORMAT_FIELDS } from "./modules/extract_format_fields.nf"
+include { MERGE_CLASSIFY_CNV } from "./modules/merge_classify_cnv.nf"
 include { FORMAT_VEP_VCF } from "./modules/format_vep_vcf.nf"
 
 nextflow.enable.types = true

@@ -148,7 +148,6 @@ class VariantCallingReport(ResultsReport):
         metadata: dict,
         paths: dict,
         other_text: dict = {},
-        purecn_prefix: str = "",
         existing_variants_file: str = "",
         tmpdir: str = "temp",
         therapy_databases=["open_targets", "civic"],
