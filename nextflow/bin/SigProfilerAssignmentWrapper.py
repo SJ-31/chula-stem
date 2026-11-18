@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import os
 from pathlib import Path
 
 from SigProfilerAssignment import Analyzer as Analyze
@@ -12,6 +11,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input_folder")
     parser.add_argument("-o", "--output_folder")
+    parser.add_argument(
+        "-l",
+        "--volume",
+        default=None,
+        help="Path to directory containing downloaded genome data",
+        action="store",
+    )
     parser.add_argument(
         "-t",
         "--input_type",
@@ -58,6 +64,7 @@ if __name__ == "__main__":
             exome=args["exome"],
             genome_build=args["genome_build"],
             exclude_signature_subgroups=to_exclude,
+            volume=args["volume"],
         )
     except ValueError:
         outpath = Path(args["output_folder"]) / "Assignment_Solution"

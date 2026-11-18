@@ -5,7 +5,7 @@ process CONCAT_VCF {
     // Concatenate groups vcf files of the same samples
     record(
         id: String,
-        vcfs: Bag<Path>
+        vcfs: List<Path>
     )
     prefix: String
 

@@ -169,12 +169,13 @@ workflow {
     )
     
     mutational_signatures = SIGPROFILERASSIGNMENT(
-        tool_outs.map { v -> record(id: v.id,
-                                    suffix: v.output_type,
-                                    vcfs: [file(v.consensus)]) },
+        tool_outs
+            .filter { v -> v.output_type != "germline" }
+            .map { v -> record(id: v.id,
+                               vcfs: [file(v.consensus)]) },
         true,
-        params.ref?.sigprofiler_exclude,
-        params.sigprofiler_volume,
+        params.sigprofiler_exclude,
+        params.sigprofiler_volume.toUriString(),
     )
 
     if (params.update_cache) {

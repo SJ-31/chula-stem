@@ -1,15 +1,18 @@
 nextflow.enable.types = true
 
+// WARNING: [2026-11-18 Wed] sigprofilerassignment needs to be installed
+// with matplotlib<=3.9
+// e.g. conda create -n SigProfiler sigprofilerassignment matplotlib=3.9 -c bioconda
 process SIGPROFILERASSIGNMENT {
     input:
     record(
         id: String,
-        suffix: String,
         vcfs: List<Path>
     )
     is_exome: Boolean
-    exclude_file: String?
-    volume: String
+    exclude_file: Path?
+    volume: String // path to the installed sigprofiler reference
+    // genome data
 
     output:
     record(
@@ -23,14 +26,12 @@ process SIGPROFILERASSIGNMENT {
 
     script:
     //
-    output = "${id}-SigProfilerAssignment_${suffix}"
+    output = "${id}-SigProfilerAssignment"
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args ?: ""
     activities_file = "${output}/Activities/Assignment_Solution_Activities.txt"
     """
-    export SIGPROFILERASSIGNMENT_VOLUME=${volume}
-
     mkdir vcfs
 
     for v in *vcf.gz; do
@@ -41,6 +42,7 @@ process SIGPROFILERASSIGNMENT {
     SigProfilerAssignmentWrapper.py -i vcfs \\
         ${args} \\
         -o ${output} \\
+        -l ${volume} \\
         ${exome_flag} \\
         ${exclude_flag}
 
