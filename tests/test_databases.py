@@ -51,18 +51,17 @@ def test_database_empty(tmp_path):
 mdb = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
 
 val = (
-    mdb.gene_score_set("CCR5")
-    .head(500)
-    .select(
-        [
-            "scores.score",
-            "accession",
-            "title",
-            "targetGenes.HGNC",
-            "classification",
-            "hgvs.p",
-        ]
-    )
+    mdb.gene_score_set("CCR5").head(500)
+    # .select(
+    #     [
+    #         "scores.score",
+    #         "accession",
+    #         "title",
+    #         "targetGenes.HGNC",
+    #         "classification",
+    #         "hgvs.p",
+    #     ]
+    # )
 )
 
 from great_tables import GT, html, md

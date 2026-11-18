@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pyhere import here
 
@@ -6,7 +8,7 @@ from pyhere import here
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import BaseDocTemplate
-from sarek_plus import entry_point
+from sarek_plus import VariantCallingReport, entry_point
 from sarek_plus.report.format import (
     AscatResult,
     CNVKitResult,
@@ -190,11 +192,60 @@ def test_combine_cnv():
     print(d)
 
 
-def test_no_therapy():
-    path = "/home/shannc/Bio_SDD/chula-stem/tests/data/report_params_no_therapy.json"
-    entry_point.callback(
-        report_type="variant_calling",
-        specification=path,
-        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
-        output="/home/shannc/Bio_SDD/chula-stem/tests/plots/report_no_therapy.pdf",
+def gen_report_paths(sample) -> dict[str, Path]:
+    sarek_plus = here("output", "nf-work", "sarek_plus_test", "out")
+    sarek = here("output", "sarek_pdac_test")
+    paths: dict[str, Path] = {
+        "optitype": sarek_plus / "optitype" / sample / f"{sample}-optitype_result.tsv",
+        "therapy_data_cache": sarek_plus / "gene_data.db",
+        "vep_small_somatic": sarek_plus
+        / "annotation"
+        / sample
+        / f"{sample}-tumor_vs_{sample}-normal.tsv",
+        "vcf_format_germline": sarek_plus
+        / "format_fields"
+        / sample
+        / f"{sample}-format_fields_germline.tsv",
+        "vcf_format_somatic": sarek_plus
+        / "format_fields"
+        / sample
+        / f"{sample}-format_fields_paired.tsv",
+        "vep_small_germline": sarek_plus
+        / "annotation"
+        / sample
+        / f"{sample}-normal.tsv",
+        "vep_sv_germline": None,
+        "vep_sv_somatic": sarek_plus
+        / "annotation"
+        / sample
+        / f"{sample}-sv_concat.tsv",
+        "cosmic_signatures": "TODO",
+        "classify_cnv": "TODO",
+        "sigprofiler": "TODO",
+    }
+    return {k: v for k, v in paths.items() if v.exists()}
+
+
+def test_report():
+    sample = "PHcase_1"
+    sarek_plus = here("output", "nf-work", "sarek_plus_test", "out")
+    sarek = here("output", "sarek_pdac_test")
+    outdir = here("tests", "sarek_plus_out")
+    outfile = outdir / "report.pdf"
+    paths = gen_report_paths(sample)
+    report = VariantCallingReport(
+        filename=outfile,
+        other_text={
+            "title": "Test WES",
+            "disclaimer": "DISCLAIMER",
+            "front_page_note": "FRONT_PAGE_NOTE",
+            "details": "DETAILS",
+        },
+        paths=paths,
+        metadata={"age": 42, "sex": "YY"},
+        tmpdir=outdir / "report_tmp",
+        therapy_databases=["open_targets", "civic"],
+        download_therapy_data=False,
     )
+    report.build()
+    report.merge()
