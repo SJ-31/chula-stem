@@ -17,6 +17,7 @@ params {
 
 // NOTE: https://github.com/nf-core/sarek/blob/master/conf/igenomes.config for the igenomes references
 
+
 workflow {
 
     main:
@@ -63,8 +64,6 @@ workflow {
             )
         }
         .mix(merged)
-
-    fastq.filter { v -> v.status == 0 }.view()
 
     optitype = OPTITYPE(fastq.filter { v -> v.status == 0 }, "dna")
 
@@ -138,13 +137,12 @@ workflow {
     }
     format_fields = EXTRACT_FORMAT_FIELDS(to_extract_format)
 
-
     cnv_to_merge = tool_outs
         .map { v ->
             def res = [:]
-            ["purecn", "freec", "ascat", "cnvkit"].each { el ->
+            ["purecn_cns", "controlfreec_cns", "ascat_cns", "cnvkit_cns"].each { el ->
                 if (v[el]) {
-                    res[el] = file(v[el])
+                    res[el.replace("_cns", "")] = file(v[el])
                 }
             }
             record(id: v.id, caller2cnv_file: res)

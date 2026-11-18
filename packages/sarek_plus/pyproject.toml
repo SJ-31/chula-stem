@@ -19,7 +19,7 @@ dependencies = [
 dev = ["pytest", "icecream", "ipython"]
 
 [project.scripts]
-get_therapy_cache = "sarek_plus:therapy_cache_from_files"
+update_gene_cache = "sarek_plus:update_gene_cache"
 format_vep_vcf = "sarek_plus.format_vep_vcf:main"
 extract_vcf_format = "sarek_plus.format_vep_vcf:extract_vcf_format"
 make_sarek_manifest = "sarek_plus.manifest:make_sarek_manifest"

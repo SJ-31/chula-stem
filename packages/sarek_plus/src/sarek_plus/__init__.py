@@ -56,10 +56,7 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
 
 @click.command()
 @click.option(
-    "-i",
-    "--input-files",
-    required=True,
-    help="Path to directory containing input files",
+    "-i", "--input-file", help="Input file with gene names", multiple=True, type=Path
 )
 @click.option(
     "-c",
@@ -82,35 +79,52 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
     default="not_in_databases.txt",
     show_default=True,
     help="File to write genes that weren't found",
+    type=Path,
 )
 @click.option(
-    "-i",
-    "--ignore_failed_file",
+    "-g",
+    "--ignore-failed-file",
     required=True,
     help="If supplied, will ignore all genes in this file",
+    type=Path,
 )
 @click.option(
-    "-e", "--cache", required=True, help="DB file to cache data", default=None
+    "-e",
+    "--cache",
+    required=True,
+    help="DB file to cache data",
+    default=None,
+    type=Path,
+)
+@click.option(
+    "-t",
+    "--filter-confident",
+    required=True,
+    help="Keep only confident entries e.g. high annotation scores, verified by multiple submitters",
+    default=None,
+    is_flag=True,
 )
 @click.option(
     "-d",
     "--databases",
     required=True,
-    help="Comma-delimited string specifying which databases to include in the lookup",
+    help="Database to include in the lookup",
     default=None,
-    type=str,
+    multiple=True,
 )
-def therapy_cache_from_files(
-    input_files: str,
-    not_in_db: str,
+def update_gene_cache(
+    input_files: list[Path],
+    not_in_db: Path,
     filter_confident: bool,
-    cache: str,
+    databases: str,
+    cache: Path,
+    ignore_failed_file: Path | None = None,
     gene_col: str = "Genes",
 ):
     import polars as pl
 
     genes: set = set()
-    for path in Path(input_files).rglob("*"):
+    for path in input_files:
         path: Path
         if path.is_dir():
             continue
@@ -123,9 +137,12 @@ def therapy_cache_from_files(
         else:
             with open(path, "r") as f:
                 genes |= set(f.read().splitlines())
+    if ignore_failed_file:
+        genes -= set(ignore_failed_file.read_text().splitlines())
     _ = get_therapy_df(
         genes,
-        cache=Path(cache),
+        cache=cache,
+        dbs=databases,
         not_in_db_file=not_in_db,
         filter_confident=filter_confident,
         lookup=True,
@@ -174,6 +191,7 @@ def merge_cnv_calls(
         "ascat": AscatResult,
         "cnvkit": CNVKitResult,
         "freec": FreecResult,
+        "controlfreec": FreecResult,
     }
     dfs: list[pl.DataFrame] = []
     for spec in cnv_input:
