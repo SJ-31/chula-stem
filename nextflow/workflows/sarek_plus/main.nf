@@ -5,14 +5,17 @@ include { SAREK_MANIFEST } from "./modules/sarek_manifest.nf"
 include { CONCAT_VCF } from "./modules/concat_vcf.nf"
 include { SIGPROFILERASSIGNMENT ; SIGPROFILERASSIGNMENT_COLLECT } from "./modules/sigprofilerassignment.nf"
 include { EXTRACT_FORMAT_FIELDS } from "./modules/extract_format_fields.nf"
+include { UPDATE_GENE_CACHE } from "./modules/update_gene_cache.nf"
 include { MERGE_CLASSIFY_CNV } from "./modules/merge_classify_cnv.nf"
 include { FORMAT_VEP_VCF } from "./modules/format_vep_vcf.nf"
 
 nextflow.enable.types = true
 params {
     sarek_config: Path
-    ref: Map
+    ref: Map<String,String>
     defaults: Map
+    sigprofiler_volume: String
+    update_cache: Boolean
 }
 
 // NOTE: https://github.com/nf-core/sarek/blob/master/conf/igenomes.config for the igenomes references
@@ -108,13 +111,14 @@ workflow {
     //     default_purity: params.defaults.purity,
     //     default_ploidy: params.defaults.ploidy
     // )
+    
     sv_tumor_to_concat = tool_outs
         .filter { v -> v.output_type == "paired" || v.output_type == "tumor_only" }
         .filter { v -> v.vep_manta_somatic || v.vep_tiddit }
         .map { v ->
             record(
                 id: v.id,
-                vcfs: ([v?.vep_manta_somatic, v?.vep_tiddit].findAll { el -> el }) as Bag,
+                vcfs: ([v?.vep_manta_somatic, v?.vep_tiddit].findAll { el -> el }),
             )
         }
 
@@ -163,32 +167,49 @@ workflow {
         ["CALLERS", "NCALLERS", "SVTYPE"],
         "CSQ",
     )
+    
+    mutational_signatures = SIGPROFILERASSIGNMENT(
+        tool_outs.map { v -> record(id: v.id,
+                                    suffix: v.output_type,
+                                    vcfs: [file(v.consensus)]) },
+        true,
+        params.ref?.sigprofiler_exclude,
+        params.sigprofiler_volume,
+    )
 
+    if (params.update_cache) {
+        cache_proc = UPDATE_GENE_CACHE(vep_tsvs.map { v -> v.tsv }.collect(),
+                                       params.ref.gene_data_cache,
+                                       params.ref?.open_targets,
+                                       "",
+                                       true
+        )
+        report_cache = cache_proc.map { v -> v.cache } 
+    } else {
+        report_cache = channel.value(params.ref.gene_data_cache)
+    }
+    
+    
     publish:
 
-    // mutational_signatures = SIGPROFILERASSIGNMENT(
-    //     sarek_out.tool_outs.map { v -> record(id: v.id, vcfs: [v.consensus]) },
-    //     true,
-    //     params.ref?.sigprofiler_exclude,
-    //     params.ref.sigprofiler_volume,
-    // )
+
     // combined_signatures = SIGPROFILERASSIGNMENT_COLLECT(
     //     mutational_signatures.map { v -> v.activities }.collect(),
     //     "TODO", // Put the sample pattern here once you figure out what it is
     // )
-    // TODO: use 'topics' to extract versions as well as logs
-    // https://docs.seqera.io/nextflow/tutorials/topic-channels/
-
-    // TODO: integrate Mave data with the report
-    // TODO: combine everything for the report
-
     optitype = optitype
     format_fields = format_fields
     vep_tsvs = vep_tsvs
     sarek_out = sarek_out
+    mutational_signatures = mutational_signatures
 }
 
 output {
+    mutational_signatures {
+        path { v -> v.dir >> "sigprofilerassignment/${v.id}/${v.dir.name}" 
+        }
+    }
+    
     sarek_out {
         path { v ->
             v.tool_outs >> v.tool_outs.name

@@ -4,10 +4,11 @@ process SIGPROFILERASSIGNMENT {
     input:
     record(
         id: String,
-        vcfs: Bag<Path>
+        suffix: String,
+        vcfs: List<Path>
     )
     is_exome: Boolean
-    exclude_file: Path
+    exclude_file: String?
     volume: String
 
     output:
@@ -22,7 +23,7 @@ process SIGPROFILERASSIGNMENT {
 
     script:
     //
-    output = "${id}-SigProfilerAssignment"
+    output = "${id}-SigProfilerAssignment_${suffix}"
     exome_flag = is_exome ? " --exome " : ""
     exclude_flag = exclude_file ? " --exclude_file ${exclude_file} " : ""
     args = task.ext.args ?: ""
@@ -33,6 +34,7 @@ process SIGPROFILERASSIGNMENT {
     mkdir vcfs
 
     for v in *vcf.gz; do
+        bcftools index \$v
         sigprofiler_assignment_cleanup.bash \$v vcfs
     done
 
