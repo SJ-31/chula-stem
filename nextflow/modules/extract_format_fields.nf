@@ -25,10 +25,10 @@ process EXTRACT_FORMAT_FIELDS {
     suffix = suffix ?: ""
     samples_field = ""
     if (normal_sample) {
-        samples_field = "${samples_field} -s NORMAL -s ${id}_${normal_sample} -r NORMAL=${normal_sample}"
+        samples_field = "${samples_field} -s NORMAL -s ${id}_${normal_sample} -s ${normal_sample} -r NORMAL=${normal_sample} -r ${id}_${normal_sample}=${normal_sample}"  
     }
     if (tumor_sample) {
-        samples_field = "${samples_field} -s TUMOR -s ${id}_${tumor_sample} -r TUMOR=${id}_${tumor_sample}"
+        samples_field = "${samples_field} -s TUMOR -s ${id}_${tumor_sample} -s ${tumor_sample} -r TUMOR=${tumor_sample} -r ${id}_${tumor_sample}=${tumor_sample}"
     }
     output = "${id}-format_fields${suffix}.tsv"
     """

@@ -21,8 +21,8 @@ process OPTITYPE {
 
     script:
     prefix = "${id}-optitype"
-    out_csv = "${prefix}.csv"
-    out_pdf = "${prefix}.pdf"
+    out_csv = "${prefix}_result.tsv"
+    out_pdf = "${prefix}_coverage_plot.pdf"
     data_type_flag = "dna" == data_type ? "--dna" : "--rna"
     args = task.ext.args ?: ""
     """

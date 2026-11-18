@@ -12,7 +12,7 @@ process CONCAT_VCF {
     output:
     record(
         id: id,
-        concat: output,
+        concat: file(output),
     )
 
     topic:
