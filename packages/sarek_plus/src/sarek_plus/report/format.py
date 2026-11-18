@@ -151,6 +151,7 @@ class CopyNumberResult:
             "cn": pa.Column(int),
             "caller": pa.Column(str),
         },
+        coerce=True,
     )
 
     def _read_segmental(self, file: Path) -> pl.LazyFrame:
@@ -160,7 +161,7 @@ class CopyNumberResult:
         lf: pl.LazyFrame = self._read_segmental(file)
         to_select = list(self.segment_schema.columns.keys())
         if add_genes:
-            if "genes" not in lf.columns:
+            if "genes" not in lf.collect_schema().names():
                 lf = CopyNumberResult.add_gene_data(lf, "chr", "start", "end")
             to_select.extend(["genes", "n_genes"])
         lf = (
@@ -179,7 +180,7 @@ class CopyNumberResult:
 
     @staticmethod
     def add_gene_data(
-        df: pl.LazyFrame, chr_col: str, start_col: str, end_col: str
+        lf: pl.LazyFrame, chr_col: str, start_col: str, end_col: str
     ) -> pl.LazyFrame:
         name_mapping: dict = Ensembl116.name_mapping("ensembl", "gene_name", False)
         gene_coords: pl.LazyFrame = (
@@ -188,8 +189,8 @@ class CopyNumberResult:
             .rename({"chr": chr_col, "start": start_col, "end": end_col})
             .lazy()
         )
-        df = (
-            df.with_columns(
+        lf = (
+            lf.with_columns(
                 pl.when(pl.col("chr").str.starts_with("chr"))
                 .then(pl.col("chr").str.strip_prefix("chr"))
                 .otherwise(pl.col("chr"))
@@ -202,15 +203,15 @@ class CopyNumberResult:
             )
             .drop(cs.ends_with("_right"))
         )
-        group_cols = [c for c in df.columns if c != "ensembl"]
-        df = (
-            df.group_by(group_cols)
+        group_cols = [c for c in lf.collect_schema().names() if c != "ensembl"]
+        lf = (
+            lf.group_by(group_cols)
             .agg(pl.col("ensembl"))
             .with_columns(pl.col("ensembl").list.unique())
             .rename({"ensembl": "genes"})
             .with_columns(pl.col("genes").list.len().alias("n_genes"))
         )
-        return df
+        return lf
 
     @staticmethod
     def intervals_to_df(tree: IntervalTree) -> pl.DataFrame:
@@ -290,7 +291,7 @@ class AscatResult(CopyNumberResult):
     def _read_segmental(self, file: Path) -> pl.LazyFrame:
         "Reads the 'cnvs.txt' file"
         df = (
-            pl.scan_csv(file, separator="\t")
+            pl.scan_csv(file, separator="\t", infer_schema_length=None)
             .pipe(self.schema.validate)
             .rename({"startpos": "start", "endpos": "end"})
             .with_columns(cn=pl.col("nMajor") + pl.col("nMinor"))
@@ -309,14 +310,15 @@ class FreecResult(CopyNumberResult):
             "copy number": pa.Column(pl.Int64),
             "WilcoxonRankSumTestPvalue": pa.Column(pl.Float64),
             "KolmogorovSmirnovPvalue": pa.Column(pl.Float64),
-        }
+        },
+        coerce=True,
     )
 
     def _read_segmental(self, file: Path) -> pl.LazyFrame:
         "Reads .p.value.txt"
         thresh: float = self.cfg.get("p_threshold", 0.05)
         df = (
-            pl.scan_csv(file, separator="\t")
+            pl.scan_csv(file, separator="\t", infer_schema_length=None)
             .pipe(self.schema.validate)
             .filter(
                 (pl.col("WilcoxonRankSumTestPvalue") <= thresh)
@@ -349,7 +351,7 @@ class CNVKitResult(CopyNumberResult):
         )
         mappings.update(Ensembl116.name_mapping("mane_select", "gene_name"))
         lf: pl.LazyFrame = (
-            pl.scan_csv(file, separator="\t")
+            pl.scan_csv(file, separator="\t", infer_schema_length=None)
             .pipe(self.schema.validate)
             .filter(pl.col("p_ttest") <= self.cfg.get("p_threshold", 0.05))
             .select(["chromosome", "start", "end", "gene", "cn"])

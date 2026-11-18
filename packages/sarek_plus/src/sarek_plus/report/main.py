@@ -1,11 +1,11 @@
 #!/usr/bin/env ipython
 import datetime
 import os
-from dataclasses import dataclass, fields
 from pathlib import Path
 
 import polars as pl
 import pymupdf
+from attrs import define, fields
 from pymupdf import Document, Page
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
