@@ -12,10 +12,20 @@ include { FORMAT_VEP_VCF } from "./modules/format_vep_vcf.nf"
 nextflow.enable.types = true
 params {
     sarek_config: Path
-    ref: Map<String,String>
     defaults: Map
-    sigprofiler_volume: String
     update_cache: Boolean
+    genome: Path
+    sigprofiler_volume: Path
+    sigprofiler_exclude: Path?
+    gene_data_cache: String
+    open_targets: String?
+    panel_of_normals: Path?
+    baits: Path?
+    mappability: Path
+    purecn_bait_intervals: Path?
+    purecn_mapping_bias: Path?
+    purecn_normaldb: Path?
+    snp_blacklist: Path?
 }
 
 // NOTE: https://github.com/nf-core/sarek/blob/master/conf/igenomes.config for the igenomes references
@@ -113,12 +123,12 @@ workflow {
     // )
     
     sv_tumor_to_concat = tool_outs
-        .filter { v -> v.output_type == "paired" || v.output_type == "tumor_only" }
+        .filter { v -> v.output_type != "germline" }
         .filter { v -> v.vep_manta_somatic || v.vep_tiddit }
         .map { v ->
             record(
                 id: v.id,
-                vcfs: ([v?.vep_manta_somatic, v?.vep_tiddit].findAll { el -> el }),
+                vcfs: ([v?.vep_manta_somatic, v?.vep_tiddit].findAll { el -> el }.toList()),
             )
         }
 
