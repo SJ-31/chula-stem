@@ -1,10 +1,11 @@
+nextflow.enable.types = true
+
 process SAREK_MANIFEST {
     input:
-    val sarek_config
+    sarek_config: Path
 
     output:
-    path ("tool_outs.csv"), emit: tool_outs
-    path ("preprocessed.csv"), emit: preprocessed
+    record(tool_outs: file("tool_outs.csv"), preprocessed: file("preprocessed.csv"))
 
     script:
     """
