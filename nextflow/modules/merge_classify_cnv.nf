@@ -8,7 +8,8 @@ process MERGE_CLASSIFY_CNV {
     record(
         id: String,
         caller2cnv_file: Map<String, Path>
-    )
+        )
+    genome_build: String
 
     output:
     // Input format for the BED file is to have the columns below
@@ -16,10 +17,10 @@ process MERGE_CLASSIFY_CNV {
     // 2. CNV start
     // 3. CNV end
     // 4. CNV type (DEL or DUP)
-    record(id: id, concordant: file(concordant), discordant: file(discordant), classified: file(tsv))
+    record(id: id, concordant: file(concordant), discordant: file(discordant), classified: file(tsv, optional: true))
 
     topic:
-    record(id: id, process: "merge_classify_cnv", file: file("merge_classify_cn.log")) >> "logs"
+    record(id: id, process: "merge_classify_cnv", file: file("merge_classify_cnv.log")) >> "logs"
 
     script:
     //
@@ -38,12 +39,14 @@ process MERGE_CLASSIFY_CNV {
         xan drop cn | \\
         xan fmt -t '\t' | \\
         xan behead > tmp.bed
-    
-    ClassifyCNV.py --infile tmp.bed \\
-        --GenomeBuild ${task.ext.genome} \\
-        --outdir ${intermediate}
 
-    mv "${intermediate}/Scoresheet.txt" ${tsv}
+    if [[ -s tmp.bed ]]; then
+        ClassifyCNV.py --infile tmp.bed \\
+            --GenomeBuild ${genome_build} \\
+            --outdir ${intermediate}
+        mv "${intermediate}/Scoresheet.txt" ${tsv}
+    fi
+
     get_nextflow_log.bash merge_classify_cnv.log
     """
 }

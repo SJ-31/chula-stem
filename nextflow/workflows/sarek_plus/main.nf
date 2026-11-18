@@ -123,7 +123,7 @@ workflow {
     to_extract_format = tool_outs.map { v ->
         def res = [:]
         ["deepvariant", "freebayes", "strelka", "tiddit", "deepsomatic", "manta_somatic", "muse", "mutect2", "strelka_indels", "haplotypecaller", "deepvariant"].each { el ->
-            if (v[el]) {
+            if (v[el] && file(v[el]).exists()) {
                 res[el] = file(v[el])
             }
         }
@@ -141,7 +141,7 @@ workflow {
         .map { v ->
             def res = [:]
             ["purecn_cns", "controlfreec_cns", "ascat_cns", "cnvkit_cns"].each { el ->
-                if (v[el]) {
+                if (v[el] && file(v[el]).exists()) {
                     res[el.replace("_cns", "")] = file(v[el])
                 }
             }
@@ -149,7 +149,7 @@ workflow {
         }
         .filter { v -> v.caller2cnv_file.size() > 1 }
     // TODO: [2026-11-17 Tue] put this into the report
-    merged_cnvs = MERGE_CLASSIFY_CNV(cnv_to_merge)
+    merged_cnvs = MERGE_CLASSIFY_CNV(cnv_to_merge, "hg38")
 
 
     to_vep_tsv = tool_outs
