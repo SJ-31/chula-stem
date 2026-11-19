@@ -156,7 +156,6 @@ class Rename:
         "VAF": "VAF (%)",
         "Alt_depth": "VRS",
         "SYMBOL": "Gene",
-        "HGVSc": "HGVS",
         "Existing_variation": "Database Name",
         "Consequence": "Variant Type",
         "CLIN_SIG": "ClinVar",
@@ -164,7 +163,6 @@ class Rename:
     sv = {
         "SYMBOL": "Gene",
         "Loc": "Locus",
-        "HGVSc": "HGVS",
         "Existing_variation": "Database Name",
         "Consequence": "Variant Type",
         "SVTYPE": "SV Class",

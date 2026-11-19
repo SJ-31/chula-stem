@@ -84,9 +84,10 @@ def entry_point(report_type: str, specification: str, output: str, tmpdir: str) 
 @click.option(
     "-g",
     "--ignore-failed-file",
-    required=True,
+    required=False,
     help="If supplied, will ignore all genes in this file",
     type=Path,
+    default=None,
 )
 @click.option(
     "-e",

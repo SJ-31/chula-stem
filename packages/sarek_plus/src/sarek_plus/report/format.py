@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import numpy as np
 import pandera.polars as pa
@@ -81,32 +81,6 @@ def dbvar_link(x):
     return f"dbVar:{link}"
 
 
-def get_copy_number(
-    df: pl.DataFrame, cnvkit_path: str = "", cn_col_name="cn"
-) -> pl.DataFrame:
-    """
-    Add a copy number column `cn_col_name` to df
-    by merging with the raw CNV data. df must have the
-    column "Locus", containing the location of the cnv in the form of
-        chromosome:start-end
-    :param format: one of CNVKit
-    """
-    wanted_cols = df.columns + [cn_col_name]
-    if cnvkit_path:
-        cnvkit: pl.DataFrame = pl.read_csv(
-            cnvkit_path, separator="\t", null_values="NA", infer_schema_length=None
-        ).rename({"cn": cn_col_name})
-        if "chromosome" in cnvkit.columns and "chr" not in cnvkit["chromosome"][0]:
-            cnvkit = cnvkit.with_columns(pl.col("chromosome").str.replace("^", "chr"))
-        cnvkit = add_loc(cnvkit)
-        df = df.join(cnvkit, how="left", on="Locus")
-    if cnvkit_path:
-        df = df.with_columns(
-            pl.coalesce([cn_col_name, f"{cn_col_name}_right"]).alias(cn_col_name)
-        )
-    return df.select(wanted_cols)
-
-
 def get_clingen_link(clingen_str) -> str:
     def get_sym(clingen_link: str) -> str:
         find = re.findall(r".*sym=(.*)\&.*", clingen_link)
@@ -120,9 +94,8 @@ def get_clingen_link(clingen_str) -> str:
     return add_link(symbol, clingen_str, underline="yes")
 
 
-# TODO: [2026-10-27 Tue] finish this. Subclass for each
-# output, extract the gene column and copy number, then combine
-# with the
+# TODO: look into how to report allele-specific copy number i.e.
+# copy number of specific variants
 
 
 @define
@@ -420,16 +393,25 @@ def msisensor_pro_fmt(msisensor_path: Path) -> tuple:
 
 
 def classify_cnv_fmt(
-    classifycnv_path,
-    cnvkit_path: str = "",
+    path: Path,
+    cnv_data_merge: Path,
+    cols_keep: tuple[str] | None = ("cn", "callers"),
+    chr_col: str = "chr",
+    start_col: str = "start",
+    end_col: str = "end",
 ) -> tuple:
     """
     Format cnv data from ClassifyCNV for the report
+
+    Parameters
+    ----------
+    cnv_data_merge : Path | None
+        Additional tabular data to add to ClassifyCNV output
+    cols_keep : list[str] | None
+        Columns from `cnv_data_merge` to retain
     """
     cnv = (
-        pl.read_csv(
-            classifycnv_path, separator="\t", null_values="NA", infer_schema_length=None
-        )
+        pl.read_csv(path, separator="\t", null_values="NA", infer_schema_length=None)
         .filter(pl.col("Start").is_not_null() & pl.col("End").is_not_null())
         .with_columns(
             pl.struct(s="source", acc="accession")
@@ -451,9 +433,10 @@ def classify_cnv_fmt(
 
     if cnv.is_empty():
         return tuple([empty_table(Rename.cnv)] * 3)
+
     # "group_by" operation required because data was exploded to become longer on
     #   dosage-sensitive genes in the R script
-    wanted_cols = ["Locus"] + list(Rename.cnv.values())
+    wanted_cols = ["Locus"] + list(Rename.cnv.values()) + list(cols_keep)
     cnv = (
         add_loc(
             cnv,
@@ -469,19 +452,20 @@ def classify_cnv_fmt(
             limit_genes(Rename.cnv["All protein coding genes"], 25),
         )
     )
-    cn_col = "CN"
-    wanted_cols.insert(1, cn_col)
+    to_merge = (
+        pl.read_csv(cnv_data_merge)
+        .pipe(add_loc, chr_col=chr_col, start_col=start_col, end_col=end_col)
+        .select("Locus", *cols_keep)
+    )
     with_cn = (
-        get_copy_number(cnv, cnvkit_path, cn_col_name=cn_col)
+        cnv.join(to_merge, on="Locus", how="left")
         .select(wanted_cols)
         .cast(pl.String)
         .with_columns(cs.by_dtype(pl.String).str.replace("^$", "-"))
         .fill_null("-")
     )
     relevant = with_cn.filter(
-        (pl.col("ClinGen") != "-")
-        & (pl.col(cn_col) != "-")
-        & (pl.col("ClinGen").str.len_chars() > 1)
+        (pl.col("ClinGen") != "-") & (pl.col("ClinGen").str.len_chars() > 1)
     )
     nonrelevant = with_cn.filter(~pl.col("Locus").is_in(relevant["Locus"]))
     return with_cn, relevant, nonrelevant
@@ -494,35 +478,86 @@ def format_var_type(var: str) -> str:
     return var.strip()
 
 
+def get_vcf_nth(col: str, n: int, cast_to: pl.DataType = pl.Int64) -> pl.Expr:
+    if cast_to in {pl.Int64, pl.Float64}:
+        return (
+            pl.col(col)
+            .str.split(",")
+            .list.get(n, null_on_oob=True)
+            .replace(".", None)
+            .cast(cast_to)
+        )
+    return pl.col(str).str.split(",").list.get(n, null_on_oob=True).cast(cast_to)
+
+
+def collapse_hgvs(
+    df: pl.DataFrame,
+    hgvsp: str = "HGVSp",
+    hgvsc: str = "HGVSc",
+    hgvsg: str = "HGVSg",
+    col_added: str = "HGVS",
+) -> pl.DataFrame:
+    """
+    Group HGVS columns (HGVSp, HGVSg, HGVSc) into a single column "HGVS"
+    When available, protein-level and transcript-level identifiers are preferred over
+    genomic
+    """
+    ordering = [o for o in [hgvsp, hgvsc, hgvsg] if o in df.columns()]
+    if not ordering:
+        print("WARNING: no HGVS columns are in `df`")
+        return df.with_columns(pl.lit(None).alias(col_added).cast(pl.String))
+    return df.with_columns(pl.coalesce(ordering).alias(col_added).cast(pl.String))
+
+
 def vep_fmt(
     vep_path: Path,
-    variant_class: str,
+    variant_class: Literal["sv", "small"],
+    sample: str,
+    format_fields: Path,
     existing_variants: list[str] | None = None,
     mavedb: MaveDB | None = None,
+    significant_hgvs: set | None = None,
 ) -> tuple:
     """Format and filter vep output into a dataframe with values ready to write
         into a reportlab table
     :param: existing_variants Accept only variants whose ids are in this list
-        i.e. dbSNP, COSMIC that
+        i.e. dbSNP, COSMIC
     """
-    df: pl.DataFrame = pl.read_csv(
+    significant_hgvs = significant_hgvs or set()
+    lf: pl.LazyFrame = pl.scan_csv(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
+    )
+    join_cols = ["CHROM", "POS", "ALT", "REF"]
+    f_lf = pl.LazyFrame = (
+        pl.scan_csv(
+            format_fields,
+            separator="\t",
+            null_values=["NA", "."],
+            infer_schema_length=None,
+        )
+        .filter(pl.col("sample") == sample)
+        .join(lf, on=join_cols, how="right")
+        .with_columns(cs.ends_with("_AF").mean().alias("VAF"))
+    )
+    format_cols = f_lf.collect_schema().columns()
+    ad_cols = [col for col in format_cols if col.endswith("_AD")]
+    f_lf = f_lf.with_columns(get_vcf_nth(col, 1) for col in ad_cols).with_columns(
+        cs.ends_with("_AD").mean().alias("Alt_depth"),
+    )
+    lf = (
+        lf.join(f_lf, how="left", on=join_cols)
+        .concat_str(["CHROM", "POS"], separator=":")
+        .alias("Loc"),
     )
     if variant_class == "sv":
         rename: dict = Rename.sv
-        try:
-            df = df.drop("VAF")
-        except:
-            pass
     else:
         rename: dict = Rename.snp
-    if df.is_empty():
+    if lf.collect().is_empty():
         return tuple([empty_table(rename.values())] * 3)
-    df = df.with_columns(
-        pl.concat_str([pl.col("Loc"), pl.col("Feature")], separator="|").alias("VAR_ID")
-    )
+    lf = lf
     if existing_variants:
-        df = df.filter(
+        lf = lf.filter(
             pl.col("Existing_variation")
             .str.split(";")
             .list.set_intersection(existing_variants)
@@ -531,31 +566,14 @@ def vep_fmt(
         )
     clinsig: str = Rename.snp["CLIN_SIG"]
     wanted_cols: list = list(rename.values())
-    df = df.drop("Gene").rename(rename)
+    lf = lf.drop("Gene").pipe(collapse_hgvs).rename(rename)
     if variant_class != "sv":
         for col, round_to, scale in zip(
             [rename["VAF"], rename["Alt_depth"]], [2, 0], [100, 1]
         ):
-            try:
-                df = df.with_columns(
-                    (pl.col(col).cast(pl.Float64) * scale).round(round_to)
-                )
-            except pl.exceptions.InvalidOperationError:
-                df = df.with_columns(
-                    pl.col(col).map_elements(
-                        lambda vaf: ",".join(
-                            list(
-                                map(
-                                    lambda y: str(np.round(float(y) * scale, round_to)),
-                                    vaf.split(","),
-                                )
-                            )
-                        ),
-                        return_dtype=pl.String,
-                    )
-                )
-    df = (
-        df.with_columns(pl.col("HGVS").str.extract(r".*:(.*)$", 1))
+            lf = lf.with_columns((pl.col(col).cast(pl.Float64) * scale).round(round_to))
+    lf = (
+        lf.with_columns(pl.col("HGVS").str.extract(r".*:(.*)$", 1))
         .pipe(lambda x: str_split_unique(x, "Variant Type", ";", ";", format_var_type))
         .with_columns(
             cs.by_dtype(pl.String)
@@ -573,20 +591,25 @@ def vep_fmt(
         .fill_null("-")
     )
     if variant_class != "sv":
-        df = df.filter(
+        lf = lf.filter(
             ~str_split_contains(clinsig, ["benign", "likely benign"], separator=";")
         )
-    if not df.is_empty():
-        df = pl.concat(
+    if not lf.is_empty():
+        lf = pl.concat(
             [
                 sort_clinsig(d, clinsig_col=clinsig, separator=";")
-                for d in df.partition_by("impact_score", maintain_order=True)
+                for d in lf.partition_by("impact_score", maintain_order=True)
             ],
             how="vertical_relaxed",
         )
-        df = df.with_columns(cs.by_dtype(pl.String).str.replace_all(";", ", "))
-        relevant = df.filter(pl.col(clinsig).str.contains("pathogenic"))
-        nonrelevant = df.filter(~pl.col("VAR_ID").is_in(relevant["VAR_ID"]))
+        df = lf.with_columns(
+            cs.by_dtype(pl.String).str.replace_all(";", ", ")
+        ).collect()
+        relevant_mask = df[clinsig].str.contains("pathogenic") | df["HGVS"].is_in(
+            significant_hgvs
+        )
+        relevant = df.filter(relevant_mask)
+        nonrelevant = df.filter(~relevant_mask)
         if variant_class != "sv":
             nonrelevant = filter_multiallelic(
                 nonrelevant,
@@ -596,7 +619,7 @@ def vep_fmt(
             )
             if mavedb:
                 nonrelevant = fmt_mavedb(nonrelevant, mavedb)
-        return df, relevant.select(wanted_cols), nonrelevant.select(wanted_cols)
+        return lf, relevant.select(wanted_cols), nonrelevant.select(wanted_cols)
     return tuple([empty_table(rename.values())] * 3)
 
 
