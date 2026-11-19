@@ -301,8 +301,12 @@ def _make_sarek_manifest(config: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
                     file = joint_germline
                     sample_dir = "joint_variant_calling"
                 annotated: str | None = obj.vep(file, sample_dir)
-                tool_outs[caller].append(file)
-                tool_outs[f"vep_{caller}"].append(annotated)
+                if file and Path(file).exists():
+                    tool_outs[caller].append(file)
+                    tool_outs[f"vep_{caller}"].append(annotated)
+                else:
+                    tool_outs[caller].append(None)
+                    tool_outs[f"vep_{caller}"].append(None)
 
             if not added_preprocessed:
                 tumor_recal, normal_recal = (
