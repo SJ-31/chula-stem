@@ -228,7 +228,7 @@ def gen_report_paths(sample) -> dict[str, Path | None]:
         / "Activities"
         / "Assignment_Solution_Activities.txt",
     }
-    return {k: v for k, v in paths.items() if v is None or v.exists()}
+    return {k: None if (v is None or not v.exists()) else v for k, v in paths.items()}
 
 
 def test_report():

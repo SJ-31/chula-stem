@@ -1,6 +1,7 @@
 #!/usr/bin/env ipython
 
 import os
+from pathlib import Path
 
 import pytest
 from pyhere import here
@@ -53,22 +54,54 @@ def test_database_empty(tmp_path):
         assert set(dummies) == genes
 
 
-mdb = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
+def test_update_db(tmp_path):
+    db = here("tests", "sarek_plus_out", "gene_cache.db")
+    os.environ["OPEN_TARGETS_DUMP"] = "./data/ot"
+    import polars as pl
+    from click.testing import CliRunner
 
-val = (
-    mdb.gene_score_set("CCR5").head(500)
-    # .select(
-    #     [
-    #         "scores.score",
-    #         "accession",
-    #         "title",
-    #         "targetGenes.HGNC",
-    #         "classification",
-    #         "hgvs.p",
-    #     ]
-    # )
-)
+    tmp_genes: Path = tmp_path / "genes1.txt"
+    tmp_genes.write_text("\n".join(["KRAS", "EGFR", "BRCA"]))
+    tmp_df = pl.DataFrame({"SYMBOL": ["TP53", "RET", "MET"], "AD": ["9", "2", "10"]})
+    tmp_df.write_csv(tmp_path / "foobar.csv")
 
-from great_tables import GT, html, md
+    runner = CliRunner()
+    runner.invoke(
+        update_gene_cache,
+        [
+            "-i",
+            str(tmp_genes),
+            "-i",
+            str(tmp_path / "foobar.csv"),
+            "-d",
+            "open_targets",
+            "-d",
+            "civic",
+            "-t",
+            "-e",
+            str(db),
+            "-c",
+            "SYMBOL",
+        ],
+    )
+
+
+# mdb = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
+
+# val = (
+#     mdb.gene_score_set("CCR5").head(500)
+#     # .select(
+#     #     [
+#     #         "scores.score",
+#     #         "accession",
+#     #         "title",
+#     #         "targetGenes.HGNC",
+#     #         "classification",
+#     #         "hgvs.p",
+#     #     ]
+#     # )
+# )
+
+# from great_tables import GT, html, md
 
 # tab = GT(val).
