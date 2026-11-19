@@ -24,6 +24,9 @@ Implemented databases [2026-10-24 Sat]
 - OpenTargets
 - CiVIC
 
+A path to the pre-downloaded OpenTargets data dump can be specified with
+the `OPEN_TARGETS_DUMP` environment variable
+
 NOTE: The OpenTargets and CiVIC databases are organized differently —
 the former uses gene-therapy associations, while the latter uses
 gene-literature source (nested within variant aliases)
@@ -40,7 +43,6 @@ def get_therapy_df(
     filter_confident=False,
     attempt_failed=True,
     lookup: bool = False,
-    db_kws: dict | None = None,
 ) -> pl.DataFrame:
     """Get therapeutic information
 
@@ -56,11 +58,8 @@ def get_therapy_df(
     - "db": Database name
     - "db_link": link to page of association in database
     """
-    db_kws = db_kws or {}
     db_mapping = {"civic": Civic, "open_targets": OpenTargets}
-    therapy_dbs: list[TherapyDB] = [
-        db_mapping[db](cache=cache, **db_kws.get(db, {})) for db in dbs
-    ]
+    therapy_dbs: list[TherapyDB] = [db_mapping[db](cache) for db in dbs]
     temp: list[pl.DataFrame] = []
     genes_copy: set = copy.copy(genes)
     if not attempt_failed and not_in_db_file and os.path.exists(not_in_db_file):
@@ -485,9 +484,10 @@ class OpenTargets(TherapyDB):
         "db": "VARCHAR",
     }
 
-    def __init__(self, cache, data_dir: Path | str | None = None) -> None:
+    def __init__(self, cache) -> None:
         """
         Parameters
+        ----------
         data_dir : Path | str | None
             Optional path to directory containing pre-downloaded
             Open Targets data.
@@ -495,9 +495,11 @@ class OpenTargets(TherapyDB):
             `clinical_target` and `clinical_report`
         """
         self.db: duckdb.DuckDBPyConnection = duckdb.connect(cache)
-        self.data_dir: Path | None = (
-            Path(data_dir) if isinstance(data_dir, str) else data_dir
-        )
+        if (ot_dir := os.environ.get("OPEN_TARGETS_DUMP")) and Path(ot_dir).exists():
+            print(f"INFO: Open Targets directory set to {ot_dir} from env")
+            self.data_dir: Path | None = Path(ot_dir)
+        else:
+            self.data_dir = None
 
     @staticmethod
     def filter_format_diseases(df: pl.DataFrame) -> pl.DataFrame:
@@ -528,42 +530,35 @@ class OpenTargets(TherapyDB):
 
         https://platform.opentargets.org/downloads
         """
-        if self.data_dir is None:
+        ftp_str = "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output"
+        data_dir = self.data_dir
+        if data_dir is None:
             tmpdir = TemporaryDirectory()
             data_dir = Path(tmpdir.name)
-            cmd_args = [
-                "wget",
-                "--recursive",
-                "--no-parent",
-                "--no-host-directories",
-                "--cut-dirs",
-                "6",
-                "-P",
-                tmpdir.name,
-            ]
-            _ = run(
-                " ".join(
-                    cmd_args
-                    + [
-                        "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_report"
-                    ]
-                ),
-                shell=True,
-                check=True,
-            )
-            _ = run(
-                " ".join(
-                    cmd_args
-                    + [
-                        "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output/clinical_target"
-                    ]
-                ),
-                shell=True,
-                check=True,
-            )
         else:
-            data_dir = self.data_dir
             tmpdir = None
+        cmd_args = [
+            "wget",
+            "--recursive",
+            "--no-parent",
+            "--no-host-directories",
+            "--cut-dirs",
+            "6",
+            "-P",
+            str(data_dir),
+        ]
+        if not (data_dir / "clinical_report").exists():
+            _ = run(
+                " ".join(cmd_args + [f"{ftp_str}/clinical_report"]),
+                shell=True,
+                check=True,
+            )
+        if not (data_dir / "clinical_target").exists():
+            _ = run(
+                " ".join(cmd_args + [f"{ftp_str}/clinical_target"]),
+                shell=True,
+                check=True,
+            )
         print("DATA exists", data_dir.exists())
         print(list((data_dir / "clinical_target").iterdir()))
         report = duckdb.read_parquet(f"{data_dir}/clinical_report/*.parquet")

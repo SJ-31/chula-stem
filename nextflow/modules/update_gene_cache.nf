@@ -14,8 +14,10 @@ process UPDATE_GENE_CACHE {
     
     script:
     input_str = vcfs.collect { v -> "-i ${v}" }.join(" ")
-    filter_str = "--filter-confident" ? filter_confident : ""
+    filter_str = filter_confident ? "--filter-confident" : ""
+    open_targets_str = open_targets ? "export OPEN_TARGETS_DUMP=${open_targets}" : ""
     """
+    ${open_targets_str}
     update_gene_cache ${input_str} ${filter_str} \\
         -c ${gene_column} \\
         -d open_targets -d civic \\
