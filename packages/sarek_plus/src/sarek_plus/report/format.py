@@ -10,6 +10,7 @@ from __future__ import annotations
 #       these fns will add relevant links
 import re
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import ClassVar, Literal
 
@@ -491,7 +492,7 @@ def get_vcf_nth(col: str, n: int, cast_to: pl.DataType = pl.Int64) -> pl.Expr:
 
 
 def collapse_hgvs(
-    df: pl.DataFrame,
+    df: pl.DataFrame | pl.LazyFrame,
     hgvsp: str = "HGVSp",
     hgvsc: str = "HGVSc",
     hgvsg: str = "HGVSg",
@@ -502,7 +503,12 @@ def collapse_hgvs(
     When available, protein-level and transcript-level identifiers are preferred over
     genomic
     """
-    ordering = [o for o in [hgvsp, hgvsc, hgvsg] if o in df.columns]
+    if isinstance(df, pl.DataFrame):
+        ordering = [o for o in [hgvsp, hgvsc, hgvsg] if o in df.columns]
+    else:
+        ordering = [
+            o for o in [hgvsp, hgvsc, hgvsg] if o in df.collect_schema().names()
+        ]
     if not ordering:
         print("WARNING: no HGVS columns are in `df`")
         return df.with_columns(pl.lit(None).alias(col_added).cast(pl.String))
