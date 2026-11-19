@@ -19,6 +19,7 @@ process UPDATE_GENE_CACHE {
     """
     ${open_targets_str}
     update_gene_cache ${input_str} ${filter_str} \\
+        -e ${cache_file} \\
         -c ${gene_column} \\
         -d open_targets -d civic \\
         --not-in-db failed_lookups.txt

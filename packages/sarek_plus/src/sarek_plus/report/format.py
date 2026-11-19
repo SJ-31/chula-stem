@@ -502,7 +502,7 @@ def collapse_hgvs(
     When available, protein-level and transcript-level identifiers are preferred over
     genomic
     """
-    ordering = [o for o in [hgvsp, hgvsc, hgvsg] if o in df.columns()]
+    ordering = [o for o in [hgvsp, hgvsc, hgvsg] if o in df.columns]
     if not ordering:
         print("WARNING: no HGVS columns are in `df`")
         return df.with_columns(pl.lit(None).alias(col_added).cast(pl.String))

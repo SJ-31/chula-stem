@@ -45,62 +45,6 @@ def default_shapes(canvas, doc: BaseDocTemplate):
 
 
 @pytest.mark.skip(reason="Done")
-def test_full(front_page_only=False):
-    from sarek_plus.report.variant_calling_report import VariantCallingReport
-
-    meta = {
-        "patient_name": "John Doe",
-        "gender": "Male",
-        "patient_birthdate": "1990-05-14",
-        "physician": "Dr. Alice Smith",
-        "diagnosis": "Hypertension",
-        "hospital": "Green Valley Medical Center",
-        "id": "SMP-123456",
-        "collection_date": "2024-12-01",
-        "sample_type": "Blood",
-    }
-    R = VariantCallingReport(
-        "/home/shannc/Bio_SDD/chula-stem/tests/report_full.pdf",
-        metadata=meta,
-        vep_small=small_path,
-        vep_sv=sv_pat,
-        classify_cnv="/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
-        msisensor_pro="/home/shannc/Bio_SDD/chula-stem/tests/msisensor/4-null-CR.tsv",
-        sigprofiler="/home/shannc/Bio_SDD/chula-stem/tests/6-null-SigProfilerAssignment/Activities/Assignment_Solution_Activities.txt",
-        cosmic_signatures="/home/shannc/Bio_SDD/chula-stem/nextflow/config/cosmic_signatures_v3.4-2024-12-26.csv",
-        tmpdir="/home/shannc/Bio_SDD/chula-stem/tests/report_tmp",
-    )
-    if front_page_only:
-        R.build_front_page()
-    else:
-        R.build()
-        R.merge()
-
-
-@pytest.mark.skip(reason="Done")
-def test_front_page():
-    test_full(True)
-
-
-spec: list = [
-    {
-        "file": "/home/shannc/Bio_SDD/chula-stem/tests/classify_cnv/4-classify_cnv-CR.tsv",
-        "is_list": True,
-        "is_list_separator": ",",
-        "column": "All protein coding genes",
-    },
-    {
-        "file": "/home/shannc/Bio_SDD/chula-stem/tests/msisensor/5-P1-Msisensor_unstable.tsv",
-        "column": "gene_name",
-    },
-    {
-        "file": "/home/shannc/Bio_SDD/chula-stem/tests/vep/sv.tsv",
-        "column": "SYMBOL",
-    },
-]
-
-
-@pytest.mark.skip(reason="Done")
 def test_read_json():
     path = "/home/shannc/Bio_SDD/chula-stem/tests/report_params.json"
     entry_point.callback(
@@ -240,6 +184,8 @@ def test_report():
     paths = gen_report_paths(sample)
     report = VariantCallingReport(
         filename=outfile,
+        sample_somatic=f"{sample}-tumor",
+        sample_normal=f"{sample}-normal",
         other_text={
             "title": "Test WES",
             "disclaimer": "DISCLAIMER",

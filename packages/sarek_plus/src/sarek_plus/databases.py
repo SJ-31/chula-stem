@@ -549,7 +549,7 @@ class OpenTargets(TherapyDB):
                 continue
             if not (self.data_dir / subdir).exists():
                 _ = run(
-                    " ".join(cmd_args + [f"{ftp_str}/clinical_report"]),
+                    " ".join(cmd_args + [f"{ftp_str}/{subdir}"]),
                     shell=True,
                     check=True,
                 )

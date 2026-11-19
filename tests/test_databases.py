@@ -61,8 +61,9 @@ def test_update_db(tmp_path):
     from click.testing import CliRunner
 
     tmp_genes: Path = tmp_path / "genes1.txt"
-    tmp_genes.write_text("\n".join(["KRAS", "EGFR", "BRCA"]))
-    tmp_df = pl.DataFrame({"SYMBOL": ["TP53", "RET", "MET"], "AD": ["9", "2", "10"]})
+    genes = ["KRAS", "EGFR", "BRCA", "TP53", "RET", "MET"]
+    tmp_genes.write_text("\n".join(genes[:3]))
+    tmp_df = pl.DataFrame({"SYMBOL": genes[3:], "AD": ["9", "2", "10"]})
     tmp_df.write_csv(tmp_path / "foobar.csv")
 
     runner = CliRunner()
@@ -84,6 +85,10 @@ def test_update_db(tmp_path):
             "SYMBOL",
         ],
     )
+    lookup = get_therapy_df(
+        set(genes), cache=db, dbs=["open_targets", "civic"], lookup=False
+    )
+    print(lookup)
 
 
 # mdb = MaveDB("/home/shannc/Downloads/mavedb-dump.2026062418131")
