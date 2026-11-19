@@ -25,7 +25,7 @@ process MERGE_CLASSIFY_CNV {
     script:
     //
     input_str = caller2cnv_file.entrySet().collect { e -> "-i ${e.key}:${e.value}" }.join(" ")
-    tsv = "${id}_ClassifyCNV.tsv"
+    tsv = "${id}-ClassifyCNV.tsv"
     concordant = "${id}-CNV_concordant.csv"
     discordant = "${id}-CNV_discordant.csv"
     intermediate = "${id}_intermediate"

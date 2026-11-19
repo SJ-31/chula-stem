@@ -213,6 +213,7 @@ workflow {
     vep_tsvs = vep_tsvs
     sarek_out = sarek_out
     mutational_signatures = mutational_signatures
+    merged_cnvs = merged_cnvs
 }
 
 output {
@@ -220,14 +221,19 @@ output {
         path { v -> v.dir >> "sigprofilerassignment/${v.id}/${v.dir.name}" 
         }
     }
-    
+    merged_cnvs {
+        path { v ->
+            v.classified >> "merged_cnvs/${v.id}/${v.classified.name}"
+            v.concordant >> "merged_cnvs/${v.id}/${v.concordant.name}"
+            v.discordant >> "merged_cnvs/${v.id}/${v.discordant.name}"
+        }
+    }
     sarek_out {
         path { v ->
             v.tool_outs >> v.tool_outs.name
             v.preprocessed >> v.preprocessed.name
         }
     }
-
     optitype {
         path { v ->
             v.optitype_csv >> "optitype/${v.id}/${v.optitype_csv.name}"

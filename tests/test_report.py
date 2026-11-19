@@ -164,7 +164,10 @@ def gen_report_paths(sample) -> dict[str, Path | None]:
         / sample
         / f"{sample}-sv_concat.tsv",
         "cosmic_signatures": here("resources", "cosmic_signatures_v3.6-2026-11-19.csv"),
-        "classify_cnv": None,  # TODO
+        "classify_cnv": sarek_plus
+        / "merged_cnvs"
+        / sample
+        / f"{sample}-ClassifyCNV.tsv",
         "sigprofiler": sarek_plus
         / "sigprofilerassignment"
         / sample
