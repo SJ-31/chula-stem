@@ -531,12 +531,7 @@ class OpenTargets(TherapyDB):
         https://platform.opentargets.org/downloads
         """
         ftp_str = "ftp://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output"
-        data_dir = self.data_dir
-        if data_dir is None:
-            tmpdir = TemporaryDirectory()
-            data_dir = Path(tmpdir.name)
-        else:
-            tmpdir = None
+        url = "https://ftp.ebi.ac.uk/pub/databases/opentargets/platform/26.09/output"
         cmd_args = [
             "wget",
             "--recursive",
@@ -545,29 +540,21 @@ class OpenTargets(TherapyDB):
             "--cut-dirs",
             "6",
             "-P",
-            str(data_dir),
+            str(self.data_dir),
         ]
-        if not (data_dir / "clinical_report").exists():
-            _ = run(
-                " ".join(cmd_args + [f"{ftp_str}/clinical_report"]),
-                shell=True,
-                check=True,
-            )
-        if not (data_dir / "clinical_target").exists():
-            _ = run(
-                " ".join(cmd_args + [f"{ftp_str}/clinical_target"]),
-                shell=True,
-                check=True,
-            )
-        print("DATA exists", data_dir.exists())
-        print(list((data_dir / "clinical_target").iterdir()))
-        report = duckdb.read_parquet(f"{data_dir}/clinical_report/*.parquet")
-        print("DATA exists", data_dir.exists())
-        print(list((data_dir / "clinical_target").iterdir()))
-        target = duckdb.read_parquet(f"{data_dir}/clinical_target/*.parquet")
-        if tmpdir is not None:
-            tmpdir.cleanup()
-        return report, target
+        data = {}
+        for subdir in ("clinical_report", "clinical_target"):
+            if not self.data_dir:
+                data[subdir] = duckdb.read_parquet(f"{url}/{subdir}/*.parquet")
+                continue
+            if not (self.data_dir / subdir).exists():
+                _ = run(
+                    " ".join(cmd_args + [f"{ftp_str}/clinical_report"]),
+                    shell=True,
+                    check=True,
+                )
+            data[subdir] = duckdb.read_parquet(f"{self.data_dir}/{subdir}/*.parquet")
+        return data["clinical_report"], data["clinical_target"]
 
     def get_genes_batched(self, genes: set, confident: bool = True) -> pl.DataFrame:
         report, target = self.get_data()
