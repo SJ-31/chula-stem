@@ -192,10 +192,10 @@ def test_combine_cnv():
     print(d)
 
 
-def gen_report_paths(sample) -> dict[str, Path]:
+def gen_report_paths(sample) -> dict[str, Path | None]:
     sarek_plus = here("output", "nf-work", "sarek_plus_test", "out")
     sarek = here("output", "sarek_pdac_test")
-    paths: dict[str, Path] = {
+    paths: dict[str, Path | None] = {
         "optitype": sarek_plus / "optitype" / sample / f"{sample}-optitype_result.tsv",
         "therapy_data_cache": sarek_plus / "gene_data.db",
         "vep_small_somatic": sarek_plus
@@ -219,11 +219,16 @@ def gen_report_paths(sample) -> dict[str, Path]:
         / "annotation"
         / sample
         / f"{sample}-sv_concat.tsv",
-        "cosmic_signatures": "TODO",
-        "classify_cnv": "TODO",
-        "sigprofiler": "TODO",
+        "cosmic_signatures": here("resources", "cosmic_signatures_v3.6-2026-11-19.csv"),
+        "classify_cnv": None,  # TODO
+        "sigprofiler": sarek_plus
+        / "sigprofilerassignment"
+        / sample
+        / f"{sample}-SigProfilerAssignment"
+        / "Activities"
+        / "Assignment_Solution_Activities.txt",
     }
-    return {k: v for k, v in paths.items() if v.exists()}
+    return {k: v for k, v in paths.items() if v is not None or v.exists()}
 
 
 def test_report():

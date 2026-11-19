@@ -1,3 +1,5 @@
+# TODO: use this as the template for running sarek. Document
+# it somewhere
 input: "/data/home/shannc/chula-stem/nextflow/input/manifests/sarek_test.csv"
 outdir: "/data/home/shannc/chula-stem/output/sarek_pdac_test"
 snpeff_cache: "/data/project/stemcell/cache/sarek/snpeff"
@@ -12,6 +14,8 @@ save_output_as_bam: true
 snv_consensus_calling: true
 concatenate_vcfs: true
 consensus_min_count: 2
+vep_include_fasta: true
+vep_custom_args: "--everything --filter_common --per_gene --total_length --offline --format vcf --hgvsg"
 intervals: "/data/project/stemcell/shannc/reference/exome_kits/MGI_V5/MGI_Exome_Capture_V5_lifted.bed"
 genome: "GATK.GRCh38"
 ascat_genome: hg38
