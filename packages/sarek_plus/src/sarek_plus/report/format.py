@@ -472,6 +472,17 @@ def classify_cnv_fmt(
     return with_cn, relevant, nonrelevant
 
 
+def optitype_fmt(path: str) -> tuple[dict, list]:
+    df = pl.read_csv(path, separator="\t")
+    res = {"Reads": df["Reads"][0], "Objective": df["Objective"][0]}
+    df = df.drop(df.columns[0], *res.keys()).unpivot(
+        variable_name="Allele", value_name="Call"
+    )
+    rows = [[r["Allele"], r["Call"]] for r in df.iter_rows(named=True)]
+    rows.insert(0, df.columns)
+    return res, rows
+
+
 def format_var_type(var: str) -> str:
     to_remove = ["_variant$"]
     for pat in to_remove:

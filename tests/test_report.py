@@ -142,6 +142,16 @@ def gen_report_paths(sample) -> dict[str, Path | None]:
     paths: dict[str, Path | None] = {
         "optitype": sarek_plus / "optitype" / sample / f"{sample}-optitype_result.tsv",
         "therapy_data_cache": sarek_plus / "gene_data.db",
+        "freec_purity": sarek
+        / "variant_calling"
+        / "controlfreec"
+        / f"{sample}-tumor_vs_{sample}-normal"
+        / f"{sample}-tumor_vs_{sample}-normal.tumor.mpileup.gz_info.txt",
+        "ascat_purity": sarek
+        / "variant_calling"
+        / "ascat"
+        / f"{sample}-tumor_vs_{sample}-normal"
+        / f"{sample}-tumor_vs_{sample}-normal.purityploidy.txt",
         "vep_small_somatic": sarek_plus
         / "annotation"
         / sample
