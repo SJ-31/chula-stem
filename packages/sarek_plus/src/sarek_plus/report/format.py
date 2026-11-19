@@ -518,8 +518,8 @@ def collapse_hgvs(
 def vep_fmt(
     vep_path: Path,
     variant_class: Literal["sv", "small"],
-    sample: str,
     format_fields: Path,
+    sample: str | None = None,
     existing_variants: list[str] | None = None,
     mavedb: MaveDB | None = None,
     significant_hgvs: set | None = None,
@@ -534,34 +534,41 @@ def vep_fmt(
         vep_path, separator="\t", null_values=["NA", "."], infer_schema_length=None
     )
     join_cols = ["CHROM", "POS", "ALT", "REF"]
-    f_lf = pl.LazyFrame = (
-        pl.scan_csv(
-            format_fields,
-            separator="\t",
-            null_values=["NA", "."],
-            infer_schema_length=None,
-        )
-        .filter(pl.col("sample") == sample)
-        .join(lf, on=join_cols, how="right")
-        .with_columns(cs.ends_with("_AF").mean().alias("VAF"))
-    )
-    format_cols = f_lf.collect_schema().columns()
-    ad_cols = [col for col in format_cols if col.endswith("_AD")]
-    f_lf = f_lf.with_columns(get_vcf_nth(col, 1) for col in ad_cols).with_columns(
-        cs.ends_with("_AD").mean().alias("Alt_depth"),
-    )
-    lf = (
-        lf.join(f_lf, how="left", on=join_cols)
-        .concat_str(["CHROM", "POS"], separator=":")
-        .alias("Loc"),
-    )
+    f_lf = pl.LazyFrame = pl.scan_csv(
+        format_fields,
+        separator="\t",
+        null_values=["NA", "."],
+        infer_schema_length=None,
+    ).join(lf.select(join_cols), on=join_cols, how="right")
+    format_cols = f_lf.collect_schema().names()
     if variant_class == "sv":
-        rename: dict = Rename.sv
+        rename: dict = deepcopy(Rename.sv)
     else:
-        rename: dict = Rename.snp
+        rename: dict = deepcopy(Rename.snp)
+    if "sample" in format_cols and sample:
+        f_lf = f_lf.filter(pl.col("sample") == sample)
+    ad_cols = [col for col in format_cols if col.endswith("_AD")]
+    af_cols = [col for col in format_cols if col.endswith("_AF")]
+    if ad_cols:
+        f_lf = f_lf.with_columns(
+            get_vcf_nth(col, 1).alias(col) for col in ad_cols
+        ).with_columns(
+            pl.mean_horizontal(ad_cols).alias("Alt_depth"),
+        )
+    else:
+        f_lf = f_lf.with_columns(pl.lit(None).alias("Alt_depth"))
+    if af_cols:
+        f_lf = f_lf.with_columns(pl.mean_horizontal(af_cols).alias("VAF"))
+    else:
+        f_lf = f_lf.with_columns(pl.lit(None).alias("VAF"))
+
+    lf = lf.join(
+        f_lf.select(join_cols + ["Alt_depth", "VAF"]), how="left", on=join_cols
+    ).with_columns(
+        pl.concat_str(["CHROM", "POS"], separator=":").alias("Loc"),
+    )
     if lf.collect().is_empty():
         return tuple([empty_table(rename.values())] * 3)
-    lf = lf
     if existing_variants:
         lf = lf.filter(
             pl.col("Existing_variation")
@@ -573,11 +580,10 @@ def vep_fmt(
     clinsig: str = Rename.snp["CLIN_SIG"]
     wanted_cols: list = list(rename.values())
     lf = lf.drop("Gene").pipe(collapse_hgvs).rename(rename)
-    if variant_class != "sv":
-        for col, round_to, scale in zip(
-            [rename["VAF"], rename["Alt_depth"]], [2, 0], [100, 1]
-        ):
-            lf = lf.with_columns((pl.col(col).cast(pl.Float64) * scale).round(round_to))
+    if variant_class != "sv" and ad_cols:
+        lf = lf.with_columns(pl.col(rename["Alt_depth"]).cast(pl.Float64).round(0))
+    if variant_class != "sv" and af_cols:
+        lf = lf.with_columns((pl.col(rename["VAF"]).cast(pl.Float64) * 100).round(2))
     lf = (
         lf.with_columns(pl.col("HGVS").str.extract(r".*:(.*)$", 1))
         .pipe(lambda x: str_split_unique(x, "Variant Type", ";", ";", format_var_type))
@@ -600,31 +606,28 @@ def vep_fmt(
         lf = lf.filter(
             ~str_split_contains(clinsig, ["benign", "likely benign"], separator=";")
         )
-    if not lf.is_empty():
-        lf = pl.concat(
+    if not lf.collect().is_empty():
+        df: pl.DataFrame = pl.concat(
             [
                 sort_clinsig(d, clinsig_col=clinsig, separator=";")
-                for d in lf.partition_by("impact_score", maintain_order=True)
+                for d in lf.collect().partition_by("impact_score", maintain_order=True)
             ],
             how="vertical_relaxed",
-        )
-        df = lf.with_columns(
-            cs.by_dtype(pl.String).str.replace_all(";", ", ")
-        ).collect()
+        ).with_columns(cs.by_dtype(pl.String).str.replace_all(";", ", "))
         relevant_mask = df[clinsig].str.contains("pathogenic") | df["HGVS"].is_in(
             significant_hgvs
         )
         relevant = df.filter(relevant_mask)
         nonrelevant = df.filter(~relevant_mask)
-        if variant_class != "sv":
-            nonrelevant = filter_multiallelic(
-                nonrelevant,
-                rename["VAF"],
-                lambda x: all(list(map(lambda vaf: float(vaf) >= 0.6, x))),
-                separator=",",
-            )
-            if mavedb:
-                nonrelevant = fmt_mavedb(nonrelevant, mavedb)
+        # if variant_class != "sv":
+        #     nonrelevant = filter_multiallelic(
+        #         nonrelevant,
+        #         rename["VAF"],
+        #         lambda x: all(list(map(lambda vaf: float(vaf) >= 0.6, x))),
+        #         separator=",",
+        #     )
+        # if mavedb:
+        #     nonrelevant = fmt_mavedb(nonrelevant, mavedb)
         return lf, relevant.select(wanted_cols), nonrelevant.select(wanted_cols)
     return tuple([empty_table(rename.values())] * 3)
 
@@ -702,8 +705,8 @@ def sort_clinsig(
         )
     else:
 
-        def find_max(terms: list[str]) -> int:
-            if not terms:
+        def find_max(terms: pl.Series) -> int:
+            if terms.is_empty():
                 return 0
             return max((map(lambda x: CLINSIG_MAP.get(x, 0), terms)))
 
