@@ -74,16 +74,16 @@ def get_therapy_df(
             temp.append(find_info)
         if not genes:
             break
+    all_found = pl.DataFrame(schema=TherapyDB.schema_shared())
     if temp:
         all_found: pl.DataFrame = pl.concat(temp, how="vertical_relaxed")
         not_in_db: set = genes_copy - set(all_found["gene"])
-        return all_found
     else:
         not_in_db = genes_copy
-    if not_in_db_file:
+    if not_in_db_file and not_in_db:
         with open(not_in_db_file, "a") as f:
             f.write("\n".join(not_in_db))
-    return pl.DataFrame(schema=TherapyDB.schema_shared())
+    return all_found
 
 
 def no_gene_df(gene: str) -> pl.DataFrame:

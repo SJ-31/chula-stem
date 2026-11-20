@@ -10,7 +10,7 @@ process UPDATE_GENE_CACHE {
     
 
     output:
-    record(cache: cache_file, failed_lookups: file("failed_lookups.txt"))
+    record(cache: cache_file, failed_lookups: file("failed_lookups.txt", optional: true))
     
     script:
     input_str = vcfs.collect { v -> "-i ${v}" }.join(" ")
